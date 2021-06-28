@@ -1,7 +1,7 @@
 # SV_simulator
 A simulator for complex structural variants
 
-![Alt text](/complex_sv_classes_diagram.webp)
+![Alt text](imgs/complex_sv_classes_diagram.webp)
 
 For the configuration file, use this key when labelling the structural variant:
 
