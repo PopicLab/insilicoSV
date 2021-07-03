@@ -8,6 +8,7 @@ class Error(Exception):
 class Formater():
     def __init__(self):
         self.bedpe_counter = 1
+        self.bedpe_counter_dif = 1
 
     def fasta_to_dict(self, filename):
         '''
@@ -45,8 +46,111 @@ class Formater():
                 var_ranges = [(variant["min_length"], variant["max_length"])]
             variant_list.append([variant["type"], variant["number"], var_ranges])
         return variant_list
+
+    def lcs(self, str1, str2, m, n):
+        # If there is a space (_) in str1 and str2, then simply find the lcs of before and after the _ and put them together
+        # The lcs MUST have all the _ in str1 and str2 as a space cannot be transformed
+        # str1 = source, str2 = target
+        # -> returns the longest common subsequence
+    
+        L = [[(0,"") for i in range(n + 1)]
+            for i in range(m + 1)]
+ 
+        # bottom-up approach
+        for i in range(m + 1):
+            for j in range(n + 1):
+                if (i == 0 or j == 0):
+                    L[i][j] = (0,"")
+                elif(str1[i - 1].upper() == str2[j - 1].upper()):
+                    L[i][j] = (L[i - 1][j - 1][0] + 1, L[i - 1][j - 1][1] + str2[j-1])
+                else:
+                    L[i][j] = max(L[i - 1][j],
+                                L[i][j - 1])
+    
+        # L[m][n] contains length of LCS
+        return L[m][n]
+    
     
     def export_to_bedpe(self, svs, ishomogeneous, id, bedfile, reset_file = True):
+        def write_to_file(sv, source_s, source_e, target_s, target_e, transform, ishomogeneous, letter, order = 0):
+            assert (letter != "_")
+
+            # do not write transformations of size 0
+            if source_e > source_s:
+                with open(bedfile, "a") as fout:
+                    row = [str(id),
+                            str(source_s),
+                            str(source_e + 1),
+                            str(id),
+                            str(target_s),
+                            str(target_e + 1),
+                            transform,
+                            str(source_e - source_s),
+                            str(int(ishomogeneous)) + "/1",
+                            sv.type.name,
+                            str(self.bedpe_counter),
+                            str(order)]
+
+                    fout.write("\t".join(row) + "\n")
+
+        if reset_file:
+            FastaFile.reset_file(bedfile)
+        
+        for x in range(len(svs)):
+            sv = svs[x]
+
+            source, target = sv.transformation
+            letter_pos = dict()
+            place = sv.start
+            for y in range(len(sv.lengths)):
+                letter_pos[source[y]] = (place, place + sv.lengths[y])
+                place += sv.lengths[y]
+
+            # longest common subsequence represents the letters that stay in place
+            # the goal here is to minimize the number of transformations to get from source to target
+            source, target = "".join(source), "".join(target)
+            same_place = self.lcs(source, target, len(source), len(target))[1]
+            #print(source, target, same_place)
+
+            # remove letters in source which do not remain in same place
+            index = 0
+            for sr_index in range(len(source)):
+                #print("Index: ", index)
+                if index >= len(same_place) or source[sr_index].upper() != same_place[index].upper():
+                    start, end = letter_pos[source[sr_index].upper()]
+                    write_to_file(sv, start, end, start, start, "DEL", ishomogeneous[x], source[sr_index])
+                else:
+                    index += 1
+            
+            # add letters from target not in same_place
+            index = 0
+            insert_point = sv.start
+            order = 0
+            for tr_index in range(len(target)):
+                if index >= len(same_place) or target[tr_index].upper() != same_place[index].upper():
+                    order += 1
+                    start, end = letter_pos[target[tr_index].upper()]
+                    write_to_file(sv, start, end, insert_point, insert_point, "DUP", ishomogeneous[x], target[tr_index], order)
+                    
+                    # Inversion applies in either case
+                    if target[tr_index].islower():
+                        write_to_file(sv, start, end, insert_point, insert_point, "INV", ishomogeneous[x], target[tr_index], order)
+            
+
+                elif target[tr_index].upper() == same_place[index].upper():
+                    insert_point = letter_pos[same_place[index].upper()][1]
+                    order = 0
+                    index += 1
+                
+                    # Inversion applies in either case
+                    if target[tr_index].islower():
+                        start, end = letter_pos[target[tr_index].upper()]
+                        write_to_file(sv, start, end, start, end, "INV", ishomogeneous[x], target[tr_index], order)
+            
+            self.bedpe_counter += 1
+
+
+    def export_to_bedpe_dif(self, svs, ishomogeneous, id, bedfile, reset_file = True):
         if reset_file:
             FastaFile.reset_file(bedfile)
         
@@ -66,13 +170,11 @@ class Formater():
                             str(sv.lengths[y]),
                             str(int(ishomogeneous[x])) + "/1",
                             sv.type.name,
-                            str(self.bedpe_counter)]
+                            str(self.bedpe_counter_dif)]
 
                     fout.write("\t".join(row) + "\n")
                     place += sv.lengths[y]
-                self.bedpe_counter += 1
-
-
+                self.bedpe_counter_dif += 1
 
     def export_to_bed12(self, svs, id, fasta_ref, fasta_out, bedfile, reset_file = True):
         if reset_file:
@@ -151,7 +253,7 @@ class FastaFile():
             while True:
                 count += 1
                 if count % 10**6 == 0:
-                    print("{} Count achieved".format(count))
+                    print("{} Count achieved".format(count), end = "\r")
                 c = fin.read(1)
                 #print("c: ", c)
                 if not c and len(store_var) == 0:    # we have reached the end of the file
@@ -250,7 +352,7 @@ class FastaFile():
 
             pos = -1
             id_variants.sort()
-            c = None
+            c = "F"
             for variant in id_variants:
                 if verbose:
                     print("Current Variant: ", variant)
@@ -265,7 +367,7 @@ class FastaFile():
                         pos += 1
                         if pos == variant[0]:
 
-                            if variant[0] == variant[1]:   # handles special case for insertion
+                            if variant[0] == variant[1]:   # handles special case for insertion when start position = end position, will write base at position start
                                 self.fout_export.write(c)
                                 print("Writing {} at position {}".format(c, pos))
 
@@ -282,7 +384,7 @@ class FastaFile():
                 print("============================")
             skip = True
             while c != ">" and c:    # you use <= to catch the newline after each chromosome
-                if not skip and c.isalpha():
+                if not skip and c.isalpha() and c != "F":
                     self.fout_export.write(c)
                     if verbose:
                         print("Writing {} at position {}".format(c,pos))
@@ -291,7 +393,9 @@ class FastaFile():
                 c = fin_export.read(1).upper()
                 if c.isalpha():
                     pos += 1
-            assert(pos == self.len_dict[id] - 1)
+            
+            if pos != self.len_dict[id] - 1:
+                raise Error("Pos {} does not match self.len_dict[id] - 1 value {}. Here is variants: {}.".format(pos, self.len_dict[id] - 1, variants))
             self.fout_export.write("\n")
         
         self.fout_export.close()
@@ -308,28 +412,31 @@ class FastaFile():
 
 
 if __name__ == "__main__":
+
     
     tracemalloc.start()
 
     x = 10
-    y = 15
-    filein = "reference/test.fna"
-    fileout1 = "reference/test1_out.fna"
-    fileout2 = "reference/test2_out.fna"
+    y = 10
+    filein = "debugging/inputs/test.fna"
+    fileout1 = "debugging/inputs/test1_tmp_out.fna"
+    fileout2 = "debugging/inputs/test2_tmp_out.fna"
     fasta = FastaFile(filein)
     print(fasta)
-    print(fasta.fetch(x,y))
+    print("Fetched: ", fasta.fetch(x,y))
 
-    print(fasta.fetch(x + 10,y + 10))
     #fasta.next()
     #print(fasta.fetch(80,85))
-    variants = {"Chromosome19": [[2,5,"TTTTTTTT"],[7,10, "AAAAAAAAAAAAAAA"], [15, 20, "TC"]]}
+    variants = {"Chromosome19": [[5,5,""]]}
+    FastaFile.reset_file(fileout1)
+    fasta.export_piece(variants, fileout1, 0, verbose = False)
+    '''variants = {"Chromosome19": [[2,5,"TTTTTTTT"],[7,10, "AAAAAAAAAAAAAAA"], [15, 20, "TC"]]}
     variants2 = {"Chromosome19": [[2,5,"UUUUUU"]], "Chromosome21": [[4,225,"AAA"]]}
     FastaFile.reset_file(fileout1)
     FastaFile.reset_file(fileout2)
     fasta.export_piece(variants, fileout1, 0, verbose = False)
     fasta.export_piece(variants2, fileout2, 1, verbose = False)
-    #fasta.close()
+    #fasta.close()'''
 
     current, peak = tracemalloc.get_traced_memory()
     print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")

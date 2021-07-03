@@ -4,6 +4,7 @@ from processing import Error, FastaFile, Formater
 import tracemalloc   # only for testing
 import sys
 from enum import Enum
+import time
 
 # only set for testing and development
 #random.seed(10)
@@ -63,9 +64,11 @@ sv_key = {Variant_Type.INS: [("A",), ("A",)],
             Variant_Type.dDUP_iDEL: [("A","_","B"), ("A","_","A")],
             Variant_Type.INS_iDEL: [("A","_","B"), ("_","A")],
             Variant_Type.dupINV: [("A","B"), ("A","b","a")],
-            Variant_Type.INVdup: [("A","B"), ("b'","a","B")],
+            Variant_Type.INVdup: [("A","B"), ("b","a","B")],
             Variant_Type.dDUP: [("A","_"), ("A","_","A")]}
 
+
+time_start = time.time()
 
 class Structural_Variant():
     def __init__(self, sv_type, lengths, ishomogeneous = None):
@@ -73,7 +76,9 @@ class Structural_Variant():
         sv_type: integer
         lengths: list containing tuple(s) (min_length, max_length)
         '''
+        
         self.type = Variant_Type(sv_type)
+        self.transformation = sv_key[self.type]
         self.lengths = []
         self.piece_des = bedpe_key[self.type]
         #self.ishomogeneous = ishomogeneous
@@ -182,12 +187,14 @@ class SV_Simulator():
 
         '''
 
+        global time_start
         print("Setting Up Simulator...")
         self.ref_file = ref_file
         self.ref_fasta = FastaFile(ref_file) 
         print("Length Dict: ", self.ref_fasta.len_dict)
         self.formater = Formater()
         svs = self.formater.yaml_to_var_list(par_file)
+        print("Paramter SVs: ", svs)
         random.shuffle(svs)     # now assume the SVs will be ordered in this way in the altered chromosome
 
         self.svs = []
@@ -197,8 +204,8 @@ class SV_Simulator():
         for sv in svs:
             for num in range(sv[1]):
                 self.svs.append(Structural_Variant(sv[0], sv[2]))
-                draw = random.randint(1,3)
-                if draw == 3:   # sv applies to both haplotypes
+                draw = random.randint(1,4)
+                if draw == 3 or draw == 4:   # sv applies to both haplotypes
                     self.svs1.append(1)
                     self.svs2.append(1)
                 elif draw == 2:
@@ -208,7 +215,8 @@ class SV_Simulator():
                     self.svs1.append(0)
                     self.svs2.append(1)
 
-        print("Finished Setting up Simulator")
+        print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
+        time_start = time.time()
 
     
     def __str__(self):
@@ -221,7 +229,7 @@ class SV_Simulator():
         bedfile_list: list (if it contains more than one element, export to the different bed files)
         initial_reset: boolean to indicate if output file should be overwritten (True) or appended to (False)
         '''
-
+        global time_start
         if initial_reset:
             FastaFile.reset_file(fasta1_out)
             FastaFile.reset_file(fasta2_out)
@@ -235,9 +243,14 @@ class SV_Simulator():
 
             # edit chromosome
             edits = self.rand_select_svs(self.svs, id, ref_fasta)
+            print("Finished edits in {} seconds\n".format(time.time() - time_start))
+            time_start = time.time()
 
             # move on to next chromosome id
             ref_fasta.next()
+
+            #print("SVS1: {}".format(self.svs1))
+            #print("SVS2: {}".format(self.svs2))
 
             for x in range(2):
                 bedfile = bedfile_list[0]
@@ -257,14 +270,16 @@ class SV_Simulator():
                 # export edited chromosomes to FASTA files
                 ref_fasta.export_piece({id: edits_x}, fasta_out, x, verbose = verbose)
 
-                print("ID {} altered and saved in fasta file {}".format(id, fasta_out))
+                print("ID {} altered and saved in fasta file {} in {} seconds\n".format(id, fasta_out, time.time() - time_start))
+                time_start = time.time()
 
             # export variant data to BED file
-            #print("SVS1: {}".format(self.svs1))
-            #print("SVS2: {}".format(self.svs2))
             ishomogeneous = [self.svs1[index] == 1 and self.svs2[index] == 1 for index in range(len(self.svs1))]
             self.formater.export_to_bedpe(self.svs, ishomogeneous, id, bedfile, reset_file = initial_reset)
             #self.formater.export_to_bed12(svs, id, self.ref_file, fasta_out, bedfile, reset_file = initial_reset)
+
+            print("Exported to bedpe in {} seconds\n".format(time.time() - time_start))
+            time_start = time.time()
 
             initial_reset = False
 
@@ -301,7 +316,7 @@ class SV_Simulator():
             curr_sv.start = curr_place
             curr_sv.end = curr_place + curr_sv.req_space
             curr_sv.len_edit = len(edit)
-            edit = "U" * curr_sv.len_edit    # ONLY FOR TESTING AND DEVELOPMENT
+            #edit = "U" * curr_sv.len_edit    # ONLY FOR TESTING AND DEVELOPMENT
             edited_pieces.append([curr_place, curr_place + curr_sv.req_space, edit])
 
             curr_place += curr_sv.req_space
@@ -345,15 +360,15 @@ class SV_Simulator():
 if __name__ == "__main__":
     tracemalloc.start()
 
-    fasta_in = "reference/test.fna"
-    yaml_in = "par.yaml"
+    fasta_in = "debugging/inputs/test.fna"
+    yaml_in = "par_test.yaml"
     #test_svs = [[12,[(30,100)]], [16,[(300,8000)]],[8,[(500,1000)]]]
-    fasta1_out = "reference/test1_out.fna"
-    fasta2_out = "reference/test2_out.fna"
-    bed_out = "reference/out.bed"
+    fasta1_out = "debugging/inputs/test1_out.fna"
+    fasta2_out = "debugging/inputs/test2_out.fna"
+    bed_out = "debugging/inputs/out.bed"
     sim = SV_Simulator(fasta_in, yaml_in)
     sim.export_variant_genome(fasta1_out, fasta2_out, [bed_out], verbose = False)
-    print("\n" + sim)
+    print("\n" + str(sim))
     #print(len(sim.svs1))
     #print(sim.svs1[5].__dict__)
 
