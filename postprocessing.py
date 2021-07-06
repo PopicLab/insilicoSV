@@ -31,7 +31,7 @@ def prepare_for_bwa(reads1, reads2, output_files, root = None):
     merge_fastq(reads1[0], reads1[1], output_files[0])
     merge_fastq(reads2[0], reads2[1], output_files[1])
 
-root = "debugging\\reads"
+root = "reads"
 reads1 = ["test1.bwa.read1.fastq", "test2.bwa.read1.fastq"]
 reads2 = ["test1.bwa.read2.fastq", "test2.bwa.read2.fastq"]
 output_files = ["test.read1.fastq", "test.read2.fastq"]

@@ -92,21 +92,18 @@ class Structural_Variant():
             self.lengths = tuple(self.lengths)
             self.req_space = sum(self.lengths)
 
-        elif len(lengths) == 1: # value given by user represents total length of variant
-            total_length = random.randint(lengths[0][0], lengths[0][1])
-            self.req_space = total_length
+        elif len(lengths) == 1: # value given by user represents length of each event within variant
             count = 0
             num_char = len(sv_key[self.type][0])
             for x in range(num_char):
-                if x == num_char - 1:
-                    self.lengths.append(total_length - count)
-                else:
-                    self.lengths.append(total_length // num_char)
-                    count += total_length // num_char
+                length = random.randint(lengths[0][0], lengths[0][1])
+                self.lengths.append(length)
+                count += length
+            
+            self.req_space = count
 
         else:
             raise ValueError("Lengths parameter expects at least one tuple")
-
     
     def __str__(self):
         return "SV Object with Type {} and Variant Lengths {}".format(self.type, self.lengths)
@@ -194,7 +191,6 @@ class SV_Simulator():
         print("Length Dict: ", self.ref_fasta.len_dict)
         self.formater = Formater()
         svs = self.formater.yaml_to_var_list(par_file)
-        print("Paramter SVs: ", svs)
         random.shuffle(svs)     # now assume the SVs will be ordered in this way in the altered chromosome
 
         self.svs = []

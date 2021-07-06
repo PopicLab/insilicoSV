@@ -46,12 +46,14 @@ class Formater():
                 var_ranges = [(variant["min_length"], variant["max_length"])]
             variant_list.append([variant["type"], variant["number"], var_ranges])
         return variant_list
-
-    def lcs(self, str1, str2, m, n):
+    
+    
+    def lcs(self, str1, str2):
         # If there is a space (_) in str1 and str2, then simply find the lcs of before and after the _ and put them together
         # The lcs MUST have all the _ in str1 and str2 as a space cannot be transformed
         # str1 = source, str2 = target
         # -> returns the longest common subsequence
+        m, n = len(str1), len(str2)
     
         L = [[(0,"") for i in range(n + 1)]
             for i in range(m + 1)]
@@ -69,6 +71,30 @@ class Formater():
     
         # L[m][n] contains length of LCS
         return L[m][n]
+
+    def find_lcs(self, str1, str2):
+        # If there is a _ in str1 and str2, it MUST belong in the lcs
+
+        loc1 = [-1]
+        loc1.extend([index for index in range(len(str1)) if str1[index] == "_"])
+        loc1.append(len(str1))
+
+        loc2 = [-1]
+        loc2.extend([index for index in range(len(str2)) if str2[index] == "_"])
+        loc2.append(len(str2))
+
+        if len(loc1) != len(loc2):
+            raise Error("Unequal number of _ across str1 and str2, str1: {}, str2: {}".format(str1, str2))
+        
+        common = ""
+        start = 0
+        for end in range(1, len(loc1)):
+            common += self.lcs(str1[loc1[start] + 1: loc1[end]], str2[loc2[start] + 1: loc2[end]])[1]
+            if end != len(loc1) - 1:
+                common += "_"
+            
+            start = end
+        return common
     
     
     def export_to_bedpe(self, svs, ishomogeneous, id, bedfile, reset_file = True):
@@ -109,7 +135,7 @@ class Formater():
             # longest common subsequence represents the letters that stay in place
             # the goal here is to minimize the number of transformations to get from source to target
             source, target = "".join(source), "".join(target)
-            same_place = self.lcs(source, target, len(source), len(target))[1]
+            same_place = self.find_lcs(source, target)
             #print(source, target, same_place)
 
             # remove letters in source which do not remain in same place
@@ -416,7 +442,14 @@ if __name__ == "__main__":
     
     tracemalloc.start()
 
-    x = 10
+    formater = Formater()
+
+    str1 = ""
+    str2 = "CDEFABJFD"
+    print(formater.find_lcs(str1, str2))
+    
+
+    '''x = 10
     y = 10
     filein = "debugging/inputs/test.fna"
     fileout1 = "debugging/inputs/test1_tmp_out.fna"
@@ -430,7 +463,7 @@ if __name__ == "__main__":
     variants = {"Chromosome19": [[5,5,""]]}
     FastaFile.reset_file(fileout1)
     fasta.export_piece(variants, fileout1, 0, verbose = False)
-    '''variants = {"Chromosome19": [[2,5,"TTTTTTTT"],[7,10, "AAAAAAAAAAAAAAA"], [15, 20, "TC"]]}
+    variants = {"Chromosome19": [[2,5,"TTTTTTTT"],[7,10, "AAAAAAAAAAAAAAA"], [15, 20, "TC"]]}
     variants2 = {"Chromosome19": [[2,5,"UUUUUU"]], "Chromosome21": [[4,225,"AAA"]]}
     FastaFile.reset_file(fileout1)
     FastaFile.reset_file(fileout2)
