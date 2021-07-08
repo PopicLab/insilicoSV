@@ -213,7 +213,6 @@ class SV_Simulator():
 
         print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
         time_start = time.time()
-
     
     def __str__(self):
         message = "SVs1: " + str([self.svs[x].type.name for x in range(len(self.svs1)) if self.svs1[x]]) + "\n"
@@ -355,18 +354,23 @@ class SV_Simulator():
 
 if __name__ == "__main__":
     tracemalloc.start()
+    print("System Arguments: ", sys.argv)
+    fasta_in = sys.argv[1]
+    yaml_in = sys.argv[2]
+    fasta1_out = sys.argv[3]
+    fasta2_out = sys.argv[4]
+    bed_out = sys.argv[5]
 
-    fasta_in = "debugging/inputs/test.fna"
-    yaml_in = "par_test.yaml"
+    '''fasta_in = "reference/inputs/ref_chr21.fna"
+    yaml_in = "reference/inputs/par.yaml"
     #test_svs = [[12,[(30,100)]], [16,[(300,8000)]],[8,[(500,1000)]]]
-    fasta1_out = "debugging/inputs/test1_out.fna"
-    fasta2_out = "debugging/inputs/test2_out.fna"
-    bed_out = "debugging/inputs/out.bed"
+    fasta1_out = "reference/inputs/chr21_out1.fna"
+    fasta2_out = "reference/inputs/chr21_out2.fna"
+    bed_out = "reference/inputs/out21.bed"'''
+    
     sim = SV_Simulator(fasta_in, yaml_in)
     sim.export_variant_genome(fasta1_out, fasta2_out, [bed_out], verbose = False)
     print("\n" + str(sim))
-    #print(len(sim.svs1))
-    #print(sim.svs1[5].__dict__)
 
     current, peak = tracemalloc.get_traced_memory()
     print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")

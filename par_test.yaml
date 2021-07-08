@@ -1,8 +1,4 @@
-- type: 14
+- type: 8
   number: 5
-  min_length:
-  - 10
-  - 0
-  max_length:
-  - 20
-  - 0
+  min_length: 1000
+  max_length: 1500
