@@ -1,6 +1,6 @@
 import yaml
 import sys
-import tracemalloc
+#import tracemalloc
 
 class Error(Exception):
     pass
@@ -428,7 +428,7 @@ class FastaFile():
 
     @staticmethod
     def reset_file(filename):
-        print("Overwritting File {}...".format(filename))
+        #print("Overwritting File {}...".format(filename))
         with open(filename, "w") as f_reset:
             f_reset.truncate()
 

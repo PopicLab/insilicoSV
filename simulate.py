@@ -1,7 +1,7 @@
 import random
 import numpy as np
 from processing import Error, FastaFile, Formater
-import tracemalloc   # only for testing
+#import tracemalloc   # only for testing
 import sys
 from enum import Enum
 import time
@@ -353,8 +353,7 @@ class SV_Simulator():
 
 
 if __name__ == "__main__":
-    tracemalloc.start()
-    print("System Arguments: ", sys.argv)
+    #tracemalloc.start()
     fasta_in = sys.argv[1]
     yaml_in = sys.argv[2]
     fasta1_out = sys.argv[3]
@@ -367,14 +366,14 @@ if __name__ == "__main__":
     fasta1_out = "reference/inputs/chr21_out1.fna"
     fasta2_out = "reference/inputs/chr21_out2.fna"
     bed_out = "reference/inputs/out21.bed"'''
-    
+
     sim = SV_Simulator(fasta_in, yaml_in)
     sim.export_variant_genome(fasta1_out, fasta2_out, [bed_out], verbose = False)
     print("\n" + str(sim))
 
-    current, peak = tracemalloc.get_traced_memory()
-    print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
-    tracemalloc.stop()
+    #current, peak = tracemalloc.get_traced_memory()
+    #print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
+    #tracemalloc.stop()
 
 
 
