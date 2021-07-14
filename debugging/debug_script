@@ -1,0 +1,9 @@
+#!/bin/bash
+dwgsim -H -o 1 inputs/test1_out.fna reads/test1
+dwgsim -H -o 1 inputs/test2_out.fna reads/test2
+cat reads/test1.bwa.read1.fastq.gz reads/test2.bwa.read1.fastq.gz > reads/test.bwa.read1.fastq.gz
+cat reads/test1.bwa.read2.fastq.gz reads/test2.bwa.read2.fastq.gz > reads/test.bwa.read2.fastq.gz
+bwa index inputs/test.fna
+bwa mem inputs/test.fna reads/test.bwa.read1.fastq.gz reads/test.bwa.read2.fastq.gz | samtools view -1 -o alignments/test.bam /dev/stdin
+samtools sort -o alignments/test_sorted.bam alignments/test.bam
+samtools index alignments/test_sorted.bam
