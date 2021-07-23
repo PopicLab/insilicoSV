@@ -203,7 +203,7 @@ class SV_Simulator():
                 edits_x = [edits[val] for val in range(len(activations)) if activations[val]]
                 
                 # export edited chromosomes to FASTA files
-                self.formatter.export_piece({id: edits_x}, fasta_out, x, self.len_dict, verbose = verbose)
+                self.formatter.export_piece({id: edits_x}, fasta_out, ref_fasta, verbose = verbose)
 
                 print("ID {} altered and saved in fasta file {} in {} seconds\n".format(id, fasta_out, time.time() - time_start))
                 time_start = time.time()

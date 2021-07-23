@@ -1,6 +1,7 @@
 import yaml
 import sys
 from constants import Constants, Operations
+from pysam import FastaFile
 #import tracemalloc
 
 class Error(Exception):
@@ -82,7 +83,6 @@ class FormatterIO():
             start = end
         return common
     
-    
     def export_to_bedpe(self, svs, ishomozygous, id, bedfile, reset_file = True):
         def write_to_file(sv, source_s, source_e, target_s, target_e, transform, ishomozygous, letter, order = 0):
             assert (letter != "_")
@@ -147,7 +147,6 @@ class FormatterIO():
                     if target[tr_index].islower():
                         write_to_file(sv, start, end, insert_point, insert_point, Operations.INV.name, ishomozygous[x], target[tr_index], order)
             
-
                 elif target[tr_index].upper() == same_place[index].upper():
                     insert_point = letter_pos[same_place[index].upper()][1]
                     order = 0
@@ -160,82 +159,36 @@ class FormatterIO():
             
             self.bedpe_counter += 1
     
-    def export_piece(self, variants, fasta_out, index, len_dict, verbose = False):
-        '''
-        only appends to file fasta_out the edited chromosomes given in variants
-
-        index: 0 or 1, indicates which file handlers to use
-        variants: dictionary (key = ID, value = list of list [start position, end position, edited piece]})
-        reset_file: boolean to indicate whether to reset the fasta_out file at the beginning
-        '''
-
-        assert (index == 0 or index == 1)
-        if index == 0:
-            fin_export = self.fin_export1
-        else:
-            fin_export = self.fin_export2
-
-        self.fout_export = open(fasta_out, "a")
-
-        for id in variants:
-            if id not in len_dict:
-                raise KeyError("ID {} not found in inputted fasta file".format(id))
-        
-        for id in variants:
-            if verbose:
-                print("New ID: ", id)
-            fin_export.readline()
-            self.fout_export.write(">" + str(id) + "\n")
-            chr_variants = variants[id]
-
-            pos = -1
-            chr_variants.sort()
-            c = "F"
-            for variant in chr_variants:
-                var_start, var_end = variant[0], variant[1]
-                if verbose:
-                    print("Current Variant: ", variant)
-                
-                while pos < var_end - 1 or (var_start == var_end and pos < var_end):
-                    c = fin_export.read(1).upper()
-
-                    if c == ">" or not c:
-                        raise IndexError("Position {} out of range for file {}".format(pos, fasta_out))
-                    
-                    if c.isalpha():
-                        pos += 1
-                        if pos == var_start:
-
-                            if var_start == var_end:   # handles special case for insertion when start position = end position, will write base at position start
-                                self.fout_export.write(c)
-                                print("Writing {} at position {}".format(c, pos))
-
-                            self.fout_export.write(variant[2])
-                            if verbose:
-                                print("Writing2 {} at position {}".format(variant[2], pos))
-                        elif pos < var_start:
-                            self.fout_export.write(c)
-                            if verbose:
-                                print("Writing3 {} at position {}".format(c, pos))
-                
-            skip = True
-            while c != ">" and c:    # you use <= to catch the newline after each chromosome
-                if not skip and c.isalpha() and c != "F":
-                    self.fout_export.write(c)
-                    if verbose:
-                        print("Writing {} at position {}".format(c,pos))
-                skip = False
-
-                c = fin_export.read(1).upper()
-                if c.isalpha():
-                    pos += 1
+    def export_piece(self, variants, fasta_out, fasta_file, verbose = False):
+        with open(fasta_out,"a") as fout_export:
+            for id in variants:
+                if id not in fasta_file.references:
+                    raise KeyError("ID {} not found in inputted fasta file".format(id))
             
-            if pos != len_dict[id] - 1:
-                raise Error("Exporting {} variants failed to execute completely. Pos {} does not match len_dict[id] - 1 value {}. Here is variants: {}.".format(id, pos, len_dict[id] - 1, variants))
-            self.fout_export.write("\n")
-        
-        self.fout_export.close()
-    
+            for id in variants:
+                if verbose:
+                    print("New ID: ", id)
+                fout_export.write(">" + str(id) + "\n")
+                chr_variants = variants[id]
+                chr_variants.sort()
+                chr_variants.append([fasta_file.get_reference_length(id), fasta_file.get_reference_length(id), ""]) # to ensure that all bases after last variant are included
+
+                pos = 0
+                for variant in chr_variants:
+                    var_start, var_end = variant[0], variant[1]
+                    for idx in range(pos, var_end):
+                        if idx < var_start:
+                            c = fasta_file.fetch(id, idx, idx+1)
+                            fout_export.write(c)
+
+                        elif idx == var_start:
+                            fout_export.write(variant[2])
+
+                        if idx == var_end - 1 and var_start == var_end:   # for insertions, insert piece right before position var_end
+                            fout_export.write(variant[2])
+                    pos = var_end
+                fout_export.write("\n")
+
     def reset_file(self, filename):
         #print("Overwritting File {}...".format(filename))
         with open(filename, "w") as f_reset:
@@ -243,7 +196,7 @@ class FormatterIO():
 
 
 if __name__ == "__main__":
-
+    pass
     
     #tracemalloc.start()
     
@@ -252,22 +205,32 @@ if __name__ == "__main__":
     filein = "debugging/inputs/test.fna"
     fileout1 = "debugging/inputs/test1_tmp_out.fna"
     fileout2 = "debugging/inputs/test2_tmp_out.fna"
-    fasta = FastaFile(filein)
-    print(fasta)
-    print("Fetched: ", fasta.fetch(x,y))
+    fasta = FormatterIO(filein)
+    fasta_file = FastaFile(filein)
 
+
+    order_ids = fasta_file.references
+    len_dict = dict()
+    for id in order_ids:
+        len_dict[id] = fasta_file.get_reference_length(id)
+    print("Len_dict: ", len_dict)
     #fasta.next()
     #print(fasta.fetch(80,85))
     variants = {"Chromosome19": [[5,5,""]]}
     FastaFile.reset_file(fileout1)
     fasta.export_piece(variants, fileout1, 0, verbose = False)
-    variants = {"Chromosome19": [[2,5,"TTTTTTTT"],[7,10, "AAAAAAAAAAAAAAA"], [15, 20, "TC"]]}
-    variants2 = {"Chromosome19": [[2,5,"UUUUUU"]], "Chromosome21": [[4,225,"AAA"]]}
-    FastaFile.reset_file(fileout1)
-    FastaFile.reset_file(fileout2)
-    fasta.export_piece(variants, fileout1, 0, verbose = False)
-    fasta.export_piece(variants2, fileout2, 1, verbose = False)
+    variants = {"Chromosome19": [[2,5,"UUUUU"],[7,10, "U"], [15, 20, "TC"], [75,77,"UUUUUU"]]}
+    variants2 = {"Chromosome19": [[2,5,"UUUUUU"]], "Chromosome21": [[4,15,"AAA"]]}
+    fasta.reset_file(fileout1)
+    fasta.reset_file(fileout2)
+    fasta.export_piece_fasta(variants, fileout1, fasta_file, verbose = True)
+    fasta.export_piece_fasta(variants2, fileout2, fasta_file, verbose = True)
+    #fasta.export_piece(variants, fileout1, 0, len_dict, verbose = True)
+
+    print(fasta_file.fetch("Chromosome19", 1, 2))
     #fasta.close()'''
+    # CTUUUUUTCUCTAGATCCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCT
+
 
     #current, peak = tracemalloc.get_traced_memory()
     #print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
