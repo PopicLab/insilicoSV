@@ -1,5 +1,5 @@
-# SV_simulator
-A simulator for complex structural variants
+# insilicoSV
+insilicoSV is a software to design and simulate complex structural variants, both novel and known. 
 
 ## To Run
 `python simulate.py <ref.fna> <par.yaml> <hap1.fna> <hap2.fna> <out.bed>`

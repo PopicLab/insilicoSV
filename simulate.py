@@ -1,91 +1,39 @@
 import random
 import numpy as np
-from processing import Error, FastaFile, Formater
+import argparse
+from pysam import FastaFile
+from processing import Error, FormatterIO
+from constants import Constants, Variant_Type
+from arguments import collect_args
 #import tracemalloc   # only for testing
 import sys
 from enum import Enum
 import time
-
-# only set for testing and development
-#random.seed(10)
-#np.random.seed(10)
-
-class Variant_Type(Enum):
-    INS = 1
-    DEL = 2
-    INV = 3
-    DUP = 4
-    TRANS = 5
-    dupINVdup = 6
-    delINVdel = 7
-    delINVdup = 8
-    dupINVdel = 9
-    delINV = 10
-    INVdel = 11
-    dDUP_iDEL = 12
-    INS_iDEL = 13
-    dupINV = 14
-    INVdup = 15
-    dDUP = 16
-
-bedpe_key = {Variant_Type.INS: ["INS"],     
-            Variant_Type.DEL: ["DEL"],
-            Variant_Type.INV: ["INV"],
-            Variant_Type.DUP: ["DUP"],
-            Variant_Type.TRANS: ["TRANS", "TRANS", "TRANS"],
-            Variant_Type.dupINVdup: ["DUP", "INV", "DUP"],
-            Variant_Type.delINVdel: ["DEL", "INV", "DEL"],
-            Variant_Type.delINVdup: ["DEL", "INV", "DUP"],
-            Variant_Type.dupINVdel: ["DUP", "INV", "DEL"],
-            Variant_Type.delINV: ["DEL", "INV"],
-            Variant_Type.INVdel: ["INV", "DEL"],
-            Variant_Type.dDUP_iDEL: ["DUP", "d", "DEL"],
-            Variant_Type.INS_iDEL: ["INS", "DEL"],
-            Variant_Type.dupINV: ["DUP", "INV"],
-            Variant_Type.INVdup: ["INV", "DUP"],
-            Variant_Type.dDUP: ["DUP", "d"]}
 
 # issues: insertion
 # lowercase = invert
 # _ = space
 # ' = complement
 
-sv_key = {Variant_Type.INS: [("A",), ("A",)],     
-            Variant_Type.DEL: [("A",), ()],
-            Variant_Type.INV: [("A",), ("a",)],
-            Variant_Type.DUP: [("A",), ("A","A")],
-            Variant_Type.TRANS: [("A","_","B"), ("B","_","A")],
-            Variant_Type.dupINVdup: [("A","B","C"), ("A","c","b","a","C")],
-            Variant_Type.delINVdel: [("A","B","C"), ("b",)],
-            Variant_Type.delINVdup: [("A","B","C"), ("c","b","C")],
-            Variant_Type.dupINVdel: [("A","B","C"), ("A","b","a")],
-            Variant_Type.delINV: [("A","B"), ("b",)],
-            Variant_Type.INVdel: [("A","B"), ("a",)],
-            Variant_Type.dDUP_iDEL: [("A","_","B"), ("A","_","A")],
-            Variant_Type.INS_iDEL: [("A","_","B"), ("_","A")],
-            Variant_Type.dupINV: [("A","B"), ("A","b","a")],
-            Variant_Type.INVdup: [("A","B"), ("b","a","B")],
-            Variant_Type.dDUP: [("A","_"), ("A","_","A")]}
-
 
 time_start = time.time()
 
 class Structural_Variant():
-    def __init__(self, sv_type, lengths, ishomogeneous = None):
+    def __init__(self, sv_type, lengths, ishomozygous = None):
         '''
         sv_type: integer
         lengths: list containing tuple(s) (min_length, max_length)
         '''
         
         self.type = Variant_Type(sv_type)
-        self.transformation = sv_key[self.type]
+        self.source, self.target = Constants.SV_KEY[self.type]
         self.lengths = []
-        self.piece_des = bedpe_key[self.type]
-        #self.ishomogeneous = ishomogeneous
+        # self.piece_des = bedpe_key[self.type]
+        #self.ishomozygous = ishomozygous
 
         # determine size of "letters" or pieces within variant
         if len(lengths) > 1:    # values given by user represents length of each piece of variant
-            assert (len(lengths) == len(sv_key[self.type][0])) 
+            assert (len(lengths) == len(Constants.SV_KEY[self.type][0])) 
 
             for leng in lengths:
                 self.lengths.append(random.randint(leng[0], leng[1]))
@@ -94,7 +42,7 @@ class Structural_Variant():
 
         elif len(lengths) == 1: # value given by user represents length of each event within variant
             count = 0
-            num_char = len(sv_key[self.type][0])
+            num_char = len(Constants.SV_KEY[self.type][0])
             for x in range(num_char):
                 length = random.randint(lengths[0][0], lengths[0][1])
                 self.lengths.append(length)
@@ -151,7 +99,6 @@ class Structural_Variant():
         change_genome = ""
         for y in range(len(end)):
             ele = end[y]
-            #print("Ele: ", ele)
             upper_str = ele.upper()         # changes all lowercase letters (if there are any) to uppercase so we can map to the nucleotide bases 
 
             if any(c.islower() for c in ele):   # checks if lowercase letters exist in ele
@@ -163,8 +110,6 @@ class Structural_Variant():
             else:
                 curr_piece = decode_dict["identity"](encode[upper_str[0]])
             
-            #if "'" in ele:
-            #    curr_piece = decode_dict["complement"](curr_piece)
             self.target_lengths.append(len(curr_piece))
             change_genome += curr_piece
         #print("ref {} -> transformed {} for transformation {}".format(ref_piece, change_genome, self.type.value))
@@ -172,7 +117,7 @@ class Structural_Variant():
         return change_genome
 
     def change_piece(self, ref):
-        return self.decode(sv_key[self.type][0], sv_key[self.type][1], ref)
+        return self.decode(self.source, self.target, ref)
         #print("SV of Type {} starting at index {} and ending at index {}".format(self.type, self.start, self.end))
 
 
@@ -188,18 +133,31 @@ class SV_Simulator():
         print("Setting Up Simulator...")
         self.ref_file = ref_file
         self.ref_fasta = FastaFile(ref_file) 
-        print("Length Dict: ", self.ref_fasta.len_dict)
-        self.formater = Formater()
-        svs = self.formater.yaml_to_var_list(par_file)
-        random.shuffle(svs)     # now assume the SVs will be ordered in this way in the altered chromosome
+        self.order_ids = self.ref_fasta.references
+        self.len_dict = dict()
+        for id in self.order_ids:
+            self.len_dict[id] = self.ref_fasta.get_reference_length(id)
+        print("Total base count: ", sum(self.ref_fasta.lengths))
 
+        self.formatter = FormatterIO(ref_file)
+        svs = self.formatter.yaml_to_var_list(par_file)
+        self.initialize_svs(svs)
+
+        print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
+        time_start = time.time()
+    
+    def __repr__(self):
+        message = "SVs1: " + str([self.svs[x].type.name for x in range(len(self.svs1)) if self.svs1[x]]) + "\n"
+        message += "SVs2: " + str([self.svs[y].type.name for y in range(len(self.svs2)) if self.svs2[y]]) + "\n"
+        return message
+    
+    def initialize_svs(self, svs):
         self.svs = []
         self.svs1 = []
         self.svs2 = []
-        print("Setting Up Structural Variants")
         for sv in svs:
             for num in range(sv[1]):
-                self.svs.append(Structural_Variant(sv[0], sv[2]))
+                self.svs.append(Structural_Variant(sv[0], sv[2])) # inputs: SV type, range of lengths
                 draw = random.randint(1,4)
                 if draw == 3 or draw == 4:   # sv applies to both haplotypes
                     self.svs1.append(1)
@@ -210,45 +168,30 @@ class SV_Simulator():
                 elif draw == 1:
                     self.svs1.append(0)
                     self.svs2.append(1)
+        self.ishomozygous = [self.svs1[index] == 1 and self.svs2[index] == 1 for index in range(len(self.svs1))]
 
-        print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
-        time_start = time.time()
-    
-    def __str__(self):
-        message = "SVs1: " + str([self.svs[x].type.name for x in range(len(self.svs1)) if self.svs1[x]]) + "\n"
-        message += "SVs2: " + str([self.svs[y].type.name for y in range(len(self.svs2)) if self.svs2[y]]) + "\n"
-        return message
-
-    def export_variant_genome(self, fasta1_out, fasta2_out, bedfile_list, initial_reset = True, verbose = False):
+    def export_variant_genome(self, fasta1_out, fasta2_out, bedfile, initial_reset = True, verbose = False):
         '''
-        bedfile_list: list (if it contains more than one element, export to the different bed files)
         initial_reset: boolean to indicate if output file should be overwritten (True) or appended to (False)
         '''
         global time_start
         if initial_reset:
-            FastaFile.reset_file(fasta1_out)
-            FastaFile.reset_file(fasta2_out)
+            self.formatter.reset_file(fasta1_out)
+            self.formatter.reset_file(fasta2_out)
 
         ref_fasta = self.ref_fasta
-        for id in self.ref_fasta.order_ids:
-            # reshuffle svs
+        for id in self.order_ids:
+            # shuffle svs, now assume the SVs will be ordered in this way in the altered chromosome
             temp = list(zip(self.svs, self.svs1, self.svs2))
             random.shuffle(temp)
             self.svs, self.svs1, self.svs2 = zip(*temp)
 
             # edit chromosome
-            edits = self.rand_select_svs(self.svs, id, ref_fasta)
+            edits = self.rand_edit_svs(self.svs, id, ref_fasta)
             print("Finished edits in {} seconds\n".format(time.time() - time_start))
             time_start = time.time()
 
-            # move on to next chromosome id
-            ref_fasta.next()
-
-            #print("SVS1: {}".format(self.svs1))
-            #print("SVS2: {}".format(self.svs2))
-
             for x in range(2):
-                bedfile = bedfile_list[0]
                 if x == 0:
                     fasta_out = fasta1_out
                     activations = self.svs1
@@ -256,32 +199,24 @@ class SV_Simulator():
                     fasta_out = fasta2_out
                     activations = self.svs2
 
-                if len(bedfile_list) > 1:
-                    bedfile = bedfile_list[x]
-
-                # account for homogeneous and heterogeneous variants
+                # account for homozygous and heterogeneous variants
                 edits_x = [edits[val] for val in range(len(activations)) if activations[val]]
                 
                 # export edited chromosomes to FASTA files
-                ref_fasta.export_piece({id: edits_x}, fasta_out, x, verbose = verbose)
+                self.formatter.export_piece({id: edits_x}, fasta_out, x, self.len_dict, verbose = verbose)
 
                 print("ID {} altered and saved in fasta file {} in {} seconds\n".format(id, fasta_out, time.time() - time_start))
                 time_start = time.time()
 
             # export variant data to BED file
-            ishomogeneous = [self.svs1[index] == 1 and self.svs2[index] == 1 for index in range(len(self.svs1))]
-            self.formater.export_to_bedpe(self.svs, ishomogeneous, id, bedfile, reset_file = initial_reset)
-            #self.formater.export_to_bed12(svs, id, self.ref_file, fasta_out, bedfile, reset_file = initial_reset)
-
-            print("Exported to bedpe in {} seconds\n".format(time.time() - time_start))
-            time_start = time.time()
+            self.formatter.export_to_bedpe(self.svs, self.ishomozygous, id, bedfile, reset_file = initial_reset)
 
             initial_reset = False
 
         return True
 
 
-    def rand_select_svs(self, svs, id, ref_fasta):
+    def rand_edit_svs(self, svs, id, ref_fasta):
         '''
         -> tuples with random start and end positions referring to corresponding sv from input list (including start, excluding end)
         '''
@@ -289,7 +224,7 @@ class SV_Simulator():
         for sv in svs:
             sum_spaces += sv.req_space
 
-        avail_spaces = ref_fasta.len_dict[id] - sum_spaces - 1
+        avail_spaces = self.len_dict[id] - sum_spaces - 1
         if avail_spaces < 0:
             raise ValueError("Size of variants is too big for the chromosome id {}!".format(id))
 
@@ -304,7 +239,7 @@ class SV_Simulator():
             curr_place += space
 
             # edit the appropriate piece of the genome
-            ref_piece = ref_fasta.fetch(curr_place, curr_place + curr_sv.req_space)
+            ref_piece = ref_fasta.fetch(id, curr_place, curr_place + curr_sv.req_space)
             edit = curr_sv.change_piece(ref_piece)
 
             # saving info to export into fasta and bed file
@@ -316,60 +251,31 @@ class SV_Simulator():
 
             curr_place += curr_sv.req_space
             avail_spaces -= space
-        #print("Size of SV: {} MB".format(sys.getsizeof(curr_sv)/10**6))
 
         return edited_pieces
     
-    def determine_target_pos(self, svs):
-        '''
-        Determines position of edited pieces on altered chromosome given list of Stuctural Variants
-        '''
-        svs.sort(key = lambda sv: sv.start)
-        offset = 0
-
-        for sv in svs:
-            # original chromosome blocks
-            block_starts = []
-            place = sv.start
-            for x in range(len(sv.lengths)):
-                block_starts.append(str(int(place)))
-                place += sv.lengths[x]
-            sv.block_starts = ','.join(block_starts)
-
-            # edited chromosome
-            sv.target_start = sv.start + offset
-            sv.target_end = sv.target_start + sv.len_edit
-            place = sv.target_start
-            target_block_starts = []
-            for y in range(len(sv.target_lengths)):
-                target_block_starts.append(str(int(place)))
-                place += sv.target_lengths[y]
-            sv.target_block_starts = ','.join(target_block_starts)
-
-            offset = sv.target_end - sv.end
-
-
-
-
 
 if __name__ == "__main__":
-    #tracemalloc.start()
-    fasta_in = sys.argv[1]
-    yaml_in = sys.argv[2]
-    fasta1_out = sys.argv[3]
-    fasta2_out = sys.argv[4]
-    bed_out = sys.argv[5]
 
-    '''fasta_in = "reference/inputs/ref_chr21.fna"
-    yaml_in = "reference/inputs/par.yaml"
+
+    args = collect_args()
+    #tracemalloc.start()
+    fasta_in = args[0]
+    yaml_in = args[1]
+    fasta1_out = args[2]
+    fasta2_out = args[3]
+    bed_out = args[4]
+
+    '''fasta_in = "debugging/inputs/test.fna"
+    yaml_in = "par_test.yaml"
     #test_svs = [[12,[(30,100)]], [16,[(300,8000)]],[8,[(500,1000)]]]
-    fasta1_out = "reference/inputs/chr21_out1.fna"
-    fasta2_out = "reference/inputs/chr21_out2.fna"
-    bed_out = "reference/inputs/out21.bed"'''
+    fasta1_out = "debugging/inputs/test1_out.fna"
+    fasta2_out = "debugging/inputs/test2_out.fna"
+    bed_out = "debugging/inputs/out.bed"'''
 
     sim = SV_Simulator(fasta_in, yaml_in)
-    sim.export_variant_genome(fasta1_out, fasta2_out, [bed_out], verbose = False)
-    print("\n" + str(sim))
+    sim.export_variant_genome(fasta1_out, fasta2_out, bed_out, verbose = False)
+    #print("\n" + str(sim))
 
     #current, peak = tracemalloc.get_traced_memory()
     #print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
