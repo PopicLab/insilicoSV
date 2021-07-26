@@ -22,7 +22,7 @@ class Operations(Enum):
     DUP = "DUP"
     INV = "INV"
     DEL = "DEL"
-    DIS = "DIS"
+    TRA = "TRA"
 
 class Constants():
 
@@ -31,9 +31,11 @@ class Constants():
     MIN_LENGTH_ATTR = "min_length"
     TYPE_ATTR = "type"
     NUM_ATTR = "number"
+    TRANSFORM_SOURCE_ATTR = "source"
+    TRANSFORM_TARGET_ATTR = "target"
 
     # for Structural Variant class
-    SV_KEY = {Variant_Type.INS: [("A",), ("A",)],     
+    SV_KEY = {Variant_Type.INS: [("",), ("A",)],     
             Variant_Type.DEL: [("A",), ()],
             Variant_Type.INV: [("A",), ("a",)],
             Variant_Type.DUP: [("A",), ("A","A")],

@@ -1,0 +1,10 @@
+- type: 12
+  number: 2
+  min_length: 
+    - 5
+    - 25
+    - 10
+  max_length: 
+    - 10
+    - 40
+    - 20

@@ -2,10 +2,43 @@ import yaml
 import sys
 from constants import Constants, Operations
 from pysam import FastaFile
+import argparse
+import os
 #import tracemalloc
 
 class Error(Exception):
     pass
+
+class Config():
+    def __init__(self):
+        self.variant_config_list = []
+    
+    def run_checks(self, config):
+        if Constants.TYPE_ATTR in config and Constants.TRANSFORM_SOURCE_ATTR in config and Constants.TRANSFORM_TARGET_ATTR in config:
+            raise Exception("Only a type attribute (integer) or a source and target attribute can be present for SV, not both")
+        elif Constants.TYPE_ATTR in config and not isinstance(config[Constants.TYPE_ATTR], int):
+            raise Exception("Invalid {} type for SV \'type\' attribute, int expected".format(type(config[Constants.TYPE_ATTR])))
+    
+    def create_entries(self, config_entries):
+        variant_config_list = []
+        for variant_config in config_entries:
+            self.run_checks(variant_config)
+
+            # handles length of variant_config
+            var_ranges = []
+            if isinstance(variant_config[Constants.MIN_LENGTH_ATTR], list):
+                var_ranges = [(variant_config[Constants.MIN_LENGTH_ATTR][x], variant_config[Constants.MAX_LENGTH_ATTR][x]) for x in range(len(variant_config[Constants.MIN_LENGTH_ATTR]))]
+            else:
+                var_ranges = [(variant_config[Constants.MIN_LENGTH_ATTR], variant_config[Constants.MAX_LENGTH_ATTR])]
+            
+            # type of variant_config (including custom)
+            if Constants.TYPE_ATTR in variant_config:
+                variant_config_list.append([variant_config[Constants.TYPE_ATTR], variant_config[Constants.NUM_ATTR], var_ranges])
+            elif Constants.TRANSFORM_SOURCE_ATTR in variant_config and Constants.TRANSFORM_TARGET_ATTR in variant_config:
+                variant_config_list.append([[variant_config[Constants.TRANSFORM_SOURCE_ATTR], variant_config[Constants.TRANSFORM_TARGET_ATTR]], variant_config[Constants.NUM_ATTR], var_ranges])
+        
+        self.variant_config_list = variant_config_list
+        return variant_config_list
 
 class FormatterIO():
     def __init__(self, filein):
@@ -24,16 +57,16 @@ class FormatterIO():
         self.fout_export = False
 
     def yaml_to_var_list(self, filename):
-        par_list = yaml.full_load(open(filename))
-        variant_list = []
-        for variant in par_list:
-            var_ranges = []
-            if isinstance(variant[Constants.MIN_LENGTH_ATTR], list):
-                var_ranges = [(variant[Constants.MIN_LENGTH_ATTR][x], variant[Constants.MAX_LENGTH_ATTR][x]) for x in range(len(variant[Constants.MIN_LENGTH_ATTR]))]
-            else:
-                var_ranges = [(variant[Constants.MIN_LENGTH_ATTR], variant[Constants.MAX_LENGTH_ATTR])]
-            variant_list.append([variant[Constants.TYPE_ATTR], variant[Constants.NUM_ATTR], var_ranges])
-        return variant_list
+        # config_entries = yaml.load(file, Loader=yaml.FullLoader)
+        try:
+            config_entries = yaml.full_load(open(filename))
+        except:
+            raise Exception("YAML File {} failed to be open".format(filename))
+
+        config = Config()
+        sv_configs = config.create_entries(config_entries)
+
+        return sv_configs
 
     def find_lcs(self, str1, str2):
         # Finds longest common subsequence between str1 and str2 such that if there is a _ in str1 and str2, it MUST belong in the lcs
@@ -71,7 +104,7 @@ class FormatterIO():
         loc2.append(len(str2))
 
         if len(loc1) != len(loc2):
-            raise Error("Unequal number of _ across str1 and str2, str1: {}, str2: {}".format(str1, str2))
+            raise Exception("Unequal number of _ across str1 and str2, str1: {}, str2: {}".format(str1, str2))
         
         common = ""
         start = 0
@@ -99,7 +132,7 @@ class FormatterIO():
                             transform,
                             str(source_e - source_s),
                             str(int(ishomozygous)) + "/1",
-                            sv.type.name,
+                            sv.name,
                             str(self.bedpe_counter),
                             str(order)]
 
@@ -194,7 +227,20 @@ class FormatterIO():
         with open(filename, "w") as f_reset:
             f_reset.truncate()
 
+def collect_args():
+    parser = argparse.ArgumentParser(description='insilicoSV is a software to design and simulate complex structural variants, both novel and known.')
+    parser.add_argument("ref", help="FASTA reference file")
+    parser.add_argument("config", help="YAML config file")
+    parser.add_argument("hap1", help="First output FASTA file (first haplotype)")
+    parser.add_argument("hap2", help = "Second output FASTA file (second haplotype)")
+    parser.add_argument("bedpe", help = "BEDPE file location to store variant info")
+    parser.add_argument("-r", "--root", action="store", metavar="DIR", dest="root_dir", help="root directory for all files given as positional arguments")
 
+    args = parser.parse_args()
+    io = [args.ref, args.config, args.hap1, args.hap2, args.bedpe]
+    if args.root_dir:
+        io = [os.path.join(args.root_dir, ele) for ele in io]
+    return io
 if __name__ == "__main__":
     pass
     
