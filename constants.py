@@ -5,7 +5,7 @@ class Variant_Type(Enum):
     DEL = 2
     INV = 3
     DUP = 4
-    TRANS = 5
+    TRA = 5
     dupINVdup = 6
     delINVdel = 7
     delINVdup = 8
@@ -19,10 +19,15 @@ class Variant_Type(Enum):
     dDUP = 16
 
 class Operations(Enum):
+    INS = "INS"
     DUP = "DUP"
     INV = "INV"
     DEL = "DEL"
     TRA = "TRA"
+
+class Symbols():
+    DIS = "_" # dispersion event              
+    PLACEHOLDER = "-"  # placeholder with length 0
 
 class Constants():
 
@@ -35,11 +40,11 @@ class Constants():
     TRANSFORM_TARGET_ATTR = "target"
 
     # for Structural Variant class
-    SV_KEY = {Variant_Type.INS: [("",), ("A",)],     
+    SV_KEY = {Variant_Type.INS: [("-",), ("A",)],     
             Variant_Type.DEL: [("A",), ()],
             Variant_Type.INV: [("A",), ("a",)],
             Variant_Type.DUP: [("A",), ("A","A")],
-            Variant_Type.TRANS: [("A","_","B"), ("B","_","A")],
+            Variant_Type.TRA: [("A","_","B"), ("B","_","A")],
             Variant_Type.dupINVdup: [("A","B","C"), ("A","c","b","a","C")],
             Variant_Type.delINVdel: [("A","B","C"), ("b",)],
             Variant_Type.delINVdup: [("A","B","C"), ("c","b","C")],
