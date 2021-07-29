@@ -1,21 +1,11 @@
-from os import error
 import random
-import numpy as np
-import argparse
 from pysam import FastaFile
-from processing import Error, FormatterIO, collect_args
+from processing import FormatterIO, collect_args
 from constants import Constants, Variant_Type, Symbols
-#from arguments import collect_args
 #import tracemalloc   # only for testing
 import sys
 from enum import Enum, unique
 import time
-
-# issues: insertion
-# lowercase = invert
-# _ = space
-# ' = complement
-
 
 time_start = time.time()
 

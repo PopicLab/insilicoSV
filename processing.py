@@ -6,9 +6,6 @@ import argparse
 import os
 #import tracemalloc
 
-class Error(Exception):
-    pass
-
 class Config():
     def __init__(self):
         self.variant_config_list = []
