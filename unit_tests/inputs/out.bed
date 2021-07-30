@@ -1,0 +1,4 @@
+Chromosome19	0	6	Chromosome19	0	1	DEL	5	0/1	delINVdup	1	0
+Chromosome19	10	16	Chromosome19	0	1	DUP	5	0/1	delINVdup	1	1
+Chromosome19	10	16	Chromosome19	0	1	INV	5	0/1	delINVdup	1	1
+Chromosome19	5	11	Chromosome19	5	11	INV	5	0/1	delINVdup	1	0

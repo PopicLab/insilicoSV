@@ -1,225 +1,80 @@
+from os import error
 import random
 from pysam import FastaFile
-from processing import FormatterIO, collect_args
-from constants import Constants, Variant_Type, Symbols
-#import tracemalloc   # only for testing
+from processing import FormatterIO, ErrorDetection, collect_args
+from constants import *
+from structural_variant import Structural_Variant, Event
+import tracemalloc  # only for testing
 import sys
-from enum import Enum, unique
 import time
 
 time_start = time.time()
 
-class ErrorDetection():
-    def __init__(self):
-        pass
 
-    def is_overlapping(self, event_ranges, addition):
-        # addition: tuple (start, end)
-        # event_ranges: list containing tuples
-        # checks if addition overlaps with any of the events already stored
 
-        for event in event_ranges:
-            if event[1] > addition[0] and event[0] < addition[1]:
-                return True
-        return False
+class StatsCollection():
+    '''collection of information for stats file, if requested'''
+    def __init__(self, chr_ids):
+        self.num_heterozygous = 0
+        self.num_homozygous = 0
+        self.total_svs = 0
+        self.active_svs = 0
+        self.active_events_chr = dict()
+        self.chr_ids = chr_ids
+        self.chr_lengths = dict()
+        self.avg_len = [0,0]       # Average length of SV events/components
+        self.len_frags_chr = dict()  # Lengths of altered fragments within chromosome
 
-    def any_overlapping(self, arr):
-        for x, ele in enumerate(arr):
-            if self.is_overlapping(arr[:x], ele):
-                raise Exception("Overlapping Detected: {}".format(arr))
+        for id in self.chr_ids:
+            self.len_frags_chr[id] = 0
+            self.active_events_chr[id] = 0
+    
+    def get_info(self, svs, ref_fasta):
+        self.total_svs = len(svs)
+
+        for id in self.chr_ids:
+            self.chr_lengths[id] = ref_fasta.get_reference_length(id)
+        for sv in svs:
+            if sv.active:
+                self.active_svs += 1
+
+                if sv.hap[0] and sv.hap[1]: # homozygous
+                    self.num_homozygous += 1
+                else:  # heterozygous
+                    self.num_heterozygous += 1
+
+                for frag in sv.changed_fragments:
+                    self.len_frags_chr[frag[0]] += frag[2] - frag[1]
+                
+                for symbol in sv.events_dict:
+                    if not symbol.startswith(Symbols.DIS) and not symbol.startswith(Symbols.PLACEHOLDER):
+                        self.active_events_chr[frag[0]] += 1
+                        self.avg_len[0] += sv.events_dict[symbol].length
+                        self.avg_len[1] += 1
         
-    def is_unique(self,transform):
-        # source transformation must have unique symbols except dispersion events
-        present = dict()
-        for symbol in transform:
-            if symbol in present:
-                raise Exception("Source transformation {} does not have unique symbols!".format(transform))
-            elif symbol != Symbols.DIS:
-                present[symbol] = True
-
-error_detection = ErrorDetection()
-
-class Structural_Variant():
-    def __init__(self, sv_type, length_ranges):
-        '''
-        sv_type: integer or tuple containing transformation (source, target)
-        length_ranges: list containing tuple(s) (min_length, max_length)
-        '''
-        
-        if isinstance(sv_type, int):
-            self.type = Variant_Type(sv_type)
-            self.source, self.target = Constants.SV_KEY[self.type]
-            self.name = self.type.name
+        if self.avg_len[1] != 0:
+            self.avg_len = self.avg_len[0] // self.avg_len[1]
         else:
-            self.type = None
-            self.source, self.target = sv_type
-            self.name = str("".join(self.source)) + ">" + str("".join(self.target))
-        
-        error_detection.is_unique(self.source)
-        self.source_unique_char, self.target_unique_char = self.add_unique_ids(self.source), self.add_unique_ids(self.target)
-
-        # initialize event classes
-        self.req_space = -1
-        self.source_events = []
-        self.events_dict = dict()
-        self.initialize_events(length_ranges)
-        #print("Events Dict: ", self.events_dict)
-        self.source_event_blocks = []
-        self.target_event_blocks = []
-
-        # in the event that sv is unable to be simulated due to random placement issues, will be turned on later
-        self.active = False
-
-        # 1 = homozygous, 0 = heterozygous
-        self.ishomozygous = -1
-        self.hap1 = -1
-        self.hap2 = -1
+            self.avg_len = 0
     
-    def __repr__(self):
-        return "<SV transformation {} -> {} taking up {} space>".format(self.source, self.target, self.req_space)
-    
-    def add_unique_ids(self, transformation):
-        # if dispersion events exist in transformation, tag on unique ids to make them distinct as they all are "_"
-        unique_transform = []
-        unique_id = 1
-        for component in transformation:
-            if component != Symbols.DIS:
-                unique_transform.append(component)
-            else:
-                unique_transform.append(component + str(unique_id))
-                unique_id += 1
-        return tuple(unique_transform)
+    def export_data(self, fileout):
+        def write_item(fout, name, item):
+            fout.write("{}: {}\n".format(name, item))
+        with open(fileout, "w") as fout:
+            fout.write("===== Overview =====\n")
+            write_item(fout, "SVs successfully simulated", str(self.active_svs) + "/" + str(self.total_svs))
+            write_item(fout, "Homozygous SVs", self.num_homozygous)
+            write_item(fout, "Heterozygous SVs", self.num_heterozygous)
+            write_item(fout, "Average length of SV symbols/components (excluding dispersions)", self.avg_len)
+            for id in self.chr_ids:
+                fout.write("\n===== {} =====\n".format(id))
+                write_item(fout, "Length of sequence", self.chr_lengths[id])
+                write_item(fout, "Events present", self.active_events_chr[id])
+                write_item(fout, "Total impacted length of reference chromosome", self.len_frags_chr[id])
 
-    def initialize_events(self, lengths):
-
-        # collect all unique symbols to account for insertions
-        all_symbols = []
-        for ele in self.source_unique_char + self.target_unique_char:
-            if ele.upper() not in all_symbols:
-                all_symbols.append(ele.upper())
-        all_symbols.sort()
-
-        # symbols_dict: (key = symbol, value = length)
-        symbols_dict = dict()
-        if len(lengths) > 1:    # values given by user represents custom ranges for each event symbol of variant in lexicographical order 
-            assert (len(lengths) == len(all_symbols)) 
-            for idx, symbol in enumerate(all_symbols):
-                symbols_dict[symbol] = (random.randint(lengths[idx][0], lengths[idx][1]), lengths[idx])
-
-        elif len(lengths) == 1: # value given by user represents length (same range) of each event within variant in lexicographical order
-            for symbol in all_symbols:
-                symbols_dict[symbol] = (random.randint(lengths[0][0], lengths[0][1]), lengths[0])
-
-        else:
-            raise Exception("Lengths parameter expects at least one tuple")
-        symbols_dict[Symbols.PLACEHOLDER] = (0, (0,0))
-
-        # initialize event classes
-        for idx, symbol in enumerate(all_symbols):
-            event = Event(self, symbols_dict[symbol][0], symbols_dict[symbol][1], symbol)
-            self.events_dict[symbol] = event
-        
-        for symbol in self.source_unique_char:
-            self.source_events.append(self.events_dict[symbol])
-        
-        self.req_space = sum([event.length for event in self.source_events])
-        
-        return self.source_events
-    
-    def generate_blocks(self):
-        # groups together symbols between dispersion events (_)
-        # returns list of lists
-        # Ex. AB_CD -> [["A","B"], ["C","D"]]
-        def find_blocks(transformation):
-            blocks = [[]]
-            for symbol in transformation:
-                if not symbol.startswith(Symbols.DIS):
-                    blocks[-1].append(symbol)
-                else:
-                    blocks.append([])
-            return blocks
-        self.source_event_blocks = find_blocks(self.source_unique_char)
-        self.target_event_blocks = find_blocks(self.target_unique_char)
-
-        return self.target_event_blocks
-
-    def change_fragment(self):
-
-        def complement(bases):
-            output = ""
-            for base in bases.upper():
-                if base == "A":
-                    output += "T"
-                elif base == "T":
-                    output += "A"
-                elif base == "G":
-                    output += "C"
-                elif base == "C":
-                    output += "G"
-                elif base == "N":
-                    output += "N"
-                else:
-                    output += base
-                    print("Error: Unknown base \'{}\' detected".format(base))
-            
-            return output
-
-        decode_dict = {"invert": lambda string: complement(string[::-1]),
-                       "identity": lambda string: string,
-                       "complement": complement} 
-        encoding = self.events_dict    # maps symbol like A or B to base pairs on reference 
-        #print("Encode_dict: ", encoding)
-
-        # find all blocks between dispersion events
-        self.generate_blocks()
-        
-        changed_fragments = []
-        for idx, block in enumerate(self.target_event_blocks):
-            new_frag = ""
-            for x, ele in enumerate(block):
-                upper_str = ele.upper()         # changes all lowercase symbols (if there are any) to uppercase so we can map to the nucleotide bases 
-    
-                if any(c.islower() for c in ele):   # checks if lowercase symbols exist in ele
-                    curr_piece = decode_dict["invert"](encoding[upper_str[0]].source_frag)   # remember decode_dict stores functions as the values
-    
-                elif upper_str[0] in encoding:
-                    curr_piece = decode_dict["identity"](encoding[upper_str[0]].source_frag)
-                
-                elif ele.startswith(Symbols.DIS):               # _ refers to a space
-                    raise Exception("Dispersion event detected within block: {}".format(self.target_event_blocks))
-                else: 
-                    raise Exception("Unknown {} symbol detected in target transformation {}".format(ele, self.target))
-                
-                new_frag += curr_piece
-            first_event = encoding[self.source_event_blocks[idx][0].upper()]
-            last_event = encoding[self.source_event_blocks[idx][-1].upper()]
-            changed_fragments.append([first_event.source_chr, first_event.start, last_event.end, new_frag])
-                
-        #print("ref {} -> transformed {} for transformation {}".format(ref_piece, change_genome, self.type.value))
-        self.changed_fragments = changed_fragments
-
-        return changed_fragments
-
-class Event():
-    '''represents the symbols/events within a SV transformation'''
-    def __init__(self, sv_parent, length, length_range, symbol):
-        '''
-        sv_parent: Structural Variant, event is a part of larger SV
-        '''
-        self.sv_parent = sv_parent
-        self.length = length
-        self.length_range = length_range
-        self.symbol = symbol # refers to symbol in SV's transformation
-        self.source_chr = ""
-        self.source_frag = ""
-        self.start = -1
-        self.end = -1
-    
-    def __repr__(self):
-        return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end, "source_frag": self.source_frag})
 
 class SV_Simulator():
-    def __init__(self, ref_file, par_file):
+    def __init__(self, ref_file, par_file, testing = False):
         '''
         ref: fasta filename to reference genome
         svs: list (type, number, range of length of variant)
@@ -228,17 +83,20 @@ class SV_Simulator():
 
         global time_start
         print("Setting Up Simulator...")
+
         self.ref_file = ref_file
         self.ref_fasta = FastaFile(ref_file) 
         self.order_ids = self.ref_fasta.references
         self.len_dict = dict()
         for id in self.order_ids:
             self.len_dict[id] = self.ref_fasta.get_reference_length(id)
+        self.stats = StatsCollection(self.order_ids)
+
         print("Total base count: ", sum(self.ref_fasta.lengths))
 
         self.formatter = FormatterIO(ref_file)
         svs_config = self.formatter.yaml_to_var_list(par_file)
-        self.initialize_svs(svs_config)
+        self.initialize_svs(svs_config, testing = testing)
 
         print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
         time_start = time.time()
@@ -248,12 +106,16 @@ class SV_Simulator():
         message += "SVs2: " + str([self.svs[y].name for y in range(len(self.svs)) if self.svs[y].hap[1]]) + "\n"
         return message
     
-    def initialize_svs(self, svs_config):
+    def initialize_svs(self, svs_config, random_gen = random, testing = False):
         self.svs = []
         for sv_config in svs_config:
             for num in range(sv_config[1]):
                 sv = Structural_Variant(sv_config[0], sv_config[2]) # inputs: SV type, range of lengths
-                draw = random.randint(1,4)
+                if not testing:
+                    draw = random_gen.randint(1,4)
+                else:
+                    draw = 1
+                
                 if draw == 3 or draw == 4:   # sv applies to both haplotypes
                     sv.ishomozygous = 1
                     sv.hap = [True, True]
@@ -269,9 +131,11 @@ class SV_Simulator():
         for sv in self.svs:
             sv.active = False
 
-    def produce_variant_genome(self, fasta1_out, fasta2_out, bedfile, initial_reset = True, verbose = False):
+    def produce_variant_genome(self, fasta1_out, fasta2_out, bedfile, stats_file = None, initial_reset = True, random_gen = random, testing = False, verbose = False):
         '''
         initial_reset: boolean to indicate if output file should be overwritten (True) or appended to (False)
+        random_gen: only relevant in testing
+        stats_file: whether a stats file summarizing SVs simulated will be generated in same directory the reference genome is located in
         '''
         global time_start
         if initial_reset:
@@ -280,7 +144,7 @@ class SV_Simulator():
 
         # edit chromosome
         ref_fasta = self.ref_fasta
-        self.rand_edit_svs(ref_fasta)
+        self.rand_edit_svs(ref_fasta, random_gen)
 
         # organize edits and export
         active_svs = [sv for sv in self.svs if sv.active]
@@ -303,7 +167,7 @@ class SV_Simulator():
                 # account for homozygous and heterogeneous variants
                 edits_x = edits_dict[id]
                 #print("Edits_x: ", edits_x)
-                error_detection.any_overlapping(edits_x)
+                ErrorDetection.fail_if_any_overlapping(edits_x)
                 
                 # export edited chromosomes to FASTA files
                 self.formatter.export_piece(id, edits_x, fasta_out, ref_fasta, verbose = verbose)
@@ -312,13 +176,18 @@ class SV_Simulator():
                 time_start = time.time()
 
         # export variant data to BED file
-        self.formatter.export_to_bedpe(active_svs, id, bedfile, reset_file = initial_reset)
-
+        self.formatter.export_to_bedpe(active_svs, bedfile, reset_file = initial_reset)
         initial_reset = False
+
+        # create and export stats file
+        if stats_file:
+
+            self.stats.get_info(self.svs, self.ref_fasta)
+            self.stats.export_data(stats_file)
 
         return True
     
-    def rand_select_svs(self, svs, ref_fasta):
+    def rand_select_svs(self, svs, ref_fasta, random_gen = random):
         # randomly position SVs and store reference fragments
 
         def percent_N(seq):
@@ -344,11 +213,11 @@ class SV_Simulator():
             rand_seq = ""
             base_map = {1:"A", 2: "T", 3: "G", 4: "C"}
             for x in range(length):
-                rand_seq += base_map[random.randint(1,4)]
+                rand_seq += base_map[random_gen.randint(1,4)]
             return rand_seq
         def get_rand_chr():
             # random assignment of SV to a chromosome
-            rand_id = self.order_ids[random.randint(0, len(self.order_ids)-1)]
+            rand_id = self.order_ids[random_gen.randint(0, len(self.order_ids)-1)]
             chr_len = self.len_dict[rand_id]
 
             return rand_id, chr_len
@@ -365,7 +234,7 @@ class SV_Simulator():
                 valid = True
                 
                 if tries > 100:
-                    print("Failure to simulate SV \"{}\"".format(sv))
+                    print("Failure to simulate \"{}\"".format(sv))
                     valid = False
                     break
                 
@@ -373,7 +242,7 @@ class SV_Simulator():
                 if chr_len - sv.req_space - 1 <= 0:
                     raise Exception("{} size is too big for chromosome!".format(sv))
                 else:
-                    start_pos = random.randint(0, chr_len - sv.req_space - 1)
+                    start_pos = random_gen.randint(0, chr_len - sv.req_space - 1)
                     for sv_event in sv.source_events:
                         #print("Symbol: {}, Valid: {}".format(sv_event.symbol, valid))
 
@@ -407,48 +276,55 @@ class SV_Simulator():
                         event.source_frag = generate_seq(event.length)
                 
                 # error detection
-                error_detection.any_overlapping(self.event_ranges)
+                ErrorDetection.fail_if_any_overlapping(self.event_ranges)
                 
                 #print("Events Dict after random positions selected: ", sv.events_dict)
                 #print("\n")
                 
         return self.event_ranges
 
-    def rand_edit_svs(self, ref_fasta):
+    def rand_edit_svs(self, ref_fasta, random_gen = random):
         # select random positions for SVs
-        self.rand_select_svs(self.svs, ref_fasta)
+        self.rand_select_svs(self.svs, ref_fasta, random_gen)
 
         for sv in self.svs:
             if sv.active:
                 # make edits and store in sv object
                 sv.change_fragment()
+                print("Events Dict after all edits: ", sv.events_dict)
+    
+    def close(self):
+        self.ref_fasta.close()
         
 
 if __name__ == "__main__":
 
-    args = collect_args()
+    tracemalloc.start()
+
+    '''args = collect_args()
     #tracemalloc.start()
     fasta_in = args[0]
     yaml_in = args[1]
     fasta1_out = args[2]
     fasta2_out = args[3]
-    bed_out = args[4]
+    bed_out = args[4]'''
 
-    '''fasta_in = "debugging/inputs/test.fna"
+    fasta_in = "debugging/inputs/test.fna"
     yaml_in = "debugging/inputs/par_test.yaml"
     #test_svs = [[12,[(30,100)]], [16,[(300,8000)]],[8,[(500,1000)]]]
     fasta1_out = "debugging/inputs/test1_out.fna"
     fasta2_out = "debugging/inputs/test2_out.fna"
-    bed_out = "debugging/inputs/out.bed"'''
+    bed_out = "debugging/inputs/out.bed"
+    stats_file = "debugging/inputs/stats.txt"
 
     sim = SV_Simulator(fasta_in, yaml_in)
-    print(sim.svs)
+    print(sim.svs) # Testing & Debugging
     #print(sim.rand_edit_svs("Chromosome19", sim.ref_fasta))
-    sim.produce_variant_genome(fasta1_out, fasta2_out, bed_out, verbose = False)
+    sim.produce_variant_genome(fasta1_out, fasta2_out, bed_out, stats_file, verbose = False)
     print("\n" + str(sim))
 
-    #current, peak = tracemalloc.get_traced_memory()
-    #print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
-    #tracemalloc.stop()
+    current, peak = tracemalloc.get_traced_memory()
+    print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
+    tracemalloc.stop()
 
 

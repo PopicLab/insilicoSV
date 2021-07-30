@@ -2,72 +2,74 @@ import unittest
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from simulate import Structural_Variant
+from simulate import SV_Simulator
+from pysam import FastaFile
 
-class TestStructuralVariant(unittest.TestCase):
+class RandomSim():
+    def __init__(self, increase, mode = None):
+        # mode: None, "min," "mid," or "max" - specifies which number to pick in randint method
+        # mode = None means to rely on self.curr_pos
+        assert mode in [None, "min", "mid", "max"]
 
-    @classmethod
-    def setUpClass(cls):
-        # runs before all tests
-        pass
-
-    @classmethod
-    def tearDownClass(cls):
-        # runs after all tests
-        pass
-
-    def setUp(self):
-        # runs before every test
-        self.sv_no_dispersion = Structural_Variant(8, [(5,5)])
-        self.sv_with_dispersion = Structural_Variant(5, [(5,5)])
-
-    def tearDown(self):
-        # runs after every test
-        pass
-
-    def test_generate_blocks(self):
-        self.assertEqual(self.sv_no_dispersion.generate_blocks(),[["c","b","C"]])
-
-    def test_change_fragment(self):
-        def initialize_event(event,start_pos, chr_id, frag):
-            event.start = start_pos
-            event.end = event.start + event.length
-            event.source_chr = chr_id
-            if not event.symbol.startswith("_"):
-                event.source_frag = frag
-
-        # non-dispersion events
-        bases = ["A", "T", "G", "C"]
-        base_idx = 0
-        start_pos = 10
-        for event in self.sv_no_dispersion.source_events:
-            initialize_event(event, start_pos, "chr21", bases[base_idx] * event.length)
-            start_pos += event.length
-            base_idx += 1
-        #ABC -> cbC
-        #AAAAATTTTTGGGGG -> CCCCCAAAAAGGGGG
-        self.assertEqual(self.sv_no_dispersion.change_fragment(), [["chr21", 10, 25, "CCCCCAAAAAGGGGG"]])
-
-        # SVs with dispersion events
-        base_idx = 0
-        start_pos = 25
-        for event in self.sv_with_dispersion.source_events:
-            initialize_event(event, start_pos, "chr21", bases[base_idx] * event.length)
-            start_pos += event.length
-            base_idx += 1
-        #A_B -> B_A
-        #AAAAA_GGGGG -> GGGGG_AAAAA
-        self.assertEqual(self.sv_with_dispersion.change_fragment(), [["chr21", 25, 30, "GGGGG"], ["chr21", 35, 40, "AAAAA"]])
+        self.curr_pos = 0
+        self.increase = increase
+        self.mode = mode
+    def randint(self, min_int, max_int):
+        assert (isinstance(min_int, int) and isinstance(max_int, int))
+        if self.mode == None:
+            if self.curr_pos + self.increase > max_int:
+                return min_int
+            tmp = self.curr_pos
+            self.curr_pos += self.increase
+            return tmp
+        elif self.mode == "min":
+            return min_int
+        elif self.mode == "max":
+            return max_int
+        elif self.mode == "mid":
+            return int((min_int + max_int)/2)
+        else:
+            raise Exception ("Mode {} not valid",format(self.mode))
 
 
 class TestSVSimulator(unittest.TestCase):
+
+    def setUp(self):
+        # runs before every test
+        self.ref_file1 = "unit_tests/inputs/test.fna"
+        self.par1 = "unit_tests/inputs/par.yaml"
+        self.fna_1_1 = "unit_tests/inputs/test_1.fna"
+        self.fna_2_1 = "unit_tests/inputs/test_2.fna"
+        self.bed1 = "unit_tests/inputs/out.bed"
+        self.sim1 = SV_Simulator(self.ref_file1, self.par1, testing = True)
+    
+    def tearDown(self):
+        #runs after every test
+        self.sim1.close()
+
     def test_produce_variant_genome(self):
-        # test insertions
 
         # test SVs without dispersions
+        curr_sim = self.sim1
+        random_gen = RandomSim(10)
+        self.assertEqual(curr_sim.produce_variant_genome(self.fna_1_1, self.fna_2_1, self.bed1, random_gen = random_gen), True)
+        fasta_out1 = FastaFile(self.fna_1_1)
+        changed_frag = fasta_out1.fetch(fasta_out1.references[0], 0, fasta_out1.get_reference_length(fasta_out1.references[0]))
+        # CTCCG TCGTA CTAGA CAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
+        # TCTAG TACGA CTAGA CAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
+
+        self.assertEqual(changed_frag, "TCTAGTACGACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT")
 
         # test SVs with dispersions
-        pass
+
+        # test insertions
+    
+    def test_rand_select_svs(self):
+        # test SVs without dispersions
+        curr_sim = self.sim1
+        random_gen = RandomSim(10)
+        self.assertEqual(curr_sim.rand_select_svs(curr_sim.svs, curr_sim.ref_fasta, random_gen), [(0,5), (5,10), (10,15)])
+
 
         
 
