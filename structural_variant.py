@@ -4,21 +4,25 @@ from processing import ErrorDetection
 import random
 
 class Structural_Variant():
-    def __init__(self, sv_type, length_ranges):
+    def __init__(self, sv_type, length_ranges, source = None, target = None):
         '''
-        sv_type: string or tuple containing transformation (source, target)
+        Initializes SV's transformation and sets up its events, along with several other basic attributes like zygosity
+
+        sv_type: Enum either specifying one of the prewritten classes or a Custom transformation, in which case source and target are required
         length_ranges: list containing tuple(s) (min_length, max_length)
+        source: tuple representing source sequence, optional
+        target: tuple representing target sequence, optional
         '''
-        
-        if isinstance(sv_type, str):
-            self.type = Variant_Type(sv_type)
+
+        self.type = sv_type
+        if self.type != Variant_Type.Custom:
             self.source, self.target = SV_KEY[self.type]
             self.name = self.type.name
         else:
-            self.type = None
-            self.source, self.target = sv_type
+            self.source, self.target = source, target
             self.name = str("".join(self.source)) + ">" + str("".join(self.target))
         
+        # events like dispersions will appear as the same symbol, so it's important to add unique tags to differentiate them
         ErrorDetection.validate_symbols(self.source)
         self.source_unique_char, self.target_unique_char = self.add_unique_ids(self.source), self.add_unique_ids(self.target)
 
@@ -30,20 +34,24 @@ class Structural_Variant():
         #print("Events Dict: ", self.events_dict)
         self.source_event_blocks = []
         self.target_event_blocks = []
+        self.target_block_chrs = []   # stores the assigned target chr for each block to export to BEDPE file
 
-        # in the event that sv is unable to be simulated due to random placement issues, will be turned on later
+        # specifies if sv is unable to be simulated due to random placement issues
+        # will be turned on later
         self.active = False
 
         # 1 = homozygous, 0 = heterozygous
-        self.ishomozygous = -1
-        self.hap1 = -1
-        self.hap2 = -1
+        self.ishomozygous = Zygosity.UNDEFINED
+
+        # stores list of booleans specifying if SV will be applied to certain haplotype for assigned chromosome
+        self.hap = [False, False]
     
     def __repr__(self):
-        return "<SV transformation {} -> {} taking up {} space>".format(''.join(self.source), ''.join(self.target), self.req_space)
+        return "<SV transformation {} -> {} taking up {} non-dispersion spaces>".format(''.join(self.source), ''.join(self.target), sum([event.length for event in self.source_events if not event.symbol.startswith(Symbols.DIS)]))
     
     def add_unique_ids(self, transformation):
         # if dispersion events exist in transformation, tag on unique ids to make them distinct as they all are "_"
+        # unique ids later necessary to map symbol to event
         unique_transform = []
         unique_id = 1
         for component in transformation:
@@ -55,15 +63,22 @@ class Structural_Variant():
         return tuple(unique_transform)
 
     def initialize_events(self, lengths):
+        '''
+        Initializes event classes and creates a mapping of symbol to event
 
-        # collect all unique symbols to account for insertions
+        lengths: list of tuples specifying min and max length for events within SV
+        -> returns list of events in source sequence
+        '''
+        # collect all unique symbols present in both source and target sequences - include target as there may be insertions
+        # note that the symbols represent events
         all_symbols = []
         for ele in self.source_unique_char + self.target_unique_char:
             if ele.upper() not in all_symbols:
                 all_symbols.append(ele.upper())
-        all_symbols.sort()
+        all_symbols.sort()  # user inputs symbol lengths in lexicographical order
 
-        # symbols_dict: (key = symbol, value = length)
+        # symbols_dict: (key = symbol, value = (chosen length, length range))
+        # determine length of events/symbols
         symbols_dict = dict()
         if len(lengths) > 1:    # values given by user represents custom ranges for each event symbol of variant in lexicographical order 
             assert (len(lengths) == len(all_symbols)) 
@@ -91,10 +106,18 @@ class Structural_Variant():
         return self.source_events
     
     def generate_blocks(self):
-        # groups together symbols between dispersion events (_)
-        # returns list of lists
-        # Ex. AB_CD -> [["A","B"], ["C","D"]]
+        '''
+        Groups together source and target symbols between dispersion events (_)
+        Each block of symbols belongs to the same target chromosome
+        change_fragment outputs edits using block's start and end position
+
+        -> returns list of lists
+        '''
         def find_blocks(transformation):
+            # transformation: tuple of strings
+            # -> returns list of lists of strings
+            # Ex. ("A","B","_","C","D") -> [["A","B"], ["C","D"]]
+            # Ex. ("A","B","_","_") -> [["A","B"],[],[]]
             blocks = [[]]
             for symbol in transformation:
                 if not symbol.startswith(Symbols.DIS):
@@ -110,18 +133,12 @@ class Structural_Variant():
     def change_fragment(self):
 
         def complement(bases):
+            # bases: str
             output = ""
+            base_complements = {"A": "T", "T": "A", "G": "C", "C": "G", "N":"N"}
             for base in bases.upper():
-                if base == "A":
-                    output += "T"
-                elif base == "T":
-                    output += "A"
-                elif base == "G":
-                    output += "C"
-                elif base == "C":
-                    output += "G"
-                elif base == "N":
-                    output += "N"
+                if base in base_complements:
+                    output += base_complements[base]
                 else:
                     output += base
                     print("Error: Unknown base \'{}\' detected".format(base))
@@ -134,52 +151,55 @@ class Structural_Variant():
         encoding = self.events_dict    # maps symbol like A or B to base pairs on reference 
         #print("Encode_dict: ", encoding)
 
-        # find all blocks between dispersion events
+        # find all blocks of symbols between dispersion events
         self.generate_blocks()
-        
+
         changed_fragments = []
         for idx, block in enumerate(self.target_event_blocks):
             new_frag = ""
-            # new_frag will replace events from the source sequence
-            # imagine from the point of view of the source sequence
-            first_event = encoding[self.source_event_blocks[idx][0].upper()]
-            last_event = encoding[self.source_event_blocks[idx][-1].upper()]
             for x, ele in enumerate(block):
-                upper_str = ele.upper()         # changes all lowercase symbols (if there are any) to uppercase so we can map to the nucleotide bases 
+                upper_str = ele.upper()         # used to find corresponding event from encoding, all keys in encoding are in uppercase
     
-                if any(c.islower() for c in ele):   # checks if lowercase symbols exist in ele
+                if any(c.islower() for c in ele):   # checks if lowercase symbols exist in ele, represents an inversion
                     curr_piece = decode_funcs["invert"](encoding[upper_str].source_frag)   
     
-                elif upper_str in encoding:
+                elif upper_str in encoding:   # take original fragment, no changes
                     curr_piece = decode_funcs["identity"](encoding[upper_str].source_frag)
                 
-                elif ele.startswith(Symbols.DIS):               # _ refers to a space
+                elif ele.startswith(Symbols.DIS):  # DIS = dispersion event ("_")
                     raise Exception("Dispersion event detected within block: {}".format(self.target_event_blocks))
                 else: 
-                    raise Exception("Unknown {} symbol detected in target transformation {}".format(ele, self.target))
+                    raise Exception("Unknown {} symbol detected in target transformation {}".format(ele, self.target))  # all possible symbols should have been logged and mapped to event
                 
                 new_frag += curr_piece
-                encoding[upper_str].target_chr = first_event.source_chr   # source symbols being replaced, so their source_chr is the target
+            
+            # new_frag will replace events from the source sequence, so imagine from the point of view of the source sequence
+            first_event = encoding[self.source_event_blocks[idx][0].upper()]
+            last_event = encoding[self.source_event_blocks[idx][-1].upper()]
+
+            # all events in source sequence MUST have a valid start & end position and a valid source chromosome
+            assert (first_event.start != -1 and last_event.end != -1 and first_event.source_chr != None)
             changed_fragments.append([first_event.source_chr, first_event.start, last_event.end, new_frag])
+            self.target_block_chrs.append(first_event.source_chr)  # used for exporting to bed file
                 
         #print("ref {} -> transformed {} for transformation {}".format(ref_piece, change_genome, self.type.value))
         self.changed_fragments = changed_fragments
+        print("Target Chromosomes: ", self.target_block_chrs)
 
         return changed_fragments
 
 class Event():
-    '''represents the symbols/events within a SV transformation'''
+    '''represents the symbols, also known as the "events," within a SV transformation'''
     def __init__(self, sv_parent, length, length_range, symbol):
         '''
-        sv_parent: Structural Variant, event is a part of larger SV
+        sv_parent: Structural Variant, event is always part of larger SV
         '''
         self.sv_parent = sv_parent
         self.length = length
         self.length_range = length_range
         self.symbol = symbol # refers to symbol in SV's transformation
-        self.source_chr = "None"
+        self.source_chr = None
         self.source_frag = ""
-        self.target_chr = "None"
         self.start = -1
         self.end = -1
     

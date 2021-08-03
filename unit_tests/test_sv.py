@@ -19,8 +19,8 @@ class TestStructuralVariant(unittest.TestCase):
 
     def setUp(self):
         # runs before every test
-        self.sv_no_dispersion = Structural_Variant(8, [(5,5)])
-        self.sv_with_dispersion = Structural_Variant(5, [(5,5)])
+        self.sv_no_dispersion = Structural_Variant("delINVdup", [(5,5)])
+        self.sv_with_dispersion = Structural_Variant("TRA", [(5,5)])
 
     def tearDown(self):
         # runs after every test
@@ -59,3 +59,6 @@ class TestStructuralVariant(unittest.TestCase):
         #A_B -> B_A
         #AAAAA_GGGGG -> GGGGG_AAAAA
         self.assertEqual(self.sv_with_dispersion.change_fragment(), [["chr21", 25, 30, "GGGGG"], ["chr21", 35, 40, "AAAAA"]])
+
+if __name__ == "__main__":
+    unittest.main()

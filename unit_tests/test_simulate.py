@@ -37,11 +37,11 @@ class TestSVSimulator(unittest.TestCase):
     def setUp(self):
         # runs before every test
         self.ref_file1 = "unit_tests/inputs/test.fna"
-        self.par1 = "unit_tests/inputs/par.yaml"
+        self.par1 = "unit_tests/inputs/par1.yaml"
         self.fna_1_1 = "unit_tests/inputs/test_1.fna"
         self.fna_2_1 = "unit_tests/inputs/test_2.fna"
         self.bed1 = "unit_tests/inputs/out.bed"
-        self.sim1 = SV_Simulator(self.ref_file1, self.par1, testing = True)
+        self.sim1 = SV_Simulator(self.ref_file1, self.par1, random_gen = RandomSim(10))
     
     def tearDown(self):
         #runs after every test

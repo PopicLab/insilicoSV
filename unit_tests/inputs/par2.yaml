@@ -1,0 +1,11 @@
+SVs:
+  - type: 8
+    number: 1
+    min_length: 5
+    max_length: 5
+  - type: Custom
+    source: AB_CD_E_
+    target: F_FBce__A
+    min_length: 5
+    max_length: 5
+

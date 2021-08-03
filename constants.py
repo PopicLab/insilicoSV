@@ -12,19 +12,24 @@ class Variant_Type(Enum):
     dupINVdel = "dupINVdel"
     delINV = "delINV"
     INVdel = "INVdel"
-    dDUP_iDEL = "dDUP_iDEL"
-    INS_iDEL = "INS_iDEL"
+    dDUP_iDEL = "dDUP-iDEL"
+    INS_iDEL = "INS-iDEL"
     dupINV = "dupINV"
     INVdup = "INVdup"
     dDUP = "dDUP"
     Custom = "Custom"
 
-class Operations(Enum):
+class Operations():
     INS = "INS"
     DUP = "DUP"
     INV = "INV"
     DEL = "DEL"
     TRA = "TRA"
+
+class Zygosity(Enum):
+    UNDEFINED = -1
+    HOMOZYGOUS = 1
+    HETEROZYGOUS = 0
 
 class Symbols():
     DIS = "_" # dispersion event              
@@ -33,13 +38,14 @@ class Symbols():
 # for processing from yaml config file
 MAX_LENGTH_ATTR = "max_length"
 MIN_LENGTH_ATTR = "min_length"
+RANGES_ATTR = "length_ranges"
 TYPE_ATTR = "type"
 NUM_ATTR = "number"
 TRANSFORM_SOURCE_ATTR = "source"
 TRANSFORM_TARGET_ATTR = "target"
 
 # for Structural Variant class
-SV_KEY = {Variant_Type.INS: [("-",), ("A",)],     
+SV_KEY = {Variant_Type.INS: [("-",), ("-","A")],     
         Variant_Type.DEL: [("A",), ()],
         Variant_Type.INV: [("A",), ("a",)],
         Variant_Type.DUP: [("A",), ("A","A")],
