@@ -73,8 +73,13 @@ class FormatterIO():
         def write_to_file(sv, source_chr, source_s, source_e, target_chr, target_s, target_e, transform, symbol, order = 0):
             assert (not symbol.startswith(Symbols.DIS))
 
+            # consider insertions
+            if source_e == None:
+                source_e = -1
+                source_s = -1
+
             # do not write transformations of size 0
-            if source_e == None and source_e > source_s:
+            if source_e == -1 or source_e > source_s:
                 with open(bedfile, "a") as fout:
                     row = [str(source_chr),
                             str(source_s),

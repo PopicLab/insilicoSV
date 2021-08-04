@@ -24,7 +24,7 @@ class Structural_Variant():
         
         # events like dispersions will appear as the same symbol, so it's important to add unique tags to differentiate them
         ErrorDetection.validate_symbols(self.source)
-        self.source_unique_char, self.target_unique_char = self.add_unique_ids(self.source), self.add_unique_ids(self.target)
+        self.source_unique_char, self.target_unique_char = Structural_Variant.add_unique_ids(self.source), Structural_Variant.add_unique_ids(self.target)
 
         # initialize event classes
         self.start = None   # defines the space in which SV operates
@@ -49,9 +49,10 @@ class Structural_Variant():
         self.hap = [False, False]
     
     def __repr__(self):
-        return "<SV transformation {} -> {} taking up {} non-dispersion spaces>".format(''.join(self.source), ''.join(self.target), sum([event.length for event in self.source_events if not event.symbol.startswith(Symbols.DIS)]))
+        return "<SV transformation \"{}\" -> \"{}\" taking up {} non-dispersion spaces>".format(''.join(self.source), ''.join(self.target), sum([event.length for event in self.source_events if not event.symbol.startswith(Symbols.DIS)]))
     
-    def add_unique_ids(self, transformation):
+    @staticmethod
+    def add_unique_ids(transformation):
         # if dispersion events exist in transformation, tag on unique ids to make them distinct as they all are "_"
         # unique ids necessary to map symbol to event with one-to-one correspondence
         unique_transform = []
@@ -142,102 +143,6 @@ class Structural_Variant():
 
         return self.target_symbol_blocks
 
-    def change_fragment_experimental(self):
-
-        def complement(bases):
-            # bases: str
-            output = ""
-            base_complements = {"A": "T", "T": "A", "G": "C", "C": "G", "N":"N"}
-            for base in bases.upper():
-                if base in base_complements:
-                    output += base_complements[base]
-                else:
-                    output += base
-                    print("Error: Unknown base \'{}\' detected".format(base))
-            
-            return output
-        def symbol_is_inversion(symbol):
-            return any(c.islower() for c in symbol)
-
-        decode_funcs = {"invert": lambda string: complement(string[::-1]),
-                       "complement": complement} 
-        encoding = self.events_dict    # maps symbol like A or B to base pairs on reference 
-        #print("Encode_dict: ", encoding)
-
-        # find all blocks of symbols between dispersion events
-        # we will apply edits based on a block's start and end pos
-        self.generate_blocks()
-
-        changed_fragments = []
-        assert (self.start != None and self.end != None) # start & end should have been defined alongside event positions
-        block_start = self.start
-        curr_pos = self.start
-        curr_chr = self.start_chr
-
-        for idx, block in enumerate(self.target_symbol_blocks):
-            new_frag = ""
-            for x, symbol in enumerate(block):
-                event = encoding[symbol.upper()[0]]
-
-                # duplication/inverted-duplications
-                if len(symbol) > 1 and symbol[1] == Symbols.ORIGINAL_DUP:
-                    if symbol_is_inversion(symbol):
-                        new_frag += decode_funcs["invert"](event.source_frag)
-                        event.target_ins.append((curr_chr, curr_pos, Operations.INVDUP))  # info used to export to BEDPE file
-                    else:
-                        new_frag += event.source_frag
-                        event.target_ins.append((curr_chr, curr_pos, Operations.DUP))
-                
-                else:  # symbol is an original
-                    event.target_chr = curr_chr
-                    event.target_start = curr_pos   # refers only to what happens to the original
-
-                    # insertions
-                    if symbol[0].upper() not in self.source_unique_char:
-                        new_frag += event.source_frag
-                        event.original_transform = Operations.INS
-                    
-                    # translocations - original symbol
-                    elif len(symbol) == 1 and idx != event.original_block_idx:
-                        if symbol_is_inversion(symbol):
-                            event.original_transform = Operations.INVTRA
-                            new_frag += decode_funcs["invert"](event.source_frag)
-                        else:
-                            event.original_transform = Operations.TRA
-                            new_frag += event.source_frag
-
-                    # inversions
-                    elif symbol_is_inversion(symbol):
-                        event.original_transform = Operations.INV
-                        curr_pos = event.end       # this symbol was already in source
-                        new_frag += decode_funcs["invert"](event.source_frag)
-                    
-                    # identity - original symbol did not change or move
-                    else:
-                        event.original_transform = Operations.IDENTITY
-                        curr_pos = event.end
-                        new_frag += event.source_frag
-
-            # find dispersion event right after block to update position and chromosome to edit on
-            if idx < len(self.target_symbol_blocks) - 1:
-                dis_event = self.events_dict[Symbols.DIS + str(idx + 1)]  # find the nth dispersion event
-                changed_fragments.append([curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
-                curr_pos = dis_event.end
-                block_start = dis_event.end
-                curr_chr = dis_event.source_chr
-            else:
-                changed_fragments.append([curr_chr, block_start, self.end, new_frag])
-        
-        # deletions - any original symbols not detected in target sequence are deleted
-        for symbol in self.events_dict:
-            if self.events_dict[symbol].symbol.startswith(Symbols.DIS):
-                self.events_dict[symbol].original_transform = Operations.IDENTITY
-            if self.events_dict[symbol].original_transform == Operations.UNDEFINED:
-                self.events_dict[symbol].original_transform = Operations.DEL
-
-        self.changed_fragments = changed_fragments
-
-        return changed_fragments
     def change_fragment(self):
 
         def complement(bases):
