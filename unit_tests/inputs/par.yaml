@@ -2,12 +2,12 @@ SVs:
 - max_length: 5
   min_length: 5
   number: 1
-  type: delINVdup
+  type: dDUP-iDEL
 - max_length: 5
   min_length: 5
   number: 1
-  type: delINVdel
+  type: INS-iDEL
 - max_length: 5
   min_length: 5
   number: 1
-  type: dupINVdup
+  type: dDUP

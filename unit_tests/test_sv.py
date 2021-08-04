@@ -7,24 +7,10 @@ from pysam import FastaFile
 
 class TestStructuralVariant(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        # runs before all tests
-        pass
-
-    @classmethod
-    def tearDownClass(cls):
-        # runs after all tests
-        pass
-
     def setUp(self):
         # runs before every test
         self.sv_no_dispersion = Structural_Variant("delINVdup", [(5,5)])
         self.sv_with_dispersion = Structural_Variant("TRA", [(5,5)])
-
-    def tearDown(self):
-        # runs after every test
-        pass
 
     def test_generate_blocks(self):
         self.assertEqual(self.sv_no_dispersion.generate_blocks(),[["c","b","C"]])

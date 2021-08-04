@@ -6,27 +6,9 @@ from processing import FormatterIO
 
 class TestProcessing(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        # runs before all tests
-        pass
-
-    @classmethod
-    def tearDownClass(cls):
-        # runs after all tests
-        pass
-
     def setUp(self):
         # runs before every test
         self.formatter = FormatterIO("unit_tests/inputs/test.fna")
-
-    def tearDown(self):
-        # runs after every test
-        pass
-
-    def test1_yaml(self):
-        # primarily checks error detection system
-        pass
 
     def test_find_lcs(self):
         # if lowercase letters present in target, then take those letters in lcs

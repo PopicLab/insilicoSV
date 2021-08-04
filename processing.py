@@ -11,40 +11,34 @@ class Config():
         self.run_checks()
         if "fail_if_placement_issues" not in self.__dict__:
             self.fail_if_placement_issues = False
-            #self.__dict__.update({"fail_if_placement_issues": False})
-            #print(self.__dict__)
 
-        for sv in self.SVs:
+        for config_sv in self.SVs:
             # handles cases where user enters length range for all components within SV or specifies different ranges
-            if isinstance(sv[MIN_LENGTH_ATTR], int):
-                sv[RANGES_ATTR] = [(sv[MIN_LENGTH_ATTR], sv[MAX_LENGTH_ATTR])]
+            if isinstance(config_sv["min_length"], int):
+                config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
             else:
-                sv[RANGES_ATTR] = list(zip(sv[MIN_LENGTH_ATTR], sv[MAX_LENGTH_ATTR]))
-            
-            # interchromosomal transformations (can only take place across dispersions)
-            if "allow_interchromosomal" not in sv:
-                sv["allow_interchromosomal"] = False
+                config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
             
             # supply filler values in for source and target if the type is custom
-            sv[TYPE_ATTR] = Variant_Type(sv[TYPE_ATTR])
-            if sv[TYPE_ATTR] != Variant_Type.Custom:
-                sv[TRANSFORM_SOURCE_ATTR] = None
-                sv[TRANSFORM_TARGET_ATTR] = None
+            config_sv["type"] = Variant_Type(config_sv["type"])
+            if config_sv["type"] != Variant_Type.Custom:
+                config_sv["source"] = None
+                config_sv["target"] = None
 
     def run_checks(self):
         config_svs = self.SVs
         for config_sv in config_svs:
             # makes sure required attributes are written into parameter file
-            if MIN_LENGTH_ATTR not in config_sv:
+            if "min_length" not in config_sv:
                 raise Exception("Min length must be specified on all SVs!")
-            elif MAX_LENGTH_ATTR not in config_sv:
+            elif "max_length" not in config_sv:
                 raise Exception("Max length must be specified on all SVs!")
-            elif TYPE_ATTR not in config_sv:
+            elif "type" not in config_sv:
                 raise Exception("\"Type\" attribute must be specified! For custom transformations, enter in \"Custom\"")
 
             # makes sure attributes are the correct datatype
-            elif TYPE_ATTR in config_sv and not isinstance(config_sv[TYPE_ATTR], str):
-                raise Exception("Invalid {} type for SV \'type\' attribute, str expected".format(type(config_sv[TYPE_ATTR])))
+            elif "type" in config_sv and not isinstance(config_sv["type"], str):
+                raise Exception("Invalid {} type for SV \'type\' attribute, str expected".format(type(config_sv["type"])))
 
 class FormatterIO():
     def __init__(self, filein):
@@ -72,65 +66,15 @@ class FormatterIO():
 
         return config
 
-    def find_lcs(self, source_list, target_list, input_is_list=True):
-        # Finds longest common subsequence between source_list and target_list such that if there is a dispersion event in source_list and target_list, it MUST belong in the lcs
-        # If there is a dispersion (_) in source_list and target_list, then simply find the lcs of before and after the event and put them together
-        # The lcs MUST have all the _ in source_list and target_list as a dispersion event cannot be transformed
-
-        def lcs_list(list1, list2):
-            # -> returns the longest common subsequence
-            m, n = len(list1), len(list2)
-        
-            l = [[[] for i in range(n + 1)]
-                for i in range(m + 1)]
-        
-            # bottom-up approach
-            for i in range(m + 1):
-                for j in range(n + 1):
-                    if (i == 0 or j == 0):
-                        l[i][j] = []
-                    elif(list1[i - 1].upper() == list2[j - 1].upper()):
-                        l[i][j] = l[i - 1][j - 1] + list(list2[j-1])
-                    else:
-                        l[i][j] = max(l[i - 1][j],
-                                    l[i][j - 1], key=lambda lcs_entry: len(lcs_entry))
-        
-            return l[m][n]
-        
-        if not input_is_list:
-            source_list = list(source_list)
-            target_list = list(target_list)
-        
-        # remove placeholder from source_list and target_list
-        source_list_new = [char for char in source_list if char != Symbols.PLACEHOLDER]
-        target_list_new = [char for char in target_list if char != Symbols.PLACEHOLDER]
-
-        # collects locations of dispersions (space) in source_list_new and target_list_new
-        loc1 = [-1]
-        loc1.extend([index for index in range(len(source_list_new)) if source_list_new[index].startswith(Symbols.DIS)])
-        loc1.append(len(source_list_new))
-
-        loc2 = [-1]
-        loc2.extend([index for index in range(len(target_list_new)) if target_list_new[index].startswith(Symbols.DIS)])
-        loc2.append(len(target_list_new))
-
-        if len(loc1) != len(loc2):
-            raise Exception("Unequal number of dispersion events ({}) across source_list_new and target_list_new, source_list_new: {}, target_list_new: {}".format(Symbols.DIS, source_list_new, target_list_new))
-        
-        common = list()
-        for idx in range(1, len(loc1)):
-            common.extend(lcs_list(source_list_new[loc1[idx-1] + 1: loc1[idx]], target_list_new[loc2[idx-1] + 1: loc2[idx]]))
-            if idx != len(loc1) - 1:
-                common.append(source_list_new[loc1[idx]])
-            
-        return common
-    
     def export_to_bedpe(self, svs, bedfile, reset_file = True):
-        def write_to_file(sv, source_chr, target_chr, source_s, source_e, target_s, target_e, transform, symbol, order = 0):
+        '''
+        Exports SVs changes to bedfile, uses target "blocks" to identify which subtype event is (INS, DUP, TRA, etc.)
+        '''
+        def write_to_file(sv, source_chr, source_s, source_e, target_chr, target_s, target_e, transform, symbol, order = 0):
             assert (not symbol.startswith(Symbols.DIS))
 
             # do not write transformations of size 0
-            if source_e > source_s or source_e == -1:
+            if source_e == None and source_e > source_s:
                 with open(bedfile, "a") as fout:
                     row = [str(source_chr),
                             str(source_s),
@@ -146,90 +90,106 @@ class FormatterIO():
                             str(order)]
 
                     fout.write("\t".join(row) + "\n")
+        def symbol_is_inversion(symbol):
+            return any(c.islower() for c in symbol)
 
         if reset_file:
             self.reset_file(bedfile)
         
         for x, sv in enumerate(svs):
             source, target = sv.source_unique_char, sv.target_unique_char
-            events_dict = sv.events_dict
+            encoding = sv.events_dict    # maps symbol like A or B to base pairs on reference 
+            #print("Encode_dict: ", encoding)
 
-            # longest common subsequence represents the symbols that stay in place
-            # the goal here is to minimize the number of transformations to get from source to target
-            #source, target = "".join(source), "".join(target)
-            same_place = self.find_lcs(source, target)
-            #print(source, target, same_place)
-
-            # Remove symbols in source which do not remain in same place
-            index = 0
-            for sr_symbol in source:
-                if index >= len(same_place) or sr_symbol.upper() != same_place[index].upper():
-                    event = events_dict[sr_symbol.upper()]
-                    start, end = event.start, event.end
-                    write_to_file(sv, event.source_chr, event.source_chr, start, end, start, start, Operations.DEL, sr_symbol)
-                else:
-                    index += 1
-            
-            # Add symbols from target not in same_place
-            index = 0  # refers to position on same_place
-            target_chr_index = 0
-            target_chr = sv.target_block_chrs
-            insert_point = sv.start
+            assert (sv.start != None and sv.end != None) # start & end should have been defined alongside event positions
+            curr_pos = sv.start
+            curr_chr = sv.start_chr
             order = 0
-            for tr_symbol in target:
-                # updates target chromosome to be exported
-                # note this means that we've entered a new block
-                if tr_symbol.startswith(Symbols.DIS):
-                    target_chr_index += 1
 
-                if index >= len(same_place) or tr_symbol.upper() != same_place[index].upper():   # current symbol does not remain in place
-                    order += 1
-                    event = events_dict[tr_symbol.upper()]
-                    if tr_symbol.upper() in source:  # duplication
-                        start, end = event.start, event.end
-                        event_name = Operations.DUP
-                    else:  # insertion detected
-                        start, end = -1, -1
-                        event_name = Operations.INS
-                    write_to_file(sv, event.source_chr, target_chr[target_chr_index], start, end, insert_point, insert_point, event_name, tr_symbol, order)
+            for idx, block in enumerate(sv.target_symbol_blocks):
+                for x, symbol in enumerate(block):
+                    event = encoding[symbol.upper()[0]]
+
+                    # duplication/inverted-duplications
+                    if len(symbol) > 1 and symbol[1] == Symbols.ORIGINAL_DUP:
+                        if symbol_is_inversion(symbol):
+                            event_name = Operations.INVDUP
+                        else:
+                            event_name = Operations.DUP
+                        # consider dispersed duplications
+                        
+                        order += 1
+                        write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, order)
                     
-                    # Inversion applies in either case
-                    if tr_symbol.islower():
-                        write_to_file(sv, event.source_chr, target_chr[target_chr_index], start, end, insert_point, insert_point, Operations.INV, tr_symbol, order)
+                    else:  # symbol is an original
+                        # insertions
+                        if symbol[0].upper() not in sv.source_unique_char:
+                            order += 1
+                            write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, Operations.INS, event.symbol, order)
+                        
+                        # translocations - original symbol
+                        elif len(symbol) == 1 and idx != event.original_block_idx:
+                            order += 1
+                            if symbol_is_inversion(symbol):
+                                event_name = Operations.INVTRA
+                            else:
+                                event_name = Operations.TRA
+                            write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, order)
+
+                        # inversions
+                        elif symbol_is_inversion(symbol):
+                            order = 0
+                            curr_pos = event.end       # this symbol was already in source
+                            write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, event.start, event.end, Operations.INV, event.symbol, order)
+                        
+                        # identity - original symbol did not change or move
+                        else:
+                            order = 0
+                            curr_pos = event.end
+
+                # find dispersion event right after block to update position and chromosome to edit on
+                if idx < len(sv.target_symbol_blocks) - 1:
+                    dis_event = encoding[Symbols.DIS + str(idx + 1)]  # find the nth dispersion event
+                    curr_pos = dis_event.end
+                    curr_chr = dis_event.source_chr
             
-                elif tr_symbol.upper() == same_place[index].upper():   # current symbol does remain in place - the only possible event could be an inversion
-                    event = events_dict[tr_symbol.upper()]
-                    insert_point = event.end
+            # deletions - any original symbols not detected in target sequence are deleted
+            for symbol in source:
+                # do not delete dispersion events or symbols already in target
+                if not symbol.startswith(Symbols.DIS) and symbol not in target and symbol.lower() not in target:
+                    event = encoding[symbol]
                     order = 0
-                    index += 1
-                
-                    # Inversion applies in either case
-                    # Note that all dispersions should enter this case, but none will be exported because islower() returns False
-                    if tr_symbol.islower():
-                        start, end = event.start, event.end
-                        write_to_file(sv, event.source_chr, target_chr[target_chr_index], start, end, start, end, Operations.INV, tr_symbol, order)
-                
-                else:
-                    raise Exception("Target symbol {} does not fall into either case".format(tr_symbol))
-            
+                    write_to_file(sv, event.source_chr, event.start, event.end, event.source_chr, event.start, event.start, Operations.DEL, event.symbol, order)
             self.bedpe_counter += 1
-    
+
     def export_piece(self, id, edits, fasta_out, fasta_file, verbose = False):
+        '''
+        Exports list of changes from simulator to fasta file
+
+        id: chr_id to apply edits to
+        edits: list with interval and new_frag, replace reference at the interval with new_frag
+        fasta_out: Fasta file to export changes to
+        fasta_file: FastaFile with access to reference
+        '''
         with open(fasta_out,"a") as fout_export:
             if id not in fasta_file.references:
                 raise KeyError("ID {} not found in inputted fasta file".format(id))
             
             if verbose:
                 print("New ID: ", id)
+
+            # Write in chr_id
             fout_export.write(">" + str(id) + "\n")
-            chr_variants = list(edits)
+            chr_variants = list(edits)   # given as (start, end, new_frag)
             chr_variants.sort()
             chr_variants.append([fasta_file.get_reference_length(id), fasta_file.get_reference_length(id), ""]) # to ensure that all bases after last variant are included
 
+            # apply changes by traversing reference from start to end - this is possible since chr_variants is sorted
             pos = 0
             for variant in chr_variants:
                 var_start, var_end = variant[0], variant[1]
                 for idx in range(pos, var_end):
+                    # write all reference bases up until interval, which indicates that a change will occur
                     if idx < var_start:
                         c = fasta_file.fetch(id, idx, idx+1)
                         fout_export.write(c)

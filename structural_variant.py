@@ -27,13 +27,15 @@ class Structural_Variant():
         self.source_unique_char, self.target_unique_char = self.add_unique_ids(self.source), self.add_unique_ids(self.target)
 
         # initialize event classes
-        self.req_space = -1
-        self.source_events = []
-        self.events_dict = dict()
+        self.start = None   # defines the space in which SV operates
+        self.end = None
+        self.req_space = None   # required space for SV, sum of event lengths
+        self.source_events = []   # list of Event classes for every symbol in source sequence
+        self.events_dict = dict()   # maps every unique symbol in source and target to an Event class
         self.initialize_events(length_ranges)
         #print("Events Dict: ", self.events_dict)
-        self.source_event_blocks = []
-        self.target_event_blocks = []
+        self.source_symbol_blocks = []
+        self.target_symbol_blocks = []
         self.target_block_chrs = []   # stores the assigned target chr for each block to export to BEDPE file
 
         # specifies if sv is unable to be simulated due to random placement issues
@@ -51,7 +53,7 @@ class Structural_Variant():
     
     def add_unique_ids(self, transformation):
         # if dispersion events exist in transformation, tag on unique ids to make them distinct as they all are "_"
-        # unique ids later necessary to map symbol to event
+        # unique ids necessary to map symbol to event with one-to-one correspondence
         unique_transform = []
         unique_id = 1
         for component in transformation:
@@ -73,7 +75,8 @@ class Structural_Variant():
         # note that the symbols represent events
         all_symbols = []
         for ele in self.source_unique_char + self.target_unique_char:
-            if ele.upper() not in all_symbols:
+            # only append original symbols or dispersion events
+            if len(ele) > 0 and (len(ele) == 1 or ele.startswith(Symbols.DIS)) and ele.upper() not in all_symbols:
                 all_symbols.append(ele.upper())
         all_symbols.sort()  # user inputs symbol lengths in lexicographical order
 
@@ -91,7 +94,7 @@ class Structural_Variant():
 
         else:
             raise Exception("Lengths parameter expects at least one tuple")
-        symbols_dict[Symbols.PLACEHOLDER] = (0, (0,0))
+        # symbols_dict[Symbols.PLACEHOLDER] = (0, (0,0))
 
         # initialize event classes
         for idx, symbol in enumerate(all_symbols):
@@ -108,8 +111,7 @@ class Structural_Variant():
     def generate_blocks(self):
         '''
         Groups together source and target symbols between dispersion events (_)
-        Each block of symbols belongs to the same target chromosome
-        change_fragment outputs edits using block's start and end position
+        Tracks which block index the original symbols are in
 
         -> returns list of lists
         '''
@@ -125,11 +127,117 @@ class Structural_Variant():
                 else:
                     blocks.append([])
             return blocks
-        self.source_event_blocks = find_blocks(self.source_unique_char)
-        self.target_event_blocks = find_blocks(self.target_unique_char)
+        def track_original_symbol(symbol_blocks):
+            # finds which region/block the original symbol is in
+            # if symbol is later found in another region, then translocation detected
+            # blocks: list of lists of symbols
+            for idx, block in enumerate(symbol_blocks):
+                for symbol in block:
+                    if len(symbol) == 1: # means it's an original symbol
+                        self.events_dict[symbol].original_block_idx = idx
 
-        return self.target_event_blocks
+        self.source_symbol_blocks = find_blocks(self.source_unique_char)
+        self.target_symbol_blocks = find_blocks(self.target_unique_char)
+        track_original_symbol(self.source_symbol_blocks)
 
+        return self.target_symbol_blocks
+
+    def change_fragment_experimental(self):
+
+        def complement(bases):
+            # bases: str
+            output = ""
+            base_complements = {"A": "T", "T": "A", "G": "C", "C": "G", "N":"N"}
+            for base in bases.upper():
+                if base in base_complements:
+                    output += base_complements[base]
+                else:
+                    output += base
+                    print("Error: Unknown base \'{}\' detected".format(base))
+            
+            return output
+        def symbol_is_inversion(symbol):
+            return any(c.islower() for c in symbol)
+
+        decode_funcs = {"invert": lambda string: complement(string[::-1]),
+                       "complement": complement} 
+        encoding = self.events_dict    # maps symbol like A or B to base pairs on reference 
+        #print("Encode_dict: ", encoding)
+
+        # find all blocks of symbols between dispersion events
+        # we will apply edits based on a block's start and end pos
+        self.generate_blocks()
+
+        changed_fragments = []
+        assert (self.start != None and self.end != None) # start & end should have been defined alongside event positions
+        block_start = self.start
+        curr_pos = self.start
+        curr_chr = self.start_chr
+
+        for idx, block in enumerate(self.target_symbol_blocks):
+            new_frag = ""
+            for x, symbol in enumerate(block):
+                event = encoding[symbol.upper()[0]]
+
+                # duplication/inverted-duplications
+                if len(symbol) > 1 and symbol[1] == Symbols.ORIGINAL_DUP:
+                    if symbol_is_inversion(symbol):
+                        new_frag += decode_funcs["invert"](event.source_frag)
+                        event.target_ins.append((curr_chr, curr_pos, Operations.INVDUP))  # info used to export to BEDPE file
+                    else:
+                        new_frag += event.source_frag
+                        event.target_ins.append((curr_chr, curr_pos, Operations.DUP))
+                
+                else:  # symbol is an original
+                    event.target_chr = curr_chr
+                    event.target_start = curr_pos   # refers only to what happens to the original
+
+                    # insertions
+                    if symbol[0].upper() not in self.source_unique_char:
+                        new_frag += event.source_frag
+                        event.original_transform = Operations.INS
+                    
+                    # translocations - original symbol
+                    elif len(symbol) == 1 and idx != event.original_block_idx:
+                        if symbol_is_inversion(symbol):
+                            event.original_transform = Operations.INVTRA
+                            new_frag += decode_funcs["invert"](event.source_frag)
+                        else:
+                            event.original_transform = Operations.TRA
+                            new_frag += event.source_frag
+
+                    # inversions
+                    elif symbol_is_inversion(symbol):
+                        event.original_transform = Operations.INV
+                        curr_pos = event.end       # this symbol was already in source
+                        new_frag += decode_funcs["invert"](event.source_frag)
+                    
+                    # identity - original symbol did not change or move
+                    else:
+                        event.original_transform = Operations.IDENTITY
+                        curr_pos = event.end
+                        new_frag += event.source_frag
+
+            # find dispersion event right after block to update position and chromosome to edit on
+            if idx < len(self.target_symbol_blocks) - 1:
+                dis_event = self.events_dict[Symbols.DIS + str(idx + 1)]  # find the nth dispersion event
+                changed_fragments.append([curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
+                curr_pos = dis_event.end
+                block_start = dis_event.end
+                curr_chr = dis_event.source_chr
+            else:
+                changed_fragments.append([curr_chr, block_start, self.end, new_frag])
+        
+        # deletions - any original symbols not detected in target sequence are deleted
+        for symbol in self.events_dict:
+            if self.events_dict[symbol].symbol.startswith(Symbols.DIS):
+                self.events_dict[symbol].original_transform = Operations.IDENTITY
+            if self.events_dict[symbol].original_transform == Operations.UNDEFINED:
+                self.events_dict[symbol].original_transform = Operations.DEL
+
+        self.changed_fragments = changed_fragments
+
+        return changed_fragments
     def change_fragment(self):
 
         def complement(bases):
@@ -152,39 +260,44 @@ class Structural_Variant():
         #print("Encode_dict: ", encoding)
 
         # find all blocks of symbols between dispersion events
+        # we will apply edits based on a block's start and end pos
         self.generate_blocks()
 
         changed_fragments = []
-        for idx, block in enumerate(self.target_event_blocks):
+        assert (self.start != None and self.end != None) # start & end should have been defined alongside event positions
+        block_start = self.start   # describes SV's start position - applies for the first "block"
+        curr_chr = self.start_chr
+
+        for idx, block in enumerate(self.target_symbol_blocks):
             new_frag = ""
             for x, ele in enumerate(block):
-                upper_str = ele.upper()         # used to find corresponding event from encoding, all keys in encoding are in uppercase
+                upper_str = ele[0].upper()         # used to find corresponding event from encoding, all keys in encoding are in uppercase
+                event = encoding[upper_str[0]]
     
                 if any(c.islower() for c in ele):   # checks if lowercase symbols exist in ele, represents an inversion
-                    curr_piece = decode_funcs["invert"](encoding[upper_str].source_frag)   
+                    new_frag += decode_funcs["invert"](event.source_frag)   
     
-                elif upper_str in encoding:   # take original fragment, no changes
-                    curr_piece = decode_funcs["identity"](encoding[upper_str].source_frag)
+                elif upper_str[0] in encoding:   # take original fragment, no changes
+                    new_frag += event.source_frag
                 
                 elif ele.startswith(Symbols.DIS):  # DIS = dispersion event ("_")
-                    raise Exception("Dispersion event detected within block: {}".format(self.target_event_blocks))
-                else: 
-                    raise Exception("Unknown {} symbol detected in target transformation {}".format(ele, self.target))  # all possible symbols should have been logged and mapped to event
+                    raise Exception("Dispersion event detected within block: {}".format(self.target_symbol_blocks))
+                else:
+                    raise Exception("Symbol {} failed to fall in any cases".format(ele))
                 
-                new_frag += curr_piece
-            
-            # new_frag will replace events from the source sequence, so imagine from the point of view of the source sequence
-            first_event = encoding[self.source_event_blocks[idx][0].upper()]
-            last_event = encoding[self.source_event_blocks[idx][-1].upper()]
-
-            # all events in source sequence MUST have a valid start & end position and a valid source chromosome
-            assert (first_event.start != -1 and last_event.end != -1 and first_event.source_chr != None)
-            changed_fragments.append([first_event.source_chr, first_event.start, last_event.end, new_frag])
-            self.target_block_chrs.append(first_event.source_chr)  # used for exporting to bed file
+            # find dispersion event right after block to find position of next block
+            if idx < len(self.target_symbol_blocks) - 1:
+                dis_event = self.events_dict[Symbols.DIS + str(idx + 1)]  # find the nth dispersion event
+                changed_fragments.append([curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
+                block_start = dis_event.end   # move on to next block
+                curr_chr = dis_event.source_chr
+            else:
+                changed_fragments.append([curr_chr, block_start, self.end, new_frag])
                 
         #print("ref {} -> transformed {} for transformation {}".format(ref_piece, change_genome, self.type.value))
         self.changed_fragments = changed_fragments
-        print("Target Chromosomes: ", self.target_block_chrs)
+        print(self.changed_fragments)
+        #print("Target Chromosomes: ", self.target_block_chrs)
 
         return changed_fragments
 
@@ -199,11 +312,17 @@ class Event():
         self.length_range = length_range
         self.symbol = symbol # refers to symbol in SV's transformation
         self.source_chr = None
-        self.source_frag = ""
-        self.start = -1
-        self.end = -1
+        self.source_frag = None
+        self.start = None
+        self.end = None
+
+        # experimental attributes
+        self.original_block_idx = None
+        self.original_transform = Operations.UNDEFINED  # describes what happened to the original symbol, either INS (randomly generate sequence), INV, TRA, DEL, or None (Nothing happend)
+        self.target_ins = [1]       # list of (chr, position, operation) to insert a duplication/inverted-duplication of source fragment
+        self.target_start = None
     
     def __repr__(self):
         return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end, "source_frag": self.source_frag,
-                        "source_chr": self.source_chr, "target_chr": self.target_chr})
+                        "source_chr": self.source_chr, "original_transform": self.original_transform, "target_ins": self.target_ins, "target_start": self.target_start})
 
