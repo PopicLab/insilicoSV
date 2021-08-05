@@ -52,15 +52,15 @@ Please see the table and picture for the list of predefined classes.
 
 A custom SV consists of a user-generated transformation with a source and target sequence of "symbols," most of which are alphabetical letters. Some examples of a source would be "ABC" and "A_B_C," while some examples of the target would be "a'AB" or "A_b'Bc'_C." 
 
-insilicoSV maps a randomly generated piece of the reference to each of the symbols in the source and recompiles the affected region with the target. For instance, "AB -> "A" would remove the fragment marked as symbol B. All symbols in the source sequence MUST be unique to create a one-to-one mapping between symbol and reference fragment.
+insilicoSV maps a random fragment of the reference to each of the symbols in the source and recompiles the affected region with the target. For instance, "AB -> "A" would remove the fragment marked as symbol B. All symbols in the source sequence MUST be unique to create a one-to-one mapping between symbol and reference fragment.
 
 | Name | Symbol | Description |
 |------|--------|-------------|
 | Generic Event | Any uppercase alphabetical letter (etc. "A") | The most fundamental organizing tool that maps to a reference fragment |
 | Inversion | Any lowercase alphabetical letter | Indicates an inversion. <br /> Ex. a transformation "ABC" -> "abc" will invert "A," "B", and "C" and organize the new fragments as denoted in the target |
-| Duplication | Original symbol followed by single quotation (') | An original symbol refers the initial character used in the source sequence. *There can only be ONE original symbol for every unique character - all other copies, including inverted ones, must have a duplication "'" marking.* <br /> Ex. A transformation "ABC" -> "ABA'c" would duplicate "A" after "B" and invert the fragment C.|
-| Dispersion | Underscore (_) | Indicates a gap between the symbols surrounding it. Note that events may be simulated within a dispersion but will not be within other events. |
-| Insertions | Uppercase alphabetical letter | To include foreign insertions in the transformation, add a symbol not present in the source to the target sequence. |
+| Duplication | Original symbol followed by single quotation (') | An original symbol refers to the initial character used in the source sequence. *There can only be ONE original symbol for every unique character - all other copies, including those that are inverted, must have a duplication "'" marking.* <br /> Ex. A transformation "ABC" -> "ABA'c" would duplicate "A" after "B" and invert the fragment C.|
+| Dispersion | Underscore (_) | Indicates a gap between the symbols surrounding it. Note that events may be simulated within a dispersion but not within other events. |
+| Insertions | Uppercase alphabetical letter | To add foreign, randomly-generated insertions, use a symbol not present in the source to the target sequence. <br /> Ex. "A_B" -> "A_BC" inserts a randomly-generated sequence after the fragment indicated by symbol "B"|
 
 
 
@@ -74,7 +74,7 @@ Each line/entry will have the following parameters:
 5. *target_start*: Start position on the target chr [INCLUDE at pos], zero-based indexing
 6. *target_end*: End position on the target chr [EXCLUDE at pos], one-based indexing
 7. *event_type*: Describes the transformation made by the event, either an INS, DEL, INV, TRA, DUP, INVDUP, or INVTRA. Dispersed duplications--those that do not occur immediately after the original--have an attached "d" at the front.
-8. *event_size*: Size of the fragment impacted by the event on the source chromosome 
+8. *event_size*: Size of the reference fragment impacted by the event
 9. *parent_sv*: Describes the parent SV the event is a component of, for instance "dupINVdup." If a custom SV was provided, the name becomes "source>target"
 10. *nth_sv*: int, index to count up each SV (note: not the events). All events of a SV belong in the same index.
 11. *order*: int, for insertion-like operations such as TRA, INS, or DUP, the "order" index describes in which order events that target the same position were compiled. Events with INV and DEL operations have an order of 0.
@@ -107,23 +107,23 @@ SVs:
 ```
 ```
 # BEDPE file
-None	        -1	0	Chromosome21	148	149	INS	10	    0/1	INS	        1	1
-None	        -1	0	Chromosome19	5	6	INS	6	    0/1	INS	        2	1
-None	        -1	0	Chromosome19	38	39	INS	7	    1/1	INS	        3  	1
-None	        -1	0	Chromosome21	48	49	INS	8	    1/1	INS	        4	1
-None	        -1	0	Chromosome19	86	87	INS	10	    0/1	INS	        5	1
-None	        -1	0	Chromosome19	64	65	INS	9	    1/1	INS	        6	1
-None	        -1	0	Chromosome19	7	8	INS	10	    0/1	INS	        7	1
-None	        -1	0	Chromosome21	141	142	INS	8	    1/1	INS	        8	1
-None	        -1	0	Chromosome19	74	75	INS	10	    1/1	INS	        9	1
-None	        -1	0	Chromosome19	60	61	INS	7	    0/1	INS	        10	1
+None	        -1	0	  Chromosome21	148	149	INS	10	  0/1	INS	        1	  1
+None	        -1	0	  Chromosome19	5	  6	  INS	6	    0/1	INS	        2	  1
+None	        -1	0	  Chromosome19	38	39	INS	7	    1/1	INS	        3   1
+None	        -1	0	  Chromosome21	48	49	INS	8	    1/1	INS	        4	  1
+None	        -1	0	  Chromosome19	86	87	INS	10	  0/1	INS	        5	  1
+None	        -1	0	  Chromosome19	64	65	INS	9	    1/1	INS	        6	  1
+None	        -1	0	  Chromosome19	7	  8	  INS	10	  0/1	INS	        7	  1
+None	        -1	0	  Chromosome21	141	142	INS	8	    1/1	INS	        8	  1
+None	        -1	0	  Chromosome19	74	75	INS	10	  1/1	INS	        9	  1
+None	        -1	0	  Chromosome19	60	61	INS	7	    0/1	INS	        10  1
 Chromosome21	23	31	Chromosome21	23	31	INV	7	    0/1	INVdel	    11	0
 Chromosome21	30	36	Chromosome21	30	31	DEL	5	    0/1	INVdel	    11	0
 Chromosome21	122	132	Chromosome21	122	132	INV	9	    1/1	INVdel	    12	0
-Chromosome21	131	142	Chromosome21	131	132	DEL	10	    1/1	INVdel	    12	0
-Chromosome19	93	106	Chromosome19	93	106	INV	12	    0/1	dupINVdel	13	0
-Chromosome19	88	94	Chromosome19	105	106	dINVDUP	5	0/1	dupINVdel	13	1
-Chromosome19	105	113	Chromosome19	105	106	DEL	7	    0/1	dupINVdel	13	0
+Chromosome21	131	142	Chromosome21	131	132	DEL	10	  1/1	INVdel	    12	0
+Chromosome19	93	106	Chromosome19	93	106	INV	12	  0/1	dupINVdel	  13	0
+Chromosome19	88	94	Chromosome19	105	106	dINVDUP	5	0/1	dupINVdel	  13	1
+Chromosome19	105	113	Chromosome19	105	106	DEL	7	    0/1	dupINVdel	  13	0
 ```
 
 ### Example 2 - Custom SVs
@@ -159,17 +159,17 @@ SVs:
 ```
 ```
 # BEDPE file
-Chromosome21	100	110	Chromosome21	100	110	INV	    9	0/1	AB_C_D>bb'_AEc'_EDC	1	0
-Chromosome21	100	110	Chromosome21	109	110	INVDUP	9	0/1	AB_C_D>bb'_AEc'_EDC	1	1
-Chromosome21	92	101	Chromosome21	124	125	TRA	    8	0/1	AB_C_D>bb'_AEc'_EDC	1	1   # order important for insertion-like operations at the same position
-None	        -1	0	Chromosome21	124	125	INS	    14	0/1	AB_C_D>bb'_AEc'_EDC	1	2
+Chromosome21	100	110	Chromosome21	100	110	INV	    9	  0/1	AB_C_D>bb'_AEc'_EDC	1	0
+Chromosome21	100	110	Chromosome21	109	110	INVDUP	9	  0/1	AB_C_D>bb'_AEc'_EDC	1	1
+Chromosome21	92	101	Chromosome21	124	125	TRA	    8	  0/1	AB_C_D>bb'_AEc'_EDC	1	1   # order important for insertion-like operations at the same position
+None	        -1	0	  Chromosome21	124	125	INS	    14	0/1	AB_C_D>bb'_AEc'_EDC	1	2
 Chromosome21	124	135	Chromosome21	124	125	dINVDUP	10	0/1	AB_C_D>bb'_AEc'_EDC	1	3
-None	        -1	0	Chromosome21	150	151	INS	    14	0/1	AB_C_D>bb'_AEc'_EDC	1	1
+None	        -1	0	  Chromosome21	150	151	INS	    14	0/1	AB_C_D>bb'_AEc'_EDC	1	1
 Chromosome21	124	135	Chromosome21	159	160	TRA	    10	0/1	AB_C_D>bb'_AEc'_EDC	1	1
 ```
 
 ## How to Contribute
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate. If you'd like to contribute, please fork the repository and make changes as you'd like. Pull requests are warmly welcome.
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate. If you'd like to contribute, please fork the repository and make changes as you'd like.
 
 Steps to contribute:
 1. Fork this repository (link to your repository)
