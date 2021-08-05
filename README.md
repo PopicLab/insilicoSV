@@ -1,30 +1,172 @@
-# SV_simulator
-A simulator for complex structural variants
+# insilicoSV
+insilicoSV is a software to design and simulate complex structural variants, both novel and known. 
+
+## Requirements  (Prerequisites)
+* Python 3.6 and up - [Install](https://www.python.org/downloads/)
+
+## Installation
+
+`$ pip install -r requirements.txt`
 
 ## To Run
 `python simulate.py <ref.fna> <par.yaml> <hap1.fna> <hap2.fna> <out.bed>`
 
-## Parameter File
+## Usage
 
-The configuration yaml file specifies the range of the lengths of the SVs along with the number to simulate. All SVs are distributed in a roughly even manner. Each element must have four attributes: type of SV (use below table for reference), number, minimum length, and maximum length, where max_length >= min_length >= 0. The values for min_length and max_length may either be an array or integer. If it is an integer, insilicoSV chooses a random number within the given range to reflect the size of *each* event/letter in the SV. If it is an array, the corresponding integers between the lists represent the size range for the event of the same position (e.g the first integers of both arrays give the range for the first event of the SV, and so on). Note that if the value is a list, the number of elements must match the number of events in the chosen SV. 
+insilicoSV takes in two input files: the reference genome and a yaml configuration file. Following the simulation, it outputs two haplotype files and a BEDPE file. 
+
+### Reference Genome
+This file should be in FASTA format.
+
+### Parameter File
+The configuration yaml file specifies the range of the lengths of the SVs along with the number to simulate. All configurations for structural variants should be put under the "SVs" key. For each SV, the following parameters are available:
+1. *type*: str, insilicoSV supports a predefined list of SVs and allows users to enter a custom transformation. Either "Custom" or one of the 16 predefined SV types named in the below table should be entered.
+2. *number*: int, describes how many of the specified SV type to simulate
+3. *min_length*: int or list, if an integer is provided, insilcoSV assumes that each event's length within a SV must fall between the min_length and max_length. Entering a list offers customization by specifying a different range for each event. If providing a list, enter lengths to correspond with the symbols from source and target in lexicographical order (non-dispersion events, followed by dispersion lengths)
+4. *max_length*: int or list, must be the same type as min_length, note that max_length >= min_length >= 0 for all elements in each
+5. *source [optional]*: Source sequence for a custom SV, see below to find instructions on how to create a transformation
+6. *target [optional]*: Target sequence for a custom SV, see below to find instructions on how to create a transformation
+
+Please see the table and picture for the list of predefined classes.
 
 ![Alt text](imgs/complex_sv_classes_diagram.webp)
 
-For the configuration file, use this key when labelling the structural variant:
+| SV Type | Transformation |
+|---------|----------------|
+| INS | "" -> "A" | 
+| DEL | "A" -> "" |
+| INV | "A" -> "a" |
+| DUP | "A" -> "AA'" |
+| TRA | "A_B" -> "B_A" | 
+| dupINVdup | "ABC" -> "Ac'ba'C" |
+| delINVdel | "ABC" -> "b" |
+| delINVdup | "ABC" -> "c'bC" |
+| dupINVdel | "ABC" -> "Aba'" |
+| delINV | "AB" -> "b" |
+| INVdel | "AB" -> "a" |
+| dDUP-iDEL | "A_B" -> "A_A'" |
+| INS-iDEL | "A_B" -> "_A" |
+| dupINV | "AB" -> "Aba'" |
+| INVdup | "AB" -> "b'aB" |
+| dDUP | "A_" -> "A_A'" |
 
-1 = Insertion\
-2 = Deletion\
-3 = Inversion\
-4 = Duplication\
-5 = Translocation\
-6 = dupINVdup\
-7 = delINVdel\
-8 = delINVdup\
-9 = dupINVdel\
-10 = delINV\
-11 = INVdel\
-12 = dDUP-iDEL\
-13 = INS-iDEL\
-14 = dupINV\
-15 = INVdup\
-16 = dDUP
+A custom SV consists of a user-generated transformation with a source and target sequence of "symbols," most of which are alphabetical letters. Some examples of a source would be "ABC" and "A_B_C," while some examples of the target would be "a'AB" or "A_b'Bc'_C." 
+
+insilicoSV maps a random fragment of the reference to each of the symbols in the source and recompiles the affected region with the target. For instance, "AB -> "A" would remove the fragment marked as symbol B. All symbols in the source sequence MUST be unique to create a one-to-one mapping between symbol and reference fragment.
+
+| Name | Symbol | Description |
+|------|--------|-------------|
+| Generic Event | Any uppercase alphabetical letter (etc. "A") | The most fundamental organizing tool that maps to a reference fragment |
+| Inversion | Any lowercase alphabetical letter | Indicates an inversion. <br /> Ex. a transformation "ABC" -> "abc" will invert "A," "B", and "C" and organize the new fragments as denoted in the target |
+| Duplication | Original symbol followed by single quotation (') | An original symbol refers to the initial character used in the source sequence. *There can only be ONE original symbol for every unique character - all other copies, including those that are inverted, must have a duplication "'" marking.* <br /> Ex. A transformation "ABC" -> "ABA'c" would duplicate "A" after "B" and invert the fragment C.|
+| Dispersion | Underscore (_) | Indicates a gap between the symbols surrounding it. Note that events may be simulated within a dispersion but not within other events. |
+| Insertions | Uppercase alphabetical letter | To add foreign, randomly-generated insertions, use a symbol not present in the source to the target sequence. <br /> Ex. "A_B" -> "A_BC" inserts a randomly-generated sequence after the fragment indicated by symbol "B"|
+
+
+### BEDPE File
+
+Each line/entry will have the following parameters:
+1. *source_chr*: The source chromosome of the event
+2. *source_start*: Start position on the source_chr [INCLUDE at pos], zero-based indexing
+3. *source_end*: End position on the source_chr [EXCLUDE at pos], one-based indexing
+4. *target_chr*: The target chromosome of the event
+5. *target_start*: Start position on the target chr [INCLUDE at pos], zero-based indexing
+6. *target_end*: End position on the target chr [EXCLUDE at pos], one-based indexing
+7. *event_type*: Describes the transformation made by the event, either an INS, DEL, INV, TRA, DUP, INVDUP, or INVTRA. Dispersed duplications--those that do not occur immediately after the original--have an attached "d" at the front.
+8. *event_size*: Size of the reference fragment impacted by the event
+9. *parent_sv*: Describes the parent SV the event is a component of, for instance "dupINVdup." If a custom SV was provided, the name becomes "source>target"
+10. *nth_sv*: int, index to count up each SV (note: not the events). All events of a SV belong in the same index.
+11. *order*: int, for insertion-like operations such as TRA, INS, or DUP, the "order" index describes in which order events that target the same position were compiled. Events with INV and DEL operations have an order of 0.
+
+## Usage examples
+Any parameters which were not described above will be shown in the examples below.
+### Example 1 - Predefined SVs
+```yaml
+# YAML config file
+fail_if_placement_issues: True     # stop the simulation if any SV is unable to be placed, default set to False
+SVs:
+    - type: "INS"
+      number: 10
+      min_length: 5
+      max_length: 10
+    - type: "INVdel"
+      number: 2
+      min_length: 5
+      max_length: 10
+    - type: "dupINVdel"
+      number: 1
+      min_length:
+        - 5
+        - 10
+        - 5
+      max_length:
+        - 10
+        - 15
+        - 10
+```
+```
+# BEDPE file
+None	        -1	0	  Chromosome21	148	149	INS	10	  0/1	INS	        1	  1
+None	        -1	0	  Chromosome19	5	  6	  INS	6	    0/1	INS	        2	  1
+None	        -1	0	  Chromosome19	38	39	INS	7	    1/1	INS	        3   1
+None	        -1	0	  Chromosome21	48	49	INS	8	    1/1	INS	        4	  1
+None	        -1	0	  Chromosome19	86	87	INS	10	  0/1	INS	        5	  1
+None	        -1	0	  Chromosome19	64	65	INS	9	    1/1	INS	        6	  1
+None	        -1	0	  Chromosome19	7	  8	  INS	10	  0/1	INS	        7	  1
+None	        -1	0	  Chromosome21	141	142	INS	8	    1/1	INS	        8	  1
+None	        -1	0	  Chromosome19	74	75	INS	10	  1/1	INS	        9	  1
+None	        -1	0	  Chromosome19	60	61	INS	7	    0/1	INS	        10  1
+Chromosome21	23	31	Chromosome21	23	31	INV	7	    0/1	INVdel	    11	0
+Chromosome21	30	36	Chromosome21	30	31	DEL	5	    0/1	INVdel	    11	0
+Chromosome21	122	132	Chromosome21	122	132	INV	9	    1/1	INVdel	    12	0
+Chromosome21	131	142	Chromosome21	131	132	DEL	10	  1/1	INVdel	    12	0
+Chromosome19	93	106	Chromosome19	93	106	INV	12	  0/1	dupINVdel	  13	0
+Chromosome19	88	94	Chromosome19	105	106	dINVDUP	5	0/1	dupINVdel	  13	1
+Chromosome19	105	113	Chromosome19	105	106	DEL	7	    0/1	dupINVdel	  13	0
+```
+
+### Example 2 - Custom SVs
+```yaml
+# YAML config file
+SVs:
+    - type: "Custom"
+      source: AB_C_D
+      target: bb'_AEc'_EDC
+      number: 1
+      min_length: 
+        - 5   # A
+        - 6   # B
+        - 7   # C
+        - 8   # D
+        - 10  # E
+        - 10  # first _
+        - 15  # second _
+      max_length: 
+        - 10
+        - 10
+        - 10
+        - 10
+        - 15
+        - 15
+        - 20
+```
+```
+# BEDPE file
+Chromosome21	100	110	Chromosome21	100	110	INV	    9	  0/1	AB_C_D>bb'_AEc'_EDC	1	0
+Chromosome21	100	110	Chromosome21	109	110	INVDUP	9	  0/1	AB_C_D>bb'_AEc'_EDC	1	1
+Chromosome21	92	101	Chromosome21	124	125	TRA	    8	  0/1	AB_C_D>bb'_AEc'_EDC	1	1   # order important for insertion-like operations at the same position
+None	        -1	0	  Chromosome21	124	125	INS	    14	0/1	AB_C_D>bb'_AEc'_EDC	1	2
+Chromosome21	124	135	Chromosome21	124	125	dINVDUP	10	0/1	AB_C_D>bb'_AEc'_EDC	1	3
+None	        -1	0	  Chromosome21	150	151	INS	    14	0/1	AB_C_D>bb'_AEc'_EDC	1	1
+Chromosome21	124	135	Chromosome21	159	160	TRA	    10	0/1	AB_C_D>bb'_AEc'_EDC	1	1
+```
+
+## How to Contribute
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate. If you'd like to contribute, please fork the repository and make changes as you'd like.
+
+Steps to contribute:
+1. Fork this repository (link to your repository)
+2. Create your feature branch (git checkout -b feature/insilicoSV)
+3. Commit your changes (git commit -am 'Add some feature')
+4. Push to the branch (git push origin feature/insilicoSV)
+5. Create a new Pull Request
