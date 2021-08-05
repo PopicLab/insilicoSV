@@ -259,6 +259,7 @@ class SV_Simulator():
                 
                 rand_id, chr_len, chr_event_ranges = get_rand_chr()
                 if chr_len - sv.req_space - 1 <= 0:
+                    valid = False
                     continue
                     #raise Exception("{} size is too big for chromosome!".format(sv))
                 else:
@@ -268,10 +269,7 @@ class SV_Simulator():
                     sv.start = start_pos
                     sv.start_chr = rand_id
                     sv.end = sv.start + sv.req_space
-                    if sv.start == sv.end:
-                        print("is_overlapping results")
-                        print((sv.start, sv.end))
-                        print(utils.is_overlapping(chr_event_ranges, (sv.start, sv.end)))
+
                     if len(sv.source_events) == 0 and utils.is_overlapping(chr_event_ranges, (sv.start, sv.end)):  # INS case - sv position won't be checked without this
                         valid = False
                         break
