@@ -259,7 +259,8 @@ class SV_Simulator():
                 
                 rand_id, chr_len, chr_event_ranges = get_rand_chr()
                 if chr_len - sv.req_space - 1 <= 0:
-                    raise Exception("{} size is too big for chromosome!".format(sv))
+                    continue
+                    #raise Exception("{} size is too big for chromosome!".format(sv))
                 else:
                     start_pos = random_gen.randint(0, chr_len - sv.req_space - 1)
                     # define the space in which SV operates
