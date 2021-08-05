@@ -63,7 +63,7 @@ class FormatterIO():
         Exports SVs changes to bedfile, uses target "blocks" to identify which subtype event is (INS, DUP, TRA, etc.)
         '''
         def write_to_file(sv, source_chr, source_s, source_e, target_chr, target_s, target_e, transform, symbol, order = 0):
-            assert (not symbol.startswith(Symbols.DIS))
+            assert (not symbol.startswith(Symbols.DIS.value))
 
             # consider insertions
             if source_e == None:
@@ -111,11 +111,11 @@ class FormatterIO():
                     event = encoding[symbol.upper()[0]]
 
                     # duplication/inverted-duplications
-                    if len(symbol) > 1 and symbol[1] == Symbols.DUP_MARKING:
+                    if len(symbol) > 1 and symbol[1] == Symbols.DUP_MARKING.value:
                         if symbol_is_inversion(symbol):
-                            event_name = Operations.INVDUP
+                            event_name = Operations.INVDUP.value
                         else:
-                            event_name = Operations.DUP
+                            event_name = Operations.DUP.value
                         # consider dispersed duplications
                         if event.end != curr_pos or event.source_chr != curr_chr:
                             event_name = "d" + event_name
@@ -127,22 +127,22 @@ class FormatterIO():
                         # insertions
                         if symbol[0].upper() not in sv.source_unique_char:
                             order += 1
-                            write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, Operations.INS, event.symbol, order)
+                            write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, Operations.INS.value, event.symbol, order)
                         
                         # translocations - original symbol
                         elif len(symbol) == 1 and idx != event.original_block_idx:
                             order += 1
                             if symbol_is_inversion(symbol):
-                                event_name = Operations.INVTRA
+                                event_name = Operations.INVTRA.value
                             else:
-                                event_name = Operations.TRA
+                                event_name = Operations.TRA.value
                             write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, order)
 
                         # inversions
                         elif symbol_is_inversion(symbol):
                             order = 0
                             curr_pos = event.end       # this symbol was already in source
-                            write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, event.start, event.end, Operations.INV, event.symbol, order)
+                            write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, event.start, event.end, Operations.INV.value, event.symbol, order)
                         
                         # identity - original symbol did not change or move
                         else:
@@ -151,17 +151,17 @@ class FormatterIO():
 
                 # find dispersion event right after block to update position and chromosome to edit on
                 if idx < len(sv.target_symbol_blocks) - 1:
-                    dis_event = encoding[Symbols.DIS + str(idx + 1)]  # find the nth dispersion event
+                    dis_event = encoding[Symbols.DIS.value + str(idx + 1)]  # find the nth dispersion event
                     curr_pos = dis_event.end
                     curr_chr = dis_event.source_chr
             
             # deletions - any original symbols not detected in target sequence are deleted
             for symbol in source:
                 # do not delete dispersion events or symbols already in target
-                if not symbol.startswith(Symbols.DIS) and symbol not in target and symbol.lower() not in target:
+                if not symbol.startswith(Symbols.DIS.value) and symbol not in target and symbol.lower() not in target:
                     event = encoding[symbol]
                     order = 0
-                    write_to_file(sv, event.source_chr, event.start, event.end, event.source_chr, event.start, event.start, Operations.DEL, event.symbol, order)
+                    write_to_file(sv, event.source_chr, event.start, event.end, event.source_chr, event.start, event.start, Operations.DEL.value, event.symbol, order)
             self.bedpe_counter += 1
 
     def export_piece(self, id, edits, fasta_out, fasta_file, verbose = False):
@@ -224,38 +224,15 @@ def collect_args():
     parser.add_argument("hap1", help="First output FASTA file (first haplotype)")
     parser.add_argument("hap2", help = "Second output FASTA file (second haplotype)")
     parser.add_argument("bedpe", help = "BEDPE file location to store variant info")
+    parser.add_argument("stats", help = "File location for stats file")
     parser.add_argument("-r", "--root", action="store", metavar="DIR", dest="root_dir", help="root directory for all files given as positional arguments")
 
     args = parser.parse_args()
-    io = [args.ref, args.config, args.hap1, args.hap2, args.bedpe]
+    io = [args.ref, args.config, args.hap1, args.hap2, args.bedpe, args.stats]
     if args.root_dir:
         io = [os.path.join(args.root_dir, ele) for ele in io]
     return io
 
-if __name__ == "__main__":
-    pass
-    
-    '''
-    order_ids = fasta_file.references
-    len_dict = dict()
-    for id in order_ids:
-        len_dict[id] = fasta_file.get_reference_length(id)
-    print("Len_dict: ", len_dict)
-    #fasta.next()
-    #print(fasta.fetch(80,85))
-    variants = {"Chromosome19": [[5,5,""]]}
-    FastaFile.reset_file(fileout1)
-    fasta.export_piece(variants, fileout1, 0, verbose = False)
-    variants = {"Chromosome19": [[2,5,"UUUUU"],[7,10, "U"], [15, 20, "TC"], [75,77,"UUUUUU"]]}
-    variants2 = {"Chromosome19": [[2,5,"UUUUUU"]], "Chromosome21": [[4,15,"AAA"]]}
-    fasta.reset_file(fileout1)
-    fasta.reset_file(fileout2)
-    fasta.export_piece_fasta(variants, fileout1, fasta_file, verbose = True)
-    fasta.export_piece_fasta(variants2, fileout2, fasta_file, verbose = True)
-    #fasta.export_piece(variants, fileout1, 0, len_dict, verbose = True)
-
-    print(fasta_file.fetch("Chromosome19", 1, 2))
-    #fasta.close()'''
 
 
 

@@ -5,6 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from simulate import SV_Simulator
 from pysam import FastaFile
 import yaml
+import utils
 
 class RandomSim():
     def __init__(self, increase, mode = None):
@@ -68,15 +69,10 @@ class TestObject():
     def remove_test_files(self):
         # remove all index files and output files so they can be regenerated
         # if index file not removed, then they won't be remade even if fasta file is altered
-        def rm(file):
-            if os.path.exists(file):
-                os.remove(file)
-            else:
-                "File {} not detected".format(file)
         
         files = [self.ref, self.ref + ".fai", self.par, self.hap1, self.hap1 + ".fai", self.hap2, self.hap2 + ".fai", self.bed]  # remove reference's index (.fai) file because new one should be generated
         for file in files:
-            rm(file)
+            utils.remove_file(file)
     
     def get_actual_frag(self):
         fasta_out = FastaFile(self.hap1)  # also generates a .fai file
@@ -121,6 +117,11 @@ class TestSVSimulator(unittest.TestCase):
                                         [par, {"SVs": [{"type": "dDUP-iDEL", "number": 1, "min_length": 5, "max_length": 5},
                                                         {"type": "INS-iDEL", "number": 1, "min_length": 5, "max_length": 5},
                                                         {"type": "dDUP", "number": 1, "min_length": 5, "max_length": 5}]}],
+                                        hap1, hap2, bed)]
+        self.test_objects_ins = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}], 
+                                        [par, {"SVs": [{"type": "INS", "number": 1, "min_length": 5, "max_length": 5},
+                                                        {"type": "delINV", "number": 1, "min_length": 5, "max_length": 5},
+                                                        {"type": "INS", "number": 1, "min_length": 5, "max_length": 5}]}],
                                         hap1, hap2, bed)]
 
 
@@ -187,7 +188,17 @@ class TestSVSimulator(unittest.TestCase):
         # CTCCG TCGTA CTAGA CAGGG TATAT GTCTG TGTCT CAGTG AGACA CTTAGCATGCAACTCAGTCTGTACTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
         # CTCCG _____ CTCCG TCGTA TATAT GTCTG TATATTGTCT CAGTG AGACA CTTAGCATGCAACTCAGTCTGTACTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
         self.assertEqual(changed_frag, "CTCCGCTCCGTCGTATATATGTCTGTATATTGTCTCAGTGAGACACTTAGCATGCAACTCAGTCTGTACTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT")
-    
+
+        # INS
+        #config_with_dis = self.test_objects_ins[0]
+        #config_with_dis.initialize_files()
+        #curr_sim = SV_Simulator(config_with_dis.ref, config_with_dis.par, random_gen = RandomSim(10, "max"))
+        #self.assertEqual(curr_sim.produce_variant_genome(config_with_dis.hap1, config_with_dis.hap2, config_with_dis.bed, random_gen = RandomSim(5)), True)
+        #changed_frag = config_with_dis.get_actual_frag()
+        #config_with_dis.remove_test_files()
+        # CTCCG TCGTA CTAGA CAGCT CCCGA CAGAG CACTG GTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT 
+        # AAAAA_____ TACGAAAAAA CTAGA CAGCT CCCGA CAGAG CACTG GTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT 
+        # self.assertEqual(changed_frag, "AAAAATACGAAAAAACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT ")
     
     def test_choose_rand_pos(self):
         # test SVs without dispersions

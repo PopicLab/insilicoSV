@@ -53,7 +53,7 @@ class StatsCollection():
                     
                 # count up average length of non-dispersion events
                 for symbol in sv.events_dict:
-                    if not symbol.startswith(Symbols.DIS):   
+                    if not symbol.startswith(Symbols.DIS.value):   
                         event = sv.events_dict[symbol]
                         self.avg_len[0] += event.length
                         self.avg_len[1] += 1
@@ -91,7 +91,8 @@ class SV_Simulator():
 
         # create FastaFile with access to the reference file
         self.ref_file = ref_file
-        self.ref_fasta = FastaFile(ref_file) 
+        utils.remove_file(self.ref_file + ".fai")    # if ref file was changed, then previously generated index file will not be updated
+        self.ref_fasta = FastaFile(ref_file)        # FastaFile generates a new index file if one is not found
 
         # get all chromosome ids
         self.order_ids = self.ref_fasta.references
@@ -222,6 +223,7 @@ class SV_Simulator():
             rand_seq = ""
             base_map = {1:"A", 2: "T", 3: "G", 4: "C"}
             for x in range(length):
+                #rand_seq += "A"
                 rand_seq += base_map[random_gen.randint(1,4)]
             return rand_seq
         def get_rand_chr():
@@ -279,7 +281,7 @@ class SV_Simulator():
                         start_pos += sv_event.length
 
                         # dispersion event should not impact whether position is valid or not, given that spacing is already guaranteed
-                        if sv_event.symbol.startswith(Symbols.DIS):
+                        if sv_event.symbol.startswith(Symbols.DIS.value):
                             continue
 
                         # check to see if chosen spot is a valid position
@@ -293,7 +295,7 @@ class SV_Simulator():
             if valid:
                 active_svs_total += 1
                 sv.active = True
-                chr_event_ranges.extend([(event.start, event.end) for event in sv.source_events if not event.symbol.startswith(Symbols.DIS)]) # dispersions events left out because they are not off-limits to more events
+                chr_event_ranges.extend([(event.start, event.end) for event in sv.source_events if not event.symbol.startswith(Symbols.DIS.value)]) # dispersions events left out because they are not off-limits to more events
                 #sv.start = sv.source_events[0].start
                 #sv.end = sv.source_events[-1].end
 
@@ -304,7 +306,6 @@ class SV_Simulator():
                 # populates insertions with random sequence - these event symbols only show up in target transformation
                 for event in sv.events_dict.values():
                     if event.source_frag == None and event.length > 0:
-                        print("INS detected, event_ranges: {}".format(chr_event_ranges))
                         event.source_frag = generate_seq(event.length)
                 
                 # error detection
@@ -333,35 +334,35 @@ class SV_Simulator():
                 # make edits and store in sv object
                 sv.change_fragment()
                 #print("Finished editing {}".format(sv))
-                print("Events Dict after all edits: ", sv.events_dict)
+                #print("Events Dict after all edits: ", sv.events_dict)
         #print("\n")
     
     def close(self):
         self.ref_fasta.close()
-        
 
 if __name__ == "__main__":
 
     tracemalloc.start()
 
-    '''args = collect_args()
+    args = collect_args()
     #tracemalloc.start()
     fasta_in = args[0]
     yaml_in = args[1]
     fasta1_out = args[2]
     fasta2_out = args[3]
-    bed_out = args[4]'''
+    bed_out = args[4]
+    stats_file = args[5]
 
-    fasta_in = "debugging/inputs/test.fna"
+    '''fasta_in = "debugging/inputs/test.fna"
     yaml_in = "debugging/inputs/par.yaml"
     fasta1_out = "debugging/inputs/test1_out.fna"
     fasta2_out = "debugging/inputs/test2_out.fna"
     bed_out = "debugging/inputs/out.bed"
-    stats_file = "debugging/inputs/stats.txt"
+    stats_file = "debugging/inputs/stats.txt"'''
 
     sim = SV_Simulator(fasta_in, yaml_in)
     sim.produce_variant_genome(fasta1_out, fasta2_out, bed_out, stats_file, verbose = False)
-    print(str(sim))
+    #print(str(sim))
 
     current, peak = tracemalloc.get_traced_memory()
     print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")

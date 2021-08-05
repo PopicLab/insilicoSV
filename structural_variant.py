@@ -26,8 +26,6 @@ class Structural_Variant():
         # user-generated source/target will also not group together duplication markings and their corresponding symbols together as it is inputted as string
         utils.validate_symbols(self.source)
         self.source_unique_char, self.target_unique_char = Structural_Variant.reformat_seq(self.source), Structural_Variant.reformat_seq(self.target)
-        print("New Target: ", self.target_unique_char)
-        print("New Source: ", self.source_unique_char)
 
         # initialize event classes
         self.start = None   # defines the space in which SV operates
@@ -51,7 +49,7 @@ class Structural_Variant():
         self.hap = [False, False]
     
     def __repr__(self):
-        return "<SV transformation \"{}\" -> \"{}\" taking up {} non-dispersion spaces>".format(''.join(self.source), ''.join(self.target), sum([event.length for event in self.source_events if not event.symbol.startswith(Symbols.DIS)]))
+        return "<SV transformation \"{}\" -> \"{}\" taking up {} non-dispersion spaces>".format(''.join(self.source), ''.join(self.target), sum([event.length for event in self.source_events if not event.symbol.startswith(Symbols.DIS.value)]))
 
     @staticmethod
     def reformat_seq(transformation):
@@ -62,10 +60,10 @@ class Structural_Variant():
         unique_transform = []
         unique_id = 1
         for component in transformation:
-            if component != Symbols.DIS and component != Symbols.DUP_MARKING:
+            if component != Symbols.DIS.value and component != Symbols.DUP_MARKING.value:
                 unique_transform.append(component)
-            elif component == Symbols.DUP_MARKING:   # duplication event case, need to group together symbol and duplication marking
-                unique_transform[-1] += Symbols.DUP_MARKING
+            elif component == Symbols.DUP_MARKING.value:   # duplication event case, need to group together symbol and duplication marking
+                unique_transform[-1] += Symbols.DUP_MARKING.value
             else:   # dispersion event case, component = dispersion
                 unique_transform.append(component + str(unique_id))
                 unique_id += 1
@@ -83,7 +81,7 @@ class Structural_Variant():
         all_symbols = []
         for ele in self.source_unique_char + self.target_unique_char:
             # only append original symbols or dispersion events
-            if len(ele) > 0 and (len(ele) == 1 or ele.startswith(Symbols.DIS)) and ele.upper() not in all_symbols:
+            if len(ele) > 0 and (len(ele) == 1 or ele.startswith(Symbols.DIS.value)) and ele.upper() not in all_symbols:
                 all_symbols.append(ele.upper())
         all_symbols.sort()  # user inputs symbol lengths in lexicographical order
 
@@ -129,7 +127,7 @@ class Structural_Variant():
             # Ex. ("A","B","_","_") -> [["A","B"],[],[]]
             blocks = [[]]
             for symbol in transformation:
-                if not symbol.startswith(Symbols.DIS):
+                if not symbol.startswith(Symbols.DIS.value):
                     blocks[-1].append(symbol)
                 else:
                     blocks.append([])
@@ -194,14 +192,14 @@ class Structural_Variant():
                 elif upper_str[0] in encoding:   # take original fragment, no changes
                     new_frag += event.source_frag
                 
-                elif ele.startswith(Symbols.DIS):  # DIS = dispersion event ("_")
+                elif ele.startswith(Symbols.DIS.value):  # DIS = dispersion event ("_")
                     raise Exception("Dispersion event detected within block: {}".format(self.target_symbol_blocks))
                 else:
                     raise Exception("Symbol {} failed to fall in any cases".format(ele))
                 
             # find dispersion event right after block to find position of next block
             if idx < len(self.target_symbol_blocks) - 1:
-                dis_event = self.events_dict[Symbols.DIS + str(idx + 1)]  # find the nth dispersion event
+                dis_event = self.events_dict[Symbols.DIS.value + str(idx + 1)]  # find the nth dispersion event
                 changed_fragments.append([curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
                 block_start = dis_event.end   # move on to next block
                 curr_chr = dis_event.source_chr
@@ -228,7 +226,6 @@ class Event():
         self.source_frag = None
         self.start = None
         self.end = None
-
     
     def __repr__(self):
         return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end, "source_frag": self.source_frag,

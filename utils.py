@@ -1,4 +1,5 @@
 from constants import *
+import os
 
 def is_overlapping(event_ranges, addition):
     # addition: tuple (start, end)
@@ -30,11 +31,17 @@ def validate_symbols(transform):
     for symbol in transform:
         if symbol in present:
             raise Exception("Source transformation {} does not have unique symbols!".format(transform))
-        elif symbol != Symbols.DIS:   # exclude dispersion events because they will always appear the same for user inputs
+        elif symbol != Symbols.DIS.value:   # exclude dispersion events because they will always appear the same for user inputs
             present[symbol] = True
 
-        if Symbols.DUP_MARKING in symbol:
+        if Symbols.DUP_MARKING.value in symbol:
             raise Exception("Duplication marking (') not allowed in source sequence {}".format(transform))
         if any(c.islower() for c in symbol):
             raise Exception("Only original symbols may appear in source sequence, and they must also be uppercase: {}".format(transform))
+
+def remove_file(file):
+    # removes file if it exists
+    if os.path.exists(file):
+        os.remove(file)
+
 

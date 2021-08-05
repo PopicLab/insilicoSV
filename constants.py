@@ -19,7 +19,7 @@ class Variant_Type(Enum):
     dDUP = "dDUP"
     Custom = "Custom"
 
-class Operations():
+class Operations(Enum):
     INS = "INS"
     DUP = "DUP"
     INV = "INV"
@@ -35,7 +35,7 @@ class Zygosity(Enum):
     HOMOZYGOUS = 1
     HETEROZYGOUS = 0
 
-class Symbols():
+class Symbols(Enum):
     DIS = "_" # dispersion event              
     DUP_MARKING = "'" # attached to symbols that are not the original one from source sequence
 
@@ -58,4 +58,3 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
         Variant_Type.dupINV: [("A","B"), ("A","b","a'")],
         Variant_Type.INVdup: [("A","B"), ("b'","a","B")],
         Variant_Type.dDUP: [("A","_"), ("A","_","A'")]}
-        

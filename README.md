@@ -2,7 +2,7 @@
 insilicoSV is a software to design and simulate complex structural variants, both novel and known. 
 
 ## Requirements  (Prerequisites)
-* Python 3.5 and up [Install](https://link-for-setup-guide)
+* Python 3.6 and up - [Install](https://www.python.org/downloads/)
 
 ## Installation
 
@@ -63,7 +63,6 @@ insilicoSV maps a random fragment of the reference to each of the symbols in the
 | Insertions | Uppercase alphabetical letter | To add foreign, randomly-generated insertions, use a symbol not present in the source to the target sequence. <br /> Ex. "A_B" -> "A_BC" inserts a randomly-generated sequence after the fragment indicated by symbol "B"|
 
 
-
 ### BEDPE File
 
 Each line/entry will have the following parameters:
@@ -82,7 +81,7 @@ Each line/entry will have the following parameters:
 ## Usage examples
 Any parameters which were not described above will be shown in the examples below.
 ### Example 1 - Predefined SVs
-```
+```yaml
 # YAML config file
 fail_if_placement_issues: True     # stop the simulation if any SV is unable to be placed, default set to False
 SVs:
@@ -127,12 +126,13 @@ Chromosome19	105	113	Chromosome19	105	106	DEL	7	    0/1	dupINVdel	  13	0
 ```
 
 ### Example 2 - Custom SVs
-```
+```yaml
 # YAML config file
 SVs:
     - type: "Custom"
       source: AB_C_D
       target: bb'_AEc'_EDC
+      number: 1
       min_length: 
         - 5   # A
         - 6   # B
@@ -141,21 +141,14 @@ SVs:
         - 10  # E
         - 10  # first _
         - 15  # second _
-      max_length: 10
-    - type: "INVdel"
-      number: 2
-      min_length: 5
-      max_length: 10
-    - type: "dupINVdel"
-      number: 1
-      min_length:
-        - 5
+      max_length: 
         - 10
-        - 5
-      max_length:
+        - 10
+        - 10
         - 10
         - 15
-        - 10
+        - 15
+        - 20
 ```
 ```
 # BEDPE file
