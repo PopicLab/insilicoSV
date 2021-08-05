@@ -91,7 +91,7 @@ class SV_Simulator():
 
         # create FastaFile with access to the reference file
         self.ref_file = ref_file
-        utils.remove_file(self.ref_file + ".fai")    # if ref file was changed, then previously generated index file will not be updated
+        #utils.remove_file(self.ref_file + ".fai")    # if ref file was changed, then previously generated index file will not be updated
         self.ref_fasta = FastaFile(ref_file)        # FastaFile generates a new index file if one is not found
 
         # get all chromosome ids
@@ -223,8 +223,8 @@ class SV_Simulator():
             rand_seq = ""
             base_map = {1:"A", 2: "T", 3: "G", 4: "C"}
             for x in range(length):
-                #rand_seq += "A"
-                rand_seq += base_map[random_gen.randint(1,4)]
+                rand_seq += "A"
+                #rand_seq += base_map[random_gen.randint(1,4)]
             return rand_seq
         def get_rand_chr():
             # random assignment of SV to a chromosome
@@ -267,6 +267,10 @@ class SV_Simulator():
                     sv.start = start_pos
                     sv.start_chr = rand_id
                     sv.end = sv.start + sv.req_space
+                    if sv.start == sv.end:
+                        print("is_overlapping results")
+                        print((sv.start, sv.end))
+                        print(utils.is_overlapping(chr_event_ranges, (sv.start, sv.end)))
                     if len(sv.source_events) == 0 and utils.is_overlapping(chr_event_ranges, (sv.start, sv.end)):  # INS case - sv position won't be checked without this
                         valid = False
                         break
