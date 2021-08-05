@@ -37,7 +37,7 @@ class Zygosity(Enum):
 
 class Symbols():
     DIS = "_" # dispersion event              
-    ORIGINAL_DUP = "'" # attached to symbols that are not the original one from source sequence
+    DUP_MARKING = "'" # attached to symbols that are not the original one from source sequence
 
 # "'" = implies a duplication, symbol is NOT the original
 # lowercase = invert 

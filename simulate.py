@@ -1,6 +1,7 @@
 import random
 from pysam import FastaFile
-from processing import FormatterIO, ErrorDetection, collect_args
+from processing import FormatterIO, collect_args
+import utils
 from constants import *
 from structural_variant import Structural_Variant, Event
 import tracemalloc  # only for testing
@@ -49,27 +50,20 @@ class StatsCollection():
                 # add up the lengths of impacted regions on the reference
                 for frag in sv.changed_fragments:
                     self.len_frags_chr[frag[0]] += frag[2] - frag[1]    # frag[0] = chromosome id, frag[1] = start position, frag[2] = end position of edit
-                
-                # tally up SVs that impact each chromosome
-                for chr_id in sv.target_block_chrs:
-                    self.active_events_chr[chr_id] += 1
-
+                    
                 # count up average length of non-dispersion events
                 for symbol in sv.events_dict:
                     if not symbol.startswith(Symbols.DIS):   
                         event = sv.events_dict[symbol]
                         self.avg_len[0] += event.length
                         self.avg_len[1] += 1
-        
         if self.avg_len[1] != 0:   # avoid ZeroDivisionError
             self.avg_len = self.avg_len[0] // self.avg_len[1]
         else:
             self.avg_len = 0
-    
     def export_data(self, fileout):
         '''
         Exports all collected data to entered file
-
         fileout: Location to export stats file
         '''
         def write_item(fout, name, item):
@@ -83,9 +77,7 @@ class StatsCollection():
             for id in self.chr_ids:
                 fout.write("\n===== {} =====\n".format(id))
                 write_item(fout, "Length of sequence", self.chr_lengths[id])
-                write_item(fout, "Events present", self.active_events_chr[id])
                 write_item(fout, "Total impacted length of reference chromosome", self.len_frags_chr[id])
-
 
 class SV_Simulator():
     def __init__(self, ref_file, par_file, random_gen = random):
@@ -94,7 +86,6 @@ class SV_Simulator():
         par_file: file location to configuration file (.yaml)
         random_gen: only relevant for unittesting
         '''
-
         global time_start
         print("Setting Up Simulator...")
 
@@ -113,8 +104,8 @@ class SV_Simulator():
         self.stats = StatsCollection(self.order_ids, self.len_dict)
 
         # process config file for SVs
-        self.formatter = FormatterIO(ref_file)
-        self.svs_config = self.formatter.yaml_to_var_list(par_file)
+        self.formatter = FormatterIO(par_file)
+        self.svs_config = self.formatter.yaml_to_var_list()
 
         # create all SVs
         self.svs = []
@@ -188,7 +179,7 @@ class SV_Simulator():
                 # account for homozygous and heterogeneous variants
                 edits_x = edits_dict[id]
                 #print("Edits_x: ", edits_x)
-                ErrorDetection.fail_if_any_overlapping(edits_x)
+                utils.fail_if_any_overlapping(edits_x)
                 
                 # export edited chromosomes to FASTA files
                 self.formatter.export_piece(id, edits_x, fasta_out, ref_fasta, verbose = verbose)
@@ -225,20 +216,6 @@ class SV_Simulator():
                 if char == "N":
                     total += 1
             return total / len(seq)
-        def is_overlapping(event_ranges, addition):
-            # addition: tuple (start, end)
-            # event_ranges: list containing tuples
-            # checks if addition overlaps with any of the events already stored
-
-            for event in event_ranges:
-                if addition[0] != addition[1]:
-                    if event[1] > addition[0] and event[0] < addition[1]:
-                        return True
-                else: # insertion case, start = end
-                    if addition[0] >= event[0] and addition[0] < event[1]:
-                        return True
-
-            return False
         def generate_seq(length):
             # helper function for insertions
             # generates random sequence of bases of given length
@@ -252,12 +229,17 @@ class SV_Simulator():
             # -> returns random chromosome and its length
             rand_id = self.order_ids[random_gen.randint(0, len(self.order_ids)-1)]
             chr_len = self.len_dict[rand_id]
+            chr_event_ranges = self.event_ranges[rand_id]
 
-            return rand_id, chr_len
+            return rand_id, chr_len, chr_event_ranges
         
         self.reinitialize_svs()
         
-        self.event_ranges = []
+        # maintain separate event ranges for different chromosomes
+        self.event_ranges = dict()
+        for id in self.order_ids:
+            self.event_ranges[id] = []
+
         active_svs_total = 0
         for sv in svs:
             tries = 0 # number of attempts to place sv randomly
@@ -267,13 +249,13 @@ class SV_Simulator():
                 valid = True
                 
                 if tries > 100:
-                    if self.svs_config.fail_if_placement_issues:
+                    if self.svs_config.fail_if_placement_issues:  # user can set a setting to fail if a single SV was not able to be positioned
                         raise Exception("Failed to simulate {}, {} / {} SVs successfully simulated".format(sv, active_svs_total, len(svs)))
                     print("Failure to simulate \"{}\"".format(sv))
                     valid = False
                     break
                 
-                rand_id, chr_len = get_rand_chr()
+                rand_id, chr_len, chr_event_ranges = get_rand_chr()
                 if chr_len - sv.req_space - 1 <= 0:
                     raise Exception("{} size is too big for chromosome!".format(sv))
                 else:
@@ -282,9 +264,8 @@ class SV_Simulator():
                     # we now also know where the target positions lie since we know the order and length of events
                     sv.start = start_pos
                     sv.start_chr = rand_id
-                    sv.end = start_pos + sv.req_space
-                    if len(sv.source_events) == 0 and is_overlapping(self.event_ranges, (sv.start, sv.end)):  # INS case - sv position won't be checked without this
-                        print("Position {} failed in ranges {}".format((sv.start, sv.end), self.event_ranges))
+                    sv.end = sv.start + sv.req_space
+                    if len(sv.source_events) == 0 and utils.is_overlapping(chr_event_ranges, (sv.start, sv.end)):  # INS case - sv position won't be checked without this
                         valid = False
                         break
 
@@ -304,7 +285,7 @@ class SV_Simulator():
                         # check to see if chosen spot is a valid position
                         #print("Percent_N, {} -> {}".format(frag, percent_N(frag)))
                         #print("Is_overlapping, {} -> {}".format((self.event_ranges, (sv_event.start, sv_event.end)), is_overlapping(self.event_ranges, (sv_event.start, sv_event.end))))
-                        if percent_N(frag) > 0.05 or is_overlapping(self.event_ranges, (sv_event.start, sv_event.end)):
+                        if percent_N(frag) > 0.05 or utils.is_overlapping(chr_event_ranges, (sv_event.start, sv_event.end)):
                             valid = False
                             break     # if ANY of the non-dispersion events within SV are in an invalid position, then immediately fail the try
 
@@ -312,17 +293,22 @@ class SV_Simulator():
             if valid:
                 active_svs_total += 1
                 sv.active = True
-                self.event_ranges.extend([(event.start, event.end) for event in sv.source_events if not event.symbol.startswith(Symbols.DIS)]) # dispersions events left out because they are not off-limits to more events
+                chr_event_ranges.extend([(event.start, event.end) for event in sv.source_events if not event.symbol.startswith(Symbols.DIS)]) # dispersions events left out because they are not off-limits to more events
                 #sv.start = sv.source_events[0].start
                 #sv.end = sv.source_events[-1].end
 
-                # handles insertions - these event symbols only show up in target transformation
+                # Basic INS case - no other SV may appear where INS is
+                if len(sv.source_events) == 0:
+                    chr_event_ranges.append((sv.start, sv.start))
+
+                # populates insertions with random sequence - these event symbols only show up in target transformation
                 for event in sv.events_dict.values():
                     if event.source_frag == None and event.length > 0:
+                        print("INS detected, event_ranges: {}".format(chr_event_ranges))
                         event.source_frag = generate_seq(event.length)
                 
                 # error detection
-                ErrorDetection.fail_if_any_overlapping(self.event_ranges)
+                utils.fail_if_any_overlapping(chr_event_ranges)
                 
                 #print("Events Dict after random positions selected: ", sv.events_dict)
                 #print("Current Event Ranges: ", self.event_ranges)

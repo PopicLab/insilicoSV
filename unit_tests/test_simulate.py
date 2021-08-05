@@ -10,6 +10,7 @@ class RandomSim():
     def __init__(self, increase, mode = None):
         # mode: None, "min," "mid," or "max" - specifies which number to pick in randint method
         # mode = None means to rely on self.curr_pos
+        # replaces the random module in the simulator to make the results more predictable
         assert mode in [None, "min", "mid", "max"]
 
         self.curr_pos = 0
@@ -50,9 +51,9 @@ class TestObject():
     
     def initialize_files(self):
         # initialize all files, delete old test files
+        self.remove_test_files()
         self.write_fasta_file(self.ref_content)
         self.write_yaml_file(self.par_content)
-        self.remove_test_files()
 
     def write_fasta_file(self, chr_to_sequence):
         with open(self.ref, "w") as fout:
@@ -73,7 +74,7 @@ class TestObject():
             else:
                 "File {} not detected".format(file)
         
-        files = [self.ref + ".fai", self.hap1, self.hap1 + ".fai", self.hap2, self.hap2 + ".fai"]  # remove reference's index (.fai) file because new one should be generated
+        files = [self.ref, self.ref + ".fai", self.par, self.hap1, self.hap1 + ".fai", self.hap2, self.hap2 + ".fai", self.bed]  # remove reference's index (.fai) file because new one should be generated
         for file in files:
             rm(file)
     
@@ -187,8 +188,6 @@ class TestSVSimulator(unittest.TestCase):
         # CTCCG _____ CTCCG TCGTA TATAT GTCTG TATATTGTCT CAGTG AGACA CTTAGCATGCAACTCAGTCTGTACTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
         self.assertEqual(changed_frag, "CTCCGCTCCGTCGTATATATGTCTGTATATTGTCTCAGTGAGACACTTAGCATGCAACTCAGTCTGTACTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT")
     
-
-        # test insertions
     
     def test_choose_rand_pos(self):
         # test SVs without dispersions
@@ -196,10 +195,7 @@ class TestSVSimulator(unittest.TestCase):
         config_no_dis.initialize_files()
         curr_sim = SV_Simulator(config_no_dis.ref, config_no_dis.par, random_gen = RandomSim(10, "max"))
         random_gen = RandomSim(10)
-        self.assertEqual(curr_sim.choose_rand_pos(curr_sim.svs, curr_sim.ref_fasta, random_gen), [(0,5), (5,10), (10,15)])
-
-
-        
+        self.assertEqual(curr_sim.choose_rand_pos(curr_sim.svs, curr_sim.ref_fasta, random_gen), {"Chromosome19": [(0,5), (5,10), (10,15)]})
 
 if __name__ == "__main__":
     unittest.main()

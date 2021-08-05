@@ -18,6 +18,8 @@ class Config():
                 config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
             else:
                 config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
+            # make sure max_length >= min_length >= 0
+            assert all(max_len >= min_len and min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
             
             # supply filler values in for source and target if the type is custom
             config_sv["type"] = Variant_Type(config_sv["type"])
@@ -35,35 +37,25 @@ class Config():
                 raise Exception("Max length must be specified on all SVs!")
             elif "type" not in config_sv:
                 raise Exception("\"Type\" attribute must be specified! For custom transformations, enter in \"Custom\"")
+            elif "number" not in config_sv:
+                raise Exception("Number is a required parameter for all SVs")
 
             # makes sure attributes are the correct datatype
             elif "type" in config_sv and not isinstance(config_sv["type"], str):
                 raise Exception("Invalid {} type for SV \'type\' attribute, str expected".format(type(config_sv["type"])))
-
+            
 class FormatterIO():
-    def __init__(self, filein):
+    def __init__(self, par_file):
         self.bedpe_counter = 1
-        self.bedpe_counter_dif = 1
-        self.initialize_fasta_export(filein)
+        self.par_file = par_file
 
-    def initialize_fasta_export(self, filein):
-
-        # initialization for exporting to fasta files
+    def yaml_to_var_list(self):
         try:
-            self.fin_export1 = open(filein, "r")   # needed to read original genome when exporting
-            self.fin_export2 = open(filein, "r")   # needed to read original genome when exporting
-        except FileNotFoundError:
-            print("Error: File \"{}\" Not Found".format(filein))
-        self.fout_export = False
-
-    def yaml_to_var_list(self, filename):
-        try:
-            config_entries = yaml.full_load(open(filename))
+            config_entries = yaml.full_load(open(self.par_file))
         except:
-            raise Exception("YAML File {} failed to be open".format(filename))
+            raise Exception("YAML File {} failed to be open".format(self.par_file))
 
         config = Config(**config_entries)
-
         return config
 
     def export_to_bedpe(self, svs, bedfile, reset_file = True):
@@ -77,6 +69,9 @@ class FormatterIO():
             if source_e == None:
                 source_e = -1
                 source_s = -1
+                transform_length = len(sv.events_dict[symbol].source_frag)
+            else:
+                transform_length = source_e - source_s
 
             # do not write transformations of size 0
             if source_e == -1 or source_e > source_s:
@@ -88,7 +83,7 @@ class FormatterIO():
                             str(target_s),
                             str(target_e + 1),
                             transform,
-                            str(source_e - source_s),
+                            str(transform_length),
                             str(int(sv.ishomozygous.value)) + "/1",
                             sv.name,
                             str(self.bedpe_counter),
@@ -109,19 +104,21 @@ class FormatterIO():
             assert (sv.start != None and sv.end != None) # start & end should have been defined alongside event positions
             curr_pos = sv.start
             curr_chr = sv.start_chr
-            order = 0
 
             for idx, block in enumerate(sv.target_symbol_blocks):
+                order = 0
                 for x, symbol in enumerate(block):
                     event = encoding[symbol.upper()[0]]
 
                     # duplication/inverted-duplications
-                    if len(symbol) > 1 and symbol[1] == Symbols.ORIGINAL_DUP:
+                    if len(symbol) > 1 and symbol[1] == Symbols.DUP_MARKING:
                         if symbol_is_inversion(symbol):
                             event_name = Operations.INVDUP
                         else:
                             event_name = Operations.DUP
                         # consider dispersed duplications
+                        if event.end != curr_pos or event.source_chr != curr_chr:
+                            event_name = "d" + event_name
                         
                         order += 1
                         write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, order)
@@ -199,9 +196,12 @@ class FormatterIO():
                         c = fasta_file.fetch(id, idx, idx+1)
                         fout_export.write(c)
 
-                    elif idx == var_start:
+                    # add in replacement fragment
+                    elif idx == var_start:   # after var_start, loop will ignore up till var_end
                         fout_export.write(variant[2])
 
+                    # applies only for insertions
+                    # without this, for loop would end before we insert the new_frag
                     if idx == var_end - 1 and var_start == var_end:   # for insertions, insert piece right before position var_end
                         fout_export.write(variant[2])
                 pos = var_end
@@ -216,42 +216,6 @@ class FormatterIO():
         # close all file handlers
         self.fin_export1.close()
         self.fin_export2.close()
-
-class ErrorDetection():
-    def __init__(self):
-        pass
-
-    @staticmethod
-    def fail_if_any_overlapping(arr):
-        # will raise Exception if any overlap between intervals is found
-        # arr: list of tuples
-        def is_overlapping(event_ranges, addition):
-            # addition: tuple (start, end)
-            # event_ranges: list containing tuples
-            # checks if addition overlaps with any of the events already stored
-    
-            for event in event_ranges:
-                if event[1] > addition[0] and event[0] < addition[1]:
-                    return True
-            return False
-        for x, ele in enumerate(arr):
-            if is_overlapping(arr[:x], ele):
-                raise Exception("Overlapping Detected: {}".format(arr))
-    
-    @staticmethod
-    def validate_symbols(transform):
-        '''
-        Ensures that transform has unique symbols other than dispersion events - specifically used for source sequence
-
-        transform: str, source sequence
-        '''
-        present = dict()
-        for symbol in transform:
-            if symbol in present:
-                raise Exception("Source transformation {} does not have unique symbols!".format(transform))
-            elif symbol != Symbols.DIS:   # exclude dispersion events because they will always appear the same for user inputs
-                present[symbol] = True
-            
 
 def collect_args():
     parser = argparse.ArgumentParser(description='insilicoSV is a software to design and simulate complex structural variants, both novel and known.')

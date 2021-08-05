@@ -1,6 +1,6 @@
 
 from constants import *
-from processing import ErrorDetection
+import utils
 import random
 
 class Structural_Variant():
@@ -19,12 +19,15 @@ class Structural_Variant():
             self.source, self.target = SV_KEY[self.type]
             self.name = self.type.name
         else:
-            self.source, self.target = source, target
+            self.source, self.target = tuple(source), tuple(target)
             self.name = str("".join(self.source)) + ">" + str("".join(self.target))
         
         # events like dispersions will appear as the same symbol, so it's important to add unique tags to differentiate them
-        ErrorDetection.validate_symbols(self.source)
-        self.source_unique_char, self.target_unique_char = Structural_Variant.add_unique_ids(self.source), Structural_Variant.add_unique_ids(self.target)
+        # user-generated source/target will also not group together duplication markings and their corresponding symbols together as it is inputted as string
+        utils.validate_symbols(self.source)
+        self.source_unique_char, self.target_unique_char = Structural_Variant.reformat_seq(self.source), Structural_Variant.reformat_seq(self.target)
+        print("New Target: ", self.target_unique_char)
+        print("New Source: ", self.source_unique_char)
 
         # initialize event classes
         self.start = None   # defines the space in which SV operates
@@ -36,7 +39,6 @@ class Structural_Variant():
         #print("Events Dict: ", self.events_dict)
         self.source_symbol_blocks = []
         self.target_symbol_blocks = []
-        self.target_block_chrs = []   # stores the assigned target chr for each block to export to BEDPE file
 
         # specifies if sv is unable to be simulated due to random placement issues
         # will be turned on later
@@ -50,17 +52,21 @@ class Structural_Variant():
     
     def __repr__(self):
         return "<SV transformation \"{}\" -> \"{}\" taking up {} non-dispersion spaces>".format(''.join(self.source), ''.join(self.target), sum([event.length for event in self.source_events if not event.symbol.startswith(Symbols.DIS)]))
-    
+
     @staticmethod
-    def add_unique_ids(transformation):
+    def reformat_seq(transformation):
         # if dispersion events exist in transformation, tag on unique ids to make them distinct as they all are "_"
         # unique ids necessary to map symbol to event with one-to-one correspondence
+        # groups together a duplication marking and its corresponding symbol
+        # transformation: tuple, user inputted source and target
         unique_transform = []
         unique_id = 1
         for component in transformation:
-            if component != Symbols.DIS:
+            if component != Symbols.DIS and component != Symbols.DUP_MARKING:
                 unique_transform.append(component)
-            else:
+            elif component == Symbols.DUP_MARKING:   # duplication event case, need to group together symbol and duplication marking
+                unique_transform[-1] += Symbols.DUP_MARKING
+            else:   # dispersion event case, component = dispersion
                 unique_transform.append(component + str(unique_id))
                 unique_id += 1
         return tuple(unique_transform)
@@ -144,6 +150,9 @@ class Structural_Variant():
         return self.target_symbol_blocks
 
     def change_fragment(self):
+        '''
+        Takes the mapping of symbols to events and the target sequence to construct a replacement sequence for the reference fragment
+        '''
 
         def complement(bases):
             # bases: str
@@ -166,10 +175,10 @@ class Structural_Variant():
 
         # find all blocks of symbols between dispersion events
         # we will apply edits based on a block's start and end pos
-        self.generate_blocks()
+        self.generate_blocks()  # blocks are the groupings of non-dispersion events
 
         changed_fragments = []
-        assert (self.start != None and self.end != None) # start & end should have been defined alongside event positions
+        assert (self.start != None and self.end != None), "Failed on {}".format(self) # start & end should have been defined alongside event positions
         block_start = self.start   # describes SV's start position - applies for the first "block"
         curr_chr = self.start_chr
 
@@ -201,7 +210,6 @@ class Structural_Variant():
                 
         #print("ref {} -> transformed {} for transformation {}".format(ref_piece, change_genome, self.type.value))
         self.changed_fragments = changed_fragments
-        print(self.changed_fragments)
         #print("Target Chromosomes: ", self.target_block_chrs)
 
         return changed_fragments
@@ -221,13 +229,8 @@ class Event():
         self.start = None
         self.end = None
 
-        # experimental attributes
-        self.original_block_idx = None
-        self.original_transform = Operations.UNDEFINED  # describes what happened to the original symbol, either INS (randomly generate sequence), INV, TRA, DEL, or None (Nothing happend)
-        self.target_ins = [1]       # list of (chr, position, operation) to insert a duplication/inverted-duplication of source fragment
-        self.target_start = None
     
     def __repr__(self):
         return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end, "source_frag": self.source_frag,
-                        "source_chr": self.source_chr, "original_transform": self.original_transform, "target_ins": self.target_ins, "target_start": self.target_start})
+                        "source_chr": self.source_chr})
 
