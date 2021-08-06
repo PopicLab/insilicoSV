@@ -1,5 +1,7 @@
 from enum import Enum
 
+MAX_BUFFER_SIZE = 1000000
+
 class Variant_Type(Enum):
     INS = "INS"
     DEL = "DEL"

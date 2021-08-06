@@ -124,7 +124,20 @@ class TestSVSimulator(unittest.TestCase):
                                                         {"type": "INS", "number": 1, "min_length": 5, "max_length": 5}]}],
                                         hap1, hap2, bed)]
 
+    def test_is_overlapping(self):
+        # non-insertion cases
+        print(utils.is_overlapping([(3,4),(5,10)], (4,5)))
+        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (4,5)), False)
 
+        # insertion cases
+        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (4,4))[0], True)
+        self.assertEqual(utils.is_overlapping([(3,4),(5,10), (10,15)], (10,10))[0], True)
+        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (10,10))[0], True)
+        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (20,20))[0], True)
+        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (20,21))[0], True)
+        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (19,20))[0], True)
+        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (21,21)), False)
+        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (5,5))[0], True)
 
     def test_produce_variant_genome(self):
 
@@ -190,15 +203,15 @@ class TestSVSimulator(unittest.TestCase):
         self.assertEqual(changed_frag, "CTCCGCTCCGTCGTATATATGTCTGTATATTGTCTCAGTGAGACACTTAGCATGCAACTCAGTCTGTACTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT")
 
         # INS
-        #config_with_dis = self.test_objects_ins[0]
-        #config_with_dis.initialize_files()
-        #curr_sim = SV_Simulator(config_with_dis.ref, config_with_dis.par, random_gen = RandomSim(10, "max"))
-        #self.assertEqual(curr_sim.produce_variant_genome(config_with_dis.hap1, config_with_dis.hap2, config_with_dis.bed, random_gen = RandomSim(5)), True)
-        #changed_frag = config_with_dis.get_actual_frag()
-        #config_with_dis.remove_test_files()
+        config_with_dis = self.test_objects_ins[0]
+        config_with_dis.initialize_files()
+        curr_sim = SV_Simulator(config_with_dis.ref, config_with_dis.par, random_gen = RandomSim(10, "max"))
+        self.assertEqual(curr_sim.produce_variant_genome(config_with_dis.hap1, config_with_dis.hap2, config_with_dis.bed, random_gen = RandomSim(5)), True)
+        changed_frag = config_with_dis.get_actual_frag()
+        config_with_dis.remove_test_files()
         # CTCCG TCGTA CTAGA CAGCT CCCGA CAGAG CACTG GTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT 
-        # AAAAA_____ TACGAAAAAA CTAGA CAGCT CCCGA CAGAG CACTG GTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT 
-        # self.assertEqual(changed_frag, "AAAAATACGAAAAAACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT ")
+        # AAAAACTCCG _____ TCTAG CAGCT AAAAACCCGA CAGAG CACTG GTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT 
+        self.assertEqual(changed_frag, "AAAAACTCCGTCTAGCAGCTAAAAACCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT")
     
     def test_choose_rand_pos(self):
         # test SVs without dispersions

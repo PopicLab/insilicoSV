@@ -9,11 +9,11 @@ insilicoSV is a software to design and simulate complex structural variants, bot
 `$ pip install -r requirements.txt`
 
 ## To Run
-`python simulate.py <ref.fna> <par.yaml> <hap1.fna> <hap2.fna> <out.bed>`
+`python simulate.py <ref.fna> <par.yaml> <prefix>`
 
 ## Usage
 
-insilicoSV takes in two input files: the reference genome and a yaml configuration file. Following the simulation, it outputs two haplotype files and a BEDPE file. 
+insilicoSV takes in two input files: the reference genome and a yaml configuration file. Following the simulation, it outputs two haplotype files, a BEDPE file, and a simple stats file using the prefix given. 
 
 ### Reference Genome
 This file should be in FASTA format.
@@ -74,9 +74,10 @@ Each line/entry will have the following parameters:
 6. *target_end*: End position on the target chr [EXCLUDE at pos], one-based indexing
 7. *event_type*: Describes the transformation made by the event, either an INS, DEL, INV, TRA, DUP, INVDUP, or INVTRA. Dispersed duplications--those that do not occur immediately after the original--have an attached "d" at the front.
 8. *event_size*: Size of the reference fragment impacted by the event
-9. *parent_sv*: Describes the parent SV the event is a component of, for instance "dupINVdup." If a custom SV was provided, the name becomes "source>target"
-10. *nth_sv*: int, index to count up each SV (note: not the events). All events of a SV belong in the same index.
-11. *order*: int, for insertion-like operations such as TRA, INS, or DUP, the "order" index describes in which order events that target the same position were compiled. Events with INV and DEL operations have an order of 0.
+9. *zygosity*: 0/1 = heterozygous, 1/1 = homozygous
+10. *parent_sv*: Describes the parent SV the event is a component of, for instance "dupINVdup." If a custom SV was provided, the name becomes "source>target"
+11. *nth_sv*: int, index to count up each SV (note: not the events). All events of a SV belong in the same index.
+12. *order*: int, for insertion-like operations such as TRA, INS, or DUP, the "order" index describes in which order events that target the same position were compiled. Events with INV and DEL operations have an order of 0.
 
 ## Usage examples
 Any parameters which were not described above will be shown in the examples below.

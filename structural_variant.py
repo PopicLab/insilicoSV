@@ -24,7 +24,7 @@ class Structural_Variant():
         
         # events like dispersions will appear as the same symbol, so it's important to add unique tags to differentiate them
         # user-generated source/target will also not group together duplication markings and their corresponding symbols together as it is inputted as string
-        utils.validate_symbols(self.source)
+        utils.validate_symbols(self.source, self.target)
         self.source_unique_char, self.target_unique_char = Structural_Variant.reformat_seq(self.source), Structural_Variant.reformat_seq(self.target)
 
         # initialize event classes
@@ -161,7 +161,7 @@ class Structural_Variant():
                     output += base_complements[base]
                 else:
                     output += base
-                    print("Error: Unknown base \'{}\' detected".format(base))
+                    print("Warning: Unknown base \'{}\' detected, complement of base not taken".format(base))
             
             return output
 
@@ -198,6 +198,7 @@ class Structural_Variant():
                     raise Exception("Symbol {} failed to fall in any cases".format(ele))
                 
             # find dispersion event right after block to find position of next block
+            assert curr_chr != None, "Unvalid chr detected for SV {} and events_dict {}".format(self, self.events_dict)
             if idx < len(self.target_symbol_blocks) - 1:
                 dis_event = self.events_dict[Symbols.DIS.value + str(idx + 1)]  # find the nth dispersion event
                 changed_fragments.append([curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
@@ -208,6 +209,10 @@ class Structural_Variant():
                 
         #print("ref {} -> transformed {} for transformation {}".format(ref_piece, change_genome, self.type.value))
         self.changed_fragments = changed_fragments
+
+        # remove source fragments from events to save space as they are no longer needed
+        for key, event in self.events_dict.items():
+            event.source_frag = "Removed"
         #print("Target Chromosomes: ", self.target_block_chrs)
 
         return changed_fragments
@@ -228,6 +233,6 @@ class Event():
         self.end = None
     
     def __repr__(self):
-        return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end, "source_frag": self.source_frag,
+        return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end,
                         "source_chr": self.source_chr})
 

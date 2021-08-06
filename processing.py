@@ -4,6 +4,7 @@ from constants import *
 from pysam import FastaFile
 import argparse
 import os
+import time
 
 class Config():
     def __init__(self,**entries):
@@ -62,19 +63,18 @@ class FormatterIO():
         '''
         Exports SVs changes to bedfile, uses target "blocks" to identify which subtype event is (INS, DUP, TRA, etc.)
         '''
-        def write_to_file(sv, source_chr, source_s, source_e, target_chr, target_s, target_e, transform, symbol, order = 0):
-            assert (not symbol.startswith(Symbols.DIS.value))
+        def write_to_file(sv, source_chr, source_s, source_e, target_chr, target_s, target_e, transform, symbol, event, order = 0):
+            assert (not event.symbol.startswith(Symbols.DIS.value))
 
             # consider insertions
-            if source_e == None:
-                source_e = -1
-                source_s = -1
-                transform_length = len(sv.events_dict[symbol].source_frag)
+            if transform == Operations.INS.value:
+                transform_length = event.length
+                #transform_length = len(sv.events_dict[symbol].source_frag)
             else:
                 transform_length = source_e - source_s
 
-            # do not write transformations of size 0
-            if source_e == -1 or source_e > source_s:
+            # do not write events of size 0
+            if event.length > 0:
                 with open(bedfile, "a") as fout:
                     row = [str(source_chr),
                             str(source_s),
@@ -121,13 +121,13 @@ class FormatterIO():
                             event_name = "d" + event_name
                         
                         order += 1
-                        write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, order)
+                        write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, event, order)
                     
                     else:  # symbol is an original
                         # insertions
                         if symbol[0].upper() not in sv.source_unique_char:
                             order += 1
-                            write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, Operations.INS.value, event.symbol, order)
+                            write_to_file(sv, curr_chr, curr_pos, curr_pos, curr_chr, curr_pos, curr_pos, Operations.INS.value, event.symbol, event, order)
                         
                         # translocations - original symbol
                         elif len(symbol) == 1 and idx != event.original_block_idx:
@@ -136,13 +136,13 @@ class FormatterIO():
                                 event_name = Operations.INVTRA.value
                             else:
                                 event_name = Operations.TRA.value
-                            write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, order)
+                            write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, event, order)
 
                         # inversions
                         elif symbol_is_inversion(symbol):
                             order = 0
                             curr_pos = event.end       # this symbol was already in source
-                            write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, event.start, event.end, Operations.INV.value, event.symbol, order)
+                            write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, event.start, event.end, Operations.INV.value, event.symbol, event, order)
                         
                         # identity - original symbol did not change or move
                         else:
@@ -161,8 +161,9 @@ class FormatterIO():
                 if not symbol.startswith(Symbols.DIS.value) and symbol not in target and symbol.lower() not in target:
                     event = encoding[symbol]
                     order = 0
-                    write_to_file(sv, event.source_chr, event.start, event.end, event.source_chr, event.start, event.start, Operations.DEL.value, event.symbol, order)
+                    write_to_file(sv, event.source_chr, event.start, event.end, event.source_chr, event.start, event.start, Operations.DEL.value, event.symbol, event, order)
             self.bedpe_counter += 1
+
 
     def export_piece(self, id, edits, fasta_out, fasta_file, verbose = False):
         '''
@@ -172,7 +173,15 @@ class FormatterIO():
         edits: list with interval and new_frag, replace reference at the interval with new_frag
         fasta_out: Fasta file to export changes to
         fasta_file: FastaFile with access to reference
-        '''
+        '''    
+        def get_buffer_size(curr_pos, target):
+            # returns the number of bases to read at the given position
+            # max bases to take in is MAX_BUFFER_SIZE
+            if target - curr_pos > MAX_BUFFER_SIZE:
+                return MAX_BUFFER_SIZE
+            else:
+                return target - curr_pos
+
         with open(fasta_out,"a") as fout_export:
             if id not in fasta_file.references:
                 raise KeyError("ID {} not found in inputted fasta file".format(id))
@@ -190,20 +199,18 @@ class FormatterIO():
             pos = 0
             for variant in chr_variants:
                 var_start, var_end = variant[0], variant[1]
-                for idx in range(pos, var_end):
-                    # write all reference bases up until interval, which indicates that a change will occur
-                    if idx < var_start:
-                        c = fasta_file.fetch(id, idx, idx+1)
-                        fout_export.write(c)
+                # write all reference bases up until interval, which indicates that a change will occur
+                while pos < var_start:
+                    appropriate_buffer = get_buffer_size(pos, var_start)
+                    c = fasta_file.fetch(id, pos, pos + appropriate_buffer)
+                    fout_export.write(c)
+                    pos += appropriate_buffer
 
-                    # add in replacement fragment
-                    elif idx == var_start:   # after var_start, loop will ignore up till var_end
-                        fout_export.write(variant[2])
+                # add in replacement fragment
+                assert (pos == var_start), "Replacement fragment about to be inserted at position {} instead of var_start {}".format(pos, var_start)
+                # after var_start, loop will ignore up till var_end
+                fout_export.write(variant[2])
 
-                    # applies only for insertions
-                    # without this, for loop would end before we insert the new_frag
-                    if idx == var_end - 1 and var_start == var_end:   # for insertions, insert piece right before position var_end
-                        fout_export.write(variant[2])
                 pos = var_end
             fout_export.write("\n")
 
@@ -221,18 +228,21 @@ def collect_args():
     parser = argparse.ArgumentParser(description='insilicoSV is a software to design and simulate complex structural variants, both novel and known.')
     parser.add_argument("ref", help="FASTA reference file")
     parser.add_argument("config", help="YAML config file")
-    parser.add_argument("hap1", help="First output FASTA file (first haplotype)")
-    parser.add_argument("hap2", help = "Second output FASTA file (second haplotype)")
-    parser.add_argument("bedpe", help = "BEDPE file location to store variant info")
-    parser.add_argument("stats", help = "File location for stats file")
-    parser.add_argument("-r", "--root", action="store", metavar="DIR", dest="root_dir", help="root directory for all files given as positional arguments")
+    parser.add_argument("prefix", help="Used for naming haplotype, bed, and stats file")
+    #parser.add_argument("hap1", help="First output FASTA file (first haplotype)")
+    #parser.add_argument("hap2", help = "Second output FASTA file (second haplotype)")
+    #parser.add_argument("bedpe", help = "BEDPE file location to store variant info")
+    #parser.add_argument("stats", help = "File location for stats file")
+    parser.add_argument("-r", "--root", action="store", metavar="DIR", dest="root_dir", help="root directory for all files given")
 
     args = parser.parse_args()
-    io = [args.ref, args.config, args.hap1, args.hap2, args.bedpe, args.stats]
+    #io = [args.ref, args.config, args.hap1, args.hap2, args.bedpe, args.stats]
+    args_dict = {"ref": args.ref, "config": args.config, "hap1": args.prefix + ".hapA.fa",
+                "hap2": args.prefix + ".hapB.fa", "bedpe": args.prefix + ".bed", "stats": args.prefix + ".stats.txt"}
     if args.root_dir:
-        io = [os.path.join(args.root_dir, ele) for ele in io]
-    return io
-
+        for key, curr_path in args_dict.items():
+            args_dict[key] = os.path.join(args.root_dir, curr_path)
+    return args_dict
 
 
 
