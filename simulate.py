@@ -336,9 +336,9 @@ class SV_Simulator():
                         if sorted_ranges[x][0] - sorted_ranges[x-1][1] > sv.req_space:
                             print("Possible position between intervals {} and {}".format(sorted_ranges[x-1], sorted_ranges[x]))
 
-            time_dif = time.time() - time_start1
+            time_dif = time.time() - time_start_local
             print("{} / {} SVs successfully placed ========== {} / {} SVs unsuccessfully placed, {} tries, {} seconds".format(active_svs_total, len(svs), inactive_svs_total, len(svs), tries, time_dif), end = "\r")
-            time_start1 = time.time()
+            time_start_local = time.time()
         print("\n")
         return self.event_ranges
 

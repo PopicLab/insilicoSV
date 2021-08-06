@@ -9,7 +9,10 @@ insilicoSV is a software to design and simulate complex structural variants, bot
 `$ pip install -r requirements.txt`
 
 ## To Run
-`python simulate.py <ref.fna> <par.yaml> <prefix>`
+```
+samtools faidx <ref.fna>   # if index file already produced, skip this line
+python simulate.py <ref.fna> <par.yaml> <prefix>
+```
 
 ## Usage
 
