@@ -18,6 +18,8 @@ python simulate.py <ref.fna> <par.yaml> <prefix>
 
 insilicoSV takes in two input files: the reference genome and a yaml configuration file. Following the simulation, it outputs two haplotype files, a BEDPE file, and a simple stats file using the prefix given. 
 
+Note: not all SVs inputted may be simulated. Because the simulator randomly selects positions for SVs, a SV may fail to be placed due to oversaturation. 
+
 ### Reference Genome
 This file should be in FASTA format.
 
@@ -25,10 +27,17 @@ This file should be in FASTA format.
 The configuration yaml file specifies the range of the lengths of the SVs along with the number to simulate. All configurations for structural variants should be put under the "SVs" key. For each SV, the following parameters are available:
 1. *type*: str, insilicoSV supports a predefined list of SVs and allows users to enter a custom transformation. Either "Custom" or one of the 16 predefined SV types named in the below table should be entered.
 2. *number*: int, describes how many of the specified SV type to simulate
-3. *min_length*: int or list, if an integer is provided, insilcoSV assumes that each event's length within a SV must fall between the min_length and max_length. Entering a list offers customization by specifying a different range for each event. If providing a list, enter lengths to correspond with the symbols from source and target in lexicographical order (non-dispersion events, followed by dispersion lengths)
+3. *min_length*: int or list, if an integer is provided, insilcoSV assumes that each event's length within a SV must fall between the min_length and max_length. Entering a list offers customization by specifying a different range for each event. If provided a list, insilicoSV assumes lengths are entered to correspond with the symbols in lexicographical order. The lengths for non-dispersion events (represented by alphabetical characters) will therefore be considered before that of dispersions (_). See usage example #2. 
 4. *max_length*: int or list, must be the same type as min_length, note that max_length >= min_length >= 0 for all elements in each
-5. *source [optional]*: Source sequence for a custom SV, see below to find instructions on how to create a transformation
-6. *target [optional]*: Target sequence for a custom SV, see below to find instructions on how to create a transformation
+5. *source=None [optional]*: Source sequence for a custom SV, see below to find instructions on how to create a transformation
+6. *target=None [optional]*: Target sequence for a custom SV, see below to find instructions on how to create a transformation
+
+The following optional parameters can be set under the "sim_settings" key to change default configurations for the simulator:
+1. *max_tries=100 [optional]*: number of tries to find a valid position to simulate each SV
+2. *fail_if_placement_issues=False [optional]*: if set to True, insilicoSV will raise an Exception when a single SV fails to be placed and simulated
+3. *generate_log_file=False [optional]*: if set to True, insilicoSV will generate a log file for diagnostic purposes and debugging
+4. *filter_small_chr=True [optional]*: filter out chromosomes too small for a SV to be placed, speeds up the process for simulation
+5. *prioritize_top=False [optional]*: if set to True, simulate the SVs listed first as the later ones may fail to be placed. Otherwise, give each SV an equal chance to be simulated
 
 Please see the table and picture for the list of predefined classes.
 
@@ -83,11 +92,12 @@ Each line/entry will have the following parameters:
 12. *order*: int, for insertion-like operations such as TRA, INS, or DUP, the "order" index describes in which order events that target the same position were compiled. Events with INV and DEL operations have an order of 0.
 
 ## Usage examples
-Any parameters which were not described above will be shown in the examples below.
 ### Example 1 - Predefined SVs
 ```yaml
 # YAML config file
-fail_if_placement_issues: True     # stop the simulation if any SV is unable to be placed, default set to False
+sim_settings:
+    max_tries: 200
+    prioritize_top: True
 SVs:
     - type: "INS"
       number: 10

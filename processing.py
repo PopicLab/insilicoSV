@@ -8,10 +8,12 @@ import time
 
 class Config():
     def __init__(self,**entries):
-        self.__dict__.update(entries)
-        self.run_checks()
-        if "fail_if_placement_issues" not in self.__dict__:
-            self.fail_if_placement_issues = False
+        self.__dict__.update(DEFAULT_CONFIG)
+        self.__dict__.update({"SVs": entries["SVs"]})
+        #self.__dict__["SVs"].update(entries["SVs"])
+        if "sim_settings" in entries:   # if the user changed any of the default settings for the sim, they get updated here
+            self.__dict__["sim_settings"].update(entries["sim_settings"])
+        self.run_checks(entries)
 
         for config_sv in self.SVs:
             # handles cases where user enters length range for all components within SV or specifies different ranges
@@ -22,13 +24,14 @@ class Config():
             # make sure max_length >= min_length >= 0
             assert all(max_len >= min_len and min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
             
-            # supply filler values in for source and target if the type is custom
+            # use Enum for variant type
             config_sv["type"] = Variant_Type(config_sv["type"])
             if config_sv["type"] != Variant_Type.Custom:
                 config_sv["source"] = None
                 config_sv["target"] = None
-
-    def run_checks(self):
+    
+    def run_checks(self, entries):
+        # entries: dict representing full config file parsed from yaml
         config_svs = self.SVs
         for config_sv in config_svs:
             # makes sure required attributes are written into parameter file
@@ -44,6 +47,14 @@ class Config():
             # makes sure attributes are the correct datatype
             elif "type" in config_sv and not isinstance(config_sv["type"], str):
                 raise Exception("Invalid {} type for SV \'type\' attribute, str expected".format(type(config_sv["type"])))
+        valid_optional_par = ["fail_if_placement_issues", "max_tries", "generate_log_file", "filter_small_chr", "prioritize_top"] # valid arguments within sim_settings
+        for parameter in self.sim_settings:
+            if parameter not in valid_optional_par:
+                raise Exception("\"{}\" is an invalid argument under sim_settings".format(parameter))
+        valid_keys = ["sim_settings", "SVs"]  # valid arguments at the top level
+        for key in entries:
+            if key not in valid_keys:
+                raise Exception("Unknown argument \"{}\"".format(key))
             
 class FormatterIO():
     def __init__(self, par_file):
@@ -62,14 +73,15 @@ class FormatterIO():
     def export_to_bedpe(self, svs, bedfile, reset_file = True):
         '''
         Exports SVs changes to bedfile, uses target "blocks" to identify which subtype event is (INS, DUP, TRA, etc.)
+        svs: list of Structural Variant objects
+        bedfile: File location for bedpe file
+        reset_file: True = delete any previous content in bed file, False = append
         '''
         def write_to_file(sv, source_chr, source_s, source_e, target_chr, target_s, target_e, transform, symbol, event, order = 0):
             assert (not event.symbol.startswith(Symbols.DIS.value))
-
             # consider insertions
             if transform == Operations.INS.value:
                 transform_length = event.length
-                #transform_length = len(sv.events_dict[symbol].source_frag)
             else:
                 transform_length = source_e - source_s
 
@@ -104,7 +116,6 @@ class FormatterIO():
             assert (sv.start != None and sv.end != None) # start & end should have been defined alongside event positions
             curr_pos = sv.start
             curr_chr = sv.start_chr
-
             for idx, block in enumerate(sv.target_symbol_blocks):
                 order = 0
                 for x, symbol in enumerate(block):
@@ -119,7 +130,6 @@ class FormatterIO():
                         # consider dispersed duplications
                         if event.end != curr_pos or event.source_chr != curr_chr:
                             event_name = "d" + event_name
-                        
                         order += 1
                         write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, event, order)
                     
@@ -164,8 +174,7 @@ class FormatterIO():
                     write_to_file(sv, event.source_chr, event.start, event.end, event.source_chr, event.start, event.start, Operations.DEL.value, event.symbol, event, order)
             self.bedpe_counter += 1
 
-
-    def export_piece(self, id, edits, fasta_out, fasta_file, verbose = False):
+    def export_variants_to_fasta(self, id, edits, fasta_out, fasta_file, verbose = False):
         '''
         Exports list of changes from simulator to fasta file
 
@@ -208,7 +217,6 @@ class FormatterIO():
 
                 # add in replacement fragment
                 assert (pos == var_start), "Replacement fragment about to be inserted at position {} instead of var_start {}".format(pos, var_start)
-                # after var_start, loop will ignore up till var_end
                 fout_export.write(variant[2])
 
                 pos = var_end
@@ -236,9 +244,8 @@ def collect_args():
     parser.add_argument("-r", "--root", action="store", metavar="DIR", dest="root_dir", help="root directory for all files given")
 
     args = parser.parse_args()
-    #io = [args.ref, args.config, args.hap1, args.hap2, args.bedpe, args.stats]
     args_dict = {"ref": args.ref, "config": args.config, "hap1": args.prefix + ".hapA.fa",
-                "hap2": args.prefix + ".hapB.fa", "bedpe": args.prefix + ".bed", "stats": args.prefix + ".stats.txt"}
+                "hap2": args.prefix + ".hapB.fa", "bedpe": args.prefix + ".bed", "stats": args.prefix + ".stats.txt", "log_file": args.prefix + ".log"}
     if args.root_dir:
         for key, curr_path in args_dict.items():
             args_dict[key] = os.path.join(args.root_dir, curr_path)

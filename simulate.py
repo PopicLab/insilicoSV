@@ -7,6 +7,7 @@ from constants import *
 from structural_variant import Structural_Variant, Event
 import tracemalloc  # only for testing
 import sys
+import logging
 import time
 
 time_start = time.time()
@@ -93,11 +94,12 @@ class StatsCollection():
                 write_item(fout, "Total impacted length of reference chromosome", self.len_frags_chr[id])
 
 class SV_Simulator():
-    def __init__(self, ref_file, par_file, random_gen = random):
+    def __init__(self, ref_file, par_file, random_gen = random, log_file=None):
         '''
         ref_file: file location to reference genome (.fasta or .fna or .fa)
         par_file: file location to configuration file (.yaml)
         random_gen: only relevant for unittesting
+        log_file: location to store log file with diagnostic information if config parameters indicate so
         '''
         global time_start
         print("Setting Up Simulator...")
@@ -119,7 +121,12 @@ class SV_Simulator():
 
         # process config file for SVs
         self.formatter = FormatterIO(par_file)
-        self.svs_config = self.formatter.yaml_to_var_list()
+        config = self.formatter.yaml_to_var_list()
+        self.svs_config = config.SVs    # config for what SVs to simulate
+        self.sim_settings = config.sim_settings
+        if log_file and self.sim_settings["generate_log_file"]:
+            logging.basicConfig(filename=log_file, filemode="w", level=logging.DEBUG, format='[%(name)s: %(levelname)s - %(asctime)s] %(message)s')
+            self.log_to_file("YAML Configuration: {}".format(config.__dict__))
 
         # create all SVs
         self.svs = []
@@ -131,11 +138,17 @@ class SV_Simulator():
     def __repr__(self):
         return "All structural variants entered into simulator: {}".format(self.svs)
     
+    def log_to_file(self, info):
+        # only logs to file if config setting indicates so
+        if self.sim_settings["generate_log_file"]:
+            logging.debug(info)
+
+    
     def initialize_svs(self, random_gen = random):
         '''
         Creates Structural_Variant objects for every SV to simulate and decides zygosity
         '''
-        for sv_config in self.svs_config.SVs:
+        for sv_config in self.svs_config:
             for num in range(sv_config["number"]):
                 sv = Structural_Variant(sv_config["type"], sv_config["length_ranges"], source=sv_config["source"], target=sv_config["target"]) # inputs: SV type, range of lengths
                 draw = random_gen.randint(1,3)
@@ -150,10 +163,9 @@ class SV_Simulator():
                     sv.ishomozygous = Zygosity.HETEROZYGOUS
                     sv.hap = [True, False]
                 self.svs.append(sv) 
-    
-    def reinitialize_svs(self):
-        for sv in self.svs:
-            sv.active = False
+        # shuffle svs if we are not prioritizing the simulation of the SVs inputted first
+        if not self.sim_settings["prioritize_top"]:
+            random.shuffle(self.svs)
 
     def produce_variant_genome(self, fasta1_out, fasta2_out, bedfile, stats_file = None, initial_reset = True, random_gen = random, verbose = False):
         '''
@@ -188,7 +200,15 @@ class SV_Simulator():
             for sv in active_svs:
                 if sv.hap[x]:
                     for frag in sv.changed_fragments:
+                        #print("Frag: {}, SV: {}".format(frag[0:3], sv))
                         edits_dict[frag[0]].append(frag[1:])
+            
+            # only for debugging
+            for id in edits_dict:
+                edits_dict[id].sort()
+                self.event_ranges[id].sort()
+            self.log_to_file("Event Ranges: {}".format(self.event_ranges))
+            self.log_to_file("Intervals for hap {}: {}".format(x, edits_dict))
 
             for id in self.order_ids:
                 # account for homozygous and heterogeneous variants
@@ -197,7 +217,7 @@ class SV_Simulator():
                 utils.fail_if_any_overlapping(edits_x)
                 
                 # export edited chromosomes to FASTA files
-                self.formatter.export_piece(id, edits_x, fasta_out, ref_fasta, verbose = verbose)
+                self.formatter.export_variants_to_fasta(id, edits_x, fasta_out, ref_fasta, verbose = verbose)
 
                 print("ID {} altered and saved in fasta file {} in {} seconds".format(id, fasta_out, time.time() - time_start))
                 time_start = time.time()
@@ -239,17 +259,21 @@ class SV_Simulator():
             for x in range(length):
                 rand_seq += base_map[random_gen.randint(1,4)]
             return rand_seq
-        def get_rand_chr():
+        def get_rand_chr(check_size=None):
             # random assignment of SV to a chromosome
             # -> returns random chromosome and its length
-            rand_id = self.order_ids[random_gen.randint(0, len(self.order_ids)-1)]
+            valid_chrs = self.order_ids
+            if check_size != None and self.sim_settings["filter_small_chr"]:   # if parameter setting on, only choose random chr from those that are big enough
+                valid_chrs = [chr for chr, chr_size in self.len_dict.items() if chr_size > check_size]
+            if len(valid_chrs) == 0:
+                raise Exception("SVs are too big for the reference!")
+
+            rand_id = valid_chrs[random_gen.randint(0, len(valid_chrs)-1)]
             chr_len = self.len_dict[rand_id]
             chr_event_ranges = self.event_ranges[rand_id]
             assert rand_id != None
 
             return rand_id, chr_len, chr_event_ranges
-        
-        self.reinitialize_svs()
         
         # maintain separate event ranges for different chromosomes
         self.event_ranges = dict()
@@ -266,14 +290,14 @@ class SV_Simulator():
                 tries += 1
                 valid = True
                 
-                if tries > 100:
-                    if self.svs_config.fail_if_placement_issues:  # user can set a setting to fail if a single SV was not able to be positioned
+                if tries > self.sim_settings["max_tries"]:
+                    if self.sim_settings["fail_if_placement_issues"]:  # user can set a setting to fail if a single SV was not able to be positioned
                         raise Exception("Failed to simulate {}, {} / {} SVs successfully simulated (set fail_if_placement_issues to False to override placement failures)".format(sv, active_svs_total, len(svs)))
                     #print("Failure to simulate \"{}\"".format(sv))
                     valid = False
                     break
                 
-                rand_id, chr_len, chr_event_ranges = get_rand_chr()
+                rand_id, chr_len, chr_event_ranges = get_rand_chr(check_size=sv.req_space)
                 if chr_len - sv.req_space - 1 <= 0:  # SV is too big for current chromosome
                     valid = False
                     continue
@@ -281,15 +305,10 @@ class SV_Simulator():
                     start_pos = random_gen.randint(0, chr_len - sv.req_space - 1)
                     # define the space in which SV operates
                     # we now also know where the target positions lie since we know the order and length of events
-                    sv.start = start_pos
-                    sv.start_chr = rand_id
+                    new_intervals = []  # tracks new ranges of blocks
+                    sv.start, sv.start_chr = start_pos, rand_id
                     sv.end = sv.start + sv.req_space
-
-                    if verbose:
-                        print("is_overlapping({}, {}) -> {}".format(chr_event_ranges, (sv.start, sv.end), utils.is_overlapping(chr_event_ranges, (sv.start, sv.end))))
-                    if len(sv.source_events) == 0 and utils.is_overlapping(chr_event_ranges, (sv.start, sv.end)):  # INS case - sv position won't be checked without this
-                        valid = False
-                        continue
+                    block_start = sv.start
 
                     for sv_event in sv.source_events:
 
@@ -302,24 +321,27 @@ class SV_Simulator():
 
                         # dispersion event should not impact whether position is valid or not, given that spacing is already guaranteed
                         if sv_event.symbol.startswith(Symbols.DIS.value):
-                            continue
 
-                        # check to see if chosen spot is a valid position
-                        #print("Percent_N, {} -> {}".format(frag, percent_N(frag)))
-                        #print("Is_overlapping, {} -> {}".format((self.event_ranges, (sv_event.start, sv_event.end)), is_overlapping(self.event_ranges, (sv_event.start, sv_event.end))))
-                        if percent_N(frag) > 0.05 or utils.is_overlapping(chr_event_ranges, (sv_event.start, sv_event.end)):
-                            valid = False
-                            break     # if ANY of the non-dispersion events within SV are in an invalid position, then immediately fail the try
+                            # check to see if chosen spot is a valid position
+                            #print("is_overlapping({}, {}) -> {}".format(chr_event_ranges, (block_start, sv_event.start), utils.is_overlapping(chr_event_ranges, (block_start, sv_event.start))))
+                            if percent_N(ref_fasta.fetch(rand_id, block_start, sv_event.start)) > 0.05 or utils.is_overlapping(chr_event_ranges, (block_start, sv_event.start)):
+                                valid = False
+                                break     # if ANY of the non-dispersion events within SV are in an invalid position, then immediately fail the try
+                            new_intervals.append((block_start, sv_event.start))
+                            block_start = sv_event.end   # remember that the end is actually the position right after the sv_event
+
+                    if utils.is_overlapping(chr_event_ranges, (block_start, sv.end)):  # catches the last block in sequence, also makes sure INS case goes through checks and interval gets recorded
+                        valid = False
+                        continue
+                    else:
+                        new_intervals.append((block_start, sv.end))
 
             # adds new SV to simulate only if chosen positions were valid
             if valid:
                 active_svs_total += 1
                 sv.active = True
-                chr_event_ranges.extend([(event.start, event.end) for event in sv.source_events if not event.symbol.startswith(Symbols.DIS.value)]) # dispersions events left out because they are not off-limits to more events
-
-                # Basic INS case - no other SV may appear where INS is
-                if len(sv.source_events) == 0 and not utils.is_overlapping(chr_event_ranges, (sv.start, sv.start)):
-                    chr_event_ranges.append((sv.start, sv.start))
+                self.log_to_file("Intervals {} added for SV {}".format(new_intervals, sv))
+                chr_event_ranges.extend(new_intervals)
 
                 # populates insertions with random sequence - these event symbols only show up in target transformation
                 for event in sv.events_dict.values():
@@ -330,15 +352,11 @@ class SV_Simulator():
                 #print("\n")
             else:
                 inactive_svs_total += 1
-                if verbose:
-                    sorted_ranges = sorted(chr_event_ranges)
-                    for x in range(1, len(chr_event_ranges) - 1):
-                        if sorted_ranges[x][0] - sorted_ranges[x-1][1] > sv.req_space:
-                            print("Possible position between intervals {} and {}".format(sorted_ranges[x-1], sorted_ranges[x]))
 
             time_dif = time.time() - time_start_local
             print("{} / {} SVs successfully placed ========== {} / {} SVs unsuccessfully placed, {} tries, {} seconds".format(active_svs_total, len(svs), inactive_svs_total, len(svs), tries, time_dif), end = "\r")
             time_start_local = time.time()
+        
         print("\n")
         return self.event_ranges
 
@@ -362,8 +380,7 @@ class SV_Simulator():
                 sv.change_fragment()
                 total += 1
                 print("{} / {} SVs successfully edited".format(total, active_svs_total), end = "\r")
-                #print("Finished editing {}".format(sv))
-                #print("Events Dict after all edits: ", sv.events_dict)
+                self.log_to_file("Events Dict after all edits: {} ".format(sv.events_dict))
     
     def close(self):
         self.ref_fasta.close()
@@ -380,6 +397,7 @@ if __name__ == "__main__":
     fasta2_out = args["hap2"]
     bed_out = args["bedpe"]
     stats_file = args["stats"]
+    log_file = args["log_file"]
 
     '''fasta_in = "debugging/inputs/test.fna"
     yaml_in = "debugging/inputs/par.yaml"
@@ -388,7 +406,7 @@ if __name__ == "__main__":
     bed_out = "debugging/inputs/out.bed"
     stats_file = "debugging/inputs/stats.txt"'''
 
-    sim = SV_Simulator(fasta_in, yaml_in)
+    sim = SV_Simulator(fasta_in, yaml_in, log_file=log_file)
     sim.produce_variant_genome(fasta1_out, fasta2_out, bed_out, stats_file, verbose = False)
     #print(str(sim))
     print("Simulation completed in {} seconds".format(time.time() - sim_start))

@@ -1,6 +1,6 @@
 from enum import Enum
 
-MAX_BUFFER_SIZE = 1000000
+MAX_BUFFER_SIZE = 1000000  # max number of bases that can be read at one time to export to fasta file
 
 class Variant_Type(Enum):
     INS = "INS"
@@ -41,8 +41,6 @@ class Symbols(Enum):
     DIS = "_" # dispersion event              
     DUP_MARKING = "'" # attached to symbols that are not the original one from source sequence
 
-# "'" = implies a duplication, symbol is NOT the original
-# lowercase = invert 
 # for Structural Variant class
 SV_KEY = {Variant_Type.INS: [(), ("A")],     
         Variant_Type.DEL: [("A",), ()],
@@ -60,3 +58,10 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
         Variant_Type.dupINV: [("A","B"), ("A","b","a'")],
         Variant_Type.INVdup: [("A","B"), ("b'","a","B")],
         Variant_Type.dDUP: [("A","_"), ("A","_","A'")]}
+
+DEFAULT_CONFIG = {"sim_settings": {"max_tries": 100, 
+                                    "fail_if_placement_issues": False, 
+                                    "generate_log_file": False, 
+                                    "filter_small_chr": True,
+                                    "prioritize_top": False},
+                "SVs": {}}

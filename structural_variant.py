@@ -161,7 +161,7 @@ class Structural_Variant():
                     output += base_complements[base]
                 else:
                     output += base
-                    print("Warning: Unknown base \'{}\' detected, complement of base not taken".format(base))
+                    print("Warning: Unknown base \'{}\' detected in reference, complement of base not taken".format(base))
             
             return output
 

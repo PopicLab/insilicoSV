@@ -91,35 +91,35 @@ class TestSVSimulator(unittest.TestCase):
         bed = "unit_tests/inputs/out.bed"
 
         self.test_objects_no_dis = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}], 
-                                        [par, {"SVs": [{"type": "delINVdup", "number": 1, "max_length": 5, "min_length": 5}]}],
+                                        [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "delINVdup", "number": 1, "max_length": 5, "min_length": 5}]}],
                                         hap1, hap2, bed),
                                     TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}], 
-                                                [par, {"SVs": [{"type": "delINVdup", "number": 1, "max_length": 5, "min_length": 5},
+                                                [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "delINVdup", "number": 1, "max_length": 5, "min_length": 5},
                                                                             {"type": "delINVdel", "number": 1, "min_length": 5, "max_length": 5},
                                                                             {"type": "dupINVdup", "number": 1, "min_length": 5, "max_length": 5}
                                                                             ]}],
                                                 hap1, hap2, bed),
                                     TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGAGTCAGGGAGCAAAAAAGTGTGACACTAGTCCACAGGTGAGAAACACAAATATTCAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}], 
-                                                [par, {"SVs": [{"type": "dupINVdel", "number": 1, "max_length": 5, "min_length": 5},
+                                                [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "dupINVdel", "number": 1, "max_length": 5, "min_length": 5},
                                                                 {"type": "delINV", "number": 1, "min_length": 5, "max_length": 5},
                                                                 {"type": "INVdel", "number": 1, "min_length": 5, "max_length": 5}
                                                                 ]}],
                                                 hap1, hap2, bed),
                                     TestObject([ref_file, {"Chromosome19": "ACACTAGTCCACAGGTGAGAATCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}], 
-                                                [par, {"SVs": [{"type": "dupINV", "number": 1, "max_length": 5, "min_length": 5},
+                                                [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "dupINV", "number": 1, "max_length": 5, "min_length": 5},
                                                                 {"type": "INVdup", "number": 1, "min_length": 5, "max_length": 5}
                                                                 ]}],
                                                 hap1, hap2, bed)]
         self.test_objects_with_dis = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}], 
-                                        [par, {"SVs": [{"type": "TRA", "number": 2, "min_length": 5, "max_length": 5}]}],
+                                        [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "TRA", "number": 2, "min_length": 5, "max_length": 5}]}],
                                         hap1, hap2, bed),
                                     TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGGGTATATGTCTGTGTCTCAGTGAGACACTTAGCATGCAACTCAGTCTGTACTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}], 
-                                        [par, {"SVs": [{"type": "dDUP-iDEL", "number": 1, "min_length": 5, "max_length": 5},
+                                        [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "dDUP-iDEL", "number": 1, "min_length": 5, "max_length": 5},
                                                         {"type": "INS-iDEL", "number": 1, "min_length": 5, "max_length": 5},
                                                         {"type": "dDUP", "number": 1, "min_length": 5, "max_length": 5}]}],
                                         hap1, hap2, bed)]
         self.test_objects_ins = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}], 
-                                        [par, {"SVs": [{"type": "INS", "number": 1, "min_length": 5, "max_length": 5},
+                                        [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "INS", "number": 1, "min_length": 5, "max_length": 5},
                                                         {"type": "delINV", "number": 1, "min_length": 5, "max_length": 5},
                                                         {"type": "INS", "number": 1, "min_length": 5, "max_length": 5}]}],
                                         hap1, hap2, bed)]
@@ -219,7 +219,7 @@ class TestSVSimulator(unittest.TestCase):
         config_no_dis.initialize_files()
         curr_sim = SV_Simulator(config_no_dis.ref, config_no_dis.par, random_gen = RandomSim(10, "max"))
         random_gen = RandomSim(10)
-        self.assertEqual(curr_sim.choose_rand_pos(curr_sim.svs, curr_sim.ref_fasta, random_gen), {"Chromosome19": [(0,5), (5,10), (10,15)]})
+        self.assertEqual(curr_sim.choose_rand_pos(curr_sim.svs, curr_sim.ref_fasta, random_gen), {"Chromosome19": [(0,15)]})
 
 if __name__ == "__main__":
     unittest.main()
