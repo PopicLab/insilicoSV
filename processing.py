@@ -5,6 +5,7 @@ from pysam import FastaFile
 import argparse
 import os
 import time
+import utils
 
 class Config():
     def __init__(self,**entries):
@@ -70,11 +71,12 @@ class FormatterIO():
         config = Config(**config_entries)
         return config
 
-    def export_to_bedpe(self, svs, bedfile, reset_file = True):
+    def export_to_bedpe(self, svs, bedfile, ins_fasta, reset_file = True):
         '''
-        Exports SVs changes to bedfile, uses target "blocks" to identify which subtype event is (INS, DUP, TRA, etc.)
+        Exports SVs changes to bedfile and foreign insertions to separate fasta file, uses target "blocks" to identify which subtype event is (INS, DUP, TRA, etc.)
         svs: list of Structural Variant objects
         bedfile: File location for bedpe file
+        ins_fasta: File location to export foreign insertions
         reset_file: True = delete any previous content in bed file, False = append
         '''
         def write_to_file(sv, source_chr, source_s, source_e, target_chr, target_s, target_e, transform, symbol, event, order = 0):
@@ -105,8 +107,17 @@ class FormatterIO():
         def symbol_is_inversion(symbol):
             return any(c.islower() for c in symbol)
 
+        def export_insertions(chr, start_pos, seq, ins_fasta):
+            '''
+            Exports foreign insertion sequences to separate fasta file, append only
+            '''
+            with open(ins_fasta, "a") as fout_ins:
+                fout_ins.write(">{}_{}\n".format(chr, start_pos))
+                fout_ins.write("{}\n".format(seq))
+        
         if reset_file:
-            self.reset_file(bedfile)
+            utils.reset_file(bedfile)
+            utils.reset_file(ins_fasta)
         
         for x, sv in enumerate(svs):
             source, target = sv.source_unique_char, sv.target_unique_char
@@ -138,6 +149,7 @@ class FormatterIO():
                         if symbol[0].upper() not in sv.source_unique_char:
                             order += 1
                             write_to_file(sv, curr_chr, curr_pos, curr_pos, curr_chr, curr_pos, curr_pos, Operations.INS.value, event.symbol, event, order)
+                            export_insertions(curr_chr, curr_pos, event.source_frag, ins_fasta)   # foreign insertion sequences need to be exported separate from bed file
                         
                         # translocations - original symbol
                         elif len(symbol) == 1 and idx != event.original_block_idx:
@@ -222,11 +234,6 @@ class FormatterIO():
                 pos = var_end
             fout_export.write("\n")
 
-    def reset_file(self, filename):
-        #print("Overwritting File {}...".format(filename))
-        with open(filename, "w") as f_reset:
-            f_reset.truncate()
-    
     def close(self):
         # close all file handlers
         self.fin_export1.close()
@@ -236,15 +243,11 @@ def collect_args():
     parser = argparse.ArgumentParser(description='insilicoSV is a software to design and simulate complex structural variants, both novel and known.')
     parser.add_argument("ref", help="FASTA reference file")
     parser.add_argument("config", help="YAML config file")
-    parser.add_argument("prefix", help="Used for naming haplotype, bed, and stats file")
-    #parser.add_argument("hap1", help="First output FASTA file (first haplotype)")
-    #parser.add_argument("hap2", help = "Second output FASTA file (second haplotype)")
-    #parser.add_argument("bedpe", help = "BEDPE file location to store variant info")
-    #parser.add_argument("stats", help = "File location for stats file")
+    parser.add_argument("prefix", help="Used for naming all output files (haplotype, bed, and stats)")
     parser.add_argument("-r", "--root", action="store", metavar="DIR", dest="root_dir", help="root directory for all files given")
 
     args = parser.parse_args()
-    args_dict = {"ref": args.ref, "config": args.config, "hap1": args.prefix + ".hapA.fa",
+    args_dict = {"ref": args.ref, "config": args.config, "ins_fasta": args.prefix + ".insertions.fa", "hap1": args.prefix + ".hapA.fa",
                 "hap2": args.prefix + ".hapB.fa", "bedpe": args.prefix + ".bed", "stats": args.prefix + ".stats.txt", "log_file": args.prefix + ".log"}
     if args.root_dir:
         for key, curr_path in args_dict.items():

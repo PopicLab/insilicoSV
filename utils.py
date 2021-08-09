@@ -51,3 +51,8 @@ def remove_file(file):
     # removes file if it exists
     if os.path.exists(file):
         os.remove(file)
+
+def reset_file(filename):
+    #print("Overwritting File {}...".format(filename))
+    with open(filename, "w") as f_reset:
+        f_reset.truncate()

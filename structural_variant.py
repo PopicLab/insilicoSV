@@ -89,7 +89,7 @@ class Structural_Variant():
         # determine length of events/symbols
         symbols_dict = dict()
         if len(lengths) > 1:    # values given by user represents custom ranges for each event symbol of variant in lexicographical order 
-            assert (len(lengths) == len(all_symbols)) 
+            assert (len(lengths) == len(all_symbols)), "Number of lengths entered does not match the number of symbols (remember foreign insertions and dispersions) present!" 
             for idx, symbol in enumerate(all_symbols):
                 symbols_dict[symbol] = (random.randint(lengths[idx][0], lengths[idx][1]), lengths[idx])
 
@@ -176,7 +176,7 @@ class Structural_Variant():
         self.generate_blocks()  # blocks are the groupings of non-dispersion events
 
         changed_fragments = []
-        assert (self.start != None and self.end != None), "Failed on {}".format(self) # start & end should have been defined alongside event positions
+        assert (self.start != None and self.end != None), "Undefined SV start for {}".format(self) # start & end should have been defined alongside event positions
         block_start = self.start   # describes SV's start position - applies for the first "block"
         curr_chr = self.start_chr
 
@@ -209,13 +209,15 @@ class Structural_Variant():
                 
         #print("ref {} -> transformed {} for transformation {}".format(ref_piece, change_genome, self.type.value))
         self.changed_fragments = changed_fragments
-
-        # remove source fragments from events to save space as they are no longer needed
-        for key, event in self.events_dict.items():
-            event.source_frag = "Removed"
-        #print("Target Chromosomes: ", self.target_block_chrs)
-
+        self.clean_event_storage()   # clean up unused storage - we do not need to store most source_frags anymore
+        
         return changed_fragments
+    
+    def clean_event_storage(self):
+        # remove source fragments from events to save space as they are no longer needed
+        for event in self.events_dict.values():
+            if event.symbol in self.source_unique_char:  # do not clean out insertion fragments as they'll need to be exported later
+                event.source_frag = "Removed"
 
 class Event():
     '''represents the symbols, also known as the "events," within a SV transformation'''

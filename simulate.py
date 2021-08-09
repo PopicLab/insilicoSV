@@ -143,7 +143,6 @@ class SV_Simulator():
         if self.sim_settings["generate_log_file"]:
             logging.debug(info)
 
-    
     def initialize_svs(self, random_gen = random):
         '''
         Creates Structural_Variant objects for every SV to simulate and decides zygosity
@@ -167,7 +166,7 @@ class SV_Simulator():
         if not self.sim_settings["prioritize_top"]:
             random.shuffle(self.svs)
 
-    def produce_variant_genome(self, fasta1_out, fasta2_out, bedfile, stats_file = None, initial_reset = True, random_gen = random, verbose = False):
+    def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta, bedfile, stats_file = None, initial_reset = True, random_gen = random, verbose = False):
         '''
         initial_reset: boolean to indicate if output file should be overwritten (True) or appended to (False)
         random_gen: only relevant in testing
@@ -175,8 +174,8 @@ class SV_Simulator():
         '''
         global time_start
         if initial_reset:
-            self.formatter.reset_file(fasta1_out)
-            self.formatter.reset_file(fasta2_out)
+            utils.reset_file(fasta1_out)
+            utils.reset_file(fasta2_out)
 
         # edit chromosome
         ref_fasta = self.ref_fasta
@@ -194,7 +193,7 @@ class SV_Simulator():
                 edits_dict[id] = []
 
             if x == 0:
-                fasta_out = fasta1_out
+                fasta_out = fasta1_out  # where to write new genome to
             elif x == 1:
                 fasta_out = fasta2_out
             for sv in active_svs:
@@ -219,18 +218,17 @@ class SV_Simulator():
                 # export edited chromosomes to FASTA files
                 self.formatter.export_variants_to_fasta(id, edits_x, fasta_out, ref_fasta, verbose = verbose)
 
-                print("ID {} altered and saved in fasta file {} in {} seconds".format(id, fasta_out, time.time() - time_start))
+                print("ID {} exported to fasta file {} in {} seconds".format(id, fasta_out, time.time() - time_start))
                 time_start = time.time()
 
         # export variant data to BED file
-        self.formatter.export_to_bedpe(active_svs, bedfile, reset_file = initial_reset)
+        self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file = initial_reset)
         initial_reset = False
 
         # create and export stats file
         if stats_file:
             self.stats.get_info(self.svs)
             self.stats.export_data(stats_file)
-
         return True
     
     def choose_rand_pos(self, svs, ref_fasta, random_gen = random, verbose = False):
@@ -340,18 +338,17 @@ class SV_Simulator():
             if valid:
                 active_svs_total += 1
                 sv.active = True
-                self.log_to_file("Intervals {} added for SV {}".format(new_intervals, sv))
+                self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(new_intervals, rand_id, sv))
                 chr_event_ranges.extend(new_intervals)
 
                 # populates insertions with random sequence - these event symbols only show up in target transformation
                 for event in sv.events_dict.values():
                     if event.source_frag == None and event.length > 0:
                         event.source_frag = generate_seq(event.length)
-                
-                #print("Events Dict after random positions selected: ", sv.events_dict)
-                #print("\n")
             else:
                 inactive_svs_total += 1
+                if tries < self.sim_settings["max_tries"]:
+                    raise Exception("{} only got {} tries instead of the max {}".format(sv, tries, self.sim_settings["max_tries"]))
 
             time_dif = time.time() - time_start_local
             print("{} / {} SVs successfully placed ========== {} / {} SVs unsuccessfully placed, {} tries, {} seconds".format(active_svs_total, len(svs), inactive_svs_total, len(svs), tries, time_dif), end = "\r")
@@ -395,6 +392,7 @@ if __name__ == "__main__":
     yaml_in = args["config"]
     fasta1_out = args["hap1"]
     fasta2_out = args["hap2"]
+    ins_fasta = args["ins_fasta"]
     bed_out = args["bedpe"]
     stats_file = args["stats"]
     log_file = args["log_file"]
@@ -406,8 +404,8 @@ if __name__ == "__main__":
     bed_out = "debugging/inputs/out.bed"
     stats_file = "debugging/inputs/stats.txt"'''
 
-    sim = SV_Simulator(fasta_in, yaml_in, log_file=log_file)
-    sim.produce_variant_genome(fasta1_out, fasta2_out, bed_out, stats_file, verbose = False)
+    sim = SV_Simulator(args["ref"], args["config"], log_file=args["log_file"])
+    sim.produce_variant_genome(args["hap1"], args["hap2"], args["ins_fasta"], args["bedpe"], args["stats"], verbose = False)
     #print(str(sim))
     print("Simulation completed in {} seconds".format(time.time() - sim_start))
 
