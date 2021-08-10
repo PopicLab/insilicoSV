@@ -153,8 +153,8 @@ class SV_Simulator():
         for sv_config in self.svs_config:
             for num in range(sv_config["number"]):
                 sv = Structural_Variant(sv_config["type"], sv_config["length_ranges"], source=sv_config["source"], target=sv_config["target"]) # inputs: SV type, range of lengths
+
                 draw = random_gen.randint(1,3)
-                
                 if draw == 3:   # sv applies to both haplotypes
                     sv.ishomozygous = Zygosity.HOMOZYGOUS
                     sv.hap = [True, True]
@@ -202,7 +202,6 @@ class SV_Simulator():
             for sv in active_svs:
                 if sv.hap[x]:
                     for frag in sv.changed_fragments:
-                        #print("Frag: {}, SV: {}".format(frag[0:3], sv))
                         edits_dict[frag[0]].append(frag[1:])
             
             # only for debugging
@@ -226,7 +225,6 @@ class SV_Simulator():
 
         # export variant data to BED file
         self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file = initial_reset)
-        initial_reset = False
 
         # create and export stats file
         if stats_file:
