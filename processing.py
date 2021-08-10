@@ -222,7 +222,7 @@ class FormatterIO():
                 var_start, var_end = variant[0], variant[1]
                 # write all reference bases up until interval, which indicates that a change will occur
                 while pos < var_start:
-                    appropriate_buffer = get_buffer_size(pos, var_start)
+                    appropriate_buffer = get_buffer_size(pos, var_start)   # amount of bases to read
                     c = fasta_file.fetch(id, pos, pos + appropriate_buffer)
                     fout_export.write(c)
                     pos += appropriate_buffer

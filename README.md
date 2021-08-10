@@ -43,6 +43,8 @@ Please see the table and picture for the list of predefined classes.
 
 ![Alt text](imgs/complex_sv_classes_diagram.webp)
 
+Source: Collins, R.L., Brand, H., Karczewski, K.J. *et al.* *Nature* (2020)
+
 | SV Type | Transformation |
 |---------|----------------|
 | INS | "" -> "A" | 
@@ -86,7 +88,7 @@ Each line/entry will have the following parameters:
 6. *target_end*: End position on the target chr [EXCLUDE at pos], one-based indexing
 7. *event_type*: Describes the transformation made by the event, either an INS, DEL, INV, TRA, DUP, INVDUP, or INVTRA. Dispersed duplications--those that do not occur immediately after the original--have an attached "d" at the front.
 8. *event_size*: Size of the reference fragment impacted by the event
-9. *zygosity*: 0/1 = heterozygous, 1/1 = homozygous
+9. *zygosity*: 0/1 = heterozygous, 1/1 = homozygous. insilicoSV gives each SV a 2/3 chance of being heterozygous and 1/3 chance of being homozygous. 
 10. *parent_sv*: Describes the parent SV the event is a component of, for instance "dupINVdup." If a custom SV was provided, the name becomes "source>target"
 11. *nth_sv*: int, index to count up each SV (note: not the events). All events of a SV belong in the same index.
 12. *order*: int, for insertion-like operations such as TRA, INS, or DUP, the "order" index describes in which order events that target the same position were compiled. Events with INV and DEL operations have an order of 0.
@@ -120,16 +122,16 @@ SVs:
 ```
 ```
 # BEDPE file
-None	        -1	0	  Chromosome21	148	149	INS	10	  0/1	INS	        1	  1
-None	        -1	0	  Chromosome19	5	  6	  INS	6	    0/1	INS	        2	  1
-None	        -1	0	  Chromosome19	38	39	INS	7	    1/1	INS	        3   1
-None	        -1	0	  Chromosome21	48	49	INS	8	    1/1	INS	        4	  1
-None	        -1	0	  Chromosome19	86	87	INS	10	  0/1	INS	        5	  1
-None	        -1	0	  Chromosome19	64	65	INS	9	    1/1	INS	        6	  1
-None	        -1	0	  Chromosome19	7	  8	  INS	10	  0/1	INS	        7	  1
-None	        -1	0	  Chromosome21	141	142	INS	8	    1/1	INS	        8	  1
-None	        -1	0	  Chromosome19	74	75	INS	10	  1/1	INS	        9	  1
-None	        -1	0	  Chromosome19	60	61	INS	7	    0/1	INS	        10  1
+Chromosome21	148	149 Chromosome21	148	149	INS	10	  0/1	INS	        1	  1
+Chromosome19	5	  6	  Chromosome19	5	  6	  INS	6	    0/1	INS	        2	  1
+Chromosome19	38	39	Chromosome19	38	39	INS	7	    1/1	INS	        3   1
+Chromosome21	48	49	Chromosome21	48	49	INS	8	    1/1	INS	        4	  1
+Chromosome19	86	87	Chromosome19	86	87	INS	10	  0/1	INS	        5	  1
+Chromosome19	64	65	Chromosome19	64	65	INS	9	    1/1	INS	        6	  1
+Chromosome19	7	  8	  Chromosome19	7	  8	  INS	10	  0/1	INS	        7	  1
+Chromosome21	141	142	Chromosome21	141	142	INS	8	    1/1	INS	        8	  1
+Chromosome19	74	75	Chromosome19	74	75	INS	10	  1/1	INS	        9	  1
+Chromosome19	60	61	Chromosome19	60	61	INS	7	    0/1	INS	        10  1
 Chromosome21	23	31	Chromosome21	23	31	INV	7	    0/1	INVdel	    11	0
 Chromosome21	30	36	Chromosome21	30	31	DEL	5	    0/1	INVdel	    11	0
 Chromosome21	122	132	Chromosome21	122	132	INV	9	    1/1	INVdel	    12	0
@@ -169,9 +171,9 @@ SVs:
 Chromosome21	100	110	Chromosome21	100	110	INV	    9	  0/1	AB_C_D>bb'_AEc'_EDC	1	0
 Chromosome21	100	110	Chromosome21	109	110	INVDUP	9	  0/1	AB_C_D>bb'_AEc'_EDC	1	1
 Chromosome21	92	101	Chromosome21	124	125	TRA	    8	  0/1	AB_C_D>bb'_AEc'_EDC	1	1   # order important for insertion-like operations at the same position
-None	        -1	0	  Chromosome21	124	125	INS	    14	0/1	AB_C_D>bb'_AEc'_EDC	1	2
+Chromosome21	124	125	Chromosome21	124	125	INS	    14	0/1	AB_C_D>bb'_AEc'_EDC	1	2
 Chromosome21	124	135	Chromosome21	124	125	dINVDUP	10	0/1	AB_C_D>bb'_AEc'_EDC	1	3
-None	        -1	0	  Chromosome21	150	151	INS	    14	0/1	AB_C_D>bb'_AEc'_EDC	1	1
+Chromosome21	150	151	Chromosome21	150	151	INS	    14	0/1	AB_C_D>bb'_AEc'_EDC	1	1
 Chromosome21	124	135	Chromosome21	159	160	TRA	    10	0/1	AB_C_D>bb'_AEc'_EDC	1	1
 ```
 

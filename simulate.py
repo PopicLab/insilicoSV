@@ -102,7 +102,7 @@ class SV_Simulator():
         log_file: location to store log file with diagnostic information if config parameters indicate so
         '''
         global time_start
-        print("Setting Up Simulator...")
+        print("Setting up Simulator...")
 
         # create FastaFile with access to the reference file
         self.ref_file = ref_file
@@ -138,10 +138,13 @@ class SV_Simulator():
     def __repr__(self):
         return "All structural variants entered into simulator: {}".format(self.svs)
     
-    def log_to_file(self, info):
+    def log_to_file(self, info, key = "DEBUG"):
         # only logs to file if config setting indicates so
+        log_func = [logging.debug, logging.warning]
+        key_to_func = {"DEBUG": logging.debug, "WARNING": logging.warning}
         if self.sim_settings["generate_log_file"]:
-            logging.debug(info)
+            key_to_func[key](info)
+            #logging.debug(info)
 
     def initialize_svs(self, random_gen = random):
         '''
@@ -319,16 +322,18 @@ class SV_Simulator():
 
                         # dispersion event should not impact whether position is valid or not, given that spacing is already guaranteed
                         if sv_event.symbol.startswith(Symbols.DIS.value):
-
                             # check to see if chosen spot is a valid position
                             #print("is_overlapping({}, {}) -> {}".format(chr_event_ranges, (block_start, sv_event.start), utils.is_overlapping(chr_event_ranges, (block_start, sv_event.start))))
-                            if percent_N(ref_fasta.fetch(rand_id, block_start, sv_event.start)) > 0.05 or utils.is_overlapping(chr_event_ranges, (block_start, sv_event.start)):
+                            if utils.is_overlapping(chr_event_ranges, (block_start, sv_event.start)):   # sv_event.start is the end of the current block
                                 valid = False
                                 break     # if ANY of the non-dispersion events within SV are in an invalid position, then immediately fail the try
                             new_intervals.append((block_start, sv_event.start))
                             block_start = sv_event.end   # remember that the end is actually the position right after the sv_event
-
-                    if utils.is_overlapping(chr_event_ranges, (block_start, sv.end)):  # catches the last block in sequence, also makes sure INS case goes through checks and interval gets recorded
+                        elif percent_N(frag) > 0.05:
+                            valid = False
+                            break
+                    # catches the last (and perhaps only) block in sequence
+                    if utils.is_overlapping(chr_event_ranges, (block_start, sv.end)):  
                         valid = False
                         continue
                     else:
@@ -347,8 +352,8 @@ class SV_Simulator():
                         event.source_frag = generate_seq(event.length)
             else:
                 inactive_svs_total += 1
-                if tries < self.sim_settings["max_tries"]:
-                    raise Exception("{} only got {} tries instead of the max {}".format(sv, tries, self.sim_settings["max_tries"]))
+                if tries != self.sim_settings["max_tries"]+1:
+                    self.log_to_file("{} only got {} tries instead of the max {}".format(sv, tries, self.sim_settings["max_tries"]+1), key = "WARNING")
 
             time_dif = time.time() - time_start_local
             print("{} / {} SVs successfully placed ========== {} / {} SVs unsuccessfully placed, {} tries, {} seconds".format(active_svs_total, len(svs), inactive_svs_total, len(svs), tries, time_dif), end = "\r")

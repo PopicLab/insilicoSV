@@ -207,7 +207,6 @@ class Structural_Variant():
             else:
                 changed_fragments.append([curr_chr, block_start, self.end, new_frag])
                 
-        #print("ref {} -> transformed {} for transformation {}".format(ref_piece, change_genome, self.type.value))
         self.changed_fragments = changed_fragments
         self.clean_event_storage()   # clean up unused storage - we do not need to store most source_frags anymore
         
