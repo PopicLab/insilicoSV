@@ -1,6 +1,7 @@
 from os import write
 import random
 from pysam import FastaFile
+from pysam import VariantFile
 from processing import FormatterIO, collect_args
 import utils
 from constants import *
@@ -123,6 +124,17 @@ class SV_Simulator():
         self.formatter = FormatterIO(par_file)
         config = self.formatter.yaml_to_var_list()
         self.svs_config = config.SVs    # config for what SVs to simulate
+
+        # Based on the SVs config information, set a flag indicating which mode we're in
+        self.mode = "randomized"
+        self.vcf_path = None
+        if "vcf_path" in self.svs_config[0]:
+            self.mode = "fixed"
+            self.vcf_path = self.svs_config[0]["vcf_path"]
+
+        print(f'MODE = {self.mode}')
+        print('svs_config list:')
+        print(str(self.svs_config))
         self.sim_settings = config.sim_settings
         if log_file and self.sim_settings["generate_log_file"]:
             logging.basicConfig(filename=log_file, filemode="w", level=logging.DEBUG, format='[%(name)s: %(levelname)s - %(asctime)s] %(message)s')
@@ -130,7 +142,7 @@ class SV_Simulator():
 
         # create all SVs
         self.svs = []
-        self.initialize_svs(random_gen = random_gen)
+        self.initialize_svs(mode=self.mode, vcf_path=self.vcf_path, random_gen=random_gen)
 
         print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
         time_start = time.time()
@@ -146,16 +158,24 @@ class SV_Simulator():
             key_to_func[key](info)
             #logging.debug(info)
 
-    def initialize_svs(self, random_gen = random):
+    def process_vcf(self, vcf_path, random_gen=random):
         '''
-        Creates Structural_Variant objects for every SV to simulate and decides zygosity
+        Method to process vcf containing SVs to be added (deterministically) to reference
         '''
-        for sv_config in self.svs_config:
-            for num in range(sv_config["number"]):
-                sv = Structural_Variant(sv_config["type"], sv_config["length_ranges"], source=sv_config["source"], target=sv_config["target"]) # inputs: SV type, range of lengths
-
-                draw = random_gen.randint(1,3)
-                if draw == 3:   # sv applies to both haplotypes
+        vcf = VariantFile(vcf_path)
+        # for every record in vcf, add SV object to list
+        for rec in vcf.fetch():
+            type = Variant_Type(rec.info['SVTYPE'])
+            if rec.info['SVTYPE'] == "INS":
+                # raise expection until we include logic to extract the insertion sequence from an INS vcf record
+                raise Exception('Cannot process INS events from input VCF – need to add logic for extracting inserted sequence')
+            sv = Structural_Variant(type, rec_start=rec.start, rec_stop=rec.stop, rec_chrom=rec.chrom)
+            # extract genotype from VCF record: if none is given, draw randomly, otherwise take from one of the samples
+            gts = set([rec.samples[i]['GT'] for i in range(len(rec.samples))])
+            if (len(gts) == 1) and ((None, None) in gts):
+                # if all of the samples in the vcf record gave (None,None), generate randomly
+                draw = random_gen.randint(1, 3)
+                if draw == 3:  # sv applies to both haplotypes
                     sv.ishomozygous = Zygosity.HOMOZYGOUS
                     sv.hap = [True, True]
                 elif draw == 2:
@@ -164,12 +184,53 @@ class SV_Simulator():
                 elif draw == 1:
                     sv.ishomozygous = Zygosity.HETEROZYGOUS
                     sv.hap = [True, False]
-                self.svs.append(sv) 
-        # shuffle svs if we are not prioritizing the simulation of the SVs inputted first
-        if not self.sim_settings["prioritize_top"]:
-            random.shuffle(self.svs)
+            else:
+                # if (None, None) isn't the only genotype, draw until you get a non-None one
+                # Get genotype in the form (1,0) -> construct hap and ishomozygous from that
+                gt = (None, None)
+                while gt == (None, None):
+                    gt = gts.pop()
+                if sum(gt) == 2:
+                    sv.ishomozygous = Zygosity.HOMOZYGOUS
+                else:
+                    sv.ishomozygous = Zygosity.HETEROZYGOUS
+                sv.hap = [bool(i) for i in gt]
 
-    def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta, bedfile, stats_file = None, initial_reset = True, random_gen = random, verbose = False):
+            self.svs.append(sv)
+
+    def initialize_svs(self, mode, vcf_path=None, random_gen=random):
+        '''
+        Creates Structural_Variant objects for every SV to simulate and decides zygosity
+        mode: flag indicating whether SVs are to be randomly generated or read in from VCF
+        vcf_path: optional path that will be used if mode=="fixed"
+        '''
+        if mode == "randomized":
+            for sv_config in self.svs_config:
+                for num in range(sv_config["number"]):
+                    sv = Structural_Variant(sv_config["type"], sv_config["length_ranges"], source=sv_config["source"], target=sv_config["target"]) # inputs: SV type, range of lengths
+
+                    draw = random_gen.randint(1,3)
+                    if draw == 3:   # sv applies to both haplotypes
+                        sv.ishomozygous = Zygosity.HOMOZYGOUS
+                        sv.hap = [True, True]
+                    elif draw == 2:
+                        sv.ishomozygous = Zygosity.HETEROZYGOUS
+                        sv.hap = [False, True]
+                    elif draw == 1:
+                        sv.ishomozygous = Zygosity.HETEROZYGOUS
+                        sv.hap = [True, False]
+                    self.svs.append(sv)
+            # shuffle svs if we are not prioritizing the simulation of the SVs inputted first
+            if not self.sim_settings["prioritize_top"]:
+                random.shuffle(self.svs)
+        else:
+            # branch for mode == "fixed"
+            self.process_vcf(vcf_path)
+        print('SELF.SVS at end of call to initialize_svs():')
+        print(self.svs)
+
+    def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta, bedfile, stats_file = None, initial_reset = True,
+                               random_gen = random, mode = "randomized", verbose = False):
         '''
         initial_reset: boolean to indicate if output file should be overwritten (True) or appended to (False)
         random_gen: only relevant in testing
@@ -182,7 +243,8 @@ class SV_Simulator():
 
         # edit chromosome
         ref_fasta = self.ref_fasta
-        self.apply_transformations(ref_fasta, random_gen)
+        print('*** calling apply_transformations() ***')
+        self.apply_transformations(ref_fasta, mode, random_gen)
         print("Finished SV placements and transformations in {} seconds".format(time.time() - time_start))
         time_start = time.time()
 
@@ -231,8 +293,60 @@ class SV_Simulator():
             self.stats.get_info(self.svs)
             self.stats.export_data(stats_file)
         return True
-    
-    def choose_rand_pos(self, svs, ref_fasta, random_gen = random, verbose = False):
+
+    def choose_fixed_pos(self, svs, ref_fasta):
+        '''
+        fixed-mode analogue to choose_rand_pos()
+        svs: list of Structural Variant objects
+        ref_fasta: FastaFile with access to reference file
+        -> returns list of tuples, represents position ranges for non-dispersion events
+        ** currently assuming events won't include INSs
+        # TODO: add logic to extract insertion sequences from INS records in the input VCF
+        '''
+        # maintain separate event ranges for different chromosomes
+        self.event_ranges = dict()
+        for id in self.order_ids:
+            self.event_ranges[id] = []
+
+        active_svs_total = 0
+        # inactive_svs_total = 0
+        time_start_local = 0
+
+        for sv in svs:
+            # in this method we're able to take the following SV attributes for granted
+            # rec_start, rec_stop, rec_chrom
+            # start_pos = sv.start #<- in order to stay as close as possible to the procedure in choose_rand_pos(); could be redundant
+            new_intervals = []  # tracks new ranges of blocks
+            block_start = sv.start
+
+            # this entire loop might be irrelevant in the fixed mode case
+            for sv_event in sv.source_events:
+                # store start and end position and reference fragment
+                sv_event.start, sv_event.end = sv.start, sv.end
+                sv_event.source_chr = sv.start_chr
+                frag = ref_fasta.fetch(sv_event.source_chr, sv_event.start, sv_event.end)
+                sv_event.source_frag = frag
+                # start_pos += sv_event.length
+                new_intervals.append((block_start, sv.end))
+
+            # adds new SV to simulate only if chosen positions were valid
+            active_svs_total += 1
+            sv.active = True
+            self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(new_intervals, sv.start_chr, sv))
+            self.event_ranges[sv.start_chr].extend(new_intervals)
+
+            time_dif = time.time() - time_start_local
+            print(
+                "{} / {} SVs successfully placed ========== {} seconds".format(
+                    active_svs_total, len(svs), time_dif), end="\r")
+            time_start_local = time.time()
+
+        print("\n")
+        print('EVENT RANGES:')
+        print(self.event_ranges)
+        return self.event_ranges
+
+    def choose_rand_pos(self, svs, ref_fasta, random_gen=random, verbose=False):
         '''
         randomly positions SVs and stores reference fragments in SV events
 
@@ -358,18 +472,26 @@ class SV_Simulator():
             time_start_local = time.time()
         
         print("\n")
+        print('EVENT RANGES:')
+        print(self.event_ranges)
         return self.event_ranges
 
-    def apply_transformations(self, ref_fasta, random_gen = random):
+    def apply_transformations(self, ref_fasta, mode, random_gen = random):
         '''
         Randomly chooses positions for all SVs and carries out all edits
         Populates event classes within SVs with reference fragments and start & end positions
         Stores list of changes, which each have an interval and a sequence to substitute the reference frag with, in SV
         
         ref_fasta: FastaFile with access to reference
+        mode: flag indicating whether we're adding SVs to the reference in a randomized or deterministic way
         '''
-        # select random positions for SVs
-        self.choose_rand_pos(self.svs, ref_fasta, random_gen)
+        if mode == "randomized":
+            # select random positions for SVs
+            self.choose_rand_pos(self.svs, ref_fasta, random_gen)
+        else:
+            # TODO: in the fixed case, we have each SV position from the start and stop values taken from the VCF,
+            # so we just need to make sure we have the same form of SV objects as you get from running choose_rand_pos()
+            self.choose_fixed_pos(self.svs, ref_fasta)
 
         print("Starting edit process...")
         active_svs_total = sum([1 for sv in self.svs if sv.active])
@@ -408,7 +530,10 @@ if __name__ == "__main__":
     stats_file = "debugging/inputs/stats.txt"'''
 
     sim = SV_Simulator(args["ref"], args["config"], log_file=args["log_file"])
-    sim.produce_variant_genome(args["hap1"], args["hap2"], args["ins_fasta"], args["bedpe"], args["stats"], verbose = False)
+    # sim object has mode variable that indicates whether we're randomly adding SVs to reference, or deterministically
+    # adding SVs from an input vcf
+    sim.produce_variant_genome(args["hap1"], args["hap2"], args["ins_fasta"], args["bedpe"], args["stats"],
+                               mode=sim.mode, verbose=False)
     #print(str(sim))
     print("Simulation completed in {} seconds".format(time.time() - sim_start))
 

@@ -14,24 +14,36 @@ class Config():
         #self.__dict__["SVs"].update(entries["SVs"])
         if "sim_settings" in entries:   # if the user changed any of the default settings for the sim, they get updated here
             self.__dict__["sim_settings"].update(entries["sim_settings"])
-        self.run_checks(entries)
 
-        for config_sv in self.SVs:
-            # handles cases where user enters length range for all components within SV or specifies different ranges
-            if isinstance(config_sv["min_length"], int):
-                config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
-            else:
-                config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
-            # make sure max_length >= min_length >= 0
-            assert all(max_len >= min_len and min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
-            
-            # use Enum for variant type
-            config_sv["type"] = Variant_Type(config_sv["type"])
-            if config_sv["type"] != Variant_Type.Custom:
-                config_sv["source"] = None
-                config_sv["target"] = None
+        # flag indicating the mode in which the given SVs are to be added to the reference
+        mode = "randomized"
+        # check for whether the config is giving SVs to be added randomly or deterministically
+        if "vcf_path" in self.__dict__["SVs"][0]:
+            mode = "fixed"
+            self.run_checks_fixed(entries)
+        else:
+            self.run_checks_randomized(entries)
+
+        if mode == "randomized":
+            for config_sv in self.SVs:
+                # handles cases where user enters length range for all components within SV or specifies different ranges
+                if isinstance(config_sv["min_length"], int):
+                    config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
+                else:
+                    config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
+                # make sure max_length >= min_length >= 0
+                assert all(max_len >= min_len and min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
+
+                # use Enum for variant type
+                config_sv["type"] = Variant_Type(config_sv["type"])
+                if config_sv["type"] != Variant_Type.Custom:
+                    config_sv["source"] = None
+                    config_sv["target"] = None
     
-    def run_checks(self, entries):
+    def run_checks_randomized(self, entries):
+        '''
+        check method for yaml given with SVs given for randomized placement on reference
+        '''
         # entries: dict representing full config file parsed from yaml
         config_svs = self.SVs
         for config_sv in config_svs:
@@ -56,7 +68,14 @@ class Config():
         for key in entries:
             if key not in valid_keys:
                 raise Exception("Unknown argument \"{}\"".format(key))
-            
+
+    def run_checks_fixed(self, entries):
+        '''
+        check method for a yaml given with fixed SV locations (e.g. if intending to add set of known variants to reference)
+        '''
+        # TODO: add corresponding parameter checks based on what we'll need in the deterministic case
+        pass
+
 class FormatterIO():
     def __init__(self, par_file):
         self.bedpe_counter = 1

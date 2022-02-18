@@ -4,14 +4,19 @@ import utils
 import random
 
 class Structural_Variant():
-    def __init__(self, sv_type, length_ranges, source = None, target = None):
+    def __init__(self, sv_type, length_ranges=None, source=None, target=None,
+                 rec_start=None, rec_stop=None, rec_chrom=None):
         '''
         Initializes SV's transformation and sets up its events, along with several other basic attributes like zygosity
 
         sv_type: Enum either specifying one of the prewritten classes or a Custom transformation, in which case source and target are required
+        Params given in randomized mode:
         length_ranges: list containing tuple(s) (min_length, max_length)
         source: tuple representing source sequence, optional
         target: tuple representing target sequence, optional
+        Params given in fixed mode:
+        rec_start, rec_stop, rec_GT, rec_chrom: start, stop, genotype, and chromosome extracted from the VCF record for a given SV
+        TODO: ---> chromosome isn't dealt with until later, not sure if it will make sense to add it here
         '''
 
         self.type = sv_type
@@ -28,11 +33,16 @@ class Structural_Variant():
         self.source_unique_char, self.target_unique_char = Structural_Variant.reformat_seq(self.source), Structural_Variant.reformat_seq(self.target)
 
         # initialize event classes
-        self.start = None   # defines the space in which SV operates
-        self.end = None
+        self.start = rec_start   # defines the space in which SV operates
+        self.end = rec_stop
+        self.start_chr = rec_chrom
         self.req_space = None   # required space for SV, sum of event lengths
         self.source_events = []   # list of Event classes for every symbol in source sequence
         self.events_dict = dict()   # maps every unique symbol in source and target to an Event class
+        if not length_ranges:
+            # if we're in fixed mode we'll have to define our own single-value length range based on the SV's start/end
+            length_ranges = [(self.end - self.start, self.end - self.start)]
+            print(f'length_ranges = {length_ranges}')
         self.initialize_events(length_ranges)
         #print("Events Dict: ", self.events_dict)
         self.source_symbol_blocks = []
@@ -139,6 +149,8 @@ class Structural_Variant():
             for idx, block in enumerate(symbol_blocks):
                 for symbol in block:
                     if len(symbol) == 1: # means it's an original symbol
+                        print(f'SYMBOL = {symbol}')
+                        print(f'EVENTS_DICT = {self.events_dict}')
                         self.events_dict[symbol].original_block_idx = idx
 
         self.source_symbol_blocks = find_blocks(self.source_unique_char)
