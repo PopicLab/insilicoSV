@@ -132,9 +132,9 @@ class SV_Simulator():
             self.mode = "fixed"
             self.vcf_path = self.svs_config[0]["vcf_path"]
 
-        print(f'MODE = {self.mode}')
-        print('svs_config list:')
-        print(str(self.svs_config))
+        # print(f'MODE = {self.mode}')
+        # print('svs_config list:')
+        # print(str(self.svs_config))
         self.sim_settings = config.sim_settings
         if log_file and self.sim_settings["generate_log_file"]:
             logging.basicConfig(filename=log_file, filemode="w", level=logging.DEBUG, format='[%(name)s: %(levelname)s - %(asctime)s] %(message)s')
@@ -166,10 +166,17 @@ class SV_Simulator():
         # for every record in vcf, add SV object to list
         for rec in vcf.fetch():
             type = Variant_Type(rec.info['SVTYPE'])
-            if rec.info['SVTYPE'] == "INS":
-                # raise expection until we include logic to extract the insertion sequence from an INS vcf record
-                raise Exception('Cannot process INS events from input VCF – need to add logic for extracting inserted sequence')
-            sv = Structural_Variant(type, rec_start=rec.start, rec_stop=rec.stop, rec_chrom=rec.chrom)
+            # if rec.info['SVTYPE'] == "INS":
+            #     # raise expection until we include logic to extract the insertion sequence from an INS vcf record
+            #     raise Exception('Cannot process INS events from input VCF – need to add logic for extracting inserted sequence')
+            insertion_sequence = None
+            if 'INSSEQ' in rec.info:
+                insertion_sequence = rec.info['INSSEQ'][0]
+            sv_length = None
+            if 'SVLEN' in rec.info:
+                sv_length = rec.info['SVLEN']
+            sv = Structural_Variant(type, rec_start=rec.start, rec_stop=rec.stop, rec_chrom=rec.chrom,
+                                    ins_seq=insertion_sequence, rec_svlen=sv_length)
             # extract genotype from VCF record: if none is given, draw randomly, otherwise take from one of the samples
             gts = set([rec.samples[i]['GT'] for i in range(len(rec.samples))])
             if (len(gts) == 1) and ((None, None) in gts):
@@ -226,8 +233,6 @@ class SV_Simulator():
         else:
             # branch for mode == "fixed"
             self.process_vcf(vcf_path)
-        print('SELF.SVS at end of call to initialize_svs():')
-        print(self.svs)
 
     def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta, bedfile, stats_file = None, initial_reset = True,
                                random_gen = random, mode = "randomized", verbose = False):
@@ -243,7 +248,6 @@ class SV_Simulator():
 
         # edit chromosome
         ref_fasta = self.ref_fasta
-        print('*** calling apply_transformations() ***')
         self.apply_transformations(ref_fasta, mode, random_gen)
         print("Finished SV placements and transformations in {} seconds".format(time.time() - time_start))
         time_start = time.time()
@@ -276,7 +280,6 @@ class SV_Simulator():
             for id in self.order_ids:
                 # account for homozygous and heterogeneous variants
                 edits_x = edits_dict[id]
-                #print("Edits_x: ", edits_x)
                 utils.fail_if_any_overlapping(edits_x)
                 
                 # export edited chromosomes to FASTA files
@@ -300,8 +303,6 @@ class SV_Simulator():
         svs: list of Structural Variant objects
         ref_fasta: FastaFile with access to reference file
         -> returns list of tuples, represents position ranges for non-dispersion events
-        ** currently assuming events won't include INSs
-        # TODO: add logic to extract insertion sequences from INS records in the input VCF
         '''
         # maintain separate event ranges for different chromosomes
         self.event_ranges = dict()
@@ -309,27 +310,30 @@ class SV_Simulator():
             self.event_ranges[id] = []
 
         active_svs_total = 0
-        # inactive_svs_total = 0
         time_start_local = 0
 
         for sv in svs:
+            # print('ATTRIBUTES FOR SV OBJECT')
+            # print(f'sv.source_events = {sv.source_events}')
+            # print(f'sv.events_dict = {sv.events_dict}')
             # in this method we're able to take the following SV attributes for granted
             # rec_start, rec_stop, rec_chrom
-            # start_pos = sv.start #<- in order to stay as close as possible to the procedure in choose_rand_pos(); could be redundant
             new_intervals = []  # tracks new ranges of blocks
             block_start = sv.start
 
-            # this entire loop might be irrelevant in the fixed mode case
             for sv_event in sv.source_events:
                 # store start and end position and reference fragment
                 sv_event.start, sv_event.end = sv.start, sv.end
                 sv_event.source_chr = sv.start_chr
                 frag = ref_fasta.fetch(sv_event.source_chr, sv_event.start, sv_event.end)
                 sv_event.source_frag = frag
-                # start_pos += sv_event.length
                 new_intervals.append((block_start, sv.end))
+            # ---- new_intervals update and source_frag update for insertion events (no source fragment)
+            for event in sv.events_dict.values():
+                if event.source_frag == None and event.length > 0:
+                    event.source_frag = sv.insert_seq
+                    new_intervals.append((block_start, sv.end))
 
-            # adds new SV to simulate only if chosen positions were valid
             active_svs_total += 1
             sv.active = True
             self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(new_intervals, sv.start_chr, sv))

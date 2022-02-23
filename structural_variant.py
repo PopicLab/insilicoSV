@@ -5,7 +5,7 @@ import random
 
 class Structural_Variant():
     def __init__(self, sv_type, length_ranges=None, source=None, target=None,
-                 rec_start=None, rec_stop=None, rec_chrom=None):
+                 rec_start=None, rec_stop=None, rec_chrom=None, ins_seq=None, rec_svlen=None):
         '''
         Initializes SV's transformation and sets up its events, along with several other basic attributes like zygosity
 
@@ -16,6 +16,7 @@ class Structural_Variant():
         target: tuple representing target sequence, optional
         Params given in fixed mode:
         rec_start, rec_stop, rec_GT, rec_chrom: start, stop, genotype, and chromosome extracted from the VCF record for a given SV
+        ins_seq: record INFO field extracted from a given VCF (in fixed mode) if the event is of type INS
         TODO: ---> chromosome isn't dealt with until later, not sure if it will make sense to add it here
         '''
 
@@ -35,16 +36,20 @@ class Structural_Variant():
         # initialize event classes
         self.start = rec_start   # defines the space in which SV operates
         self.end = rec_stop
+        self.svlen = rec_svlen    # VCF might not give SVLEN in the info field, but is needed for INS events
         self.start_chr = rec_chrom
+        self.insert_seq = ins_seq    # insertion sequence from input VCF if SV is of type INS
         self.req_space = None   # required space for SV, sum of event lengths
         self.source_events = []   # list of Event classes for every symbol in source sequence
         self.events_dict = dict()   # maps every unique symbol in source and target to an Event class
         if not length_ranges:
             # if we're in fixed mode we'll have to define our own single-value length range based on the SV's start/end
-            length_ranges = [(self.end - self.start, self.end - self.start)]
-            print(f'length_ranges = {length_ranges}')
+            # or SVLEN if it's present in the VCF INFO field
+            if not self.svlen:
+                length_ranges = [(self.end - self.start, self.end - self.start)]
+            else:
+                length_ranges = [(self.svlen, self.svlen)]
         self.initialize_events(length_ranges)
-        #print("Events Dict: ", self.events_dict)
         self.source_symbol_blocks = []
         self.target_symbol_blocks = []
 
@@ -86,6 +91,7 @@ class Structural_Variant():
         lengths: list of tuples specifying min and max length for events within SV
         -> returns list of events in source sequence
         '''
+
         # collect all unique symbols present in both source and target sequences - include target as there may be insertions
         # note that the symbols represent events
         all_symbols = []
@@ -115,7 +121,7 @@ class Structural_Variant():
         for idx, symbol in enumerate(all_symbols):
             event = Event(self, symbols_dict[symbol][0], symbols_dict[symbol][1], symbol)
             self.events_dict[symbol] = event
-        
+
         for symbol in self.source_unique_char:
             self.source_events.append(self.events_dict[symbol])
         
@@ -149,8 +155,6 @@ class Structural_Variant():
             for idx, block in enumerate(symbol_blocks):
                 for symbol in block:
                     if len(symbol) == 1: # means it's an original symbol
-                        print(f'SYMBOL = {symbol}')
-                        print(f'EVENTS_DICT = {self.events_dict}')
                         self.events_dict[symbol].original_block_idx = idx
 
         self.source_symbol_blocks = find_blocks(self.source_unique_char)
@@ -180,8 +184,7 @@ class Structural_Variant():
         decode_funcs = {"invert": lambda string: complement(string[::-1]),
                        "identity": lambda string: string,
                        "complement": complement} 
-        encoding = self.events_dict    # maps symbol like A or B to base pairs on reference 
-        #print("Encode_dict: ", encoding)
+        encoding = self.events_dict    # maps symbol like A or B to base pairs on reference
 
         # find all blocks of symbols between dispersion events
         # we will apply edits based on a block's start and end pos
@@ -197,7 +200,7 @@ class Structural_Variant():
             for x, ele in enumerate(block):
                 upper_str = ele[0].upper()         # used to find corresponding event from encoding, all keys in encoding are in uppercase
                 event = encoding[upper_str[0]]
-    
+
                 if any(c.islower() for c in ele):   # checks if lowercase symbols exist in ele, represents an inversion
                     new_frag += decode_funcs["invert"](event.source_frag)   
     
@@ -247,5 +250,5 @@ class Event():
     
     def __repr__(self):
         return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end,
-                        "source_chr": self.source_chr})
+                        "source_chr": self.source_chr, "source_frag": self.source_frag})
 
