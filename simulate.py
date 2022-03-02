@@ -162,23 +162,33 @@ class SV_Simulator():
         '''
         Method to process vcf containing SVs to be added (deterministically) to reference
         '''
+        def generate_seq(length):
+            # helper function for insertions
+            # generates random sequence of bases of given length
+            rand_seq = ""
+            base_map = {1:"A", 2: "T", 3: "G", 4: "C"}
+            for x in range(length):
+                rand_seq += base_map[random_gen.randint(1,4)]
+            return rand_seq
         vcf = VariantFile(vcf_path)
         # for every record in vcf, add SV object to list
         for rec in vcf.fetch():
             type = Variant_Type(rec.info['SVTYPE'])
-            # if rec.info['SVTYPE'] == "INS":
-            #     # raise expection until we include logic to extract the insertion sequence from an INS vcf record
-            #     raise Exception('Cannot process INS events from input VCF – need to add logic for extracting inserted sequence')
-            insertion_sequence = None
-            if 'INSSEQ' in rec.info:
-                insertion_sequence = rec.info['INSSEQ'][0]
             sv_length = None
             if 'SVLEN' in rec.info:
                 sv_length = rec.info['SVLEN']
+            insertion_sequence = None
+            if rec.info['SVTYPE'] == 'INS':
+                if 'INSSEQ' in rec.info:
+                    insertion_sequence = rec.info['INSSEQ'][0]
+                else:
+                    insertion_sequence = generate_seq(sv_length)
+
             sv = Structural_Variant(type, rec_start=rec.start, rec_stop=rec.stop, rec_chrom=rec.chrom,
                                     ins_seq=insertion_sequence, rec_svlen=sv_length)
             # extract genotype from VCF record: if none is given, draw randomly, otherwise take from one of the samples
-            gts = set([rec.samples[i]['GT'] for i in range(len(rec.samples))])
+            gts_list = [rec.samples[i]['GT'] for i in range(len(rec.samples))]
+            gts = set(gts_list)
             if (len(gts) == 1) and ((None, None) in gts):
                 # if all of the samples in the vcf record gave (None,None), generate randomly
                 draw = random_gen.randint(1, 3)
@@ -196,7 +206,9 @@ class SV_Simulator():
                 # Get genotype in the form (1,0) -> construct hap and ishomozygous from that
                 gt = (None, None)
                 while gt == (None, None):
-                    gt = gts.pop()
+                    # -> take genotypes in order or drawing randomly
+                    # gt = gts.pop()
+                    gt = random.choice(gts_list)
                 if sum(gt) == 2:
                     sv.ishomozygous = Zygosity.HOMOZYGOUS
                 else:
@@ -331,7 +343,9 @@ class SV_Simulator():
             # ---- new_intervals update and source_frag update for insertion events (no source fragment)
             for event in sv.events_dict.values():
                 if event.source_frag == None and event.length > 0:
+                    # print(sv)
                     event.source_frag = sv.insert_seq
+                    # print(event.source_frag)
                     new_intervals.append((block_start, sv.end))
 
             active_svs_total += 1
@@ -493,8 +507,6 @@ class SV_Simulator():
             # select random positions for SVs
             self.choose_rand_pos(self.svs, ref_fasta, random_gen)
         else:
-            # TODO: in the fixed case, we have each SV position from the start and stop values taken from the VCF,
-            # so we just need to make sure we have the same form of SV objects as you get from running choose_rand_pos()
             self.choose_fixed_pos(self.svs, ref_fasta)
 
         print("Starting edit process...")
@@ -503,6 +515,7 @@ class SV_Simulator():
         for sv in self.svs:
             if sv.active:
                 # make edits and store in sv object
+                # print(sv)
                 sv.change_fragment()
                 total += 1
                 print("{} / {} SVs successfully edited".format(total, active_svs_total), end = "\r")
