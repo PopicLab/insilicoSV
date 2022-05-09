@@ -17,7 +17,6 @@ class Structural_Variant():
         Params given in fixed mode:
         rec_start, rec_stop, rec_GT, rec_chrom: start, stop, genotype, and chromosome extracted from the VCF record for a given SV
         ins_seq: record INFO field extracted from a given VCF (in fixed mode) if the event is of type INS
-        TODO: ---> chromosome isn't dealt with until later, not sure if it will make sense to add it here
         '''
 
         self.type = sv_type

@@ -207,8 +207,8 @@ class SV_Simulator():
                 gt = (None, None)
                 while gt == (None, None):
                     # -> take genotypes in order or drawing randomly
-                    # gt = gts.pop()
-                    gt = random.choice(gts_list)
+                    gt = gts.pop()
+                    #gt = random.choice(gts_list)
                 if sum(gt) == 2:
                     sv.ishomozygous = Zygosity.HOMOZYGOUS
                 else:
@@ -359,9 +359,9 @@ class SV_Simulator():
                     active_svs_total, len(svs), time_dif), end="\r")
             time_start_local = time.time()
 
-        print("\n")
-        print('EVENT RANGES:')
-        print(self.event_ranges)
+        #print("\n")
+        #print('EVENT RANGES:')
+        #print(self.event_ranges)
         return self.event_ranges
 
     def choose_rand_pos(self, svs, ref_fasta, random_gen=random, verbose=False):
