@@ -1,0 +1,9 @@
+[submodule "LRSIM"]
+	path = LRSIM
+	url = https://github.com/aquaskyline/LRSIM.git
+[submodule "pbsim2"]
+	path = pbsim2
+	url = https://github.com/yukiteruono/pbsim2.git
+[submodule "DWGSIM"]
+	path = DWGSIM
+	url = https://github.com/nh13/DWGSIM.git
