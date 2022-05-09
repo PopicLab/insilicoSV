@@ -15,16 +15,8 @@ class Config():
         if "sim_settings" in entries:   # if the user changed any of the default settings for the sim, they get updated here
             self.__dict__["sim_settings"].update(entries["sim_settings"])
 
-        # flag indicating the mode in which the given SVs are to be added to the reference
-        mode = "randomized"
-        # check for whether the config is giving SVs to be added randomly or deterministically
-        if "vcf_path" in self.__dict__["SVs"][0]:
-            mode = "fixed"
-            self.run_checks_fixed(entries)
-        else:
+        if "vcf_path" not in self.__dict__["SVs"][0]:
             self.run_checks_randomized(entries)
-
-        if mode == "randomized":
             for config_sv in self.SVs:
                 # handles cases where user enters length range for all components within SV or specifies different ranges
                 if isinstance(config_sv["min_length"], int):
@@ -68,13 +60,6 @@ class Config():
         for key in entries:
             if key not in valid_keys:
                 raise Exception("Unknown argument \"{}\"".format(key))
-
-    def run_checks_fixed(self, entries):
-        '''
-        check method for a yaml given with fixed SV locations (e.g. if intending to add set of known variants to reference)
-        '''
-        # TODO: add corresponding parameter checks based on what we'll need in the deterministic case
-        pass
 
 class FormatterIO():
     def __init__(self, par_file):
