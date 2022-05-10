@@ -10,6 +10,7 @@ import tracemalloc  # only for testing
 import sys
 import logging
 import time
+from collections import defaultdict
 
 time_start = time.time()
 
@@ -142,7 +143,9 @@ class SV_Simulator():
 
         # create all SVs
         self.svs = []
-        self.initialize_svs(mode=self.mode, vcf_path=self.vcf_path, random_gen=random_gen)
+        # Going to populate event_ranges while we traverse the vcf (in process_vcf, called by initialize_svs)
+        self.event_ranges = defaultdict(list)
+        self.initialize_svs(random_gen=random_gen)
 
         print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
         time_start = time.time()
@@ -158,19 +161,32 @@ class SV_Simulator():
             key_to_func[key](info)
             #logging.debug(info)
 
+    def get_rand_chr(self, check_size=None, random_gen=random):
+        # random assignment of SV to a chromosome
+        # -> returns random chromosome and its length
+        valid_chrs = self.order_ids
+        if check_size != None and self.sim_settings["filter_small_chr"]:   # if parameter setting on, only choose random chr from those that are big enough
+            valid_chrs = [chr for chr, chr_size in self.len_dict.items() if chr_size > check_size]
+        if len(valid_chrs) == 0:
+            raise Exception("SVs are too big for the reference!")
+
+        rand_id = valid_chrs[random_gen.randint(0, len(valid_chrs)-1)]
+        chr_len = self.len_dict[rand_id]
+        chr_event_ranges = self.event_ranges[rand_id]
+        assert rand_id != None
+
+        return rand_id, chr_len, chr_event_ranges
+
     def process_vcf(self, vcf_path, random_gen=random):
         '''
         Method to process vcf containing SVs to be added (deterministically) to reference
         '''
-        def generate_seq(length):
-            # helper function for insertions
-            # generates random sequence of bases of given length
-            rand_seq = ""
-            base_map = {1:"A", 2: "T", 3: "G", 4: "C"}
-            for x in range(length):
-                rand_seq += base_map[random_gen.randint(1,4)]
-            return rand_seq
+        active_svs_total = 0
+        time_start_local = 0
+
         vcf = VariantFile(vcf_path)
+        # printing a single example of each new SV type that we come across
+        seen_svtypes = set()
         # for every record in vcf, add SV object to list
         for rec in vcf.fetch():
             type = Variant_Type(rec.info['SVTYPE'])
@@ -182,10 +198,42 @@ class SV_Simulator():
                 if 'INSSEQ' in rec.info:
                     insertion_sequence = rec.info['INSSEQ'][0]
                 else:
-                    insertion_sequence = generate_seq(sv_length)
+                    insertion_sequence = utils.generate_seq(sv_length, random_gen)
 
-            sv = Structural_Variant(type, rec_start=rec.start, rec_stop=rec.stop, rec_chrom=rec.chrom,
-                                    ins_seq=insertion_sequence, rec_svlen=sv_length)
+            # add the SV interval to the event_ranges dict keyed on chromosome
+            self.event_ranges[rec.chrom].append((rec.start, rec.stop))
+
+            # For SVs in fixed mode, length_ranges will just be the single length value
+            sv = Structural_Variant(sv_type=type, mode='fixed')
+            sv.start = rec.start
+            sv.end = rec.stop
+            sv.start_chr = rec.chrom
+            sv.active = True
+            # adding the logging statements from choose_rand_pos
+            active_svs_total += 1
+            self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(self.event_ranges[rec.chrom],
+                                                                                        sv.start_chr, sv))
+            time_dif = time.time() - time_start_local
+            # can't display this as a proportion of the total number of SVs because this is when
+            # we're creating the total list of SVs
+            print("{} SVs successfully placed ========== {} seconds".format(active_svs_total, time_dif), end="\r")
+            time_start_local = time.time()
+
+            frag = self.ref_fasta.fetch(rec.chrom, rec.start, rec.stop)
+            # ---> so get the valid source symbol key need to index in since we're skipping the initialize_events method
+            # that does the parsing in the randomized case
+            sv_event = Event(sv_parent=sv, length=sv_length, length_range=None, symbol=sv.source_unique_char[0])
+            sv_event.start = rec.start
+            sv_event.end = rec.stop
+            sv_event.source_frag = frag
+            if sv_event.source_frag == None and sv_event.length > 0:
+                sv_event.source_frag = insertion_sequence
+            sv.events_dict[sv.source_unique_char[0]] = sv_event
+            # print the sv_event object if its of a type we haven't seen
+            if type not in seen_svtypes:
+                print(f'sv_event of type {type}: {sv_event}')
+                seen_svtypes.add(type)
+
             # extract genotype from VCF record: if none is given, draw randomly, otherwise take from one of the samples
             gts_list = [rec.samples[i]['GT'] for i in range(len(rec.samples))]
             gts = set(gts_list)
@@ -216,14 +264,19 @@ class SV_Simulator():
                 sv.hap = [bool(i) for i in gt]
 
             self.svs.append(sv)
+        
+        # print("\n")
+        # print('EVENT RANGES:')
+        # print(self.event_ranges)
 
-    def initialize_svs(self, mode, vcf_path=None, random_gen=random):
+
+    def initialize_svs(self, random_gen=random):
         '''
         Creates Structural_Variant objects for every SV to simulate and decides zygosity
-        mode: flag indicating whether SVs are to be randomly generated or read in from VCF
-        vcf_path: optional path that will be used if mode=="fixed"
+        self.mode: flag indicating whether SVs are to be randomly generated or read in from VCF
+        self.vcf_path: optional path that will be used if mode=="fixed"
         '''
-        if mode == "randomized":
+        if self.mode == "randomized":
             for sv_config in self.svs_config:
                 for num in range(sv_config["number"]):
                     sv = Structural_Variant(sv_config["type"], sv_config["length_ranges"], source=sv_config["source"], target=sv_config["target"]) # inputs: SV type, range of lengths
@@ -244,10 +297,10 @@ class SV_Simulator():
                 random.shuffle(self.svs)
         else:
             # branch for mode == "fixed"
-            self.process_vcf(vcf_path)
+            self.process_vcf(self.vcf_path)
 
     def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta, bedfile, stats_file = None, initial_reset = True,
-                               random_gen = random, mode = "randomized", verbose = False):
+                               random_gen = random, verbose = False):
         '''
         initial_reset: boolean to indicate if output file should be overwritten (True) or appended to (False)
         random_gen: only relevant in testing
@@ -260,7 +313,7 @@ class SV_Simulator():
 
         # edit chromosome
         ref_fasta = self.ref_fasta
-        self.apply_transformations(ref_fasta, mode, random_gen)
+        self.apply_transformations(ref_fasta, random_gen)
         print("Finished SV placements and transformations in {} seconds".format(time.time() - time_start))
         time_start = time.time()
 
@@ -309,60 +362,59 @@ class SV_Simulator():
             self.stats.export_data(stats_file)
         return True
 
-    def choose_fixed_pos(self, svs, ref_fasta):
-        '''
-        fixed-mode analogue to choose_rand_pos()
-        svs: list of Structural Variant objects
-        ref_fasta: FastaFile with access to reference file
-        -> returns list of tuples, represents position ranges for non-dispersion events
-        '''
-        # maintain separate event ranges for different chromosomes
-        self.event_ranges = dict()
-        for id in self.order_ids:
-            self.event_ranges[id] = []
-
-        active_svs_total = 0
-        time_start_local = 0
-
-        for sv in svs:
-            # print('ATTRIBUTES FOR SV OBJECT')
-            # print(f'sv.source_events = {sv.source_events}')
-            # print(f'sv.events_dict = {sv.events_dict}')
-            # in this method we're able to take the following SV attributes for granted
-            # rec_start, rec_stop, rec_chrom
-            new_intervals = []  # tracks new ranges of blocks
-            block_start = sv.start
-
-            for sv_event in sv.source_events:
-                # store start and end position and reference fragment
-                sv_event.start, sv_event.end = sv.start, sv.end
-                sv_event.source_chr = sv.start_chr
-                frag = ref_fasta.fetch(sv_event.source_chr, sv_event.start, sv_event.end)
-                sv_event.source_frag = frag
-                new_intervals.append((block_start, sv.end))
-            # ---- new_intervals update and source_frag update for insertion events (no source fragment)
-            for event in sv.events_dict.values():
-                if event.source_frag == None and event.length > 0:
-                    # print(sv)
-                    event.source_frag = sv.insert_seq
-                    # print(event.source_frag)
-                    new_intervals.append((block_start, sv.end))
-
-            active_svs_total += 1
-            sv.active = True
-            self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(new_intervals, sv.start_chr, sv))
-            self.event_ranges[sv.start_chr].extend(new_intervals)
-
-            time_dif = time.time() - time_start_local
-            print(
-                "{} / {} SVs successfully placed ========== {} seconds".format(
-                    active_svs_total, len(svs), time_dif), end="\r")
-            time_start_local = time.time()
-
-        #print("\n")
-        #print('EVENT RANGES:')
-        #print(self.event_ranges)
-        return self.event_ranges
+    # TODO: this method can be deleted (but want to keep it around for a little longer in case I'm wrong)
+    # def choose_fixed_pos(self, svs, ref_fasta):
+    #     '''
+    #     fixed-mode analogue to choose_rand_pos()
+    #     svs: list of Structural Variant objects
+    #     ref_fasta: FastaFile with access to reference file
+    #     -> returns list of tuples, represents position ranges for non-dispersion events
+    #     '''
+    #     # maintain separate event ranges for different chromosomes
+    #     self.event_ranges = dict()
+    #     for id in self.order_ids:
+    #         self.event_ranges[id] = []
+    #
+    #     active_svs_total = 0
+    #     time_start_local = 0
+    #
+    #     for sv in svs:
+    #         # in this method we're able to take the following SV attributes for granted
+    #         # rec_start, rec_stop, rec_chrom
+    #         new_intervals = []  # tracks new ranges of blocks
+    #         block_start = sv.start
+    #
+    #         for sv_event in sv.source_events:
+    #             # store start and end position and reference fragment
+    #             sv_event.start, sv_event.end = sv.start, sv.end
+    #             sv_event.source_chr = sv.start_chr
+    #             frag = ref_fasta.fetch(sv_event.source_chr, sv_event.start, sv_event.end)
+    #             sv_event.source_frag = frag
+    #             print(f'sv.events_dict for sv of type {sv.type}: {sv.events_dict}')
+    #             new_intervals.append((block_start, sv.end))
+    #         # ---- new_intervals update and source_frag update for insertion events (no source fragment)
+    #         for event in sv.events_dict.values():
+    #             if event.source_frag == None and event.length > 0:
+    #                 #print(sv)
+    #                 event.source_frag = sv.insert_seq
+    #                 #print(event.source_frag)
+    #                 new_intervals.append((block_start, sv.end))
+    #
+    #         active_svs_total += 1
+    #         sv.active = True
+    #         self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(new_intervals, sv.start_chr, sv))
+    #         self.event_ranges[sv.start_chr].extend(new_intervals)
+    #
+    #         time_dif = time.time() - time_start_local
+    #         print(
+    #             "{} / {} SVs successfully placed ========== {} seconds".format(
+    #                 active_svs_total, len(svs), time_dif), end="\r")
+    #         time_start_local = time.time()
+    #
+    #     print("\n")
+    #     print('EVENT RANGES:')
+    #     print(self.event_ranges)
+    #     return self.event_ranges
 
     def choose_rand_pos(self, svs, ref_fasta, random_gen=random, verbose=False):
         '''
@@ -373,39 +425,6 @@ class SV_Simulator():
         random_gen: only relevant for unittesting
         -> returns list of tuples, represents position ranges for non-dispersion events
         '''
-
-        def percent_N(seq):
-            total = 0
-            if len(seq) == 0:  # avoid ZeroDivisionError
-                return 0
-            for char in seq:
-                if char == "N":
-                    total += 1
-            return total / len(seq)
-        def generate_seq(length):
-            # helper function for insertions
-            # generates random sequence of bases of given length
-            rand_seq = ""
-            base_map = {1:"A", 2: "T", 3: "G", 4: "C"}
-            for x in range(length):
-                rand_seq += base_map[random_gen.randint(1,4)]
-            return rand_seq
-        def get_rand_chr(check_size=None):
-            # random assignment of SV to a chromosome
-            # -> returns random chromosome and its length
-            valid_chrs = self.order_ids
-            if check_size != None and self.sim_settings["filter_small_chr"]:   # if parameter setting on, only choose random chr from those that are big enough
-                valid_chrs = [chr for chr, chr_size in self.len_dict.items() if chr_size > check_size]
-            if len(valid_chrs) == 0:
-                raise Exception("SVs are too big for the reference!")
-
-            rand_id = valid_chrs[random_gen.randint(0, len(valid_chrs)-1)]
-            chr_len = self.len_dict[rand_id]
-            chr_event_ranges = self.event_ranges[rand_id]
-            assert rand_id != None
-
-            return rand_id, chr_len, chr_event_ranges
-        
         # maintain separate event ranges for different chromosomes
         self.event_ranges = dict()
         for id in self.order_ids:
@@ -428,7 +447,7 @@ class SV_Simulator():
                     valid = False
                     break
                 
-                rand_id, chr_len, chr_event_ranges = get_rand_chr(check_size=sv.req_space)
+                rand_id, chr_len, chr_event_ranges = self.get_rand_chr(check_size=sv.req_space, random_gen=random_gen)
                 if chr_len - sv.req_space - 1 <= 0:  # SV is too big for current chromosome
                     valid = False
                     continue
@@ -459,7 +478,7 @@ class SV_Simulator():
                                 break     # if ANY of the non-dispersion events within SV are in an invalid position, then immediately fail the try
                             new_intervals.append((block_start, sv_event.start))
                             block_start = sv_event.end   # remember that the end is actually the position right after the sv_event
-                        elif percent_N(frag) > 0.05:
+                        elif utils.percent_N(frag) > 0.05:
                             valid = False
                             break
                     # catches the last (and perhaps only) block in sequence
@@ -479,7 +498,7 @@ class SV_Simulator():
                 # populates insertions with random sequence - these event symbols only show up in target transformation
                 for event in sv.events_dict.values():
                     if event.source_frag == None and event.length > 0:
-                        event.source_frag = generate_seq(event.length)
+                        event.source_frag = utils.generate_seq(event.length, random_gen)
             else:
                 inactive_svs_total += 1
                 if tries != self.sim_settings["max_tries"]+1:
@@ -494,7 +513,7 @@ class SV_Simulator():
         print(self.event_ranges)
         return self.event_ranges
 
-    def apply_transformations(self, ref_fasta, mode, random_gen = random):
+    def apply_transformations(self, ref_fasta, random_gen=random):
         '''
         Randomly chooses positions for all SVs and carries out all edits
         Populates event classes within SVs with reference fragments and start & end positions
@@ -503,11 +522,10 @@ class SV_Simulator():
         ref_fasta: FastaFile with access to reference
         mode: flag indicating whether we're adding SVs to the reference in a randomized or deterministic way
         '''
-        if mode == "randomized":
+        if self.mode == "randomized":
             # select random positions for SVs
             self.choose_rand_pos(self.svs, ref_fasta, random_gen)
-        else:
-            self.choose_fixed_pos(self.svs, ref_fasta)
+        # in fixed mode self.event_ranges() is populated in process_vcf()
 
         print("Starting edit process...")
         active_svs_total = sum([1 for sv in self.svs if sv.active])
@@ -549,8 +567,7 @@ if __name__ == "__main__":
     sim = SV_Simulator(args["ref"], args["config"], log_file=args["log_file"])
     # sim object has mode variable that indicates whether we're randomly adding SVs to reference, or deterministically
     # adding SVs from an input vcf
-    sim.produce_variant_genome(args["hap1"], args["hap2"], args["ins_fasta"], args["bedpe"], args["stats"],
-                               mode=sim.mode, verbose=False)
+    sim.produce_variant_genome(args["hap1"], args["hap2"], args["ins_fasta"], args["bedpe"], args["stats"], verbose=False)
     #print(str(sim))
     print("Simulation completed in {} seconds".format(time.time() - sim_start))
 

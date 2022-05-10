@@ -4,21 +4,20 @@ import utils
 import random
 
 class Structural_Variant():
-    def __init__(self, sv_type, length_ranges=None, source=None, target=None,
-                 rec_start=None, rec_stop=None, rec_chrom=None, ins_seq=None, rec_svlen=None):
+    def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None):
         '''
         Initializes SV's transformation and sets up its events, along with several other basic attributes like zygosity
 
         sv_type: Enum either specifying one of the prewritten classes or a Custom transformation, in which case source and target are required
+        mode: flag to indicate whether we're in fixed or randomized mode
+            ---> is there a better way to do this (subclass this and create an alternate constructor for the fixed case
+                where a lot of this code isn't necessary)
         Params given in randomized mode:
-        length_ranges: list containing tuple(s) (min_length, max_length)
+        length_ranges: list containing tuple(s) (min_length, max_length) OR singleton int given if the SV is of known
+            position/is being read in from a vcf of known/fixed variants
         source: tuple representing source sequence, optional
         target: tuple representing target sequence, optional
-        Params given in fixed mode:
-        rec_start, rec_stop, rec_GT, rec_chrom: start, stop, genotype, and chromosome extracted from the VCF record for a given SV
-        ins_seq: record INFO field extracted from a given VCF (in fixed mode) if the event is of type INS
         '''
-
         self.type = sv_type
         if self.type != Variant_Type.Custom:
             self.source, self.target = SV_KEY[self.type]
@@ -33,22 +32,14 @@ class Structural_Variant():
         self.source_unique_char, self.target_unique_char = Structural_Variant.reformat_seq(self.source), Structural_Variant.reformat_seq(self.target)
 
         # initialize event classes
-        self.start = rec_start   # defines the space in which SV operates
-        self.end = rec_stop
-        self.svlen = rec_svlen    # VCF might not give SVLEN in the info field, but is needed for INS events
-        self.start_chr = rec_chrom
-        self.insert_seq = ins_seq    # insertion sequence from input VCF if SV is of type INS
+        self.start = None   # defines the space in which SV operates
+        self.end = None
         self.req_space = None   # required space for SV, sum of event lengths
         self.source_events = []   # list of Event classes for every symbol in source sequence
         self.events_dict = dict()   # maps every unique symbol in source and target to an Event class
-        if not length_ranges:
-            # if we're in fixed mode we'll have to define our own single-value length range based on the SV's start/end
-            # or SVLEN if it's present in the VCF INFO field
-            if not self.svlen:
-                length_ranges = [(self.end - self.start, self.end - self.start)]
-            else:
-                length_ranges = [(self.svlen, self.svlen)]
-        self.initialize_events(length_ranges)
+        # initialize_events sets the values of events_dict, source_dict, and req_space
+        if mode == 'randomized':
+            self.initialize_events(length_ranges)
         self.source_symbol_blocks = []
         self.target_symbol_blocks = []
 
@@ -90,7 +81,6 @@ class Structural_Variant():
         lengths: list of tuples specifying min and max length for events within SV
         -> returns list of events in source sequence
         '''
-
         # collect all unique symbols present in both source and target sequences - include target as there may be insertions
         # note that the symbols represent events
         all_symbols = []
@@ -103,7 +93,7 @@ class Structural_Variant():
         # symbols_dict: (key = symbol, value = (chosen length, length range))
         # determine length of events/symbols
         symbols_dict = dict()
-        if len(lengths) > 1:    # values given by user represents custom ranges for each event symbol of variant in lexicographical order 
+        if len(lengths) > 1:    # values given by user represents custom ranges for each event symbol of variant in lexicographical order
             assert (len(lengths) == len(all_symbols)), "Number of lengths entered does not match the number of symbols (remember foreign insertions and dispersions) present!" 
             for idx, symbol in enumerate(all_symbols):
                 symbols_dict[symbol] = (random.randint(lengths[idx][0], lengths[idx][1]), lengths[idx])
@@ -125,8 +115,8 @@ class Structural_Variant():
             self.source_events.append(self.events_dict[symbol])
         
         self.req_space = sum([event.length for event in self.source_events])
-        
-        return self.source_events
+        # ** I don't think this return statement is used
+        #return self.source_events
     
     def generate_blocks(self):
         '''
@@ -166,23 +156,9 @@ class Structural_Variant():
         '''
         Takes the mapping of symbols to events and the target sequence to construct a replacement sequence for the reference fragment
         '''
-
-        def complement(bases):
-            # bases: str
-            output = ""
-            base_complements = {"A": "T", "T": "A", "G": "C", "C": "G", "N":"N"}
-            for base in bases.upper():
-                if base in base_complements:
-                    output += base_complements[base]
-                else:
-                    output += base
-                    print("Warning: Unknown base \'{}\' detected in reference, complement of base not taken".format(base))
-            
-            return output
-
-        decode_funcs = {"invert": lambda string: complement(string[::-1]),
+        decode_funcs = {"invert": lambda string: utils.complement(string[::-1]),
                        "identity": lambda string: string,
-                       "complement": complement} 
+                       "complement": utils.complement}
         encoding = self.events_dict    # maps symbol like A or B to base pairs on reference
 
         # find all blocks of symbols between dispersion events
