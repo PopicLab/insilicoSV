@@ -177,8 +177,8 @@ class Structural_Variant():
                 event = encoding[upper_str[0]]
 
                 if any(c.islower() for c in ele):   # checks if lowercase symbols exist in ele, represents an inversion
-                    new_frag += decode_funcs["invert"](event.source_frag)   
-    
+                    new_frag += decode_funcs["invert"](event.source_frag)
+
                 elif upper_str[0] in encoding:   # take original fragment, no changes
                     new_frag += event.source_frag
                 
@@ -196,7 +196,7 @@ class Structural_Variant():
                 curr_chr = dis_event.source_chr
             else:
                 changed_fragments.append([curr_chr, block_start, self.end, new_frag])
-                
+
         self.changed_fragments = changed_fragments
         self.clean_event_storage()   # clean up unused storage - we do not need to store most source_frags anymore
         

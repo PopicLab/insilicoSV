@@ -96,7 +96,7 @@ class StatsCollection():
                 write_item(fout, "Total impacted length of reference chromosome", self.len_frags_chr[id])
 
 class SV_Simulator():
-    def __init__(self, ref_file, par_file, random_gen = random, log_file=None):
+    def __init__(self, ref_file, par_file, random_gen=random, log_file=None):
         '''
         ref_file: file location to reference genome (.fasta or .fna or .fa)
         par_file: file location to configuration file (.yaml)
@@ -222,13 +222,19 @@ class SV_Simulator():
             frag = self.ref_fasta.fetch(rec.chrom, rec.start, rec.stop)
             # ---> so get the valid source symbol key need to index in since we're skipping the initialize_events method
             # that does the parsing in the randomized case
-            sv_event = Event(sv_parent=sv, length=sv_length, length_range=None, symbol=sv.source_unique_char[0])
+
+            # Need to account for the fact that INSs have an empty source char and should thus take the symbol from target
+            if rec.info['SVTYPE'] == 'INS':
+                sv_symbol = sv.target_unique_char[0]
+            else:
+                sv_symbol = sv.source_unique_char[0]
+            sv_event = Event(sv_parent=sv, length=sv_length, length_range=None, symbol=sv_symbol)
             sv_event.start = rec.start
             sv_event.end = rec.stop
             sv_event.source_frag = frag
             if sv_event.source_frag == None and sv_event.length > 0:
                 sv_event.source_frag = insertion_sequence
-            sv.events_dict[sv.source_unique_char[0]] = sv_event
+            sv.events_dict[sv_symbol] = sv_event
             # print the sv_event object if its of a type we haven't seen
             if type not in seen_svtypes:
                 print(f'sv_event of type {type}: {sv_event}')
@@ -334,7 +340,7 @@ class SV_Simulator():
                 if sv.hap[x]:
                     for frag in sv.changed_fragments:
                         edits_dict[frag[0]].append(frag[1:])
-            
+
             # only for debugging
             for id in edits_dict:
                 edits_dict[id].sort()

@@ -1,7 +1,9 @@
 import unittest
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# the above path command is resulting in utils not importing correctly
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from simulate import SV_Simulator
 from pysam import FastaFile
 import yaml
@@ -73,13 +75,13 @@ class TestObject():
         files = [self.ref, self.ref + ".fai", self.par, self.hap1, self.hap1 + ".fai", self.hap2, self.hap2 + ".fai", self.bed]  # remove reference's index (.fai) file because new one should be generated
         for file in files:
             utils.remove_file(file)
-    
+
     def get_actual_frag(self):
         fasta_out = FastaFile(self.hap1)  # also generates a .fai file
         return fasta_out.fetch(fasta_out.references[0], 0, fasta_out.get_reference_length(fasta_out.references[0]))
 
 class TestSVSimulator(unittest.TestCase):
-
+    # TODO: this errors out on trying to use methods from utils (imported at the top)
     def setUp(self):
 
         # runs before every test
@@ -212,7 +214,8 @@ class TestSVSimulator(unittest.TestCase):
         # CTCCG TCGTA CTAGA CAGCT CCCGA CAGAG CACTG GTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT 
         # AAAAACTCCG _____ TCTAG CAGCT AAAAACCCGA CAGAG CACTG GTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT 
         self.assertEqual(changed_frag, "AAAAACTCCGTCTAGCAGCTAAAAACCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT")
-    
+
+    # TODO: this test fails in the choose_rand_pos step because the curr_sim object doesn't have any SV objects associated with it
     def test_choose_rand_pos(self):
         # test SVs without dispersions
         config_no_dis = self.test_objects_no_dis[0]
