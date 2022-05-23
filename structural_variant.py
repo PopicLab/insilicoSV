@@ -55,14 +55,9 @@ class Structural_Variant():
         self.hap = [False, False]
 
     def __repr__(self):
-        return "<SV transformation \"{}\" -> \"{}\" taking up {} non-dispersion spaces>".format(''.join(self.source),
-                                                                                                ''.join(self.target),
-                                                                                                sum([event.length for
-                                                                                                     event in
-                                                                                                     self.source_events
-                                                                                                     if
-                                                                                                     not event.symbol.startswith(
-                                                                                                         Symbols.DIS.value)]))
+        return "<SV transformation \"{}\" -> \"{}\" taking up {} non-dispersion spaces>".format(
+            ''.join(self.source), ''.join(self.target),
+            sum([event.length for event in self.source_events if not event.symbol.startswith(Symbols.DIS.value)]))
 
     @staticmethod
     def reformat_seq(transformation):
@@ -102,13 +97,12 @@ class Structural_Variant():
         # determine length of events/symbols
         symbols_dict = dict()
         if len(lengths) > 1:  # values given by user represents custom ranges for each event symbol of variant in lexicographical order
-            assert (len(lengths) == len(
-                all_symbols)), "Number of lengths entered does not match the number of symbols (remember foreign insertions and dispersions) present!"
+            assert (len(lengths) == len(all_symbols)), \
+                "Number of lengths entered does not match the number of symbols (remember foreign insertions and dispersions) present!"
             for idx, symbol in enumerate(all_symbols):
                 symbols_dict[symbol] = (random.randint(lengths[idx][0], lengths[idx][1]), lengths[idx])
 
-        elif len(
-                lengths) == 1:  # value given by user represents length (same range) of each event within variant in lexicographical order
+        elif len(lengths) == 1:  # value given by user represents length (same range) of each event within variant in lexicographical order
             for symbol in all_symbols:
                 symbols_dict[symbol] = (random.randint(lengths[0][0], lengths[0][1]), lengths[0])
 

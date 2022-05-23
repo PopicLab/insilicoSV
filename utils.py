@@ -1,5 +1,6 @@
 from constants import *
 import os
+import random
 
 def is_overlapping(event_ranges, addition):
     # addition: tuple (start, end)
@@ -57,34 +58,27 @@ def reset_file(filename):
     with open(filename, "w") as f_reset:
         f_reset.truncate()
 
-def generate_seq(length, random_gen):
+def generate_seq(length):
     # helper function for insertions
     # generates random sequence of bases of given length
-    rand_seq = ""
     base_map = {1:"A", 2: "T", 3: "G", 4: "C"}
-    for x in range(length):
-        rand_seq += base_map[random_gen.randint(1,4)]
-    return rand_seq
+    return ''.join([base_map[n] for n in random.choices(range(1,5), k=length)])
 
 def percent_N(seq):
-    total = 0
     if len(seq) == 0:  # avoid ZeroDivisionError
         return 0
-    for char in seq:
-        if char == "N":
-            total += 1
-    return total / len(seq)
+    else:
+        return (sum[int(elt == 'N') for elt in seq]) / len(seq)
 
 
-def complement(bases):
-    # bases: str
+def complement(seq):
+    # seq: str
     output = ""
     base_complements = {"A": "T", "T": "A", "G": "C", "C": "G", "N": "N"}
-    for base in bases.upper():
+    for base in seq.upper():
         if base in base_complements:
             output += base_complements[base]
         else:
-            output += base
-            print("Warning: Unknown base \'{}\' detected in reference, complement of base not taken".format(base))
+            raise ValueError("Unknown base \'{}\' detected in reference, complement of base not taken".format(base))
 
     return output
