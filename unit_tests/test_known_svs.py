@@ -40,10 +40,7 @@ class TestKnownSVs(unittest.TestCase):
         self.test_object_simple_INS = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                  [par, {"SVs": [{"vcf_path": test_vcf_simple_ins}]}], hap1, hap2, bed)
 
-    # TODO: sort out how to get for different genotypes
-    #  --> the get_actual_frag() method only looks in the hap1 output...
-    #  ------> I guess the answer is to just add an optional flag that'll look in both haps and we'll generalize
-    #  the tests to check if both haplotypes look the way they should
+    # TODO: add tests for different genotypes
     def helper_test_simple_sv(self, sv_type, config_event_obj, input_frag, target_frag):
         # template test method for simple SVs
         config_simple_del = config_event_obj
@@ -60,18 +57,17 @@ class TestKnownSVs(unittest.TestCase):
         self.assertEqual(changed_frag, target_frag)
 
     def test_simple_del(self):
-        self.helper_test_simple_sv('DEL', self.test_object_simple_DEL, 'GCACTATCTCTCCGT', 'GCTCCGT')
+        self.helper_test_simple_sv('DEL', self.test_object_simple_DEL, 'GCACTATCTCTCCGT', 'GCCTCCGT')
 
     def test_simple_dup(self):
-        self.helper_test_simple_sv('DUP', self.test_object_simple_DUP, 'GCACTATCTCTCCGT', 'GCACTATCTCACTATCTCTCCGT')
+        self.helper_test_simple_sv('DUP', self.test_object_simple_DUP, 'GCACTATCTCTCCGT', 'GCACTATCTACTATCTCTCCGT')
 
     def test_simple_inv(self):
-        self.helper_test_simple_sv('INV', self.test_object_simple_INV, 'GCACTATCTCTCCGT', 'GCGAGATAGTTCCGT')
+        self.helper_test_simple_sv('INV', self.test_object_simple_INV, 'GCACTATCTCTCCGT', 'GCAGATAGTCTCCGT')
 
-    # TODO: How to specify an insertion interval in our example ins vcf?
-    #  --> and how to handle INSSEQ? What's the actual form of INS events we should expect?
-    # def test_simple_ins(self):
-    #     self.helper_test_simple_sv('INS', self.test_object_simple_INS, 'GCACTATCTCTCCGT', 'GCAGGGGGGGCTATCTCTCCGT')
+    def test_simple_ins(self):
+        self.helper_test_simple_sv('INS', self.test_object_simple_INS, 'GCACTATCTCTCCGT', 'GCGGGGGGGACTATCTCTCCGT')
+
 
 if __name__ == '__main__':
     unittest.main()
