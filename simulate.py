@@ -142,9 +142,6 @@ class SV_Simulator():
             self.mode = "fixed"
             self.vcf_path = self.svs_config[0]["vcf_path"]
 
-        # print(f'MODE = {self.mode}')
-        # print('svs_config list:')
-        # print(str(self.svs_config))
         self.sim_settings = config.sim_settings
         if log_file and self.sim_settings["generate_log_file"]:
             logging.basicConfig(filename=log_file, filemode="w", level=logging.DEBUG,
@@ -197,7 +194,7 @@ class SV_Simulator():
 
         vcf = VariantFile(vcf_path)
         # printing a single example of each new SV type that we come across
-        seen_svtypes = set()
+        # seen_svtypes = set()
         # for every record in vcf, add SV object to list
         for rec in vcf.fetch():
             type = Variant_Type(rec.info['SVTYPE'])
@@ -212,7 +209,6 @@ class SV_Simulator():
                     insertion_sequence = rec.info['INSSEQ'][0]
                 else:
                     insertion_sequence = utils.generate_seq(sv_length, random_gen)
-                print(f'insertion_sequence = {insertion_sequence}')
 
             # add the SV interval to the event_ranges dict keyed on chromosome
             self.event_ranges[rec.chrom].append((rec.start, rec.stop))
@@ -253,9 +249,9 @@ class SV_Simulator():
                 sv_event.source_frag = insertion_sequence
             sv.events_dict[sv_symbol] = sv_event
             # print the sv_event object if its of a type we haven't seen
-            if type not in seen_svtypes:
-                print(f'sv_event of type {type}: {sv_event}')
-                seen_svtypes.add(type)
+            # if type not in seen_svtypes:
+            #     print(f'sv_event of type {type}: {sv_event}')
+            #     seen_svtypes.add(type)
 
             # extract genotype from VCF record: if none is given, draw randomly, otherwise take from one of the samples
             gts_list = [rec.samples[i]['GT'] for i in range(len(rec.samples))]
@@ -356,9 +352,7 @@ class SV_Simulator():
             for sv in active_svs:
                 if sv.hap[x]:
                     for frag in sv.changed_fragments:
-                        print(f'adding fragment {frag} from sv.changed_fragments')
                         edits_dict[frag[0]].append(frag[1:])
-                        print(f'edits_dict = {edits_dict}')
 
             # only for debugging
             for id in edits_dict:
@@ -486,9 +480,9 @@ class SV_Simulator():
                     active_svs_total, len(svs), inactive_svs_total, len(svs), tries, time_dif), end="\r")
             time_start_local = time.time()
 
-        print("\n")
-        print('EVENT RANGES:')
-        print(self.event_ranges)
+        # print("\n")
+        # print('EVENT RANGES:')
+        # print(self.event_ranges)
         return self.event_ranges
 
     def apply_transformations(self, ref_fasta, random_gen=random):
@@ -504,9 +498,6 @@ class SV_Simulator():
             # select random positions for SVs
             self.choose_rand_pos(self.svs, ref_fasta, random_gen)
         # in fixed mode self.event_ranges() is populated in process_vcf()
-
-        for sv in self.svs:
-            print(f'SV EVENTS AFTER CHOOSE_RAND_POS: {sv.events_dict}')
 
         print("Starting edit process...")
         active_svs_total = sum([1 for sv in self.svs if sv.active])

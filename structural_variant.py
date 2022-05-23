@@ -39,11 +39,8 @@ class Structural_Variant():
         self.source_events = []  # list of Event classes for every symbol in source sequence
         self.events_dict = dict()  # maps every unique symbol in source and target to an Event class
         # initialize_events sets the values of events_dict, source_dict, and req_space
-        print(f'MODE = {mode}')
         if mode == 'randomized':
-            print('CALLING INITIALIZE_EVENTS')
             self.initialize_events(length_ranges)
-            print(f'after initialize events, events_dict = {self.events_dict}')
         self.source_symbol_blocks = []
         self.target_symbol_blocks = []
 
@@ -164,8 +161,6 @@ class Structural_Variant():
 
         self.source_symbol_blocks = find_blocks(self.source_unique_char)
         self.target_symbol_blocks = find_blocks(self.target_unique_char)
-        print(f'source_symbol_blocks = {self.source_symbol_blocks}')
-        print(f'target_symbol_blocks = {self.target_symbol_blocks}')
         track_original_symbol(self.source_symbol_blocks)
 
         return self.target_symbol_blocks
@@ -195,16 +190,12 @@ class Structural_Variant():
                 # used to find corresponding event from encoding, all keys in encoding are in uppercase
                 upper_str = ele[0].upper()
                 event = encoding[upper_str[0]]
-                print(f'upper_str = {upper_str}')
-                print(f'event = {event}')
 
                 if any(c.islower() for c in ele):  # checks if lowercase symbols exist in ele, represents an inversion
                     new_frag += decode_funcs["invert"](event.source_frag)
 
                 elif upper_str[0] in encoding:  # take original fragment, no changes
                     new_frag += event.source_frag
-                    # *** new frag here is just getting set to the source fragment -- not incorporating the insseq
-                    print(f'new_frag = {new_frag}')
 
                 elif ele.startswith(Symbols.DIS.value):  # DIS = dispersion event ("_")
                     raise Exception("Dispersion event detected within block: {}".format(self.target_symbol_blocks))
@@ -224,7 +215,6 @@ class Structural_Variant():
 
         self.changed_fragments = changed_fragments
         self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
-        print(f'changed_fragments = {self.changed_fragments}')
 
         return changed_fragments
 
