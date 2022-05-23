@@ -25,6 +25,14 @@ class TestKnownSVs(unittest.TestCase):
         test_vcf_simple_dup = "unit_tests/inputs/example_simple_dup.vcf"
         test_vcf_simple_inv = "unit_tests/inputs/example_simple_inv.vcf"
         test_vcf_simple_ins = "unit_tests/inputs/example_simple_ins.vcf"
+
+        test_vcf_multidel = "unit_tests/inputs/example_multidel.vcf"
+        test_vcf_del_ins = "unit_tests/inputs/example_del_ins.vcf"
+        test_vcf_del_ins_del = "unit_tests/inputs/example_del_ins_del.vcf"
+        test_vcf_del_dup_del = "unit_tests/inputs/example_del_dup_del.vcf"
+        test_vcf_del_inv_del = "unit_tests/inputs/example_del_inv_del.vcf"
+        test_vcf_dup_dup_ins = "unit_tests/inputs/example_dup_dup_ins.vcf"
+
         ref_file = "unit_tests/inputs/test.fna"
         par = "unit_tests/inputs/par.yaml"
         hap1 = "unit_tests/inputs/test1.fna"
@@ -39,6 +47,18 @@ class TestKnownSVs(unittest.TestCase):
                                                  [par, {"SVs": [{"vcf_path": test_vcf_simple_inv}]}], hap1, hap2, bed)
         self.test_object_simple_INS = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                  [par, {"SVs": [{"vcf_path": test_vcf_simple_ins}]}], hap1, hap2, bed)
+        self.test_object_multiDEL = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                 [par, {"SVs": [{"vcf_path": test_vcf_multidel}]}], hap1, hap2, bed)
+        self.test_object_del_ins = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                               [par, {"SVs": [{"vcf_path": test_vcf_del_ins}]}], hap1, hap2, bed)
+        self.test_object_del_ins_del = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                              [par, {"SVs": [{"vcf_path": test_vcf_del_ins_del}]}], hap1, hap2, bed)
+        self.test_object_del_dup_del = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                  [par, {"SVs": [{"vcf_path": test_vcf_del_dup_del}]}], hap1, hap2, bed)
+        self.test_object_del_inv_del = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                  [par, {"SVs": [{"vcf_path": test_vcf_del_inv_del}]}], hap1, hap2, bed)
+        self.test_object_dup_dup_ins = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                  [par, {"SVs": [{"vcf_path": test_vcf_dup_dup_ins}]}], hap1, hap2, bed)
 
     # TODO: add tests for different genotypes
     def helper_test_simple_sv(self, sv_type, config_event_obj, input_frag, target_frag):
@@ -68,6 +88,25 @@ class TestKnownSVs(unittest.TestCase):
     def test_simple_ins(self):
         self.helper_test_simple_sv('INS', self.test_object_simple_INS, 'GCACTATCTCTCCGT', 'GCGGGGGGGACTATCTCTCCGT')
 
+    def test_multi_del(self):
+        self.helper_test_simple_sv('DEL, DEL', self.test_object_multiDEL, 'GCACTATCTCTCCGT', 'GCTATCTCCGT')
+
+    def test_del_ins(self):
+        self.helper_test_simple_sv('INS, DEL', self.test_object_del_ins, 'GCACTATCTCTCCGT', 'GCGGGGGGGACTATCTCGT')
+
+    def test_del_ins_del(self):
+        self.helper_test_simple_sv('DEL, INS, DEL', self.test_object_del_ins_del, 'GCACTATCTCTCCGT',
+                                   'GCGGGGGGGTATCTCGT')
+
+    def test_del_dup_del(self):
+        self.helper_test_simple_sv('DEL, DUP, DEL', self.test_object_del_dup_del, 'GCACTATCTCTCCGT', 'GCTATCTATCTCGT')
+
+    def test_del_inv_del(self):
+        self.helper_test_simple_sv('DEL, INV, DEL', self.test_object_del_inv_del, 'GCACTATCTCTCCGT', 'GCATACTCGT')
+
+    def test_dup_dup_inv(self):
+        self.helper_test_simple_sv('DUP, DUP, INS', self.test_object_dup_dup_ins, 'GCACTATCTCTCCGT',
+                                   'GCACACGGGGGGGTATCTCTCCTCCGT')
 
 if __name__ == '__main__':
     unittest.main()

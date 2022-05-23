@@ -278,9 +278,10 @@ class SV_Simulator():
                     # gt = random.choice(gts_list)
                 if sum(gt) == 2:
                     sv.ishomozygous = Zygosity.HOMOZYGOUS
+                    sv.hap = [True, True]
                 else:
                     sv.ishomozygous = Zygosity.HETEROZYGOUS
-                sv.hap = [bool(i) for i in gt]
+                    sv.hap = random.choice([[True, False], [False, True]])
 
             self.svs.append(sv)
 
