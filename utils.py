@@ -58,17 +58,21 @@ def reset_file(filename):
     with open(filename, "w") as f_reset:
         f_reset.truncate()
 
-def generate_seq(length):
+def generate_seq(length, random_gen=None):
     # helper function for insertions
     # generates random sequence of bases of given length
     base_map = {1:"A", 2: "T", 3: "G", 4: "C"}
-    return ''.join([base_map[n] for n in random.choices(range(1,5), k=length)])
+    if not random_gen:
+        return ''.join([base_map[n] for n in random.choices(range(1, 5), k=length)])
+    else:
+        # version using the fake random generator made for testing
+        return ''.join([base_map[random_gen.randint(1, 4)] for _ in range(length)])
 
 def percent_N(seq):
     if len(seq) == 0:  # avoid ZeroDivisionError
         return 0
     else:
-        return (sum[int(elt == 'N') for elt in seq]) / len(seq)
+        return seq.count('N') / len(seq)
 
 
 def complement(seq):

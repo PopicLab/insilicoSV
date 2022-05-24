@@ -150,7 +150,8 @@ class TestSVSimulator(unittest.TestCase):
         config_no_dis = self.test_objects_no_dis[1]
         config_no_dis.initialize_files()    # generate reference and parameter files
         curr_sim = SV_Simulator(config_no_dis.ref, config_no_dis.par, random_gen = RandomSim(0, "max"))   # random_gen ensures that SVs are all homozygous
-        self.assertEqual(curr_sim.produce_variant_genome(config_no_dis.hap1, config_no_dis.hap2, config_no_dis.bed, random_gen = RandomSim(10)), True)
+        self.assertEqual(curr_sim.produce_variant_genome(config_no_dis.hap1, config_no_dis.hap2, config_no_dis.ref,
+                                                         config_no_dis.bed, random_gen=RandomSim(10)), True)
         changed_frag = config_no_dis.get_actual_frag()   # fetch fragment produced by simulator to compare with answer
         config_no_dis.remove_test_files()   # remove any output files and .fai files
         # Work
@@ -162,19 +163,21 @@ class TestSVSimulator(unittest.TestCase):
         config_no_dis = self.test_objects_no_dis[2]
         config_no_dis.initialize_files()
         curr_sim = SV_Simulator(config_no_dis.ref, config_no_dis.par, random_gen = RandomSim(0, "max"))
-        self.assertEqual(curr_sim.produce_variant_genome(config_no_dis.hap1, config_no_dis.hap2, config_no_dis.bed, random_gen = RandomSim(10)), True)
+        self.assertEqual(curr_sim.produce_variant_genome(config_no_dis.hap1, config_no_dis.hap2, config_no_dis.ref,
+                                                         config_no_dis.bed, random_gen = RandomSim(10)), True)
         changed_frag = config_no_dis.get_actual_frag()
         config_no_dis.remove_test_files()
         # CTCCG TCGTA CTAGA CAGCT CCCGA GTCAG GGAGC AAAAA AGTGT GACAC TAGTC CACAG GTGAGAAACACAAATATTCAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
         # CTCCG TACGA CGGAG CAGCT _____ CTGAC GCTCC _____ AGTGT GACAC TAGTC CACAG GTGAGAAACACAAATATTCAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
         self.assertEqual(changed_frag, "CTCCGTACGACGGAGCAGCTCTGACGCTCCAGTGTGACACTAGTCCACAGGTGAGAAACACAAATATTCAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT")
-        #ACACTAGTCCACAGGTGAGAATCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
-        
+        # #ACACTAGTCCACAGGTGAGAATCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
+        #
         # dupINV, INVdup
         config_no_dis = self.test_objects_no_dis[3]
         config_no_dis.initialize_files()
         curr_sim = SV_Simulator(config_no_dis.ref, config_no_dis.par, random_gen = RandomSim(0, "max"))
-        self.assertEqual(curr_sim.produce_variant_genome(config_no_dis.hap1, config_no_dis.hap2, config_no_dis.bed, random_gen = RandomSim(10)), True)
+        self.assertEqual(curr_sim.produce_variant_genome(config_no_dis.hap1, config_no_dis.hap2, config_no_dis.ref,
+                                                         config_no_dis.bed, random_gen = RandomSim(10)), True)
         changed_frag = config_no_dis.get_actual_frag()
         config_no_dis.remove_test_files()
         # ACACT AGTCC ACAGG TGAGA ATCTT GTTTC TTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
@@ -186,7 +189,8 @@ class TestSVSimulator(unittest.TestCase):
         config_with_dis = self.test_objects_with_dis[0]
         config_with_dis.initialize_files()
         curr_sim = SV_Simulator(config_with_dis.ref, config_with_dis.par, random_gen = RandomSim(10, "max"))
-        self.assertEqual(curr_sim.produce_variant_genome(config_with_dis.hap1, config_with_dis.hap2, config_with_dis.bed, random_gen = RandomSim(10)), True)
+        self.assertEqual(curr_sim.produce_variant_genome(config_with_dis.hap1, config_with_dis.hap2, config_no_dis.ref,
+                                                         config_with_dis.bed, random_gen = RandomSim(10)), True)
         changed_frag = config_with_dis.get_actual_frag()
         config_with_dis.remove_test_files()
         # CTCCG TCGTA CTAGA CAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
@@ -197,7 +201,8 @@ class TestSVSimulator(unittest.TestCase):
         config_with_dis = self.test_objects_with_dis[1]
         config_with_dis.initialize_files()
         curr_sim = SV_Simulator(config_with_dis.ref, config_with_dis.par, random_gen = RandomSim(10, "max"))
-        self.assertEqual(curr_sim.produce_variant_genome(config_with_dis.hap1, config_with_dis.hap2, config_with_dis.bed, random_gen = RandomSim(5)), True)
+        self.assertEqual(curr_sim.produce_variant_genome(config_with_dis.hap1, config_with_dis.hap2, config_no_dis.ref,
+                                                         config_with_dis.bed, random_gen = RandomSim(5)), True)
         changed_frag = config_with_dis.get_actual_frag()
         config_with_dis.remove_test_files()
         # CTCCG TCGTA CTAGA CAGGG TATAT GTCTG TGTCT CAGTG AGACA CTTAGCATGCAACTCAGTCTGTACTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
@@ -208,11 +213,12 @@ class TestSVSimulator(unittest.TestCase):
         config_with_dis = self.test_objects_ins[0]
         config_with_dis.initialize_files()
         curr_sim = SV_Simulator(config_with_dis.ref, config_with_dis.par, random_gen = RandomSim(10, "max"))
-        self.assertEqual(curr_sim.produce_variant_genome(config_with_dis.hap1, config_with_dis.hap2, config_with_dis.bed, random_gen = RandomSim(5)), True)
+        self.assertEqual(curr_sim.produce_variant_genome(config_with_dis.hap1, config_with_dis.hap2, config_no_dis.ref,
+                                                         config_with_dis.bed, random_gen = RandomSim(5)), True)
         changed_frag = config_with_dis.get_actual_frag()
         config_with_dis.remove_test_files()
-        # CTCCG TCGTA CTAGA CAGCT CCCGA CAGAG CACTG GTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT 
-        # AAAAACTCCG _____ TCTAG CAGCT AAAAACCCGA CAGAG CACTG GTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT 
+        # CTCCG TCGTA CTAGA CAGCT CCCGA CAGAG CACTG GTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
+        # AAAAACTCCG _____ TCTAG CAGCT AAAAACCCGA CAGAG CACTG GTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
         self.assertEqual(changed_frag, "AAAAACTCCGTCTAGCAGCTAAAAACCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT")
 
     # TODO: this test fails in the choose_rand_pos step because the curr_sim object doesn't have any SV objects associated with it
