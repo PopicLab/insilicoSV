@@ -63,17 +63,15 @@ class TestKnownSVs(unittest.TestCase):
     # TODO: add tests for different genotypes
     def helper_test_simple_sv(self, sv_type, config_event_obj, input_frag, target_frag):
         # template test method for simple SVs
-        config_simple_del = config_event_obj
-        config_simple_del.initialize_files()
-        fixed_sim = SV_Simulator(config_simple_del.ref, config_simple_del.par)
-        self.assertEqual(fixed_sim.produce_variant_genome(fasta1_out=config_simple_del.hap1,
-                                                          fasta2_out=config_simple_del.hap2,
-                                                          ins_fasta=config_simple_del.ref,
-                                                          bedfile=config_simple_del.bed, verbose=True), True)
-        changed_frag = config_simple_del.get_actual_frag()  # fetch fragment produced by simulator
-        config_simple_del.remove_test_files()  # remove any output files and .fai files
-        print(f'input frag from simple {sv_type} test = {input_frag}')
-        print(f'changed frag from simple {sv_type} test = {changed_frag}')
+        config = config_event_obj
+        config.initialize_files()
+        fixed_sim = SV_Simulator(config.ref, config.par)
+        self.assertEqual(fixed_sim.produce_variant_genome(fasta1_out=config.hap1, fasta2_out=config.hap2,
+                                                          ins_fasta=config.ref, bedfile=config.bed, verbose=False), True)
+        changed_frag = config.get_actual_frag()  # fetch fragment produced by simulator
+        config.remove_test_files()  # remove any output files and .fai files
+        # print(f'input frag from simple {sv_type} test = {input_frag}')
+        # print(f'changed frag from simple {sv_type} test = {changed_frag}')
         self.assertEqual(changed_frag, target_frag)
 
     def test_simple_del(self):

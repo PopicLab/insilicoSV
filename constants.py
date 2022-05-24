@@ -1,6 +1,7 @@
 from enum import Enum
 
-MAX_BUFFER_SIZE = 1000000  # max number of bases that can be read at one time to export to fasta file
+# TODO: is this an appropriate value for this and should it be set here?
+MAX_BUFFER_SIZE: int = 1000000  # max number of bases that can be read at one time to export to fasta file
 
 
 class Variant_Type(Enum):

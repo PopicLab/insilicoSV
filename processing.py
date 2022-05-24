@@ -199,14 +199,6 @@ class FormatterIO():
         fasta_out: Fasta file to export changes to
         fasta_file: FastaFile with access to reference
         '''    
-        def get_buffer_size(curr_pos, target):
-            # returns the number of bases to read at the given position
-            # max bases to take in is MAX_BUFFER_SIZE
-            if target - curr_pos > MAX_BUFFER_SIZE:
-                return MAX_BUFFER_SIZE
-            else:
-                return target - curr_pos
-
         with open(fasta_out,"a") as fout_export:
             if id not in fasta_file.references:
                 raise KeyError("ID {} not found in inputted fasta file".format(id))
@@ -218,6 +210,7 @@ class FormatterIO():
             fout_export.write(">" + str(id) + "\n")
             chr_variants = list(edits)   # given as (start, end, new_frag)
             chr_variants.sort()
+            # *** I think this is colliding with the case of a deletion of the entire input ref sequence
             chr_variants.append([fasta_file.get_reference_length(id), fasta_file.get_reference_length(id), ""]) # to ensure that all bases after last variant are included
 
             # apply changes by traversing reference from start to end - this is possible since chr_variants is sorted
@@ -226,7 +219,7 @@ class FormatterIO():
                 var_start, var_end = variant[0], variant[1]
                 # write all reference bases up until interval, which indicates that a change will occur
                 while pos < var_start:
-                    appropriate_buffer = get_buffer_size(pos, var_start)   # amount of bases to read
+                    appropriate_buffer = MAX_BUFFER_SIZE if var_start - pos > MAX_BUFFER_SIZE else var_start - pos
                     c = fasta_file.fetch(id, pos, pos + appropriate_buffer)
                     fout_export.write(c)
                     pos += appropriate_buffer

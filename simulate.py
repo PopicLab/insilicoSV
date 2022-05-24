@@ -172,9 +172,10 @@ class SV_Simulator():
         # random assignment of SV to a chromosome
         # -> returns random chromosome and its length
         valid_chrs = self.order_ids
-        if check_size != None and self.sim_settings[
-            "filter_small_chr"]:  # if parameter setting on, only choose random chr from those that are big enough
-            valid_chrs = [chr for chr, chr_size in self.len_dict.items() if chr_size > check_size]
+        # if parameter setting on, only choose random chr from those that are big enough
+        if check_size != None and self.sim_settings["filter_small_chr"]:
+            # allow for chromosome size being equal to check size
+            valid_chrs = [chr for chr, chr_size in self.len_dict.items() if chr_size >= check_size]
         if len(valid_chrs) == 0:
             raise Exception("SVs are too big for the reference!")
 
@@ -418,11 +419,13 @@ class SV_Simulator():
                     break
 
                 rand_id, chr_len, chr_event_ranges = self.get_rand_chr(check_size=sv.req_space, random_gen=random_gen)
-                if chr_len - sv.req_space - 1 <= 0:  # SV is too big for current chromosome
+                # only set to invalid if required space exceeds chromosome length
+                if chr_len - sv.req_space < 0:  # SV is too big for current chromosome
+                    print('CHR_LEN - SV.REQ_SPACE < 0; SETTING SV TO INVALID')
                     valid = False
                     continue
                 else:
-                    start_pos = random_gen.randint(0, chr_len - sv.req_space - 1)
+                    start_pos = random_gen.randint(0, chr_len - sv.req_space)
                     # define the space in which SV operates
                     # we now also know where the target positions lie since we know the order and length of events
                     new_intervals = []  # tracks new ranges of blocks
@@ -480,11 +483,6 @@ class SV_Simulator():
                 "{} / {} SVs successfully placed ========== {} / {} SVs unsuccessfully placed, {} tries, {} seconds".format(
                     active_svs_total, len(svs), inactive_svs_total, len(svs), tries, time_dif), end="\r")
             time_start_local = time.time()
-
-        # print("\n")
-        # print('EVENT RANGES:')
-        # print(self.event_ranges)
-        return self.event_ranges
 
     def apply_transformations(self, ref_fasta, random_gen=random):
         '''
