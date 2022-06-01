@@ -234,7 +234,7 @@ class TestSVSimulator(unittest.TestCase):
         hap_bools = [len(frag) == 7 and (frag[0] == 'C' or frag[-1] == 'A') for frag in [changed_frag_1, changed_frag_2]]
         self.assertEqual(any(hap_bools), True)
 
-    def test_simple_invertions(self):
+    def test_simple_inversions(self):
         self.helper_test_known_output_svs(self.test_objects_simple_invs[0], ['TG'])
         self.helper_test_known_output_svs(self.test_objects_simple_invs[1], ['G'])
 
