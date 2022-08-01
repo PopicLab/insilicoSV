@@ -2,6 +2,7 @@ import yaml
 import sys
 from constants import *
 from pysam import FastaFile
+import pysam
 import argparse
 import os
 import time
@@ -31,7 +32,7 @@ class Config():
                 if config_sv["type"] != Variant_Type.Custom:
                     config_sv["source"] = None
                     config_sv["target"] = None
-    
+
     def run_checks_randomized(self, entries):
         '''
         check method for yaml given with SVs given for randomized placement on reference
@@ -118,15 +119,14 @@ class FormatterIO():
             with open(ins_fasta, "a") as fout_ins:
                 fout_ins.write(">{}_{}\n".format(chr, start_pos))
                 fout_ins.write("{}\n".format(seq))
-        
+
         if reset_file:
             utils.reset_file(bedfile)
             utils.reset_file(ins_fasta)
-        
+
         for x, sv in enumerate(svs):
             source, target = sv.source_unique_char, sv.target_unique_char
-            encoding = sv.events_dict    # maps symbol like A or B to base pairs on reference 
-            #print("Encode_dict: ", encoding)
+            encoding = sv.events_dict    # maps symbol like A or B to base pairs on reference
 
             assert (sv.start != None and sv.end != None) # start & end should have been defined alongside event positions
             curr_pos = sv.start
@@ -147,14 +147,14 @@ class FormatterIO():
                             event_name = "d" + event_name
                         order += 1
                         write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, event, order)
-                    
+
                     else:  # symbol is an original
                         # insertions
                         if symbol[0].upper() not in sv.source_unique_char:
                             order += 1
                             write_to_file(sv, curr_chr, curr_pos, curr_pos, curr_chr, curr_pos, curr_pos, Operations.INS.value, event.symbol, event, order)
                             export_insertions(curr_chr, curr_pos, event.source_frag, ins_fasta)   # foreign insertion sequences need to be exported separate from bed file
-                        
+
                         # translocations - original symbol
                         elif len(symbol) == 1 and idx != event.original_block_idx:
                             order += 1
@@ -169,7 +169,7 @@ class FormatterIO():
                             order = 0
                             curr_pos = event.end       # this symbol was already in source
                             write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, event.start, event.end, Operations.INV.value, event.symbol, event, order)
-                        
+
                         # identity - original symbol did not change or move
                         else:
                             order = 0
@@ -180,7 +180,7 @@ class FormatterIO():
                     dis_event = encoding[Symbols.DIS.value + str(idx + 1)]  # find the nth dispersion event
                     curr_pos = dis_event.end
                     curr_chr = dis_event.source_chr
-            
+
             # deletions - any original symbols not detected in target sequence are deleted
             for symbol in source:
                 # do not delete dispersion events or symbols already in target
@@ -190,6 +190,75 @@ class FormatterIO():
                     write_to_file(sv, event.source_chr, event.start, event.end, event.source_chr, event.start, event.start, Operations.DEL.value, event.symbol, event, order)
             self.bedpe_counter += 1
 
+    def export_to_vcf(self, svs, stats, vcffile=None):
+        '''
+        Companion function to the bedpe-writer; outputs VCF with a single record per event.
+        Intended use: provide labels to Cue such that complex events are represented by single records
+        '''
+        vcf_out = open(vcffile, 'w')
+        #TODO: write this using pysam VariantFile rather than as text (I'm not sure how to write the header in a specific way)
+        # Writing header
+        vcf_out.write('##fileformat=VCFv4.2\n##FILTER=<ID=PASS,Description="All filters passed">\n')
+        for chrm,chrm_len in stats.chr_lengths.items():
+            vcf_out.write(f'##contig=<ID={chrm},length={chrm_len}>\n')
+        vcf_out.write('##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">\n'+
+        '##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS for imprecise variants">\n'+
+        '##INFO=<ID=CIEND,Number=2,Type=Integer,Description="Confidence interval around END for imprecise variants">\n'+
+        '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">\n'+
+        '##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Length of structural variant">\n'+
+        '##INFO=<ID=SVMETHOD,Number=1,Type=String,Description="SV detection method">\n'+
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'+
+        '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE\n')
+
+        # write the records (will convert this to VariantFile commands)
+        for x, sv in enumerate(svs):
+            assert (sv.start != None and sv.end != None)  # start & end should have been defined alongside event positions
+            # TODO: Fix interval reporting for dDUPs, TRAs, etc -- start/end reported as the gap between source and target
+            #  instead of just the event interval itself
+            vcf_out.write(
+                f'{sv.start_chr}\t{sv.start}\t{sv.type.value}\tN\t<{sv.type.value}>\t.\tPASS\t'
+                f'END={sv.end};SVTYPE={sv.type.value};SVLEN={sv.end - sv.start}\tGT\t' +
+                ('1/1\n' if sv.ishomozygous == Zygosity.HOMOZYGOUS else '0/1\n'))
+
+        vcf_out.close()
+
+    def export_to_vcf_pysam(self, svs, stats, vcffile=None):
+        with open(vcffile, "w") as vcf:
+            vcf.write("##fileformat=VCFv4.2\n")
+            for chrm, chrm_len in stats.chr_lengths.items():
+                vcf.write("##contig=<ID=%s,length=%d>\n" % (chrm, chrm_len))
+            # TODO: fix header format issue (the below VariantFile call crashes because of a header format issue)
+            vcf.write("#%s\n" % "\t".join(["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]))
+            # vcf.write("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
+        vcf_file = pysam.VariantFile(vcffile)
+        # SV fields
+        vcf_file.header.info.add('END', number=1, type='Integer', description="End position of the variant "
+                                                                              "described in this record")
+        vcf_file.header.info.add('CIPOS', number=2, type='Integer', description="Confidence interval around POS for "
+                                                                                "imprecise variants")
+        vcf_file.header.info.add('CIEND', number=2, type='Integer', description="Confidence interval around END for "
+                                                                                "imprecise variants")
+        vcf_file.header.info.add('SVTYPE', number=1, type='String', description="Type of structural variant")
+        vcf_file.header.info.add('SVLEN', number=1, type='Integer', description="Length of structural variant")
+        vcf_file.header.info.add('SVMETHOD', number=1, type='String', description="SV detection method")
+        vcf_file.header.formats.add('GT', number=1, type='String', description="Genotype")
+        vcf_file.header.add_sample("SAMPLE")
+
+        vcf_out_file = pysam.VariantFile(vcffile, 'w', header=vcf_file.header)
+
+        for sv in svs:
+            print(f'sv.start_chr = {sv.start_chr}')
+            print(f'type(sv.start_chr) = {type(sv.start_chr)}')
+            vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=sv.start, stop=sv.end,
+                                                        alleles=['N', sv.type.value], id=sv.type.value,
+                                                        info={'SVTYPE': sv.type.value, 'SVLEN': sv.end - sv.start},
+                                                        qual=86, filter='PASS',
+                                                        samples=[{'GT': '1/1' if sv.ishomozygous else '0/1'}])
+            vcf_out_file.write(vcf_record)
+
+        vcf_out_file.close()
+
+
     def export_variants_to_fasta(self, id, edits, fasta_out, fasta_file, verbose = False):
         '''
         Exports list of changes from simulator to fasta file
@@ -198,11 +267,11 @@ class FormatterIO():
         edits: list with interval and new_frag, replace reference at the interval with new_frag
         fasta_out: Fasta file to export changes to
         fasta_file: FastaFile with access to reference
-        '''    
+        '''
         with open(fasta_out,"a") as fout_export:
             if id not in fasta_file.references:
                 raise KeyError("ID {} not found in inputted fasta file".format(id))
-            
+
             if verbose:
                 print("New ID: ", id)
 

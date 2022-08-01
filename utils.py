@@ -79,6 +79,7 @@ def complement(seq):
         if base in base_complements:
             output += base_complements[base]
         else:
-            raise ValueError("Unknown base \'{}\' detected in reference, complement of base not taken".format(base))
+            output += base
+            # raise ValueError("Unknown base \'{}\' detected in reference, complement of base not taken".format(base))
 
     return output

@@ -249,41 +249,44 @@ class SV_Simulator():
                 # source grad assignment in the ins case
                 sv_event.source_frag = insertion_sequence
             sv.events_dict[sv_symbol] = sv_event
-            # print the sv_event object if its of a type we haven't seen
-            # if type not in seen_svtypes:
-            #     print(f'sv_event of type {type}: {sv_event}')
-            #     seen_svtypes.add(type)
 
             # extract genotype from VCF record: if none is given, draw randomly, otherwise take from one of the samples
-            gts_list = [rec.samples[i]['GT'] for i in range(len(rec.samples))]
-            gts = set(gts_list)
-            if (len(gts) == 1) and ((None, None) in gts):
-                # if all of the samples in the vcf record gave (None,None), generate randomly
-                draw = random_gen.randint(1, 3)
-                if draw == 3:  # sv applies to both haplotypes
-                    sv.ishomozygous = Zygosity.HOMOZYGOUS
-                    sv.hap = [True, True]
-                elif draw == 2:
-                    sv.ishomozygous = Zygosity.HETEROZYGOUS
-                    sv.hap = [False, True]
-                elif draw == 1:
-                    sv.ishomozygous = Zygosity.HETEROZYGOUS
-                    sv.hap = [True, False]
+            # gts_list = [rec.samples[i]['GT'] for i in range(len(rec.samples))]
+            # gts = set(gts_list)
+            # if (len(gts) == 1) and ((None, None) in gts):
+                ## if all of the samples in the vcf record gave (None,None), generate randomly
+                # draw = random_gen.randint(1, 3)
+                # if draw == 3:  # sv applies to both haplotypes
+                #     sv.ishomozygous = Zygosity.HOMOZYGOUS
+                #     sv.hap = [True, True]
+                # elif draw == 2:
+                #     sv.ishomozygous = Zygosity.HETEROZYGOUS
+                #     sv.hap = [False, True]
+                # elif draw == 1:
+                #     sv.ishomozygous = Zygosity.HETEROZYGOUS
+                #     sv.hap = [True, False]
+            # else:
+                ## if (None, None) isn't the only genotype, draw until you get a non-None one
+                ## Get genotype in the form (1,0) -> construct hap and ishomozygous from that
+                # gt = (None, None)
+                # while gt == (None, None):
+                    ## -> take genotypes in order or drawing randomly
+                    # gt = gts.pop()
+                    ## gt = random.choice(gts_list)
+                # if sum(gt) == 2:
+                #     sv.ishomozygous = Zygosity.HOMOZYGOUS
+                #     sv.hap = [True, True]
+                # else:
+                #     sv.ishomozygous = Zygosity.HETEROZYGOUS
+                #     sv.hap = random.choice([[True, False], [False, True]])
+            # ----------- just going to choose a random genotype for now ---------
+            if random_gen.randint(0, 1):
+                sv.ishomozygous = Zygosity.HOMOZYGOUS
+                sv.hap = [True, True]
             else:
-                # if (None, None) isn't the only genotype, draw until you get a non-None one
-                # Get genotype in the form (1,0) -> construct hap and ishomozygous from that
-                gt = (None, None)
-                while gt == (None, None):
-                    # -> take genotypes in order or drawing randomly
-                    gt = gts.pop()
-                    # gt = random.choice(gts_list)
-                if sum(gt) == 2:
-                    sv.ishomozygous = Zygosity.HOMOZYGOUS
-                    sv.hap = [True, True]
-                else:
-                    sv.ishomozygous = Zygosity.HETEROZYGOUS
-                    sv.hap = random.choice([[True, False], [False, True]])
-
+                # print('SETTING SV TO HETEROZYGOUS')
+                sv.ishomozygous = Zygosity.HETEROZYGOUS
+                sv.hap = random.choice([[True, False], [False, True]])
             self.svs.append(sv)
 
         # print("\n")
@@ -376,6 +379,9 @@ class SV_Simulator():
 
         # export variant data to BED file
         self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file=initial_reset)
+        # TODO: write companion method to export_to_bedpe() that writes a VCF with a single record per event (namely for complex)
+        # ---> need to give the stats object as input to be able to write the vcf header with the right chromosome lengths
+        self.formatter.export_to_vcf(active_svs, self.stats, vcffile=bedfile[:-4]+'.vcf')
 
         # create and export stats file
         if stats_file:

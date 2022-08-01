@@ -22,6 +22,7 @@ class Variant_Type(Enum):
     INVdup = "INVdup"
     dDUP = "dDUP"
     Custom = "Custom"
+    INV_dDUP = "INV_dDUP"
 
 
 class Operations(Enum):
@@ -63,7 +64,8 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
           Variant_Type.INS_iDEL: [("A", "_", "B"), ("_", "A")],
           Variant_Type.dupINV: [("A", "B"), ("A", "b", "a'")],
           Variant_Type.INVdup: [("A", "B"), ("b'", "a", "B")],
-          Variant_Type.dDUP: [("A", "_"), ("A", "_", "A'")]}
+          Variant_Type.dDUP: [("A", "_"), ("A", "_", "A'")],
+          Variant_Type.INV_dDUP: [("A", "_"), ("A", "_", "a'")]}
 
 DEFAULT_CONFIG = {"sim_settings": {"max_tries": 100,
                                    "fail_if_placement_issues": False,
