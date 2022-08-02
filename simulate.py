@@ -378,10 +378,10 @@ class SV_Simulator():
                 time_start = time.time()
 
         # export variant data to BED file
-        self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file=initial_reset)
+        # self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file=initial_reset)
         # TODO: write companion method to export_to_bedpe() that writes a VCF with a single record per event (namely for complex)
         # ---> need to give the stats object as input to be able to write the vcf header with the right chromosome lengths
-        self.formatter.export_to_vcf(active_svs, self.stats, vcffile=bedfile[:-4]+'.vcf')
+        self.formatter.export_to_vcf_pysam(active_svs, self.stats, vcffile=bedfile[:-4]+'.vcf')
 
         # create and export stats file
         if stats_file:

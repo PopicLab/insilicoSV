@@ -227,9 +227,8 @@ class FormatterIO():
             vcf.write("##fileformat=VCFv4.2\n")
             for chrm, chrm_len in stats.chr_lengths.items():
                 vcf.write("##contig=<ID=%s,length=%d>\n" % (chrm, chrm_len))
-            # TODO: fix header format issue (the below VariantFile call crashes because of a header format issue)
             vcf.write("#%s\n" % "\t".join(["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]))
-            # vcf.write("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
+        # *** This will throw an error with pysam version 0.18, need 0.16.0.1
         vcf_file = pysam.VariantFile(vcffile)
         # SV fields
         vcf_file.header.info.add('END', number=1, type='Integer', description="End position of the variant "
@@ -247,8 +246,6 @@ class FormatterIO():
         vcf_out_file = pysam.VariantFile(vcffile, 'w', header=vcf_file.header)
 
         for sv in svs:
-            print(f'sv.start_chr = {sv.start_chr}')
-            print(f'type(sv.start_chr) = {type(sv.start_chr)}')
             vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=sv.start, stop=sv.end,
                                                         alleles=['N', sv.type.value], id=sv.type.value,
                                                         info={'SVTYPE': sv.type.value, 'SVLEN': sv.end - sv.start},
