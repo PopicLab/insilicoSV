@@ -177,6 +177,21 @@ Chromosome21	150	151	Chromosome21	150	151	INS	    14	0/1	AB_C_D>bb'_AEc'_EDC	1	1
 Chromosome21	124	135	Chromosome21	159	160	TRA	    10	0/1	AB_C_D>bb'_AEc'_EDC	1	1
 ```
 
+### Example 3 - Editing reference with input SVs
+To edit an input reference file with a known set of SVs the user can provide a VCF file containing the SVs in the yaml 
+of format shown above. The events in the VCF must be non-overlapping. Supported variant types for this use case 
+currently include DEL, DUP, INV, and INS. For insertions, we assume that events will be specified with the insertion
+sequence given in an INFO field called `INSSEQ`. The commandline call to perform this reference edit is the same as the
+previous simulate.py call given above:
+```yaml
+# YAML config file
+SVs:
+    - vcf_path: {path_to_vcf}
+```
+```
+python simulate.py <ref.fna> <par.yaml> <prefix>
+```
+
 ## How to Contribute
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate. If you'd like to contribute, please fork the repository and make changes as you'd like.
 

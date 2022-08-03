@@ -14,24 +14,28 @@ class Config():
         #self.__dict__["SVs"].update(entries["SVs"])
         if "sim_settings" in entries:   # if the user changed any of the default settings for the sim, they get updated here
             self.__dict__["sim_settings"].update(entries["sim_settings"])
-        self.run_checks(entries)
 
-        for config_sv in self.SVs:
-            # handles cases where user enters length range for all components within SV or specifies different ranges
-            if isinstance(config_sv["min_length"], int):
-                config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
-            else:
-                config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
-            # make sure max_length >= min_length >= 0
-            assert all(max_len >= min_len and min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
-            
-            # use Enum for variant type
-            config_sv["type"] = Variant_Type(config_sv["type"])
-            if config_sv["type"] != Variant_Type.Custom:
-                config_sv["source"] = None
-                config_sv["target"] = None
+        if "vcf_path" not in self.__dict__["SVs"][0]:
+            self.run_checks_randomized(entries)
+            for config_sv in self.SVs:
+                # handles cases where user enters length range for all components within SV or specifies different ranges
+                if isinstance(config_sv["min_length"], int):
+                    config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
+                else:
+                    config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
+                # make sure max_length >= min_length >= 0
+                assert all(max_len >= min_len and min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
+
+                # use Enum for variant type
+                config_sv["type"] = Variant_Type(config_sv["type"])
+                if config_sv["type"] != Variant_Type.Custom:
+                    config_sv["source"] = None
+                    config_sv["target"] = None
     
-    def run_checks(self, entries):
+    def run_checks_randomized(self, entries):
+        '''
+        check method for yaml given with SVs given for randomized placement on reference
+        '''
         # entries: dict representing full config file parsed from yaml
         config_svs = self.SVs
         for config_sv in config_svs:
@@ -56,7 +60,7 @@ class Config():
         for key in entries:
             if key not in valid_keys:
                 raise Exception("Unknown argument \"{}\"".format(key))
-            
+
 class FormatterIO():
     def __init__(self, par_file):
         self.bedpe_counter = 1
@@ -195,14 +199,6 @@ class FormatterIO():
         fasta_out: Fasta file to export changes to
         fasta_file: FastaFile with access to reference
         '''    
-        def get_buffer_size(curr_pos, target):
-            # returns the number of bases to read at the given position
-            # max bases to take in is MAX_BUFFER_SIZE
-            if target - curr_pos > MAX_BUFFER_SIZE:
-                return MAX_BUFFER_SIZE
-            else:
-                return target - curr_pos
-
         with open(fasta_out,"a") as fout_export:
             if id not in fasta_file.references:
                 raise KeyError("ID {} not found in inputted fasta file".format(id))
@@ -214,6 +210,7 @@ class FormatterIO():
             fout_export.write(">" + str(id) + "\n")
             chr_variants = list(edits)   # given as (start, end, new_frag)
             chr_variants.sort()
+            # *** I think this is colliding with the case of a deletion of the entire input ref sequence
             chr_variants.append([fasta_file.get_reference_length(id), fasta_file.get_reference_length(id), ""]) # to ensure that all bases after last variant are included
 
             # apply changes by traversing reference from start to end - this is possible since chr_variants is sorted
@@ -222,7 +219,7 @@ class FormatterIO():
                 var_start, var_end = variant[0], variant[1]
                 # write all reference bases up until interval, which indicates that a change will occur
                 while pos < var_start:
-                    appropriate_buffer = get_buffer_size(pos, var_start)   # amount of bases to read
+                    appropriate_buffer = MAX_BUFFER_SIZE if var_start - pos > MAX_BUFFER_SIZE else var_start - pos
                     c = fasta_file.fetch(id, pos, pos + appropriate_buffer)
                     fout_export.write(c)
                     pos += appropriate_buffer
