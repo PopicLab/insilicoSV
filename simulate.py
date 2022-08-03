@@ -313,6 +313,7 @@ class SV_Simulator():
                         sv.ishomozygous = Zygosity.HETEROZYGOUS
                         sv.hap = random.choice([[True, False], [False, True]])
 
+                    print(f'sv = {sv}')
                     self.svs.append(sv)
             # shuffle svs if we are not prioritizing the simulation of the SVs inputted first
             if not self.sim_settings["prioritize_top"]:

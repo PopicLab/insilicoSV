@@ -68,10 +68,12 @@ class Structural_Variant():
         unique_transform = []
         unique_id = 1
         for component in transformation:
-            if component != Symbols.DIS.value and component != Symbols.DUP_MARKING.value:
+            if component != Symbols.DIS.value and component != Symbols.DUP_MARKING.value and component != Symbols.DIV.value:
                 unique_transform.append(component)
             elif component == Symbols.DUP_MARKING.value:  # duplication event case, need to group together symbol and duplication marking
                 unique_transform[-1] += Symbols.DUP_MARKING.value
+            elif component == Symbols.DIV.value: # divergence event case, want to keep track of interval needing modification
+                unique_transform[-1] += Symbols.DIV.value
             else:  # dispersion event case, component = dispersion
                 unique_transform.append(component + str(unique_id))
                 unique_id += 1
@@ -127,8 +129,8 @@ class Structural_Variant():
             self.source_events.append(self.events_dict[symbol])
 
         self.req_space = sum([event.length for event in self.source_events])
-        # ** I don't think this return statement is used
-        # return self.source_events
+
+        print(f'self.events_dict = {self.events_dict}')
 
     def generate_blocks(self):
         '''
@@ -172,7 +174,8 @@ class Structural_Variant():
         '''
         decode_funcs = {"invert": lambda string: utils.complement(string[::-1]),
                         "identity": lambda string: string,
-                        "complement": utils.complement}
+                        "complement": utils.complement,
+                        "diverge": lambda string: utils.divergence(string)}
         encoding = self.events_dict  # maps symbol like A or B to base pairs on reference
 
         # find all blocks of symbols between dispersion events
@@ -195,6 +198,10 @@ class Structural_Variant():
                 if any(c.islower() for c in ele):  # checks if lowercase symbols exist in ele, represents an inversion
                     new_frag += decode_funcs["invert"](event.source_frag)
 
+                elif ele[-1] == '*': # checks if the element ends in an *, representing a divergent duplicate
+                    print(f'found a divergent elt: {ele}')
+                    new_frag += decode_funcs["diverge"](event.source_frag)
+
                 elif upper_str[0] in encoding:  # take original fragment, no changes
                     new_frag += event.source_frag
 
@@ -202,6 +209,8 @@ class Structural_Variant():
                     raise Exception("Dispersion event detected within block: {}".format(self.target_symbol_blocks))
                 else:
                     raise Exception("Symbol {} failed to fall in any cases".format(ele))
+
+                print(f'new_frag = {new_frag}')
 
             # find dispersion event right after block to find position of next block
             assert curr_chr != None, "Unvalid chr detected for SV {} and events_dict {}".format(self, self.events_dict)

@@ -65,11 +65,7 @@ def generate_seq(length, random_gen=None):
     return ''.join([base_map[random_gen.randint(1, 4)] for _ in range(length)])
 
 def percent_N(seq):
-    if len(seq) == 0:  # avoid ZeroDivisionError
-        return 0
-    else:
-        return seq.count('N') / len(seq)
-
+    return 0 if len(seq) == 0 else seq.count('N') / len(seq)
 
 def complement(seq):
     # seq: str
@@ -83,3 +79,9 @@ def complement(seq):
             # raise ValueError("Unknown base \'{}\' detected in reference, complement of base not taken".format(base))
 
     return output
+
+def divergence(seq, p=0.1):
+    # function to create slightly mutated version of an input sequence (to be used to create
+    # the quasi-repeated section of a divergent repeat/divergent dDUP)
+    # --> p given as the probability of changing the base
+    return ''.join([b if random.random() > p else random.choice(list({"A", "C", "T", "G"} - {b})) for b in seq.upper()])
