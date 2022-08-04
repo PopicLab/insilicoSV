@@ -130,7 +130,7 @@ class Structural_Variant():
 
         self.req_space = sum([event.length for event in self.source_events])
 
-        print(f'self.events_dict = {self.events_dict}')
+        # print(f'self.events_dict = {self.events_dict}')
 
     def generate_blocks(self):
         '''
@@ -199,7 +199,7 @@ class Structural_Variant():
                     new_frag += decode_funcs["invert"](event.source_frag)
 
                 elif ele[-1] == '*': # checks if the element ends in an *, representing a divergent duplicate
-                    print(f'found a divergent elt: {ele}')
+                    # print(f'found a divergent elt: {ele}')
                     new_frag += decode_funcs["diverge"](event.source_frag)
 
                 elif upper_str[0] in encoding:  # take original fragment, no changes
@@ -210,7 +210,7 @@ class Structural_Variant():
                 else:
                     raise Exception("Symbol {} failed to fall in any cases".format(ele))
 
-                print(f'new_frag = {new_frag}')
+                # print(f'new_frag = {new_frag}')
 
             # find dispersion event right after block to find position of next block
             assert curr_chr != None, "Unvalid chr detected for SV {} and events_dict {}".format(self, self.events_dict)

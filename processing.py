@@ -191,38 +191,6 @@ class FormatterIO():
             self.bedpe_counter += 1
 
     def export_to_vcf(self, svs, stats, vcffile=None):
-        '''
-        Companion function to the bedpe-writer; outputs VCF with a single record per event.
-        Intended use: provide labels to Cue such that complex events are represented by single records
-        '''
-        vcf_out = open(vcffile, 'w')
-        #TODO: write this using pysam VariantFile rather than as text (I'm not sure how to write the header in a specific way)
-        # Writing header
-        vcf_out.write('##fileformat=VCFv4.2\n##FILTER=<ID=PASS,Description="All filters passed">\n')
-        for chrm,chrm_len in stats.chr_lengths.items():
-            vcf_out.write(f'##contig=<ID={chrm},length={chrm_len}>\n')
-        vcf_out.write('##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">\n'+
-        '##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS for imprecise variants">\n'+
-        '##INFO=<ID=CIEND,Number=2,Type=Integer,Description="Confidence interval around END for imprecise variants">\n'+
-        '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">\n'+
-        '##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Length of structural variant">\n'+
-        '##INFO=<ID=SVMETHOD,Number=1,Type=String,Description="SV detection method">\n'+
-        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'+
-        '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE\n')
-
-        # write the records (will convert this to VariantFile commands)
-        for x, sv in enumerate(svs):
-            assert (sv.start != None and sv.end != None)  # start & end should have been defined alongside event positions
-            # TODO: Fix interval reporting for dDUPs, TRAs, etc -- start/end reported as the gap between source and target
-            #  instead of just the event interval itself
-            vcf_out.write(
-                f'{sv.start_chr}\t{sv.start}\t{sv.type.value}\tN\t<{sv.type.value}>\t.\tPASS\t'
-                f'END={sv.end};SVTYPE={sv.type.value};SVLEN={sv.end - sv.start}\tGT\t' +
-                ('1/1\n' if sv.ishomozygous == Zygosity.HOMOZYGOUS else '0/1\n'))
-
-        vcf_out.close()
-
-    def export_to_vcf_pysam(self, svs, stats, vcffile=None):
         with open(vcffile, "w") as vcf:
             vcf.write("##fileformat=VCFv4.2\n")
             for chrm, chrm_len in stats.chr_lengths.items():
@@ -240,17 +208,37 @@ class FormatterIO():
         vcf_file.header.info.add('SVTYPE', number=1, type='String', description="Type of structural variant")
         vcf_file.header.info.add('SVLEN', number=1, type='Integer', description="Length of structural variant")
         vcf_file.header.info.add('SVMETHOD', number=1, type='String', description="SV detection method")
+        # adding info fields for div_dDUP events -- TARGET locus and DIV_REPEAT segment to be inserted at TARGET
+        vcf_file.header.info.add('TARGET', number=1, type='Integer', description="Target location for divergent repeat")
+        vcf_file.header.info.add('DIV_REPEAT', number=1, type='String', description="Modified divergent repeat segment")
         vcf_file.header.formats.add('GT', number=1, type='String', description="Genotype")
-        vcf_file.header.add_sample("SAMPLE")
+        vcf_file.header.add_sample('SAMPLE')
 
         vcf_out_file = pysam.VariantFile(vcffile, 'w', header=vcf_file.header)
 
         for sv in svs:
-            vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=sv.start, stop=sv.end,
+            if sv.type.value == "div_dDUP":
+                rec_start = sv.events_dict['A'].start
+                rec_end = sv.events_dict['A'].end
+                dispersion_target = sv.events_dict['_1'].end
+                # sv.changed_fragments of the form:
+                # sv.changed_fragment = [['chr4', 87741452, 87741462, 'TCAAGTGTTG'], ['chr4', 87741487, 87741487, 'TCCATTGTTG']]
+                # --> first element describes A, second elemnt describes A* and the insertion location
+                divergent_repeat = sv.changed_fragments[1][-1]
+                info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target,
+                              'DIV_REPEAT': divergent_repeat}
+            else:
+                # TODO: specify start and end based on logic of other complex event types
+                rec_start, rec_end = sv.start, sv.end
+                info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
+
+            print(f'sv.ishomozygous = {sv.ishomozygous}')
+            zyg = (1,1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0,1)
+            vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=rec_start, stop=rec_end,
                                                         alleles=['N', sv.type.value], id=sv.type.value,
-                                                        info={'SVTYPE': sv.type.value, 'SVLEN': sv.end - sv.start},
-                                                        qual=86, filter='PASS',
-                                                        samples=[{'GT': '1/1' if sv.ishomozygous else '0/1'}])
+                                                        info=info_field,
+                                                        qual=100, filter='PASS',
+                                                        samples=[{'GT': zyg}])
             vcf_out_file.write(vcf_record)
 
         vcf_out_file.close()
