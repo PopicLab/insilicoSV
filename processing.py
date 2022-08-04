@@ -208,9 +208,8 @@ class FormatterIO():
         vcf_file.header.info.add('SVTYPE', number=1, type='String', description="Type of structural variant")
         vcf_file.header.info.add('SVLEN', number=1, type='Integer', description="Length of structural variant")
         vcf_file.header.info.add('SVMETHOD', number=1, type='String', description="SV detection method")
-        # adding info fields for div_dDUP events -- TARGET locus and DIV_REPEAT segment to be inserted at TARGET
+        # adding info fields for div_dDUP and dDUP events -- TARGET locus
         vcf_file.header.info.add('TARGET', number=1, type='Integer', description="Target location for divergent repeat")
-        vcf_file.header.info.add('DIV_REPEAT', number=1, type='String', description="Modified divergent repeat segment")
         vcf_file.header.formats.add('GT', number=1, type='String', description="Genotype")
         vcf_file.header.add_sample('SAMPLE')
 
@@ -221,12 +220,7 @@ class FormatterIO():
                 rec_start = sv.events_dict['A'].start
                 rec_end = sv.events_dict['A'].end
                 dispersion_target = sv.events_dict['_1'].end
-                # sv.changed_fragments of the form:
-                # sv.changed_fragment = [['chr4', 87741452, 87741462, 'TCAAGTGTTG'], ['chr4', 87741487, 87741487, 'TCCATTGTTG']]
-                # --> first element describes A, second elemnt describes A* and the insertion location
-                divergent_repeat = sv.changed_fragments[1][-1]
-                info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target,
-                              'DIV_REPEAT': divergent_repeat}
+                info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
             else:
                 # TODO: specify start and end based on logic of other complex event types
                 rec_start, rec_end = sv.start, sv.end
