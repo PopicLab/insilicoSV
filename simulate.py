@@ -152,6 +152,7 @@ class SV_Simulator():
         self.svs = []
         # Going to populate event_ranges while we traverse the vcf (in process_vcf, called by initialize_svs)
         self.event_ranges = defaultdict(list)
+        print('CALLING INITIALIZE_SVS')
         self.initialize_svs(random_gen=random_gen)
 
         print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
@@ -194,9 +195,6 @@ class SV_Simulator():
         time_start_local = 0
 
         vcf = VariantFile(vcf_path)
-        # printing a single example of each new SV type that we come across
-        # seen_svtypes = set()
-        # for every record in vcf, add SV object to list
         for rec in vcf.fetch():
             type = Variant_Type(rec.info['SVTYPE'])
             sv_length = None
@@ -213,11 +211,14 @@ class SV_Simulator():
 
             # add the SV interval to the event_ranges dict keyed on chromosome
             self.event_ranges[rec.chrom].append((rec.start, rec.stop))
+            print(f'self.event_ranges = {self.event_ranges}')
 
             # For SVs in fixed mode, length_ranges will just be the single length value
             sv = Structural_Variant(sv_type=type, mode='fixed')
             sv.start = rec.start
             # need to account for the 0/1-indexing that differs between the pysam start and stop fields
+            # ** This will introduce an off-by-one error with input VCFs that were created by insilico (i.e. for
+            # div_dDUPs -- important?)
             sv.end = rec.stop - 1
             sv.start_chr = rec.chrom
             sv.active = True
@@ -225,6 +226,12 @@ class SV_Simulator():
             active_svs_total += 1
             self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(self.event_ranges[rec.chrom],
                                                                                         sv.start_chr, sv))
+
+            print(f'sv.events_dict = {sv.events_dict}')
+            print(f'sv.source_unique_char = {sv.source_unique_char}')
+            print(f'sv.target_unique_char = {sv.target_unique_char}')
+            print(f'sv = {sv}')
+
             time_dif = time.time() - time_start_local
             # can't display this as a proportion of the total number of SVs because this is when
             # we're creating the total list of SVs
@@ -235,50 +242,47 @@ class SV_Simulator():
             frag = None
             if rec.info['SVTYPE'] == 'INS':
                 sv_symbol = sv.target_unique_char[0]
+                print(f'INS sv = {sv}')
+            # TODO: Don't model dDUPs as insertions?
+            elif rec.info['SVTYPE'] == 'dDUP':
+                sv_symbol = sv.source_unique_char[0]
+                # dDUP case: copy and paste the reference interval inside (rec.start, rec.end)
+                # --> going to try as an insertion of the (start, end) interval at location TARGET
+                frag = self.ref_fasta.fetch(rec.chrom, rec.start, rec.stop)
+                # what if we just model this as an insertion...
+                sv.type = Variant_Type.INS
+                sv.source_unique_char = ()
+                sv.target_unique_char = ('A',)
+            elif rec.info['SVTYPE'] == 'div_dDUP':
+                sv_symbol = sv.source_unique_char[0]
+                # div_dDUP case: insert the sequence specified in rec.info['DIV_REPEAT'] at locus rec.info['TARGET']
+                frag = rec.info['DIV_REPEAT']
+                sv.type = Variant_Type.INS
+                sv.source_unique_char = ()
+                sv.target_unique_char = ('A',)
             else:
                 sv_symbol = sv.source_unique_char[0]
                 # source frag assignment in the non-ins case
                 frag = self.ref_fasta.fetch(rec.chrom, sv.start, sv.end)
 
             sv_event = Event(sv_parent=sv, length=sv_length, length_range=None, symbol=sv_symbol)
-            sv_event.start = rec.start
-            sv_event.end = rec.stop
+            # For dDUPs, we fake the INS nature of the event by getting the sv event start and end from TARGET
+            if rec.info['SVTYPE'] in ['dDUP', 'div_dDUP']:
+                sv_event.start = rec.info['TARGET']
+                sv_event.end = rec.info['TARGET'] + 1
+            else:
+                sv_event.start = rec.start
+                sv_event.end = rec.stop
             sv_event.source_frag = frag
 
             if sv_event.source_frag is None and sv_event.length > 0:
                 # source grad assignment in the ins case
+                # *** We'll include div_dDUPs in this case and take the DIV_REPEAT sequence as the insertion sequence
                 sv_event.source_frag = insertion_sequence
             sv.events_dict[sv_symbol] = sv_event
+            print(f'sv.events_dict = {sv.events_dict}')
 
-            # extract genotype from VCF record: if none is given, draw randomly, otherwise take from one of the samples
-            # gts_list = [rec.samples[i]['GT'] for i in range(len(rec.samples))]
-            # gts = set(gts_list)
-            # if (len(gts) == 1) and ((None, None) in gts):
-                ## if all of the samples in the vcf record gave (None,None), generate randomly
-                # draw = random_gen.randint(1, 3)
-                # if draw == 3:  # sv applies to both haplotypes
-                #     sv.ishomozygous = Zygosity.HOMOZYGOUS
-                #     sv.hap = [True, True]
-                # elif draw == 2:
-                #     sv.ishomozygous = Zygosity.HETEROZYGOUS
-                #     sv.hap = [False, True]
-                # elif draw == 1:
-                #     sv.ishomozygous = Zygosity.HETEROZYGOUS
-                #     sv.hap = [True, False]
-            # else:
-                ## if (None, None) isn't the only genotype, draw until you get a non-None one
-                ## Get genotype in the form (1,0) -> construct hap and ishomozygous from that
-                # gt = (None, None)
-                # while gt == (None, None):
-                    ## -> take genotypes in order or drawing randomly
-                    # gt = gts.pop()
-                    ## gt = random.choice(gts_list)
-                # if sum(gt) == 2:
-                #     sv.ishomozygous = Zygosity.HOMOZYGOUS
-                #     sv.hap = [True, True]
-                # else:
-                #     sv.ishomozygous = Zygosity.HETEROZYGOUS
-                #     sv.hap = random.choice([[True, False], [False, True]])
+
             # ----------- just going to choose a random genotype for now ---------
             if random_gen.randint(0, 1):
                 sv.ishomozygous = Zygosity.HOMOZYGOUS
@@ -288,6 +292,8 @@ class SV_Simulator():
                 sv.ishomozygous = Zygosity.HETEROZYGOUS
                 sv.hap = random.choice([[True, False], [False, True]])
             self.svs.append(sv)
+
+        # print(f'sv = {sv}')
 
         # print("\n")
         # print('EVENT RANGES:')
@@ -320,6 +326,7 @@ class SV_Simulator():
                 random.shuffle(self.svs)
         else:
             # branch for mode == "fixed"
+            print('CALLING PROCESS_VCF')
             self.process_vcf(self.vcf_path)
 
     def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta, bedfile, stats_file=None, initial_reset=True,

@@ -84,5 +84,5 @@ def divergence(seq):
     # function to create slightly mutated version of an input sequence (to be used to create
     # the quasi-repeated section of a divergent repeat/divergent dDUP)
     # --> p given as the probability of changing the base, chosen from U(0.5,1.0)
-    p = 1.0 #random.uniform(0.5,1.0)
+    p = random.uniform(0.5,1.0)
     return ''.join([b if random.random() > p else random.choice(list({"A", "C", "T", "G"} - {b})) for b in seq.upper()])

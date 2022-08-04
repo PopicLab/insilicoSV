@@ -209,24 +209,36 @@ class FormatterIO():
         vcf_file.header.info.add('SVLEN', number=1, type='Integer', description="Length of structural variant")
         vcf_file.header.info.add('SVMETHOD', number=1, type='String', description="SV detection method")
         # adding info fields for div_dDUP and dDUP events -- TARGET locus
+        # for div_dDUP also need to record the divergent repeat segment (when we're creating the donor genome
+        # from this VCF, if this event isn't on one of the strands then we'll need to insert the divergent repeat
+        # so it matches the reference that has that edit put in)
         vcf_file.header.info.add('TARGET', number=1, type='Integer', description="Target location for divergent repeat")
+        vcf_file.header.info.add('DIV_REPEAT', number=1, type='String', description="Divergent repeat segment places at target locus")
         vcf_file.header.formats.add('GT', number=1, type='String', description="Genotype")
         vcf_file.header.add_sample('SAMPLE')
 
         vcf_out_file = pysam.VariantFile(vcffile, 'w', header=vcf_file.header)
 
         for sv in svs:
-            if sv.type.value == "div_dDUP":
+            if sv.type.value in ["div_dDUP", "dDUP"]:
+                print(f'sv.events_dict = {sv.events_dict}')
+                print(f'sv.changed_fragments = {sv.changed_fragments}')
                 rec_start = sv.events_dict['A'].start
                 rec_end = sv.events_dict['A'].end
                 dispersion_target = sv.events_dict['_1'].end
-                info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
+                if sv.type.value == 'div_dDUP':
+                    divergent_repeat = sv.changed_fragments[1][-1]
+                    print(f'divergent_repeat = {divergent_repeat}')
+                    info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target,
+                                  'DIV_REPEAT': divergent_repeat}
+                else: # dDUP case
+                    info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
             else:
                 # TODO: specify start and end based on logic of other complex event types
                 rec_start, rec_end = sv.start, sv.end
                 info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
 
-            print(f'sv.ishomozygous = {sv.ishomozygous}')
+            # print(f'sv.ishomozygous = {sv.ishomozygous}')
             zyg = (1,1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0,1)
             vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=rec_start, stop=rec_end,
                                                         alleles=['N', sv.type.value], id=sv.type.value,
