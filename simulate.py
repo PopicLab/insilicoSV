@@ -152,7 +152,7 @@ class SV_Simulator():
         self.svs = []
         # Going to populate event_ranges while we traverse the vcf (in process_vcf, called by initialize_svs)
         self.event_ranges = defaultdict(list)
-        print('CALLING INITIALIZE_SVS')
+        # print('CALLING INITIALIZE_SVS')
         self.initialize_svs(random_gen=random_gen)
 
         print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
@@ -211,7 +211,7 @@ class SV_Simulator():
 
             # add the SV interval to the event_ranges dict keyed on chromosome
             self.event_ranges[rec.chrom].append((rec.start, rec.stop))
-            print(f'self.event_ranges = {self.event_ranges}')
+            # print(f'self.event_ranges = {self.event_ranges}')
 
             # For SVs in fixed mode, length_ranges will just be the single length value
             sv = Structural_Variant(sv_type=type, mode='fixed')
@@ -227,10 +227,10 @@ class SV_Simulator():
             self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(self.event_ranges[rec.chrom],
                                                                                         sv.start_chr, sv))
 
-            print(f'sv.events_dict = {sv.events_dict}')
-            print(f'sv.source_unique_char = {sv.source_unique_char}')
-            print(f'sv.target_unique_char = {sv.target_unique_char}')
-            print(f'sv = {sv}')
+            # print(f'sv.events_dict = {sv.events_dict}')
+            # print(f'sv.source_unique_char = {sv.source_unique_char}')
+            # print(f'sv.target_unique_char = {sv.target_unique_char}')
+            # print(f'sv = {sv}')
 
             time_dif = time.time() - time_start_local
             # can't display this as a proportion of the total number of SVs because this is when
@@ -242,7 +242,7 @@ class SV_Simulator():
             frag = None
             if rec.info['SVTYPE'] == 'INS':
                 sv_symbol = sv.target_unique_char[0]
-                print(f'INS sv = {sv}')
+                # print(f'INS sv = {sv}')
             # TODO: Don't model dDUPs as insertions?
             elif rec.info['SVTYPE'] == 'dDUP':
                 sv_symbol = sv.source_unique_char[0]
@@ -257,9 +257,12 @@ class SV_Simulator():
                 sv_symbol = sv.source_unique_char[0]
                 # div_dDUP case: insert the sequence specified in rec.info['DIV_REPEAT'] at locus rec.info['TARGET']
                 frag = rec.info['DIV_REPEAT']
+                print(f'frag = {frag}')
                 sv.type = Variant_Type.INS
                 sv.source_unique_char = ()
                 sv.target_unique_char = ('A',)
+                sv.source = ()
+                sv.target = ('A',)
             else:
                 sv_symbol = sv.source_unique_char[0]
                 # source frag assignment in the non-ins case
@@ -270,10 +273,13 @@ class SV_Simulator():
             if rec.info['SVTYPE'] in ['dDUP', 'div_dDUP']:
                 sv_event.start = rec.info['TARGET']
                 sv_event.end = rec.info['TARGET'] + 1
+                sv.start = rec.info['TARGET']
+                sv.end = rec.info['TARGET']
             else:
                 sv_event.start = rec.start
                 sv_event.end = rec.stop
             sv_event.source_frag = frag
+            print(f'sv.start, st.end = {sv.start, sv.end}')
 
             if sv_event.source_frag is None and sv_event.length > 0:
                 # source grad assignment in the ins case
@@ -281,7 +287,6 @@ class SV_Simulator():
                 sv_event.source_frag = insertion_sequence
             sv.events_dict[sv_symbol] = sv_event
             print(f'sv.events_dict = {sv.events_dict}')
-
 
             # ----------- just going to choose a random genotype for now ---------
             if random_gen.randint(0, 1):
@@ -312,7 +317,9 @@ class SV_Simulator():
                                             length_ranges=sv_config["length_ranges"], source=sv_config["source"],
                                             target=sv_config["target"])
 
-                    if random_gen.randint(0, 1):
+                    # Because of the two-staged procedure to generate reads with div_dDUPs, need
+                    # to always treat div_dDUPs as homozygous (we need both haplotypes to reflect the event)
+                    if random_gen.randint(0, 1) or sv.type == Variant_Type.div_dDUP:
                         sv.ishomozygous = Zygosity.HOMOZYGOUS
                         sv.hap = [True, True]
                     else:
@@ -326,7 +333,7 @@ class SV_Simulator():
                 random.shuffle(self.svs)
         else:
             # branch for mode == "fixed"
-            print('CALLING PROCESS_VCF')
+            # print('CALLING PROCESS_VCF')
             self.process_vcf(self.vcf_path)
 
     def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta, bedfile, stats_file=None, initial_reset=True,
