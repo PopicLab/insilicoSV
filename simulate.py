@@ -245,6 +245,7 @@ class SV_Simulator():
                 # print(f'INS sv = {sv}')
             # TODO: Don't model dDUPs as insertions?
             elif rec.info['SVTYPE'] == 'dDUP':
+                # TODO: correct dDUPs (add whatever actions from the div_dDUP procedure are also applicable)
                 sv_symbol = sv.source_unique_char[0]
                 # dDUP case: copy and paste the reference interval inside (rec.start, rec.end)
                 # --> going to try as an insertion of the (start, end) interval at location TARGET
@@ -255,9 +256,16 @@ class SV_Simulator():
                 sv.target_unique_char = ('A',)
             elif rec.info['SVTYPE'] == 'div_dDUP':
                 sv_symbol = sv.source_unique_char[0]
-                # div_dDUP case: insert the sequence specified in rec.info['DIV_REPEAT'] at locus rec.info['TARGET']
-                frag = rec.info['DIV_REPEAT']
-                print(f'frag = {frag}')
+                # div_dDUP case: for an active strand, want to insert interval A at TARGET,
+                # for an inactive strand want to insert the sequence specified in rec.info['DIV_REPEAT'] at
+                # locus rec.info['TARGET'] (that is, match the edit we put in the reference)
+                # ----> Want to set frag_a to be the insertion sequence for an inactive strand,
+                # ----> want to set frag_A to be the insertion sequence for the active strand (remember: opposite of
+                # the edit we put in the reference)
+                # frag_a = rec.info['DIV_REPEAT']
+                # frag_A = self.ref_fasta.fetch(rec.chrom, rec.start, rec.stop)
+                frag = self.ref_fasta.fetch(rec.chrom, rec.start, rec.stop)
+                # print(f'frag = {frag}')
                 sv.type = Variant_Type.INS
                 sv.source_unique_char = ()
                 sv.target_unique_char = ('A',)
@@ -289,7 +297,10 @@ class SV_Simulator():
             print(f'sv.events_dict = {sv.events_dict}')
 
             # ----------- just going to choose a random genotype for now ---------
-            if random_gen.randint(0, 1):
+            # TODO: NOTE -- because heterozygous div_dDUPs act as two different insertions ('a' and 'A' for the two
+            #  strands) we'll just model homozygous ones for now
+            #  ---> for heterozygous case need to extend zygosity to create a second event with opposite insertion sequence
+            if random_gen.randint(0, 1) or rec.info['SVTYPE'] == 'div_dDUP':
                 sv.ishomozygous = Zygosity.HOMOZYGOUS
                 sv.hap = [True, True]
             else:
