@@ -118,7 +118,7 @@ class TestKnownSVs(unittest.TestCase):
     #     self.helper_test_simple_sv('DUP, DUP, INS', self.test_object_dup_dup_ins, 'GCACTATCTCTCCGT',
     #                                'GCACACGGGGGGGTATCTCTCCTCCGT')
     def test_div_dDUP(self):
-        self.helper_test_simple_sv('div_dDUP', self.test_object_div_dDUP, 'GCACTATCTCTCCGT', 'GCACTATCTGGGCTCCGT')
+        self.helper_test_simple_sv('div_dDUP', self.test_object_div_dDUP, 'GCACTATCTCTCCGT', 'GCACTATCTJJJJJCTCCGT')
 
 if __name__ == '__main__':
     unittest.main()
