@@ -310,3 +310,4 @@ def collect_args():
             args_dict[key] = os.path.join(args.root_dir, curr_path)
     return args_dict
 
+
