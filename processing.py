@@ -238,7 +238,6 @@ class FormatterIO():
                 rec_start, rec_end = sv.start, sv.end
                 info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
 
-            # print(f'sv.ishomozygous = {sv.ishomozygous}')
             zyg = (1,1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0,1)
             vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=rec_start, stop=rec_end,
                                                         alleles=['N', sv.type.value], id=sv.type.value,
