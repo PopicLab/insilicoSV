@@ -216,7 +216,7 @@ class FormatterIO():
         vcf_file.header.info.add('TARGET', number=1, type='Integer', description="Target location for divergent repeat")
         vcf_file.header.info.add('DIV_REPEAT', number=1, type='String', description="Divergent repeat segment places at target locus")
         vcf_file.header.formats.add('GT', number=1, type='String', description="Genotype")
-        vcf_file.header.add_sample('SAMPLE')
+        # vcf_file.header.add_sample('SAMPLE')
 
         vcf_out_file = pysam.VariantFile(vcffile, 'w', header=vcf_file.header)
 
