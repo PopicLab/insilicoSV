@@ -195,7 +195,7 @@ class FormatterIO():
             vcf.write("##fileformat=VCFv4.2\n")
             for chrm, chrm_len in stats.chr_lengths.items():
                 vcf.write("##contig=<ID=%s,length=%d>\n" % (chrm, chrm_len))
-            vcf.write("#%s\n" % "\t".join(["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]))
+            vcf.write("#%s\n" % "\t".join(["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", "SAMPLE"]))
         # *** This will throw an error with pysam version 0.18, need 0.16.0.1
         vcf_file = pysam.VariantFile(vcffile)
         # SV fields
