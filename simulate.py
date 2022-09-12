@@ -294,7 +294,7 @@ class SV_Simulator():
                 # *** We'll include div_dDUPs in this case and take the DIV_REPEAT sequence as the insertion sequence
                 sv_event.source_frag = insertion_sequence
             sv.events_dict[sv_symbol] = sv_event
-            print(f'sv.events_dict = {sv.events_dict}')
+            # print(f'sv.events_dict = {sv.events_dict}')
 
             # ----------- just going to choose a random genotype for now ---------
             # TODO: NOTE -- because heterozygous div_dDUPs act as two different insertions ('a' and 'A' for the two

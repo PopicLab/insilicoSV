@@ -48,7 +48,7 @@ class Symbols(Enum):
     DIS = "_"  # dispersion event
     DUP_MARKING = "'"  # attached to symbols that are not the original one from source sequence
     # TODO: DIV should probably be renamed to DIV_MARKING to make it clear that it's a modification rather than an event
-    DIV = "*" # divergent interval, attached to symbols that vary from the original by low-probability base error
+    DIV = "*"  # divergent interval, attached to symbols that vary from the original by low-probability base error
 
 
 # for Structural Variant class
@@ -64,6 +64,7 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
           Variant_Type.delINV: [("A", "B"), ("b",)],
           Variant_Type.INVdel: [("A", "B"), ("a",)],
           Variant_Type.dDUP_iDEL: [("A", "_", "B"), ("A", "_", "A'")],
+          # TODO: The first occurrence of A doesn't seem to get deleted here, we get the same out as dDUP_iDEL
           Variant_Type.INS_iDEL: [("A", "_", "B"), ("_", "A")],
           Variant_Type.dupINV: [("A", "B"), ("A", "b", "a'")],
           Variant_Type.INVdup: [("A", "B"), ("b'", "a", "B")],
