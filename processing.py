@@ -190,7 +190,7 @@ class FormatterIO():
                     write_to_file(sv, event.source_chr, event.start, event.end, event.source_chr, event.start, event.start, Operations.DEL.value, event.symbol, event, order)
             self.bedpe_counter += 1
 
-    def export_to_vcf(self, svs, stats, vcffile=None):
+    def export_to_vcf(self, svs, stats, vcffile, two_part_labels=True):
         with open(vcffile, "w") as vcf:
             vcf.write("##fileformat=VCFv4.2\n")
             for chrm, chrm_len in stats.chr_lengths.items():
@@ -222,8 +222,8 @@ class FormatterIO():
 
         for sv in svs:
             if sv.type.value in ["div_dDUP", "dDUP"]:
-                print(f'sv.events_dict = {sv.events_dict}')
-                print(f'sv.changed_fragments = {sv.changed_fragments}')
+                # print(f'sv.events_dict = {sv.events_dict}')
+                # print(f'sv.changed_fragments = {sv.changed_fragments}')
                 rec_start = sv.events_dict['A'].start
                 rec_end = sv.events_dict['A'].end
                 dispersion_target = sv.events_dict['_1'].end
@@ -232,8 +232,20 @@ class FormatterIO():
                     print(f'divergent_repeat = {divergent_repeat}')
                     info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target,
                                   'DIV_REPEAT': divergent_repeat}
-                else: # dDUP case
-                    info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
+                else:  # dDUP case
+                    # two_part_labels: flag indicating whether or not to use _A/_B labeling convention for dispersion-
+                    # based event
+                    # TODO: extend case to include TRA events
+                    if not two_part_labels:
+                        info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
+                    else:
+                        # using rec_start/end and dispersion target to create the _A/_B entries
+                        vcf_out_file.write(f'{sv.start_chr}\t{rec_start}\t{sv.type.value}\tN\t{sv.type.value}\t.\tPASS\t'
+                                      f'END={rec_end};SVTYPE={sv.type.value};SVLEN={rec_end - rec_start}\tGT\t{zyg}\n')
+                        vcf_out_file.write(
+                            f'{sv.start_chr}\t{rec_end}\t{sv.type.value}\tN\t{sv.type.value}\t.\tPASS\t'
+                            f'END={dispersion_target};SVTYPE={sv.type.value};SVLEN={dispersion_target - rec_end}\tGT\t{zyg}\n')
+                        continue
             else:
                 # TODO: specify start and end based on logic of other complex event types
                 rec_start, rec_end = sv.start, sv.end
