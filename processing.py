@@ -221,6 +221,7 @@ class FormatterIO():
         vcf_out_file = pysam.VariantFile(vcffile, 'w', header=vcf_file.header)
 
         for sv in svs:
+            zyg = (1, 1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0, 1)
             if sv.type.value in ["div_dDUP", "dDUP"]:
                 # print(f'sv.events_dict = {sv.events_dict}')
                 # print(f'sv.changed_fragments = {sv.changed_fragments}')
@@ -251,7 +252,6 @@ class FormatterIO():
                 rec_start, rec_end = sv.start, sv.end
                 info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
 
-            zyg = (1, 1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0, 1)
             vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=rec_start, stop=rec_end,
                                                         alleles=['N', sv.type.value], id=sv.type.value,
                                                         info=info_field,
