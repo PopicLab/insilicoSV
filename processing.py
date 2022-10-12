@@ -241,11 +241,16 @@ class FormatterIO():
                         info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
                     else:
                         # using rec_start/end and dispersion target to create the _A/_B entries
-                        vcf_out_file.write(f'{sv.start_chr}\t{rec_start}\t{sv.type.value}\tN\t{sv.type.value}\t.\tPASS\t'
-                                      f'END={rec_end};SVTYPE={sv.type.value};SVLEN={rec_end - rec_start}\tGT\t{zyg}\n')
-                        vcf_out_file.write(
-                            f'{sv.start_chr}\t{rec_end}\t{sv.type.value}\tN\t{sv.type.value}\t.\tPASS\t'
-                            f'END={dispersion_target};SVTYPE={sv.type.value};SVLEN={dispersion_target - rec_end}\tGT\t{zyg}\n')
+                        # vcf_out_file.write(f'{sv.start_chr}\t{rec_start}\t{sv.type.value}\tN\t{sv.type.value}\t.\tPASS\t'
+                        #               f'END={rec_end};SVTYPE={sv.type.value};SVLEN={rec_end - rec_start}\tGT\t{zyg}\n')
+                        # vcf_out_file.write(
+                        #     f'{sv.start_chr}\t{rec_end}\t{sv.type.value}\tN\t{sv.type.value}\t.\tPASS\t'
+                        #     f'END={dispersion_target};SVTYPE={sv.type.value};SVLEN={dispersion_target - rec_end}\tGT\t{zyg}\n')
+                        vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=rec_start, stop=rec_end,
+                                                                    alleles=['N', sv.type.value], id=sv.type.value,
+                                                                    info={'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start},
+                                                                    qual=100, filter='PASS',
+                                                                    samples=[{'GT': zyg}])
                         continue
             else:
                 # TODO: specify start and end based on logic of other complex event types
