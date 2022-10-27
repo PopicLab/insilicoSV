@@ -166,7 +166,8 @@ class Structural_Variant():
                             print(f'source/target for event of type {self.type}')
                             print(f'source = {self.source}')
                             print(f'target = {self.target}')
-                            # print(f'events_dict for event of type {self.type} = {self.events_dict}')
+                            evt_dict = [f'{k}:{v}' for k,v in self.events_dict.items() if k != "source_frag"]
+                            print(f'events_dict for event of type {self.type} = {evt_dict}')
                         self.events_dict[symbol].original_block_idx = idx
 
         self.source_symbol_blocks = find_blocks(self.source_unique_char)
