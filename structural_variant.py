@@ -169,7 +169,9 @@ class Structural_Variant():
                         self.events_dict[symbol].original_block_idx = idx
 
         self.source_symbol_blocks = find_blocks(self.source_unique_char)
+        print(f'source_symbol_blocks = {self.source_symbol_blocks}')
         self.target_symbol_blocks = find_blocks(self.target_unique_char)
+        print(f'target_symbol_blocks = {self.target_symbol_blocks}')
         track_original_symbol(self.source_symbol_blocks)
 
         return self.target_symbol_blocks
