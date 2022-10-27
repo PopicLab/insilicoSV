@@ -162,7 +162,10 @@ class Structural_Variant():
                     if len(symbol) == 1:  # means it's an original symbol
                         #debug
                         if symbol not in self.events_dict.keys():
-                            print(f'events_dict for event of type {self.type} = {self.events_dict}')
+                            print(f'source/target for event of type {self.type}')
+                            print(f'source = {self.source}')
+                            print(f'target = {self.target}')
+                            # print(f'events_dict for event of type {self.type} = {self.events_dict}')
                         self.events_dict[symbol].original_block_idx = idx
 
         self.source_symbol_blocks = find_blocks(self.source_unique_char)
