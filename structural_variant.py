@@ -160,6 +160,9 @@ class Structural_Variant():
             for idx, block in enumerate(symbol_blocks):
                 for symbol in block:
                     if len(symbol) == 1:  # means it's an original symbol
+                        #debug
+                        if symbol not in self.events_dict.keys():
+                            print(f'events_dict for event of type {self.type} = {self.events_dict}')
                         self.events_dict[symbol].original_block_idx = idx
 
         self.source_symbol_blocks = find_blocks(self.source_unique_char)
@@ -177,7 +180,6 @@ class Structural_Variant():
                         "complement": utils.complement,
                         "diverge": lambda string: utils.divergence(string)}
         encoding = self.events_dict  # maps symbol like A or B to base pairs on reference
-        print(f'events_dict for event of type {self.type} = {self.events_dict}')
 
         # find all blocks of symbols between dispersion events
         # we will apply edits based on a block's start and end pos
