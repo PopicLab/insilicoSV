@@ -279,10 +279,10 @@ class SV_Simulator():
             sv_event = Event(sv_parent=sv, length=sv_length, length_range=None, symbol=sv_symbol)
             # For dDUPs, we fake the INS nature of the event by getting the sv event start and end from TARGET
             if rec.info['SVTYPE'] in ['dDUP', 'div_dDUP']:
-                sv_event.start = rec.info['TARGET']
-                sv_event.end = rec.info['TARGET'] + 1
-                sv.start = rec.info['TARGET']
-                sv.end = rec.info['TARGET']
+                sv_event.start = int(rec.info['TARGET'])
+                sv_event.end = int(rec.info['TARGET']) + 1
+                sv.start = int(rec.info['TARGET'])
+                sv.end = int(rec.info['TARGET'])
             else:
                 sv_event.start = rec.start
                 sv_event.end = rec.stop
