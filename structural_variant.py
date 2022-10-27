@@ -177,6 +177,7 @@ class Structural_Variant():
                         "complement": utils.complement,
                         "diverge": lambda string: utils.divergence(string)}
         encoding = self.events_dict  # maps symbol like A or B to base pairs on reference
+        print(f'events_dict for event of type {self.type} = {self.events_dict}')
 
         # find all blocks of symbols between dispersion events
         # we will apply edits based on a block's start and end pos

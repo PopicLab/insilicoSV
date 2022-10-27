@@ -287,7 +287,7 @@ class SV_Simulator():
                 sv_event.start = rec.start
                 sv_event.end = rec.stop
             sv_event.source_frag = frag
-            print(f'sv.start, st.end = {sv.start, sv.end}')
+            # print(f'sv.start, st.end = {sv.start, sv.end}')
 
             if sv_event.source_frag is None and sv_event.length > 0:
                 # source grad assignment in the ins case
