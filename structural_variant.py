@@ -174,13 +174,13 @@ class Structural_Variant():
         #  --> key errors on 'B' in event dict; it isn't there because of non-reciprocal definition, but is
         #  expected to be there because of the reciprocal definition --- find where these collide and set to non-reciprocal
         if self.type == Variant_Type.TRA:
-            self.source_symbol_blocks = ('A', '_')
+            self.source_symbol_blocks = ('A',)
         else:
             self.source_symbol_blocks = find_blocks(self.source_unique_char)
         # print(f'source_symbol_blocks = {self.source_symbol_blocks}')
         # print(f'source_unique_char = {self.source_unique_char}')
         if self.type == Variant_Type.TRA:
-            self.target_symbol_blocks = ('_', 'A')
+            self.target_symbol_blocks = ('A',)
         else:
             self.target_symbol_blocks = find_blocks(self.target_unique_char)
         # print(f'target_symbol_blocks = {self.target_symbol_blocks}')
