@@ -113,7 +113,6 @@ class Structural_Variant():
         # symbols_dict[Symbols.PLACEHOLDER] = (0, (0,0))
 
         # if we're operating on a TRA, flip a coin to set the A or B interval to be of size 0
-        # REGENERATING OLD TRAINING GENOME, WHICH USED THE OLD DEFINITION OF TRANSLOCATION (THAT THIS NEGATED)
         if self.type == Variant_Type.TRA:
             if random.randint(0, 1):
                 symbols_dict['A'] = (0, (0, 0))
@@ -166,25 +165,13 @@ class Structural_Variant():
                             print(f'source/target for event of type {self.type}')
                             print(f'source = {self.source}')
                             print(f'target = {self.target}')
-                            # print(f'events_dict for event of type {self.type} = {self.events_dict}')
+                            print(f'events_dict for event of type {self.type} = {self.events_dict}')
                         self.events_dict[symbol].original_block_idx = idx
 
-        # **** VERY HACKY TEMPORARY SOLUTION ****
-        # TODO: Resolve issues of reciprocal versus non-reciprocal translocation in TRA in fixed mode
-        #  --> key errors on 'B' in event dict; it isn't there because of non-reciprocal definition, but is
-        #  expected to be there because of the reciprocal definition --- find where these collide and set to non-reciprocal
-        if self.type == Variant_Type.TRA:
-            self.source_symbol_blocks = ('A', '_1')
-        else:
-            self.source_symbol_blocks = find_blocks(self.source_unique_char)
+        self.source_symbol_blocks = find_blocks(self.source_unique_char)
         # print(f'source_symbol_blocks = {self.source_symbol_blocks}')
-        # print(f'source_unique_char = {self.source_unique_char}')
-        if self.type == Variant_Type.TRA:
-            self.target_symbol_blocks = ('_1', 'A')
-        else:
-            self.target_symbol_blocks = find_blocks(self.target_unique_char)
+        self.target_symbol_blocks = find_blocks(self.target_unique_char)
         # print(f'target_symbol_blocks = {self.target_symbol_blocks}')
-        # print(f'target_unique_char = {self.target_unique_char}')
         track_original_symbol(self.source_symbol_blocks)
 
         return self.target_symbol_blocks
