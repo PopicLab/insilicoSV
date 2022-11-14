@@ -152,6 +152,14 @@ class SV_Simulator():
         self.svs = []
         # Going to populate event_ranges while we traverse the vcf (in process_vcf, called by initialize_svs)
         self.event_ranges = defaultdict(list)
+
+        # if the config contains a path to a vcf of event intervals to avoid, place those intervals in event_ranges
+        for d in self.svs_config:
+            if "avoid_intervals" in d:
+                # extract {chrom: [(start, end)]} intervals from vcf
+                # add intervals from vcf to event range
+                self.extract_vcf_event_intervals(d["avoid_intervals"])
+
         # print('CALLING INITIALIZE_SVS')
         self.initialize_svs(random_gen=random_gen)
 
@@ -186,6 +194,15 @@ class SV_Simulator():
         assert rand_id != None
 
         return rand_id, chr_len, chr_event_ranges
+
+    def extract_vcf_event_intervals(self, vcf_path):
+        '''
+        When in randomized mode and given vcf of events already placed on a reference, extract those intervals
+        and add to the event_ranges dict of the simulator object
+        '''
+        vcf = VariantFile(vcf_path)
+        for rec in vcf.fetch():
+            self.event_ranges[rec.chrom].append((rec.start, rec.stop))
 
     def process_vcf(self, vcf_path, random_gen=random):
         '''
@@ -323,6 +340,8 @@ class SV_Simulator():
         '''
         if self.mode == "randomized":
             for sv_config in self.svs_config:
+                if "avoid_intervals" in sv_config:
+                    continue
                 for num in range(sv_config["number"]):
                     sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                             length_ranges=sv_config["length_ranges"], source=sv_config["source"],
@@ -419,10 +438,13 @@ class SV_Simulator():
         random_gen: only relevant for unittesting
         -> returns list of tuples, represents position ranges for non-dispersion events
         '''
+        # TODO: I believe this is redundant with self.event_ranges being instantiated to a defaultdict(list)
+        #  at the end of the simulator object constructor (in fact, this will wipe any intervals that are
+        #  placed there to tell the simulator to avoid any pre-specified intervals
         # maintain separate event ranges for different chromosomes
-        self.event_ranges = dict()
-        for id in self.order_ids:
-            self.event_ranges[id] = []
+        # self.event_ranges = dict()
+        # for id in self.order_ids:
+        #     self.event_ranges[id] = []
 
         active_svs_total = 0
         inactive_svs_total = 0

@@ -96,12 +96,12 @@ class TestSVSimulator(unittest.TestCase):
     def setUp(self):
 
         # runs before every test
-        ref_file = "unit_tests/inputs/test.fna"
-        par = "unit_tests/inputs/par.yaml"
+        ref_file = "test/inputs/test.fna"
+        par = "test/inputs/par.yaml"
 
-        hap1 = "unit_tests/inputs/test1.fna"
-        hap2 = "unit_tests/inputs/test2.fna"
-        bed = "unit_tests/inputs/out.bed"
+        hap1 = "test/inputs/test1.fna"
+        hap2 = "test/inputs/test2.fna"
+        bed = "test/inputs/out.bed"
 
         self.test_objects_no_dis = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
                                         [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "delINVdup", "number": 1, "max_length": 5, "min_length": 5}]}],
@@ -122,7 +122,11 @@ class TestSVSimulator(unittest.TestCase):
                                                 [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "dupINV", "number": 1, "max_length": 5, "min_length": 5},
                                                                 {"type": "INVdup", "number": 1, "min_length": 5, "max_length": 5}
                                                                 ]}],
-                                                hap1, hap2, bed)]
+                                                hap1, hap2, bed),
+                                    TestObject([ref_file, {"chr19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
+                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "delINVdup", "number": 1, "max_length": 5, "min_length": 5},
+                                                                                                        {"avoid_intervals": "test/inputs/example_avoid_interval.vcf"}]}],
+                                               hap1, hap2, bed)]
         self.test_objects_with_dis = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
                                         [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "TRA", "number": 2, "min_length": 5, "max_length": 5}]}],
                                         hap1, hap2, bed),
@@ -327,6 +331,32 @@ class TestSVSimulator(unittest.TestCase):
         random_gen = RandomSim(10)
         curr_sim.choose_rand_pos(curr_sim.svs, curr_sim.ref_fasta, random_gen)
         self.assertEqual(curr_sim.event_ranges, {"Chromosome19": [(0,15)]})
+
+
+    def test_avoid_intervals(self):
+        # test of calling choose_rand_pos and avoiding pre-specified intervals
+        config_no_dis = self.test_objects_no_dis[0]
+        config_no_dis.initialize_files()
+        curr_sim = SV_Simulator(config_no_dis.ref, config_no_dis.par)
+        curr_sim.sim_settings['max_tries'] = 2000
+        # define an interval in the simulation events dict that will be avoided in the pos choosing procedure
+        curr_sim.event_ranges["Chromosome19"] = [(15,83)]
+        # the sv to be added is 15 bases long -- must go in spots 0-15
+        curr_sim.choose_rand_pos(curr_sim.svs, curr_sim.ref_fasta)
+        self.assertEqual(curr_sim.event_ranges, {'Chromosome19': [(15, 83), (0, 15)]})
+
+    def test_load_avoid_intervals(self):
+        # test of avoiding pre-specified intervals by reading them in from a vcf
+        config_no_dis = self.test_objects_no_dis[-1]
+        config_no_dis.initialize_files()
+        curr_sim = SV_Simulator(config_no_dis.ref, config_no_dis.par)
+        # debug
+        # print(f'event_ranges = {curr_sim.event_ranges}')
+        # --> example config is a chr19 DEL from pos 15-83 (same as above test)
+        curr_sim.sim_settings['max_tries'] = 2000
+        curr_sim.choose_rand_pos(curr_sim.svs, curr_sim.ref_fasta)
+        self.assertEqual(curr_sim.event_ranges, {'chr19': [(15, 83), (0, 15)]})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,20 +12,21 @@ class Config():
     def __init__(self,**entries):
         self.__dict__.update(DEFAULT_CONFIG)
         self.__dict__.update({"SVs": entries["SVs"]})
-        #self.__dict__["SVs"].update(entries["SVs"])
         if "sim_settings" in entries:   # if the user changed any of the default settings for the sim, they get updated here
             self.__dict__["sim_settings"].update(entries["sim_settings"])
 
         if "vcf_path" not in self.__dict__["SVs"][0]:
             self.run_checks_randomized(entries)
             for config_sv in self.SVs:
+                if "avoid_intervals" in config_sv:
+                    continue
                 # handles cases where user enters length range for all components within SV or specifies different ranges
                 if isinstance(config_sv["min_length"], int):
                     config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
                 else:
                     config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
                 # make sure max_length >= min_length >= 0
-                assert all(max_len >= min_len and min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
+                assert all(max_len >= min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
 
                 # use Enum for variant type
                 config_sv["type"] = Variant_Type(config_sv["type"])
@@ -40,6 +41,10 @@ class Config():
         # entries: dict representing full config file parsed from yaml
         config_svs = self.SVs
         for config_sv in config_svs:
+            # "avoid_intervals" the optional argument for specifying a vcf whose event intervals
+            # will be avoided during random placement of simulated events
+            if "avoid_intervals" in config_sv:
+                continue
             # makes sure required attributes are written into parameter file
             if "min_length" not in config_sv:
                 raise Exception("Min length must be specified on all SVs!")
