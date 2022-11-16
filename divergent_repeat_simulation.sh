@@ -22,8 +22,8 @@ bwa index ${OUTPUT_PREFIX}1.hapA.fa
 bwa mem -t20 -p ${OUTPUT_PREFIX}1.hapA.fa ${OUTPUT_PREFIX}2.dwgsim.hap.12.bfast.fastq.gz | samtools view -Sb - > ${OUTPUT_PREFIX}.bwamem.bam
 samtools sort -@ 20 ${OUTPUT_PREFIX}.bwamem.bam -o ${OUTPUT_PREFIX}.bwamem.sorted.bam
 samtools index -@ 20 ${OUTPUT_PREFIX}.bwamem.bam
-# call position correcting script on R2 to make loci match with locations of repeats placed into R1
+# call position correcting script on R1 to make loci match with locations of repeats placed into genome
 # --> we assume this script and locus adjustment script (fix_fiv_dDUP_vcf.py) are in same directory
-python ${SCRIPT_PATH}/fix_div_dDUP_vcf.py --input_vcf ${OUTPUT_PREFIX}2.vcf --label_entire_event
+python ${SCRIPT_PATH}/fix_div_dDUP_vcf.py --input_vcf ${OUTPUT_PREFIX}1.vcf --label_entire_event
 # NB: flag --label_entire_event toggles whether the output vcf reports div. repeats in a single record, or
 # uses two records to report interval A and interval a separately (including the flag sets behavior to the former)
