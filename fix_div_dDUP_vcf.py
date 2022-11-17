@@ -27,7 +27,7 @@ def correct_positions(input_vcf, label_entire_event=False):
     for rec in vcf_recs.values():
         if not label_entire_event:
             out_vcf.write(rec)
-        else:
+        elif rec.id == 'div_dDUP':
             # simplified record just reporting start and end positions with respect to entire "A_A*" region
             rec.stop = rec.info['TARGET'] + rec.info['SVLEN']
             rec.info['TARGET'] = -1
