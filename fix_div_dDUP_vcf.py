@@ -25,14 +25,12 @@ def correct_positions(input_vcf, label_entire_event=False):
             total_ins_len += evt.info['SVLEN']
 
     for rec in vcf_recs.values():
-        if not label_entire_event:
-            out_vcf.write(rec)
-        elif rec.id == 'div_dDUP':
+        if label_entire_event and rec.id == 'div_dDUP':
             # simplified record just reporting start and end positions with respect to entire "A_A*" region
             rec.stop = rec.info['TARGET'] + rec.info['SVLEN']
             rec.info['TARGET'] = -1
             rec.info['SVLEN'] = rec.stop - rec.start
-            out_vcf.write(rec)
+        out_vcf.write(rec)
 
     out_vcf.close()
     in_vcf.close()
@@ -49,6 +47,8 @@ def incorporate_events(merge_vcf_path, div_vcf_path, output_vcf_path):
         for rec in vcf.fetch():
             out_vcf.write(rec)
     out_vcf.close()
+    div_vcf.close()
+    merge_vcf.close()
 
 
 if __name__ == "__main__":
