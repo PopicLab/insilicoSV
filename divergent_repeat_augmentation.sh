@@ -28,7 +28,7 @@ cat ${OUTPUT_PREFIX}2.dwgsim.hap.1.bfast.fastq.gz >> ${OUTPUT_PREFIX}2.dwgsim.ha
 bwa index ${OUTPUT_PREFIX}1.hapA.fa
 bwa mem -t20 -p ${OUTPUT_PREFIX}1.hapA.fa ${OUTPUT_PREFIX}2.dwgsim.hap.12.bfast.fastq.gz | samtools view -Sb - > ${OUTPUT_PREFIX}.bwamem.bam
 samtools sort -@ 20 ${OUTPUT_PREFIX}.bwamem.bam -o ${OUTPUT_PREFIX}.bwamem.sorted.bam
-samtools index -@ 20 ${OUTPUT_PREFIX}.sorted.bwamem.bam
+samtools index -@ 20 ${OUTPUT_PREFIX}.bwamem.sorted.bam
 # call position correcting script on R1 to make loci match with locations of repeats placed into genome
 # --> we assume this script and locus adjustment script (fix_fiv_dDUP_vcf.py) are in same directory
 python ${SCRIPT_PATH}/fix_div_dDUP_vcf.py --div_dDUP_vcf ${OUTPUT_PREFIX}1.vcf --merge_input_vcf ${EDITED_REF_VCF} --merge_output_vcf ${OUTPUT_PREFIX}1_MERGED.vcf --label_entire_event
