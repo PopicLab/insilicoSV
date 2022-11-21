@@ -33,7 +33,7 @@ samtools index -@ 20 ${OUTPUT_PREFIX}.bwamem.sorted.bam
 # call position correcting script on R1 to make loci match with locations of repeats placed into genome
 # --> we assume this script and locus adjustment script (fix_fiv_dDUP_vcf.py) are in same directory
 # --> ... and need to process the simple/dDUP vcf to give us dDUP_A/B records, and to get rid of simple types we don't want (e.g., INS)
-python ${SCRIPT_PATH}/complex_bed_to_vcf.py --bed_file ${OUTPUT_PREFIX}2_EDIT.bed --vcf_file ${OUTPUT_PREFIX}2_EDIT_SIMPLE_DOUBLELABEL.vcf --template_vcf ${OUTPUT_PREFIX}2_EDIT.vcf --include_simple DEL DUP INS
+python ${SCRIPT_PATH}/complex_bed_to_vcf.py --bed_file ${OUTPUT_PREFIX}2_EDIT.bed --vcf_file ${OUTPUT_PREFIX}2_EDIT_SIMPLE_DOUBLELABEL.vcf --template_vcf ${OUTPUT_PREFIX}2_EDIT.vcf --include_simple DEL DUP INV
 python ${SCRIPT_PATH}/fix_div_dDUP_vcf.py --div_dDUP_vcf ${OUTPUT_PREFIX}1.vcf --merge_input_vcf ${OUTPUT_PREFIX}2_EDIT_SIMPLE_DOUBLELABEL.vcf --merge_output_vcf ${OUTPUT_PREFIX}1_MERGED.vcf --label_entire_event
 ## NB: flag --label_entire_event toggles whether the output vcf reports div. repeats in a single record, or
 ## uses two records to report interval A and interval a separately (including the flag sets behavior to the former)
