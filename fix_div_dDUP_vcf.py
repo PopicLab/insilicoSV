@@ -46,6 +46,8 @@ def correct_positions_div(input_vcf, label_entire_event=False, avoid_intervals=F
                 rec_A.info['SVTYPE'] = 'div_dDUP_A'
                 rec_A.info['TARGET'] = -1
                 rec_A.info['DIV_REPEAT'] = 'NA'
+                # setting the above unsets rec.stop, so need to reset it to the original
+                rec_A.stop = rec.stop
                 rec_B.id = 'div_dDUP_B'
                 rec_B.alts = ('div_dDUP_B',)
                 rec_B.start = rec_B.info['TARGET']
