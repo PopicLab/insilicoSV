@@ -4,11 +4,12 @@ import numpy as np
 from bisect import bisect
 
 
-def correct_positions_div(input_vcf, label_entire_event=False):
+def correct_positions_div(input_vcf, label_entire_event=False, avoid_intervals=False):
     # reads input vcf, adjusts POS, END, TARGET values to account for previous events in the reference
     in_vcf = VariantFile(input_vcf)
     hd = in_vcf.header
-    out_vcf = VariantFile(input_vcf[:-4] + '_pos_corrected.vcf', 'w', header=hd)
+    file_suffix = '_avoid_intervals.vcf' if avoid_intervals else '_pos_corrected.vcf'
+    out_vcf = VariantFile(input_vcf[:-4] + file_suffix, 'w', header=hd)
     # store vcf records in dictionary keyed on start position
     vcf_recs = {}
     for rec in in_vcf.fetch():
@@ -27,12 +28,33 @@ def correct_positions_div(input_vcf, label_entire_event=False):
             total_ins_len += evt.info['SVLEN']
 
     for rec in vcf_recs.values():
-        if label_entire_event and rec.id == 'div_dDUP':
-            # simplified record just reporting start and end positions with respect to entire "A_A*" region
-            rec.stop = rec.info['TARGET'] + rec.info['SVLEN']
-            rec.info['TARGET'] = -1
-            rec.info['SVLEN'] = rec.stop - rec.start
-        out_vcf.write(rec)
+        # logic by which records are output dictated by the kind of output vcf we want
+        if not avoid_intervals:
+            if label_entire_event and rec.id == 'div_dDUP':
+                # simplified record just reporting start and end positions with respect to entire "A_A*" region
+                rec.stop = rec.info['TARGET'] + rec.info['SVLEN']
+                rec.info['TARGET'] = -1
+                rec.info['SVLEN'] = rec.stop - rec.start
+            out_vcf.write(rec)
+        else:
+            # output separate records for each A and A* ("B") to serve as avoid intervals for further simulation
+            if rec.id == 'div_dDUP':
+                rec_A = rec.copy()
+                rec_B = rec.copy()
+                rec_A.id = 'div_dDUP_A'
+                rec_A.alts = ('div_dDUP_A',)
+                rec_A.info['SVTYPE'] = 'div_dDUP_A'
+                rec_A.info['TARGET'] = -1
+                rec_A.info['DIV_REPEAT'] = 'NA'
+                rec_B.id = 'div_dDUP_B'
+                rec_B.alts = ('div_dDUP_B',)
+                rec_B.start = rec_B.info['TARGET']
+                rec_B.stop = rec_B.info['TARGET'] + rec.info['SVLEN']
+                rec_B.info['SVTYPE'] = 'div_dDUP_B'
+                rec_B.info['TARGET'] = -1
+                rec_B.info['DIV_REPEAT'] = 'NA'
+                out_vcf.write(rec_A)
+                out_vcf.write(rec_B)
 
     out_vcf.close()
     in_vcf.close()
@@ -112,15 +134,24 @@ def incorporate_events(merge_vcf_path, div_vcf_path, output_vcf_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Correct event positions in vcf recording div_dDUPs')
     parser.add_argument('--div_dDUP_vcf', help='Input vcf from R1 generation step')
-    parser.add_argument('--merge_input_vcf', help='Input vcf with previously simulated events to merge into div. vcf')
-    parser.add_argument('--merge_output_vcf', help='Output path for merged div. dDUP / other type vcf')
+    parser.add_argument('--merge_input_vcf', default=None, help='Input vcf with previously simulated events to merge into div. vcf')
+    parser.add_argument('--merge_output_vcf', default=None, help='Output path for merged div. dDUP / other type vcf')
     parser.add_argument('--label_entire_event', action='store_true', help='Boolean flag for whether or not'
                                                                           'output vcf should report one record '
                                                                           'per div. repeat with start/end giving '
                                                                           'the overall span of the entire event ('
                                                                           'rather than interval A or a '
                                                                           'specifically)')
+    parser.add_argument('--avoid_intervals', action='store_true', help='Boolean flag to trigger the preparation of a'
+                                                                       'vcf giving div_dDUP interval A and A* in'
+                                                                       'separate records (for use as avoid_intervals'
+                                                                       'vcf when simulating additional events after)')
     args = parser.parse_args()
+    assert not (args.label_entire_event and args.avoid_intervals), 'Cannot provide label_entire_event and avoid_intervals' \
+                                                                   'flags both as True'
 
-    incorporate_events(args.merge_input_vcf, args.div_dDUP_vcf, args.merge_output_vcf)
-    correct_positions_div(args.merge_output_vcf, args.label_entire_event)
+    if args.merge_input_vcf is not None and args.merge_output_vcf is not None:
+        incorporate_events(args.merge_input_vcf, args.div_dDUP_vcf, args.merge_output_vcf)
+        correct_positions_div(args.merge_output_vcf, args.label_entire_event, args.avoid_intervals)
+    else:
+        correct_positions_div(args.div_dDUP_vcf, args.label_entire_event, args.avoid_intervals)
