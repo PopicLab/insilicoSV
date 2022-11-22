@@ -20,10 +20,12 @@ def correct_positions_div(input_vcf, label_entire_event=False, avoid_intervals=F
     total_ins_len = 0
     for pos in sorted(vcf_recs.keys()):
         evt = vcf_recs[pos]
-        # *** shifting the start position of a vcf record automatically shifts the stop position as well
-        evt.start += total_ins_len
-        # in case of mixed vcf (div_dDUPs and other types) only want to shift events by cumulative div_dDUP length
         if evt.id == 'div_dDUP':
+            # *** shifting the start position of a vcf record automatically shifts the stop position as well
+            # --> when simulating further events on top of a div. repeat simulation, the current logic is such
+            # --> that the second round of events will have their locations determined already accounting for the
+            # --> insertions into the R2 reference -- that is, we won't need to shift their event positions
+            evt.start += total_ins_len
             evt.info['TARGET'] += total_ins_len
             total_ins_len += evt.info['SVLEN']
 
