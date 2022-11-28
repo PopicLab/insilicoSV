@@ -6,6 +6,8 @@ FASTA_PATH=$2 #<- reference to be used as base for simulation
 OUTPUT_PREFIX=$3 #<- filename prefix for output files (should include path to output dir)
 
 python ${SCRIPT_PATH}/simulate.py ${FASTA_PATH} ${CONFIG} ${OUTPUT_PREFIX}
+# create correctly-formatted vcf for dDUPs+simple events (remove step if not simulating dDUPs or TRAs)
+python ${SCRIPT_PATH}/complex_bed_to_vcf.py --bed_file ${OUTPUT_PREFIX}.bed --vcf_file ${OUTPUT_PREFIX}_dDUPdoublelabel.vcf --template_vcf ${OUTPUT_PREFIX}.vcf --include_simple DEL DUP INV
 dwgsim -C 30 -1 151 -2 151 -y 0 -S 0 -c 0 -m /dev/null -H ${OUTPUT_PREFIX}.hapA.fa ${OUTPUT_PREFIX}.dwgsim.hap.0
 dwgsim -C 30 -1 151 -2 151 -y 0 -S 0 -c 0 -m /dev/null -H ${OUTPUT_PREFIX}.hapB.fa ${OUTPUT_PREFIX}.dwgsim.hap.1
 mv ${OUTPUT_PREFIX}.dwgsim.hap.0.bfast.fastq.gz ${OUTPUT_PREFIX}.dwgsim.hap.12.bfast.fastq.gz
