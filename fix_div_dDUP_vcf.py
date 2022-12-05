@@ -2,6 +2,7 @@ from pysam import VariantFile
 import argparse
 import numpy as np
 from bisect import bisect
+from collections import defaultdict
 
 
 def correct_positions_div(input_vcf, label_entire_event=False, avoid_intervals=False):
@@ -11,54 +12,57 @@ def correct_positions_div(input_vcf, label_entire_event=False, avoid_intervals=F
     file_suffix = '_avoid_intervals.vcf' if avoid_intervals else '_pos_corrected.vcf'
     out_vcf = VariantFile(input_vcf[:-4] + file_suffix, 'w', header=hd)
     # store vcf records in dictionary keyed on start position
-    vcf_recs = {}
+    vcf_recs = defaultdict(dict)
     for rec in in_vcf.fetch():
-        vcf_recs[rec.start] = rec
+        vcf_recs[rec.chrom][rec.start] = rec
 
     # aggregate length of insertions up to a given point in the reference
     # --> to be added to the positions in a given vcf record
-    total_ins_len = 0
-    for pos in sorted(vcf_recs.keys()):
-        evt = vcf_recs[pos]
-        if evt.id == 'div_dDUP':
-            # *** shifting the start position of a vcf record automatically shifts the stop position as well
-            # --> when simulating further events on top of a div. repeat simulation, the current logic is such
-            # --> that the second round of events will have their locations determined already accounting for the
-            # --> insertions into the R2 reference -- that is, we won't need to shift their event positions
-            evt.start += total_ins_len
-            evt.info['TARGET'] += total_ins_len
-            total_ins_len += evt.info['SVLEN']
+    # NB: need to separate by chrom -- only want to shift by cumulative amount inserted into chromosome where event of concern is
+    for chrom in vcf_recs.keys():
+        total_ins_len = 0
+        for pos in sorted(vcf_recs[chrom].keys()):
+            evt = vcf_recs[chrom][pos]
+            if evt.id == 'div_dDUP':
+                # *** shifting the start position of a vcf record automatically shifts the stop position as well
+                # --> when simulating further events on top of a div. repeat simulation, the current logic is such
+                # --> that the second round of events will have their locations determined already accounting for the
+                # --> insertions into the R2 reference -- that is, we won't need to shift their event positions
+                evt.start += total_ins_len
+                evt.info['TARGET'] += total_ins_len
+                total_ins_len += evt.info['SVLEN']
 
-    for rec in vcf_recs.values():
-        # logic by which records are output dictated by the kind of output vcf we want
-        if not avoid_intervals:
-            if label_entire_event and rec.id == 'div_dDUP':
-                # simplified record just reporting start and end positions with respect to entire "A_A*" region
-                rec.stop = rec.info['TARGET'] + rec.info['SVLEN']
-                rec.info['TARGET'] = -1
-                rec.info['SVLEN'] = rec.stop - rec.start
-            out_vcf.write(rec)
-        else:
-            # output separate records for each A and A* ("B") to serve as avoid intervals for further simulation
-            if rec.id == 'div_dDUP':
-                rec_A = rec.copy()
-                rec_B = rec.copy()
-                rec_A.id = 'div_dDUP_A'
-                rec_A.alts = ('div_dDUP_A',)
-                rec_A.info['SVTYPE'] = 'div_dDUP_A'
-                rec_A.info['TARGET'] = -1
-                rec_A.info['DIV_REPEAT'] = 'NA'
-                # setting the above unsets rec.stop, so need to reset it to the original
-                rec_A.stop = rec.stop
-                rec_B.id = 'div_dDUP_B'
-                rec_B.alts = ('div_dDUP_B',)
-                rec_B.start = rec_B.info['TARGET']
-                rec_B.stop = rec_B.info['TARGET'] + rec.info['SVLEN']
-                rec_B.info['SVTYPE'] = 'div_dDUP_B'
-                rec_B.info['TARGET'] = -1
-                rec_B.info['DIV_REPEAT'] = 'NA'
-                out_vcf.write(rec_A)
-                out_vcf.write(rec_B)
+    for chrom in vcf_recs.keys():
+        for rec in vcf_recs[chrom].values():
+            # logic by which records are output dictated by the kind of output vcf we want
+            if not avoid_intervals:
+                if label_entire_event and rec.id == 'div_dDUP':
+                    # simplified record just reporting start and end positions with respect to entire "A_A*" region
+                    rec.stop = rec.info['TARGET'] + rec.info['SVLEN']
+                    rec.info['TARGET'] = -1
+                    rec.info['SVLEN'] = rec.stop - rec.start
+                out_vcf.write(rec)
+            else:
+                # output separate records for each A and A* ("B") to serve as avoid intervals for further simulation
+                if rec.id == 'div_dDUP':
+                    rec_A = rec.copy()
+                    rec_B = rec.copy()
+                    rec_A.id = 'div_dDUP_A'
+                    rec_A.alts = ('div_dDUP_A',)
+                    rec_A.info['SVTYPE'] = 'div_dDUP_A'
+                    rec_A.info['TARGET'] = -1
+                    rec_A.info['DIV_REPEAT'] = 'NA'
+                    # setting the above unsets rec.stop, so need to reset it to the original
+                    rec_A.stop = rec.stop
+                    rec_B.id = 'div_dDUP_B'
+                    rec_B.alts = ('div_dDUP_B',)
+                    rec_B.start = rec_B.info['TARGET']
+                    rec_B.stop = rec_B.info['TARGET'] + rec.info['SVLEN']
+                    rec_B.info['SVTYPE'] = 'div_dDUP_B'
+                    rec_B.info['TARGET'] = -1
+                    rec_B.info['DIV_REPEAT'] = 'NA'
+                    out_vcf.write(rec_A)
+                    out_vcf.write(rec_B)
 
     out_vcf.close()
     in_vcf.close()
