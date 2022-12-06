@@ -4,10 +4,10 @@
 SCRIPT=$(realpath "$0")
 SCRIPT_PATH=$(dirname "$SCRIPT")
 SOURCE_REF=$1
-CONFIG_R1=$2  # <-- insilicoSV randomized mode
-CONFIG_R2=$3  #<-- insilicoSV fixed mode config file that points to R2.vcf (or whatever it's called)
-OUTPUT_PREFIX=$4  #<-- Typically just 'R'
-CONFIG_SIMPLE_EDIT=$5  #<-- (input divergent repeat intervals in SVs section input with - avoid_intervals: {vcf_path}
+CONFIG_R1=$2
+CONFIG_R2=$3
+OUTPUT_PREFIX=$4
+CONFIG_SIMPLE_EDIT=$5  #<-- (...and input divergent repeat intervals in SVs section input with - avoid_intervals: {vcf_path})
 
 # generate R1 and R2
 python ${SCRIPT_PATH}/simulate.py ${SOURCE_REF} ${CONFIG_R1} ${OUTPUT_PREFIX}1
@@ -19,8 +19,8 @@ python ${SCRIPT_PATH}/fix_div_dDUP_vcf.py --div_dDUP_vcf ${OUTPUT_PREFIX}1.vcf -
 python ${SCRIPT_PATH}/simulate.py ${OUTPUT_PREFIX}2.hapA.fa ${CONFIG_SIMPLE_EDIT} ${OUTPUT_PREFIX}2_EDIT
 # --> NB: the vcf output of this will only specify the simple and dDUP events (we will use this in the merge step)
 # generate reads from R2_EDIT (ref with div. repeats and simple events/dDUPs)
-dwgsim -C 30 -1 151 -2 151 -y 0 -S 0 -c 0 -m /dev/null -H -R 0.30 -X 0.5 ${OUTPUT_PREFIX}2_EDIT.hapA.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.0
-dwgsim -C 30 -1 151 -2 151 -y 0 -S 0 -c 0 -m /dev/null -H -R 0.30 -X 0.5 ${OUTPUT_PREFIX}2_EDIT.hapB.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.1
+/athena/ihlab/scratch/vpopic/software/LRSIM/dwgsim -C 30 -1 151 -2 151 -y 0 -S 0 -c 0 -m /dev/null -H -R 0.30 -X 0.5 ${OUTPUT_PREFIX}2_EDIT.hapA.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.0
+/athena/ihlab/scratch/vpopic/software/LRSIM/dwgsim -C 30 -1 151 -2 151 -y 0 -S 0 -c 0 -m /dev/null -H -R 0.30 -X 0.5 ${OUTPUT_PREFIX}2_EDIT.hapB.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.1
 # concat the R2 fastqs
 mv ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.0.bfast.fastq.gz ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.bfast.fastq.gz
 cat ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.1.bfast.fastq.gz >> ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.bfast.fastq.gz
