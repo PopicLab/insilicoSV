@@ -22,12 +22,12 @@ python ${SCRIPT_PATH}/simulate.py ${OUTPUT_PREFIX}2.hapA.fa ${CONFIG_SIMPLE_EDIT
 /athena/ihlab/scratch/vpopic/software/LRSIM/dwgsim -C 30 -1 151 -2 151 -y 0 -S 0 -c 0 -m /dev/null -H -R 0.30 -X 0.5 ${OUTPUT_PREFIX}2_EDIT.hapA.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.0
 /athena/ihlab/scratch/vpopic/software/LRSIM/dwgsim -C 30 -1 151 -2 151 -y 0 -S 0 -c 0 -m /dev/null -H -R 0.30 -X 0.5 ${OUTPUT_PREFIX}2_EDIT.hapB.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.1
 # concat the R2 fastqs
-mv ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.0.bfast.fastq.gz ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.bfast.fastq.gz
-cat ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.1.bfast.fastq.gz >> ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.bfast.fastq.gz
-rm ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.1.bfast.fastq.gz
+mv ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.0.bfast.fastq ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.bfast.fastq
+cat ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.1.bfast.fastq >> ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.bfast.fastq
+rm ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.1.bfast.fastq
 # map the R2 reads to R1 (either haplotype since we required div_dDUPs to be input to R1 as homozygous)
 bwa index ${OUTPUT_PREFIX}1.hapA.fa
-bwa mem -t20 -p ${OUTPUT_PREFIX}1.hapA.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.bfast.fastq.gz | samtools view -Sb - > ${OUTPUT_PREFIX}.bwamem.bam
+bwa mem -t20 -p ${OUTPUT_PREFIX}1.hapA.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.bfast.fastq | samtools view -Sb - > ${OUTPUT_PREFIX}.bwamem.bam
 samtools sort -@ 20 ${OUTPUT_PREFIX}.bwamem.bam -o ${OUTPUT_PREFIX}.bwamem.sorted.bam
 samtools index -@ 20 ${OUTPUT_PREFIX}.bwamem.sorted.bam
 # call position correcting script on R1 to make loci match with locations of repeats placed into genome
