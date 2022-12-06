@@ -18,3 +18,7 @@ rm ${OUTPUT_PREFIX}.dwgsim.hap.12.bfast.fastq.gz
 samtools sort -@ 20 ${OUTPUT_PREFIX}.bwamem.bam > ${OUTPUT_PREFIX}.bwamem.sorted.bam
 rm ${OUTPUT_PREFIX}.bwamem.bam
 samtools index -@ 20 ${OUTPUT_PREFIX}.bwamem.sorted.bam
+
+# NB: if running on Gibus, use optimized DWSGIM for read generation: /athena/ihlab/scratch/vpopic/software/LRSIM/dwgsim
+# ---> and if using that version, need to correct read files to be of the form:
+# ${OUTPUT_PREFIX}.dwgsim.hap.{0,1}.12.fastq (i.e., no .gz suffix, and no .bfast tag)
