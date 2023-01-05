@@ -244,11 +244,6 @@ class SV_Simulator():
             self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(self.event_ranges[rec.chrom],
                                                                                         sv.start_chr, sv))
 
-            # print(f'sv.events_dict = {sv.events_dict}')
-            # print(f'sv.source_unique_char = {sv.source_unique_char}')
-            # print(f'sv.target_unique_char = {sv.target_unique_char}')
-            # print(f'sv = {sv}')
-
             time_dif = time.time() - time_start_local
             # can't display this as a proportion of the total number of SVs because this is when
             # we're creating the total list of SVs
@@ -259,7 +254,6 @@ class SV_Simulator():
             frag = None
             if rec.info['SVTYPE'] == 'INS':
                 sv_symbol = sv.target_unique_char[0]
-                # print(f'INS sv = {sv}')
             # TODO: Don't model dDUPs as insertions?
             elif rec.info['SVTYPE'] == 'dDUP':
                 # TODO: correct dDUPs (add whatever actions from the div_dDUP procedure are also applicable)
@@ -282,7 +276,6 @@ class SV_Simulator():
                 # frag_a = rec.info['DIV_REPEAT']
                 # frag_A = self.ref_fasta.fetch(rec.chrom, rec.start, rec.stop)
                 frag = self.ref_fasta.fetch(rec.chrom, rec.start, rec.stop)
-                # print(f'frag = {frag}')
                 sv.type = Variant_Type.INS
                 sv.source_unique_char = ()
                 sv.target_unique_char = ('A',)
@@ -304,14 +297,12 @@ class SV_Simulator():
                 sv_event.start = rec.start
                 sv_event.end = rec.stop
             sv_event.source_frag = frag
-            # print(f'sv.start, st.end = {sv.start, sv.end}')
 
             if sv_event.source_frag is None and sv_event.length > 0:
                 # source grad assignment in the ins case
                 # *** We'll include div_dDUPs in this case and take the DIV_REPEAT sequence as the insertion sequence
                 sv_event.source_frag = insertion_sequence
             sv.events_dict[sv_symbol] = sv_event
-            # print(f'sv.events_dict = {sv.events_dict}')
 
             # ----------- just going to choose a random genotype for now ---------
             # TODO: NOTE -- because heterozygous div_dDUPs act as two different insertions ('a' and 'A' for the two
@@ -321,16 +312,10 @@ class SV_Simulator():
                 sv.ishomozygous = Zygosity.HOMOZYGOUS
                 sv.hap = [True, True]
             else:
-                # print('SETTING SV TO HETEROZYGOUS')
                 sv.ishomozygous = Zygosity.HETEROZYGOUS
                 sv.hap = random.choice([[True, False], [False, True]])
             self.svs.append(sv)
 
-        # print(f'sv = {sv}')
-
-        # print("\n")
-        # print('EVENT RANGES:')
-        # print(self.event_ranges)
 
     def initialize_svs(self, random_gen=random):
         '''

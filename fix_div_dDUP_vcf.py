@@ -1,7 +1,5 @@
 from pysam import VariantFile
 import argparse
-import numpy as np
-from bisect import bisect
 from collections import defaultdict
 
 
@@ -66,62 +64,6 @@ def correct_positions_div(input_vcf, label_entire_event=False, avoid_intervals=F
 
     out_vcf.close()
     in_vcf.close()
-
-
-# TODO: I think this can be deleted, I'm pretty sure I was mistaken that you'll have to adjust positions in this way..
-def correct_positions_orig_events(orig_vcf_path, r1_vcf_path):
-    # when placing divergent repeats into an already edited reference, need to
-    # adjust the R1 (reference with added repeats) positions to account for events
-    # already added to the reference that will be edited and turned into R2
-    orig_vcf = VariantFile(orig_vcf_path)
-    r1_vcf = VariantFile(r1_vcf_path)
-    hd = r1_vcf.header
-    out_vcf = VariantFile(r1_vcf_path[:-4] + '_ORIGEVENTS_SHIFT.vcf', 'w', header=hd)
-    orig_recs = {}
-    for rec in orig_vcf.fetch():
-        orig_recs[rec.start] = rec
-    # walk through original recs and define a piecewise function that tells you how many places to
-    # shift depending on where you are on the genome
-    # ---> this will then be used to shift the R1 events by going to each event position and shifting by
-    # f(position) for f the above shift function ^
-    shift = 0
-    r1_shifts = {}
-    for i in range(len(list(orig_recs.keys()))):
-        pos = sorted(orig_recs.keys())[i]
-        r = orig_recs[pos]
-        svlen = int(r.info['SVLEN'])
-        if r.id == 'DEL':
-            shift -= svlen
-            r1_shifts[pos + svlen] = shift
-        # TODO: THE POSITION ADJUSTMENT WONT WORK IF INSERTIONS AREN'T INCLUDED IN THE VCF (which I think they're not...)
-        #  --> they're in the bed file that was output by the simulation -- rerun complex_bed_to_vcf.py including INS in the allow list
-        elif r.id in ['DUP', 'INS']:
-            shift += svlen
-            r1_shifts[pos + svlen] = shift
-        elif r.id == 'dDUP_A':
-            # for dDUP_A, the shift will be of size len(dDUP_A), but will only be applied to events after the dDUP_B
-            shift += svlen
-            # need to look down the list and look for the adjacent dDUP_B (might lie beyond interceding simple events)
-            for j in range(i, len(list(orig_recs.keys()))):
-                # stop at the first dDUP_B we see
-                if orig_recs[sorted(orig_recs.keys())[j]].id == 'dDUP_B':
-                    r_ddup_b = orig_recs[sorted(orig_recs.keys())[j]]
-                    # double check that we're conceivably next to the dDUP_A of concern
-                    # *** this will raise an exception if a dDUP_A is unmatches
-                    assert np.abs(r_ddup_b.start - r.stop) < 100, 'dDUP_A found without a mate'
-                    r1_shifts[r_ddup_b.stop] = shift
-                    break
-    # walk through r1 records and apply a shift to each one determined by the r1_shifts dict
-    # --> the right shift value will be the dict value matching the greatest key that is < the r1 record's position
-    for rec in r1_vcf.fetch():
-        supremum_index = bisect(sorted(r1_shifts.keys()), rec.start) - 1
-        event_shift = r1_shifts[sorted(r1_shifts.keys())[supremum_index]]
-        rec.start += event_shift
-        # all recs in this edit step should be div_dDUPs
-        if rec.id == 'div_dDUP':
-            rec.info['TARGET'] += event_shift
-        out_vcf.write(rec)
-
 
 
 def incorporate_events(merge_vcf_path, div_vcf_path, output_vcf_path):

@@ -17,7 +17,6 @@ def convert_to_vcf(bedfile, vcffile, template_vcf, include_simple):
             chrm = ln[0]
             intervalA_start = int(ln[1])
             intervalA_end = int(ln[2])
-            intervalB_start = int(ln[4])
             intervalB_end = int(ln[5])
             svtype = ln[-3]
             gt = ln[8]

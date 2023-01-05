@@ -204,7 +204,6 @@ class FormatterIO():
                                            "SAMPLE"]))
         # *** This will throw an error with pysam version 0.18, need 0.16.0.1
         vcf_file = pysam.VariantFile(vcffile)
-        # SV fields
         vcf_file.header.info.add('END', number=1, type='Integer', description="End position of the variant "
                                                                               "described in this record")
         vcf_file.header.info.add('CIPOS', number=2, type='Integer', description="Confidence interval around POS for "
@@ -228,8 +227,6 @@ class FormatterIO():
         for sv in svs:
             zyg = (1, 1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0, 1)
             if sv.type.value in ["div_dDUP", "dDUP"]:
-                # print(f'sv.events_dict = {sv.events_dict}')
-                # print(f'sv.changed_fragments = {sv.changed_fragments}')
                 rec_start = sv.events_dict['A'].start
                 rec_end = sv.events_dict['A'].end
                 dispersion_target = sv.events_dict['_1'].end
@@ -245,17 +242,12 @@ class FormatterIO():
                     if not two_part_labels:
                         info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
                     else:
-                        # using rec_start/end and dispersion target to create the _A/_B entries
-                        # vcf_out_file.write(f'{sv.start_chr}\t{rec_start}\t{sv.type.value}\tN\t{sv.type.value}\t.\tPASS\t'
-                        #               f'END={rec_end};SVTYPE={sv.type.value};SVLEN={rec_end - rec_start}\tGT\t{zyg}\n')
-                        # vcf_out_file.write(
-                        #     f'{sv.start_chr}\t{rec_end}\t{sv.type.value}\tN\t{sv.type.value}\t.\tPASS\t'
-                        #     f'END={dispersion_target};SVTYPE={sv.type.value};SVLEN={dispersion_target - rec_end}\tGT\t{zyg}\n')
                         vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=rec_start, stop=rec_end,
                                                                     alleles=['N', sv.type.value], id=sv.type.value,
                                                                     info={'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start},
                                                                     qual=100, filter='PASS',
                                                                     samples=[{'GT': zyg}])
+                        vcf_out_file.write(vcf_record)
                         continue
             else:
                 # TODO: specify start and end based on logic of other complex event types
