@@ -224,11 +224,12 @@ class FormatterIO():
 
         vcf_out_file = pysam.VariantFile(vcffile, 'w', header=vcf_file.header)
 
-        print('TRAVERSING SVS IN EXPORT_TO_VCF')
+        # print('TRAVERSING SVS IN EXPORT_TO_VCF')
         for sv in svs:
-            # # debug
-            # print(f'sv.events_dict.keys() = {list(sv.events_dict.keys())}')
-            # print(f'sv.events_dict = {sv.events_dict}')
+            # debug
+            if sv.type.value == 'TRA':
+                print(f'sv.events_dict.keys() = {list(sv.events_dict.keys())}')
+                print(f'sv.events_dict = {sv.events_dict}')
             zyg = (1, 1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0, 1)
             if sv.type.value in ["div_dDUP", "dDUP", "INV_dDUP", "TRA"]:
                 rec_start = sv.events_dict['A'].start
