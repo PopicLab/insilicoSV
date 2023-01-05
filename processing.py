@@ -236,6 +236,7 @@ class FormatterIO():
                 dispersion_target = sv.events_dict['_1'].end
                 info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
                 print(f'info_field = {info_field}')
+                print(f'rec_start = {rec_start}; rec_end = {rec_end}')
                 if sv.type.value == 'div_dDUP':
                     divergent_repeat = sv.changed_fragments[1][-1]
                     info_field['DIV_REPEAT'] = divergent_repeat
