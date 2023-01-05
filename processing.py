@@ -226,17 +226,17 @@ class FormatterIO():
 
         print('TRAVERSING SVS IN EXPORT_TO_VCF')
         for sv in svs:
-            # debug
-            print(f'sv.events_dict.keys() = {list(sv.events_dict.keys())}')
-            print(f'sv.events_dict = {sv.events_dict}')
+            # # debug
+            # print(f'sv.events_dict.keys() = {list(sv.events_dict.keys())}')
+            # print(f'sv.events_dict = {sv.events_dict}')
             zyg = (1, 1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0, 1)
             if sv.type.value in ["div_dDUP", "dDUP", "INV_dDUP", "TRA"]:
                 rec_start = sv.events_dict['A'].start
                 rec_end = sv.events_dict['A'].end
                 dispersion_target = sv.events_dict['_1'].end
                 info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
-                print(f'info_field = {info_field}')
-                print(f'rec_start = {rec_start}; rec_end = {rec_end}')
+                # print(f'info_field = {info_field}')
+                # print(f'rec_start = {rec_start}; rec_end = {rec_end}')
                 if sv.type.value == 'div_dDUP':
                     divergent_repeat = sv.changed_fragments[1][-1]
                     info_field['DIV_REPEAT'] = divergent_repeat
