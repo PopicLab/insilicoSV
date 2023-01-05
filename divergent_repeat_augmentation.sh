@@ -30,6 +30,9 @@ bwa index ${OUTPUT_PREFIX}1.hapA.fa
 bwa mem -t20 -p ${OUTPUT_PREFIX}1.hapA.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.fastq | samtools view -Sb - > ${OUTPUT_PREFIX}.bwamem.bam
 samtools sort -@ 20 ${OUTPUT_PREFIX}.bwamem.bam -o ${OUTPUT_PREFIX}.bwamem.sorted.bam
 samtools index -@ 20 ${OUTPUT_PREFIX}.bwamem.sorted.bam
+## -- remove unsorted bam and fastq
+rm ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.fastq
+rm ${OUTPUT_PREFIX}.bwamem.bam
 # call position correcting script on R1 to make loci match with locations of repeats placed into genome
 # --> we assume this script and locus adjustment script (fix_fiv_dDUP_vcf.py) are in same directory
 # --> ... and need to process the simple/dDUP vcf to give us dDUP_A/B records, and to get rid of simple types we don't want (e.g., INS)
