@@ -195,7 +195,7 @@ class FormatterIO():
                     write_to_file(sv, event.source_chr, event.start, event.end, event.source_chr, event.start, event.start, Operations.DEL.value, event.symbol, event, order)
             self.bedpe_counter += 1
 
-    def export_to_vcf(self, svs, stats, vcffile, two_part_labels=True):
+    def export_to_vcf(self, svs, stats, vcffile):
         with open(vcffile, "w") as vcf:
             vcf.write("##fileformat=VCFv4.2\n")
             for chrm, chrm_len in stats.chr_lengths.items():
@@ -224,33 +224,22 @@ class FormatterIO():
 
         vcf_out_file = pysam.VariantFile(vcffile, 'w', header=vcf_file.header)
 
+        print('TRAVERSING SVS IN EXPORT_TO_VCF')
         for sv in svs:
+            # debug
+            print(f'sv.events_dict.keys() = {list(sv.events_dict.keys())}')
+            print(f'sv.events_dict = {sv.events_dict}')
             zyg = (1, 1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0, 1)
-            if sv.type.value in ["div_dDUP", "dDUP"]:
+            if sv.type.value in ["div_dDUP", "dDUP", "INV_dDUP", "TRA"]:
                 rec_start = sv.events_dict['A'].start
                 rec_end = sv.events_dict['A'].end
                 dispersion_target = sv.events_dict['_1'].end
+                info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
+                print(f'info_field = {info_field}')
                 if sv.type.value == 'div_dDUP':
                     divergent_repeat = sv.changed_fragments[1][-1]
-                    print(f'divergent_repeat = {divergent_repeat}')
-                    info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target,
-                                  'DIV_REPEAT': divergent_repeat}
-                else:  # dDUP case
-                    # two_part_labels: flag indicating whether or not to use _A/_B labeling convention for dispersion-
-                    # based event
-                    # TODO: extend case to include TRA events
-                    if not two_part_labels:
-                        info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
-                    else:
-                        vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=rec_start, stop=rec_end,
-                                                                    alleles=['N', sv.type.value], id=sv.type.value,
-                                                                    info={'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start},
-                                                                    qual=100, filter='PASS',
-                                                                    samples=[{'GT': zyg}])
-                        vcf_out_file.write(vcf_record)
-                        continue
+                    info_field['DIV_REPEAT'] = divergent_repeat
             else:
-                # TODO: specify start and end based on logic of other complex event types
                 rec_start, rec_end = sv.start, sv.end
                 info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
 
