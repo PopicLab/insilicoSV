@@ -232,8 +232,16 @@ class FormatterIO():
                 print(f'sv.events_dict = {sv.events_dict}')
             zyg = (1, 1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0, 1)
             if sv.type.value in ["div_dDUP", "dDUP", "INV_dDUP", "TRA"]:
-                rec_start = sv.events_dict['A'].start
-                rec_end = sv.events_dict['A'].end
+                if sv.type.value == 'TRA':
+                    if sv.events_dict['A'].length == 0:
+                        rec_start = sv.events_dict['B'].start
+                        rec_end = sv.events_dict['B'].end
+                    else:
+                        rec_start = sv.events_dict['A'].start
+                        rec_end = sv.events_dict['A'].end
+                else:
+                    rec_start = sv.events_dict['A'].start
+                    rec_end = sv.events_dict['A'].end
                 dispersion_target = sv.events_dict['_1'].end
                 info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
                 # print(f'info_field = {info_field}')
