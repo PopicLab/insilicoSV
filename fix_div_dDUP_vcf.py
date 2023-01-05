@@ -7,7 +7,7 @@ def correct_positions_div(input_vcf, label_entire_event=False, avoid_intervals=F
     # reads input vcf, adjusts POS, END, TARGET values to account for previous events in the reference
     in_vcf = VariantFile(input_vcf)
     hd = in_vcf.header
-    file_suffix = '_avoid_intervals.vcf' if avoid_intervals else '_pos_corrected.vcf'
+    file_suffix = '_decoy_divrepeat_intervals.vcf' if avoid_intervals else '_pos_corrected.vcf'
     out_vcf = VariantFile(input_vcf[:-4] + file_suffix, 'w', header=hd)
     # store vcf records in dictionary keyed on start position
     vcf_recs = defaultdict(dict)
@@ -39,6 +39,8 @@ def correct_positions_div(input_vcf, label_entire_event=False, avoid_intervals=F
                     rec.stop = rec.info['TARGET'] + rec.info['SVLEN']
                     rec.info['TARGET'] = -1
                     rec.info['SVLEN'] = rec.stop - rec.start
+                # remove divergent repeat sequence for reporting
+                rec.info['DIV_REPEAT'] = '(removed)'
                 out_vcf.write(rec)
             else:
                 # output separate records for each A and A* ("B") to serve as avoid intervals for further simulation
