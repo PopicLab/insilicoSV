@@ -463,18 +463,35 @@ class SV_Simulator():
                     sv.end = sv.start + sv.req_space
                     block_start = sv.start
 
+                    # provisional dumb solution to flipped dispersions: keep track of previous subevent's start position
+                    prev_start = None
                     for sv_event in sv.source_events:
-                        # debug
-                        if sv_event.symbol.startswith(Symbols.DIS.value):
+                        # debug -- manually reversed dispersion
+                        flip_dispersion = True #<- dummy bool to trigger flipping the dispersion
+                        if sv_event.symbol.startswith(Symbols.DIS.value) and flip_dispersion:
+                            # special source event logic for a dispersion that needs to be flipped
+                            # --> want sv_event.start to be the preceeding A's start (current start_pos - A.len)
+                            # --> then want sv_event.end to be that point - "_".len
+                            sv_event.start = prev_start
+                            sv_event.end = prev_start - sv_event.length
+                            sv_event.source_chr = rand_id
+                            frag = ref_fasta.fetch(rand_id, sv_event.end, sv_event.start)
+                            sv_event.source_frag = frag
+                            # ** what to set start pos to here? (this is a special case where we don't want to be able to
+                            # ** write an event onto the dispersion that we just traversed backwards)
+                            start_pos -= sv_event.length
                             print(f'dispersion source event : {sv_event}')
                             # are the target events populated yet?
                             print(f'events : {sv.events_dict}')
-                        # store start and end position and reference fragment
-                        sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length
-                        sv_event.source_chr = rand_id
-                        frag = ref_fasta.fetch(rand_id, sv_event.start, sv_event.end)
-                        sv_event.source_frag = frag
-                        start_pos += sv_event.length
+                        else:
+                            # store start and end position and reference fragment
+                            sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length
+                            sv_event.source_chr = rand_id
+                            frag = ref_fasta.fetch(rand_id, sv_event.start, sv_event.end)
+                            sv_event.source_frag = frag
+                            # prev_start -- store of previous start_pos in case we need to refer to it in the next event
+                            prev_start = start_pos
+                            start_pos += sv_event.length
 
                         # dispersion event should not impact whether position is valid or not, given that spacing is already guaranteed
                         if sv_event.symbol.startswith(Symbols.DIS.value):

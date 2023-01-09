@@ -221,27 +221,22 @@ class Structural_Variant():
 
             # find dispersion event right after block to find position of next block
             assert curr_chr != None, "Unvalid chr detected for SV {} and events_dict {}".format(self, self.events_dict)
-            # debug
-            print(f'len(self.target_symbol_blocks) = {len(self.target_symbol_blocks)}')
             if idx < len(self.target_symbol_blocks) - 1:
                 dis_event = self.events_dict[Symbols.DIS.value + str(idx + 1)]  # find the nth dispersion event
-                # debug
-                print(f'appending to changed framents (idx={idx}):\n{str([curr_chr, block_start, dis_event.start, new_frag])}')
                 changed_fragments.append(
                     [curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
                 block_start = dis_event.end  # move on to next block
                 curr_chr = dis_event.source_chr
             else:
                 # debug
-                print(f'appending to changed framents (idx={idx}):\n{str([curr_chr, block_start, self.end, new_frag])}')
+                ## --> THIS FRAGMENT IS THE ONE SPECIFYING THE DUPLICATION AFTER THE DISPERSION
+                print(f'appending to changed fragments (idx={idx}):\n{str([curr_chr, block_start, self.end, new_frag])}')
+
                 changed_fragments.append([curr_chr, block_start, self.end, new_frag])
 
         self.changed_fragments = changed_fragments
-        # debug
-        print('end of change_fragment()')
-        print(f'changed_fragments = {self.changed_fragments}')
         self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
-
+        # TODO: THIS RETURN IS ONLY USED FOR THE TESTS THAT ARE WRITTEN -- DELETE THIS AND REFACTOR THOSE
         return changed_fragments
 
     def clean_event_storage(self):
