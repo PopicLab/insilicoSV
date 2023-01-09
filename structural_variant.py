@@ -226,7 +226,7 @@ class Structural_Variant():
                 # debug
                 print(f'found dispersion in target_symbol_blocks')
                 print(f'idx, target_symbol_block = {idx}, {block}')
-                print(f'dis_event = {dis_event}')
+                # print(f'dis_event = {dis_event}')
                 changed_fragments.append(
                     [curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
                 block_start = dis_event.end  # move on to next block
