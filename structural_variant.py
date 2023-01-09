@@ -235,6 +235,9 @@ class Structural_Variant():
                 changed_fragments.append([curr_chr, block_start, self.end, new_frag])
 
         self.changed_fragments = changed_fragments
+        # debug
+        print('end of change_fragment()')
+        print(f'changed_fragments = {self.changed_fragments}')
         self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
 
         return changed_fragments
