@@ -171,9 +171,9 @@ class Structural_Variant():
                         self.events_dict[symbol].original_block_idx = idx
 
         self.source_symbol_blocks = find_blocks(self.source_unique_char)
-        # print(f'source_symbol_blocks = {self.source_symbol_blocks}')
+        print(f'source_symbol_blocks = {self.source_symbol_blocks}')
         self.target_symbol_blocks = find_blocks(self.target_unique_char)
-        # print(f'target_symbol_blocks = {self.target_symbol_blocks}')
+        print(f'target_symbol_blocks = {self.target_symbol_blocks}')
         track_original_symbol(self.source_symbol_blocks)
 
         return self.target_symbol_blocks
@@ -209,7 +209,6 @@ class Structural_Variant():
                     new_frag += decode_funcs["invert"](event.source_frag)
 
                 elif ele[-1] == '*': # checks if the element ends in an *, representing a divergent duplicate
-                    # print(f'found a divergent elt: {ele}')
                     new_frag += decode_funcs["diverge"](event.source_frag)
 
                 elif upper_str[0] in encoding:  # take original fragment, no changes
@@ -220,12 +219,14 @@ class Structural_Variant():
                 else:
                     raise Exception("Symbol {} failed to fall in any cases".format(ele))
 
-                # print(f'new_frag = {new_frag}')
-
             # find dispersion event right after block to find position of next block
             assert curr_chr != None, "Unvalid chr detected for SV {} and events_dict {}".format(self, self.events_dict)
             if idx < len(self.target_symbol_blocks) - 1:
                 dis_event = self.events_dict[Symbols.DIS.value + str(idx + 1)]  # find the nth dispersion event
+                # debug
+                print(f'found dispersion in target_symbol_blocks')
+                print(f'idx, target_symbol_block = {idx}, {block}')
+                print(f'dis_event = {dis_event}')
                 changed_fragments.append(
                     [curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
                 block_start = dis_event.end  # move on to next block

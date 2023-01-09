@@ -468,7 +468,7 @@ class SV_Simulator():
                         if sv_event.symbol.startswith(Symbols.DIS.value):
                             print(f'dispersion source event : {sv_event}')
                             # are the target events populated yet?
-                            print(f'target events : {sv.events_dict}')
+                            print(f'events : {sv.events_dict}')
                         # store start and end position and reference fragment
                         sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length
                         sv_event.source_chr = rand_id
