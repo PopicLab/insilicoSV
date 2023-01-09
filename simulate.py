@@ -342,8 +342,8 @@ class SV_Simulator():
                         sv.hap = random.choice([[True, False], [False, True]])
 
                     # debug
-                    print(f'sv = {sv}')
-                    print(f'sv.events_dict = {sv.events_dict}')
+                    # print(f'sv = {sv}')
+                    # print(f'sv.events_dict = {sv.events_dict}')
                     self.svs.append(sv)
             # shuffle svs if we are not prioritizing the simulation of the SVs inputted first
             if not self.sim_settings["prioritize_top"]:
@@ -465,8 +465,10 @@ class SV_Simulator():
 
                     for sv_event in sv.source_events:
                         # debug
-                        print('LOOPING OVER SOURCE EVENTS')
-                        print(f'sv_event = {sv_event}')
+                        if sv_event.symbol.startswith(Symbols.DIS.value):
+                            print(f'dispersion source event : {sv_event}')
+                            # are the target events populated yet?
+                            print(f'target events : {sv.events_dict}')
                         # store start and end position and reference fragment
                         sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length
                         sv_event.source_chr = rand_id

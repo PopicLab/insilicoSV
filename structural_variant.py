@@ -130,7 +130,9 @@ class Structural_Variant():
 
         self.req_space = sum([event.length for event in self.source_events])
 
-        # print(f'self.events_dict = {self.events_dict}')
+        # debug
+        print('END OF INITIALIZE_EVENTS')
+        print(f'self.events_dict = {self.events_dict}')
 
     def generate_blocks(self):
         '''
