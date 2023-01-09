@@ -341,7 +341,9 @@ class SV_Simulator():
                         sv.ishomozygous = Zygosity.HETEROZYGOUS
                         sv.hap = random.choice([[True, False], [False, True]])
 
-                    # print(f'sv = {sv}')
+                    # debug
+                    print(f'sv = {sv}')
+                    print(f'sv.events_dict = {sv.events_dict}')
                     self.svs.append(sv)
             # shuffle svs if we are not prioritizing the simulation of the SVs inputted first
             if not self.sim_settings["prioritize_top"]:
@@ -423,14 +425,8 @@ class SV_Simulator():
         random_gen: only relevant for unittesting
         -> returns list of tuples, represents position ranges for non-dispersion events
         '''
-        # TODO: I believe this is redundant with self.event_ranges being instantiated to a defaultdict(list)
-        #  at the end of the simulator object constructor (in fact, this will wipe any intervals that are
-        #  placed there to tell the simulator to avoid any pre-specified intervals
-        # maintain separate event ranges for different chromosomes
-        # self.event_ranges = dict()
-        # for id in self.order_ids:
-        #     self.event_ranges[id] = []
-
+        # debug
+        print('ENTERING CHOOSE_RAND_POS')
         active_svs_total = 0
         inactive_svs_total = 0
         time_start_local = 0
@@ -468,6 +464,9 @@ class SV_Simulator():
                     block_start = sv.start
 
                     for sv_event in sv.source_events:
+                        # debug
+                        print('LOOPING OVER SOURCE EVENTS')
+                        print(f'sv_event = {sv_event}')
                         # store start and end position and reference fragment
                         sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length
                         sv_event.source_chr = rand_id
@@ -477,8 +476,10 @@ class SV_Simulator():
 
                         # dispersion event should not impact whether position is valid or not, given that spacing is already guaranteed
                         if sv_event.symbol.startswith(Symbols.DIS.value):
+                            # TODO: extend dispersions to be able to point in either direction (i.e., starting at the
+                            #  end of the previous event and moving forward, or starting at the beginning of the previous
+                            #  event and moving backwards)
                             # check to see if chosen spot is a valid position
-                            # print("is_overlapping({}, {}) -> {}".format(chr_event_ranges, (block_start, sv_event.start), utils.is_overlapping(chr_event_ranges, (block_start, sv_event.start))))
                             if utils.is_overlapping(chr_event_ranges, (
                                     block_start, sv_event.start)):  # sv_event.start is the end of the current block
                                 valid = False
