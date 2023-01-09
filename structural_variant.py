@@ -224,9 +224,7 @@ class Structural_Variant():
             if idx < len(self.target_symbol_blocks) - 1:
                 dis_event = self.events_dict[Symbols.DIS.value + str(idx + 1)]  # find the nth dispersion event
                 # debug
-                print(f'found dispersion in target_symbol_blocks')
-                print(f'idx, target_symbol_block = {idx}, {block}')
-                # print(f'dis_event = {dis_event}')
+                print(f'appending to changed framents:\n{str([curr_chr, block_start, dis_event.start, new_frag])}')
                 changed_fragments.append(
                     [curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
                 block_start = dis_event.end  # move on to next block
