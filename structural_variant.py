@@ -223,15 +223,15 @@ class Structural_Variant():
             assert curr_chr != None, "Unvalid chr detected for SV {} and events_dict {}".format(self, self.events_dict)
             if idx < len(self.target_symbol_blocks) - 1:
                 dis_event = self.events_dict[Symbols.DIS.value + str(idx + 1)]  # find the nth dispersion event
+                # debug
+                print(f'appending to changed fragments (idx={idx}):\n{str([curr_chr, block_start, dis_event.start, new_frag])}')
                 changed_fragments.append(
                     [curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
                 block_start = dis_event.end  # move on to next block
                 curr_chr = dis_event.source_chr
             else:
                 # debug
-                ## --> THIS FRAGMENT IS THE ONE SPECIFYING THE DUPLICATION AFTER THE DISPERSION
                 print(f'appending to changed fragments (idx={idx}):\n{str([curr_chr, block_start, self.end, new_frag])}')
-
                 changed_fragments.append([curr_chr, block_start, self.end, new_frag])
 
         self.changed_fragments = changed_fragments

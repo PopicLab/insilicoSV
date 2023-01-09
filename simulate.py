@@ -480,9 +480,7 @@ class SV_Simulator():
                             # ** what to set start pos to here? (this is a special case where we don't want to be able to
                             # ** write an event onto the dispersion that we just traversed backwards)
                             start_pos -= sv_event.length
-                            print(f'dispersion source event : {sv_event}')
-                            # are the target events populated yet?
-                            print(f'events : {sv.events_dict}')
+                            print(f'dispersion source event :\nlen={sv_event.length}\nstart={sv_event.start}\nend={sv_event.end}')
                         else:
                             # store start and end position and reference fragment
                             sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length
