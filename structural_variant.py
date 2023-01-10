@@ -191,7 +191,7 @@ class Structural_Variant():
             self)  # start & end should have been defined alongside event positions
         block_start = self.start  # describes SV's start position - applies for the first "block"
         # debug
-        print(f'about to iterate over target_symbol_blocks\nblock_start = {block_start}'
+        print(f'about to iterate over target_symbol_blocks\nblock_start = {block_start}\n'
               f'target_symbol_blocks = {self.target_symbol_blocks}')
         curr_chr = self.start_chr
 
@@ -227,7 +227,7 @@ class Structural_Variant():
                 # debug
                 # ** Here dis_event.start is being used as "block_end" but in the case of a flipped dispersion, these
                 # ** won't be equal -- where can we establish the actual block_end?
-                print(f'appending to changed fragments (idx={idx}):\n{str([curr_chr, block_start, dis_event.start, new_frag])}')
+                print(f'appending to changed fragments (idx={idx}):\n{str([curr_chr, block_start, block_end, new_frag])}')
                 changed_fragments.append(
                     # [curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
                     [curr_chr, block_start, block_end, new_frag])  # <- block_end being the end of the last symbol in the block
