@@ -236,8 +236,12 @@ class Structural_Variant():
                 curr_chr = dis_event.source_chr
             else:
                 # debug
-                print(f'appending to changed fragments (idx={idx}):\n{str([curr_chr, block_start, self.end, new_frag])}')
-                changed_fragments.append([curr_chr, block_start, self.end, new_frag])
+                print(f'appending to changed fragments (idx={idx}):\n{str([curr_chr, block_start, block_start, new_frag])}')
+                # ** for flipped dispersion self.end is in the wrong place (it should match with block_start)
+                # ** --> it gets set to sv.start + sv.req_space in choose_rand_pos()
+                # changed_fragments.append([curr_chr, block_start, self.end, new_frag])
+                # ** is it ever wrong to have this defined for the single point like this?
+                changed_fragments.append([curr_chr, block_start, block_start, new_frag])
 
         self.changed_fragments = changed_fragments
         self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
