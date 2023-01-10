@@ -32,6 +32,13 @@ class Structural_Variant():
         self.source_unique_char, self.target_unique_char = Structural_Variant.reformat_seq(
             self.source), Structural_Variant.reformat_seq(self.target)
 
+        # debug
+        print('source and target info after calls to reformat_seq')
+        print(f'source = {self.source}')
+        print(f'target = {self.target}')
+        print(f'source_unique_char = {self.source_unique_char}')
+        print(f'target_unique_char = {self.target_unique_char}')
+
         # initialize event classes
         self.start = None  # defines the space in which SV operates
         self.end = None
@@ -41,6 +48,8 @@ class Structural_Variant():
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
             self.initialize_events(length_ranges)
+
+        # TODO: want to instantiate these two values to Blocks() objects at this point
         self.source_symbol_blocks = []
         self.target_symbol_blocks = []
 
@@ -239,9 +248,9 @@ class Structural_Variant():
                 print(f'appending to changed fragments (idx={idx}):\n{str([curr_chr, block_start, block_start, new_frag])}')
                 # ** for flipped dispersion self.end is in the wrong place (it should match with block_start)
                 # ** --> it gets set to sv.start + sv.req_space in choose_rand_pos()
-                # changed_fragments.append([curr_chr, block_start, self.end, new_frag])
-                # ** is it ever wrong to have this defined for the single point like this?
-                changed_fragments.append([curr_chr, block_start, block_start, new_frag])
+                changed_fragments.append([curr_chr, block_start, self.end, new_frag])
+                # ** this is what we want for dDUPs/INV_dDUPs but not for events without dispersions
+                # changed_fragments.append([curr_chr, block_start, block_start, new_frag])
 
         self.changed_fragments = changed_fragments
         self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
@@ -274,3 +283,42 @@ class Event():
     def __repr__(self):
         return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end,
                                     "source_chr": self.source_chr, "source_frag": self.source_frag})
+
+class Blocks():
+    """
+    Groups together source and target symbols between dispersion events (_)
+    """
+    def __init__(self, sv):
+        self.sv = sv
+        self.source_blocks = []
+        self.target_blocks = []
+
+    def generate_blocks(self):
+        self.source_blocks = self.find_blocks(self.sv.source_unique_char)
+        print(f'source_symbol_blocks = {self.source_blocks}')
+        self.target_blocks = self.find_blocks(self.sv.target_unique_char)
+        print(f'target_symbol_blocks = {self.target_blocks}')
+        self.track_original_symbol()
+
+    @staticmethod
+    def find_blocks(transformation):
+        # transformation: tuple of strings
+        # -> returns list of lists of subevents
+        # Ex. ("A","B","_","C","D") -> [["A","B"], ["C","D"]]
+        # Ex. ("A","B","_","_") -> [["A","B"],[],[]]
+        blocks = [[]]
+        for symbol in transformation:
+            if not symbol.startswith(Symbols.DIS.value):
+                blocks[-1].append(symbol)
+            else:
+                blocks.append([])
+        return blocks
+
+    def track_original_symbol(self, symbol_blocks):
+        # finds which region/block the original symbol is in
+        # if symbol is later found in another region, then translocation detected
+        # blocks: list of lists of symbols
+        for idx, block in enumerate(symbol_blocks):
+            for symbol in block:
+                if len(symbol) == 1:  # means it's an original symbol
+                    self.sv.events_dict[symbol].original_block_idx = idx
