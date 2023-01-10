@@ -203,6 +203,8 @@ class Structural_Variant():
                 upper_str = ele[0].upper()
                 event = encoding[upper_str[0]]
                 print(f'upper_str = {upper_str}\nevent = {event}')
+                # ** going to try to maintain a block_end that will be used for writing the changed fragment
+                block_end = event.end
 
                 if any(c.islower() for c in ele):  # checks if lowercase symbols exist in ele, represents an inversion
                     new_frag += decode_funcs["invert"](event.source_frag)
@@ -223,9 +225,12 @@ class Structural_Variant():
             if idx < len(self.target_symbol_blocks) - 1:
                 dis_event = self.events_dict[Symbols.DIS.value + str(idx + 1)]  # find the nth dispersion event
                 # debug
+                # ** Here dis_event.start is being used as "block_end" but in the case of a flipped dispersion, these
+                # ** won't be equal -- where can we establish the actual block_end?
                 print(f'appending to changed fragments (idx={idx}):\n{str([curr_chr, block_start, dis_event.start, new_frag])}')
                 changed_fragments.append(
-                    [curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
+                    # [curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
+                    [curr_chr, block_start, block_end, new_frag])  # <- block_end being the end of the last symbol in the block
                 block_start = dis_event.end  # move on to next block
                 print(f'block_start changed to {block_start}')
                 curr_chr = dis_event.source_chr
