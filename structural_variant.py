@@ -32,13 +32,6 @@ class Structural_Variant():
         self.source_unique_char, self.target_unique_char = Structural_Variant.reformat_seq(
             self.source), Structural_Variant.reformat_seq(self.target)
 
-        # debug
-        print('source and target info after calls to reformat_seq')
-        print(f'source = {self.source}')
-        print(f'target = {self.target}')
-        print(f'source_unique_char = {self.source_unique_char}')
-        print(f'target_unique_char = {self.target_unique_char}')
-
         # initialize event classes
         self.start = None  # defines the space in which SV operates
         self.end = None
@@ -143,6 +136,7 @@ class Structural_Variant():
         print('END OF INITIALIZE_EVENTS')
         print(f'self.events_dict = {self.events_dict}')
 
+    # MOVING INTO BLOCKS CLASS
     def generate_blocks(self):
         '''
         Groups together source and target symbols between dispersion events (_)
@@ -151,6 +145,7 @@ class Structural_Variant():
         -> returns list of lists
         '''
 
+        # MOVING INTO BLOCKS CLASS
         def find_blocks(transformation):
             # transformation: tuple of strings
             # -> returns list of lists of strings
@@ -164,6 +159,7 @@ class Structural_Variant():
                     blocks.append([])
             return blocks
 
+        # MOVING INTO BLOCKS CLASS
         def track_original_symbol(symbol_blocks):
             # finds which region/block the original symbol is in
             # if symbol is later found in another region, then translocation detected
@@ -204,6 +200,8 @@ class Structural_Variant():
               f'target_symbol_blocks = {self.target_symbol_blocks}')
         curr_chr = self.start_chr
 
+        # TODO: move this logic into the Blocks class -- want to use this to create the Blocks.target list as a list of event objects
+        #  with the relevant position information already input
         for idx, block in enumerate(self.target_symbol_blocks):
             print(f'idx, block = {idx}, {block}')
             new_frag = ""
@@ -302,9 +300,11 @@ class Blocks():
 
     @staticmethod
     def find_blocks(transformation):
-        # transformation: tuple of strings
+        # TODO: want to place the here the logic from change_fragments where we're getting the info about target events
+        #  by querying the sv.events_dict with the target symbols from sv.target_unique_char
+        # transformation: tuple of strings (source or target chars)
         # -> returns list of lists of subevents
-        # Ex. ("A","B","_","C","D") -> [["A","B"], ["C","D"]]
+        # Ex. ("A","B","_","C","D") -> [["A","B"], ["C","D"]]  #<-- want to skip the string step and make this with the list elts being the subevents specifically
         # Ex. ("A","B","_","_") -> [["A","B"],[],[]]
         blocks = [[]]
         for symbol in transformation:
@@ -313,6 +313,13 @@ class Blocks():
             else:
                 blocks.append([])
         return blocks
+
+    def dispersion_flip(self):
+        # perform the optional flip of the blocks list dictated by the flipped dispersion
+        # --> caveats: - how to determine which section of the source/target blocks lists to flip?
+        # -->          - how to trigger this/identify or mark a dispersion to be flipped?
+        # -->          - should it be a quality of a whole dispersion-related event?
+        pass
 
     def track_original_symbol(self, symbol_blocks):
         # finds which region/block the original symbol is in
