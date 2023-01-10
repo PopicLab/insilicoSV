@@ -493,9 +493,6 @@ class SV_Simulator():
 
                         # dispersion event should not impact whether position is valid or not, given that spacing is already guaranteed
                         if sv_event.symbol.startswith(Symbols.DIS.value):
-                            # TODO: extend dispersions to be able to point in either direction (i.e., starting at the
-                            #  end of the previous event and moving forward, or starting at the beginning of the previous
-                            #  event and moving backwards)
                             # check to see if chosen spot is a valid position
                             if utils.is_overlapping(chr_event_ranges, (
                                     block_start, sv_event.start)):  # sv_event.start is the end of the current block

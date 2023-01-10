@@ -162,12 +162,6 @@ class Structural_Variant():
             for idx, block in enumerate(symbol_blocks):
                 for symbol in block:
                     if len(symbol) == 1:  # means it's an original symbol
-                        #debug
-                        # if symbol not in self.events_dict.keys():
-                            # print(f'source/target for event of type {self.type}')
-                            # print(f'source = {self.source}')
-                            # print(f'target = {self.target}')
-                            # print(f'events_dict for event of type {self.type} = {self.events_dict}')
                         self.events_dict[symbol].original_block_idx = idx
 
         self.source_symbol_blocks = find_blocks(self.source_unique_char)
@@ -196,14 +190,19 @@ class Structural_Variant():
         assert (self.start is not None and self.end is not None), "Undefined SV start for {}".format(
             self)  # start & end should have been defined alongside event positions
         block_start = self.start  # describes SV's start position - applies for the first "block"
+        # debug
+        print(f'about to iterate over target_symbol_blocks\nblock_start = {block_start}'
+              f'target_symbol_blocks = {self.target_symbol_blocks}')
         curr_chr = self.start_chr
 
         for idx, block in enumerate(self.target_symbol_blocks):
+            print(f'idx, block = {idx}, {block}')
             new_frag = ""
             for x, ele in enumerate(block):
                 # used to find corresponding event from encoding, all keys in encoding are in uppercase
                 upper_str = ele[0].upper()
                 event = encoding[upper_str[0]]
+                print(f'upper_str = {upper_str}\nevent = {event}')
 
                 if any(c.islower() for c in ele):  # checks if lowercase symbols exist in ele, represents an inversion
                     new_frag += decode_funcs["invert"](event.source_frag)
@@ -228,6 +227,7 @@ class Structural_Variant():
                 changed_fragments.append(
                     [curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
                 block_start = dis_event.end  # move on to next block
+                print(f'block_start changed to {block_start}')
                 curr_chr = dis_event.source_chr
             else:
                 # debug
