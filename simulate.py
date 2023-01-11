@@ -554,7 +554,10 @@ class SV_Simulator():
         for sv in self.svs:
             if sv.active:
                 # make edits and store in sv object
-                # print(sv)
+                # debug
+                print(f'sv.source_events = {sv.source_events}')
+                print(f'sv.target_events = {sv.target_events}')
+                raise ValueError('DEBUGGING')
                 sv.change_fragment()
                 total += 1
                 print("{} / {} SVs successfully edited".format(total, active_svs_total), end="\r")

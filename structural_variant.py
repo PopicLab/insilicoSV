@@ -249,12 +249,6 @@ class Blocks():
         # *** DO WE EVER USE SOURCE BLOCKS?? DON'T WE JUST NEED THE TARGET BLOCKS WITH THE RIGHT REF FRAGS?
         self.source_blocks = self.find_blocks(self.sv.source_unique_char)
         self.target_blocks = self.find_blocks(self.sv.target_unique_char)
-        # debug
-        print('generate_blocks called in Blocks.init()')
-        print(f'self.sv.source_unique_char = {self.sv.source_unique_char}')
-        print(f'self.sv.target_unique_char = {self.sv.target_unique_char}')
-        print(f'source_symbol_blocks = {self.source_blocks}')
-        print(f'target_symbol_blocks = {self.target_blocks}')
 
     def find_blocks(self, transformation):
         # transformation: tuple of strings (source or target chars)
