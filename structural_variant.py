@@ -43,8 +43,11 @@ class Structural_Variant():
             self.initialize_events(length_ranges)
 
         # TODO: want to instantiate these two values to Blocks() objects at this point
-        self.source_symbol_blocks = []
-        self.target_symbol_blocks = []
+        sv_blocks = Blocks(self)
+        # debug
+        print(f'sv_blocks object: {sv_blocks}')
+        self.source_symbol_blocks = sv_blocks.source_blocks
+        self.target_symbol_blocks = sv_blocks.target_blocks
 
         # specifies if sv is unable to be simulated due to random placement issues
         # will be turned on later
@@ -114,12 +117,12 @@ class Structural_Variant():
             raise Exception("Lengths parameter expects at least one tuple")
         # symbols_dict[Symbols.PLACEHOLDER] = (0, (0,0))
 
-        # if we're operating on a TRA, flip a coin to set the A or B interval to be of size 0
-        if self.type == Variant_Type.TRA:
-            if random.randint(0, 1):
-                symbols_dict['A'] = (0, (0, 0))
-            else:
-                symbols_dict['B'] = (0, (0, 0))
+        # # if we're operating on a TRA, flip a coin to set the A or B interval to be of size 0
+        # if self.type == Variant_Type.TRA:
+        #     if random.randint(0, 1):
+        #         symbols_dict['A'] = (0, (0, 0))
+        #     else:
+        #         symbols_dict['B'] = (0, (0, 0))
 
         # initialize event classes
         for idx, symbol in enumerate(all_symbols):
@@ -137,56 +140,50 @@ class Structural_Variant():
         print(f'self.events_dict = {self.events_dict}')
 
     # MOVING INTO BLOCKS CLASS
-    def generate_blocks(self):
-        '''
-        Groups together source and target symbols between dispersion events (_)
-        Tracks which block index the original symbols are in
-
-        -> returns list of lists
-        '''
-
-        # MOVING INTO BLOCKS CLASS
-        def find_blocks(transformation):
-            # transformation: tuple of strings
-            # -> returns list of lists of strings
-            # Ex. ("A","B","_","C","D") -> [["A","B"], ["C","D"]]
-            # Ex. ("A","B","_","_") -> [["A","B"],[],[]]
-            blocks = [[]]
-            for symbol in transformation:
-                if not symbol.startswith(Symbols.DIS.value):
-                    blocks[-1].append(symbol)
-                else:
-                    blocks.append([])
-            return blocks
-
-        # MOVING INTO BLOCKS CLASS
-        def track_original_symbol(symbol_blocks):
-            # finds which region/block the original symbol is in
-            # if symbol is later found in another region, then translocation detected
-            # blocks: list of lists of symbols
-            for idx, block in enumerate(symbol_blocks):
-                for symbol in block:
-                    if len(symbol) == 1:  # means it's an original symbol
-                        self.events_dict[symbol].original_block_idx = idx
-
-        self.source_symbol_blocks = find_blocks(self.source_unique_char)
-        print(f'source_symbol_blocks = {self.source_symbol_blocks}')
-        self.target_symbol_blocks = find_blocks(self.target_unique_char)
-        print(f'target_symbol_blocks = {self.target_symbol_blocks}')
-        track_original_symbol(self.source_symbol_blocks)
-
-        return self.target_symbol_blocks
+    # def generate_blocks(self):
+    #     '''
+    #     Groups together source and target symbols between dispersion events (_)
+    #     Tracks which block index the original symbols are in
+    #
+    #     -> returns list of lists
+    #     '''
+    #
+    #     # MOVING INTO BLOCKS CLASS
+    #     def find_blocks(transformation):
+    #         # transformation: tuple of strings
+    #         # -> returns list of lists of strings
+    #         # Ex. ("A","B","_","C","D") -> [["A","B"], ["C","D"]]
+    #         # Ex. ("A","B","_","_") -> [["A","B"],[],[]]
+    #         blocks = [[]]
+    #         for symbol in transformation:
+    #             if not symbol.startswith(Symbols.DIS.value):
+    #                 blocks[-1].append(symbol)
+    #             else:
+    #                 blocks.append([])
+    #         return blocks
+    #
+    #     # MOVING INTO BLOCKS CLASS
+    #     def track_original_symbol(symbol_blocks):
+    #         # finds which region/block the original symbol is in
+    #         # if symbol is later found in another region, then translocation detected
+    #         # blocks: list of lists of symbols
+    #         for idx, block in enumerate(symbol_blocks):
+    #             for symbol in block:
+    #                 if len(symbol) == 1:  # means it's an original symbol
+    #                     self.events_dict[symbol].original_block_idx = idx
+    #
+    #     self.source_symbol_blocks = find_blocks(self.source_unique_char)
+    #     print(f'source_symbol_blocks = {self.source_symbol_blocks}')
+    #     self.target_symbol_blocks = find_blocks(self.target_unique_char)
+    #     print(f'target_symbol_blocks = {self.target_symbol_blocks}')
+    #     track_original_symbol(self.source_symbol_blocks)
+    #
+    #     return self.target_symbol_blocks
 
     def change_fragment(self):
         '''
         Takes the mapping of symbols to events and the target sequence to construct a replacement sequence for the reference fragment
         '''
-        decode_funcs = {"invert": lambda string: utils.complement(string[::-1]),
-                        "identity": lambda string: string,
-                        "complement": utils.complement,
-                        "diverge": lambda string: utils.divergence(string)}
-        encoding = self.events_dict  # maps symbol like A or B to base pairs on reference
-
         # find all blocks of symbols between dispersion events
         # we will apply edits based on a block's start and end pos
         self.generate_blocks()  # blocks are the groupings of non-dispersion events
@@ -265,7 +262,7 @@ class Structural_Variant():
 class Event():
     '''represents the symbols, also known as the "events," within a SV transformation'''
 
-    def __init__(self, sv_parent, length, length_range, symbol):
+    def __init__(self, sv_parent, length, length_range, symbol, source_frag=None):
         '''
         sv_parent: Structural Variant, event is always part of larger SV
         '''
@@ -273,7 +270,7 @@ class Event():
         self.length = length
         self.length_range = length_range
         self.symbol = symbol  # refers to symbol in SV's transformation
-        self.source_chr = None
+        self.source_chr = None if not source_frag else source_frag
         self.source_frag = None
         self.start = None
         self.end = None
@@ -281,6 +278,7 @@ class Event():
     def __repr__(self):
         return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end,
                                     "source_chr": self.source_chr, "source_frag": self.source_frag})
+
 
 class Blocks():
     """
@@ -290,29 +288,50 @@ class Blocks():
         self.sv = sv
         self.source_blocks = []
         self.target_blocks = []
+        self.generate_blocks()
+        self.track_original_symbol(self.source_blocks)
 
     def generate_blocks(self):
+        # *** DO WE EVER USE SOURCE BLOCKS?? DON'T WE JUST NEED THE TARGET BLOCKS WITH THE RIGHT REF FRAGS?
         self.source_blocks = self.find_blocks(self.sv.source_unique_char)
-        print(f'source_symbol_blocks = {self.source_blocks}')
         self.target_blocks = self.find_blocks(self.sv.target_unique_char)
+        # debug
+        print(f'source_symbol_blocks = {self.source_blocks}')
         print(f'target_symbol_blocks = {self.target_blocks}')
-        self.track_original_symbol()
 
-    @staticmethod
-    def find_blocks(transformation):
-        # TODO: want to place the here the logic from change_fragments where we're getting the info about target events
-        #  by querying the sv.events_dict with the target symbols from sv.target_unique_char
+    def find_blocks(self, transformation):
         # transformation: tuple of strings (source or target chars)
         # -> returns list of lists of subevents
-        # Ex. ("A","B","_","C","D") -> [["A","B"], ["C","D"]]  #<-- want to skip the string step and make this with the list elts being the subevents specifically
-        # Ex. ("A","B","_","_") -> [["A","B"],[],[]]
+        # Ex. ("A","B","_","C","D") -> [[Event("A",...),Event("B",...)], [Event("C",...),Event("D",...)]]
+        # Ex. ("A","B","_","_") -> [[Event("A",...),Event("B",...)],[],[]]
         blocks = [[]]
-        for symbol in transformation:
-            if not symbol.startswith(Symbols.DIS.value):
-                blocks[-1].append(symbol)
-            else:
+        for idx, symbol in transformation:
+            # used to find corresponding event from encoding, all keys in encoding are in uppercase
+            upper_str = symbol[0].upper()
+            source_event = self.sv.events_dict[upper_str[0]]
+            target_event = Event(sv_parent=self.sv, length=source_event.length, length_range=None, symbol=symbol,
+                                 source_frag=self.get_event_frag(source_event, symbol))
+            if symbol.startswith(Symbols.DIS.value):
                 blocks.append([])
+            else:
+                blocks[-1].append(target_event)
         return blocks
+
+    @staticmethod
+    def get_event_frag(self, event, symbol):
+        # helper fn to get the ref frag for a given subevent
+        # event: source event from events_dict
+        # symbol: target symbol
+        decode_funcs = {"invert": lambda string: utils.complement(string[::-1]),
+                        "identity": lambda string: string,
+                        "complement": utils.complement,
+                        "diverge": lambda string: utils.divergence(string)}
+        if any(c.islower() for c in symbol):
+            return decode_funcs["invert"](event.source_frag)
+        elif symbol[-1] == '*':  # checks if the element ends in an *, representing a divergent duplicate
+            return decode_funcs["diverge"](event.source_frag)
+        else:  # take original fragment, no changes
+            return event.source_frag
 
     def dispersion_flip(self):
         # perform the optional flip of the blocks list dictated by the flipped dispersion
@@ -329,3 +348,7 @@ class Blocks():
             for symbol in block:
                 if len(symbol) == 1:  # means it's an original symbol
                     self.sv.events_dict[symbol].original_block_idx = idx
+
+    def __repr__(self):
+        return f"SOURCE_BLOCKS: {self.source_blocks}\n" \
+               f"TARGET_BLOCKS: {self.target_blocks}"
