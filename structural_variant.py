@@ -289,7 +289,7 @@ class Blocks():
         self.source_blocks = []
         self.target_blocks = []
         self.generate_blocks()
-        self.track_original_symbol(self.source_blocks)
+        self.track_original_symbol()
 
     def generate_blocks(self):
         # *** DO WE EVER USE SOURCE BLOCKS?? DON'T WE JUST NEED THE TARGET BLOCKS WITH THE RIGHT REF FRAGS?
