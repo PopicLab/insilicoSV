@@ -467,7 +467,8 @@ class SV_Simulator():
                     prev_start = None
                     for sv_event in sv.source_events:
                         # debug -- manually reversed dispersion
-                        flip_dispersion = True #<- dummy bool to trigger flipping the dispersion
+                        # TODO: dispersion flipping won't be here, it'll be handled in Blocks
+                        flip_dispersion = False #<- dummy bool to trigger flipping the dispersion
                         if sv_event.symbol.startswith(Symbols.DIS.value) and flip_dispersion:
                             # special source event logic for a dispersion that needs to be flipped
                             # --> want sv_event.start to be the preceeding A's start (current start_pos - A.len)
