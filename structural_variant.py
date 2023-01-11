@@ -319,7 +319,7 @@ class Blocks():
         return blocks
 
     @staticmethod
-    def get_event_frag(self, event, symbol):
+    def get_event_frag(event, symbol):
         # helper fn to get the ref frag for a given subevent
         # event: source event from events_dict
         # symbol: target symbol
