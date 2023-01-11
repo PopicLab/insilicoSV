@@ -555,8 +555,8 @@ class SV_Simulator():
             if sv.active:
                 # make edits and store in sv object
                 # debug
-                print(f'sv.source_events = {sv.source_events}')
-                print(f'sv.target_events = {sv.target_events}')
+                print(f'sv.source_events = {sv.source_symbol_blocks}')
+                print(f'sv.target_events = {sv.target_symbol_blocks}')
                 raise ValueError('DEBUGGING')
                 sv.change_fragment()
                 total += 1
