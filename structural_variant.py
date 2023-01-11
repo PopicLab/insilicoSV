@@ -296,6 +296,7 @@ class Blocks():
         self.source_blocks = self.find_blocks(self.sv.source_unique_char)
         self.target_blocks = self.find_blocks(self.sv.target_unique_char)
         # debug
+        print('generate_blocks called in Blocks.init()')
         print(f'source_symbol_blocks = {self.source_blocks}')
         print(f'target_symbol_blocks = {self.target_blocks}')
 
@@ -305,7 +306,7 @@ class Blocks():
         # Ex. ("A","B","_","C","D") -> [[Event("A",...),Event("B",...)], [Event("C",...),Event("D",...)]]
         # Ex. ("A","B","_","_") -> [[Event("A",...),Event("B",...)],[],[]]
         blocks = [[]]
-        for idx, symbol in transformation:
+        for symbol in transformation:
             # used to find corresponding event from encoding, all keys in encoding are in uppercase
             upper_str = symbol[0].upper()
             source_event = self.sv.events_dict[upper_str[0]]
