@@ -308,8 +308,8 @@ class Blocks():
         blocks = [[]]
         for symbol in transformation:
             # used to find corresponding event from encoding, all keys in encoding are in uppercase
-            upper_str = symbol[0].upper()
-            source_event = self.sv.events_dict[upper_str[0]]
+            # upper_str = symbol[0].upper()
+            source_event = self.sv.events_dict[symbol[0].upper()]
             target_event = Event(sv_parent=self.sv, length=source_event.length, length_range=None, symbol=symbol,
                                  source_frag=self.get_event_frag(source_event, symbol))
             if symbol.startswith(Symbols.DIS.value):
