@@ -297,6 +297,8 @@ class Blocks():
         self.target_blocks = self.find_blocks(self.sv.target_unique_char)
         # debug
         print('generate_blocks called in Blocks.init()')
+        print(f'self.sv.source_unique_char = {self.sv.source_unique_char}')
+        print(f'self.sv.target_unique_char = {self.sv.target_unique_char}')
         print(f'source_symbol_blocks = {self.source_blocks}')
         print(f'target_symbol_blocks = {self.target_blocks}')
 
@@ -341,14 +343,14 @@ class Blocks():
         # -->          - should it be a quality of a whole dispersion-related event?
         pass
 
-    def track_original_symbol(self, symbol_blocks):
+    def track_original_symbol(self):
         # finds which region/block the original symbol is in
         # if symbol is later found in another region, then translocation detected
         # blocks: list of lists of symbols
-        for idx, block in enumerate(symbol_blocks):
-            for symbol in block:
-                if len(symbol) == 1:  # means it's an original symbol
-                    self.sv.events_dict[symbol].original_block_idx = idx
+        for idx, block in enumerate(self.source_blocks):
+            for event in block:
+                if len(event.symbol) == 1:  # means it's an original symbol
+                    event.original_block_idx = idx
 
     def __repr__(self):
         return f"SOURCE_BLOCKS: {self.source_blocks}\n" \
