@@ -427,6 +427,7 @@ class SV_Simulator():
         '''
         # debug
         print('ENTERING CHOOSE_RAND_POS')
+        # ---- these variables are just for logging; any way to move all this logic to a logging util function? ----
         active_svs_total = 0
         inactive_svs_total = 0
         time_start_local = 0

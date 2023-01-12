@@ -48,6 +48,10 @@ class Structural_Variant():
         self.source_symbol_blocks = sv_blocks.source_blocks
         self.target_symbol_blocks = sv_blocks.target_blocks
 
+        ## once the blocks are populated with initialized events, want to define their start/end positions
+        ## and get their
+        # self.assign_locations(randomized)
+
         # specifies if sv is unable to be simulated due to random placement issues
         # will be turned on later
         self.active = False
@@ -114,14 +118,6 @@ class Structural_Variant():
 
         else:
             raise Exception("Lengths parameter expects at least one tuple")
-        # symbols_dict[Symbols.PLACEHOLDER] = (0, (0,0))
-
-        # # if we're operating on a TRA, flip a coin to set the A or B interval to be of size 0
-        # if self.type == Variant_Type.TRA:
-        #     if random.randint(0, 1):
-        #         symbols_dict['A'] = (0, (0, 0))
-        #     else:
-        #         symbols_dict['B'] = (0, (0, 0))
 
         # initialize event classes
         for idx, symbol in enumerate(all_symbols):
@@ -137,6 +133,17 @@ class Structural_Variant():
         # debug
         print('END OF INITIALIZE_EVENTS')
         print(f'self.events_dict = {self.events_dict}')
+
+    def assign_locations(self):
+        """
+        assign events start and end positions (the single-sv-level version of choose_rand_pos originally)
+        --> to be performed once source and target Blocks objects are populated and in the right order
+        --> (so the process will be to choose a start position for the SV and assign all the successive positions accordingly)
+        """
+        # TODO: moving choose_rand_pos() logic into SV object -- seems more appropriate as a step in the event
+        #  initialization process
+        #  --> choose_rand_pos() also has some extra logic to maintain info about active/inactive variants (not sure what the meaning is)
+        pass
 
     def change_fragment(self):
         '''
@@ -204,7 +211,7 @@ class Structural_Variant():
         self.changed_fragments = changed_fragments
         self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
         # TODO: THIS RETURN IS ONLY USED FOR THE TESTS THAT ARE WRITTEN -- DELETE THIS AND REFACTOR THOSE
-        return changed_fragments
+        # return changed_fragments
 
     def clean_event_storage(self):
         # remove source fragments from events to save space as they are no longer needed
@@ -243,6 +250,9 @@ class Blocks():
         self.source_blocks = []
         self.target_blocks = []
         self.generate_blocks()
+        # TODO: optional dispersion flip should be done in init step
+        # if _____:
+        #   self.dispersion_flip()
         self.track_original_symbol()
 
     def generate_blocks(self):
