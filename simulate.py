@@ -408,10 +408,10 @@ class SV_Simulator():
 
         # export variant data to BED file
         # TODO: update export functions to work with new Block representation
+        # self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file=initial_reset)
         # debug
         for sv in active_svs:
             print(f'sv.events_dict:{sv.events_dict}')
-        self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file=initial_reset)
         self.formatter.export_to_vcf(active_svs, self.stats, vcffile=bedfile[:-4]+'.vcf')
 
         # create and export stats file

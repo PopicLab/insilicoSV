@@ -240,8 +240,8 @@ class Blocks():
         self.target_blocks = []
         self.generate_blocks()
         # TODO: optional dispersion flip should be done in init step
-        # if _____:
-        #   self.dispersion_flip()
+        if True:
+            self.dispersion_flip()
         self.track_original_symbol()
 
     def generate_blocks(self):
@@ -269,14 +269,14 @@ class Blocks():
                 blocks[-1].append(target_event)
         return blocks
 
-    @staticmethod
-
     def dispersion_flip(self):
         # perform the optional flip of the blocks list dictated by the flipped dispersion
         # --> caveats: - how to determine which section of the source/target blocks lists to flip?
         # -->          - how to trigger this/identify or mark a dispersion to be flipped?
         # -->          - should it be a quality of a whole dispersion-related event?
-        pass
+        # ===> Is it incorrect to just flip the entire list of target blocks? I don't think this is the completely
+        # general rule, but for all of our dispersion events I think this will always be the case..
+        self.target_blocks = self.target_blocks[::-1]
 
     def track_original_symbol(self):
         # finds which region/block the original symbol is in
