@@ -190,11 +190,15 @@ class Structural_Variant():
             if block[0].symbol.startswith(Symbols.DIS.value):
                 continue
             for i in range(len(block)):
+                # debug
+                print(f'i = {i}')
                 ev = block[i]
                 new_frag += ev.source_frag
                 if i == 0:
+                    print('i == 0')
                     block_start = ev.start
                 elif i == len(block) - 1:
+                    print('i = len(block) - 1')
                     block_end = ev.end
             changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
             print(f'new change fragment : {changed_fragments[-1]}')
