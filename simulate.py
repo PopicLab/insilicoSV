@@ -407,7 +407,8 @@ class SV_Simulator():
                 time_start = time.time()
 
         # export variant data to BED file
-        self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file=initial_reset)
+        # TODO: update export_to_bedpe to reflect new Block representation
+        # self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file=initial_reset)
         self.formatter.export_to_vcf(active_svs, self.stats, vcffile=bedfile[:-4]+'.vcf')
 
         # create and export stats file
@@ -488,7 +489,7 @@ class SV_Simulator():
                     else:
                         new_intervals.append((block_start, sv.end))
 
-                    # can we just keep all of the above logic checking validity and populating the source_events frags?
+                    # function to set start/end positions in target Blocks list (ordered list of events)
                     sv.assign_locations(start_pos)
 
             # adds new SV to simulate only if chosen positions were valid
