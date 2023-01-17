@@ -39,6 +39,11 @@ class Structural_Variant():
         self.source_events = []  # list of Event classes for every symbol in source sequence
         self.events_dict = dict()  # maps every unique symbol in source and target to an Event class
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
+        # TODO: how to articulate/determine whether we're considering a dispersion event that should be flipped
+        self.dispersion_flip = False
+        # while experimenting with this mode, setting the flip to true
+        if True:
+            self.dispersion_flip = True
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
             self.initialize_events(length_ranges)
@@ -147,7 +152,7 @@ class Structural_Variant():
         print('END OF INITIALIZE_EVENTS')
         print(f'self.events_dict = {self.events_dict}')
 
-    def assign_locations(self, start_pos, flipped=True):
+    def assign_locations(self, start_pos):
         """
         assign events start and end positions (the single-sv-level version of choose_rand_pos originally)
         --> to be performed once source and target Blocks objects are populated and in the right order
@@ -159,7 +164,7 @@ class Structural_Variant():
         this method to actually modify the target_blocks' events objects to set the start/end positions
         """
         current_pos = start_pos
-        if flipped:
+        if self.dispersion_flip:
             blocks = self.target_symbol_blocks[::-1]
         else:
             blocks = self.target_symbol_blocks
