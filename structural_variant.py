@@ -147,7 +147,7 @@ class Structural_Variant():
         print('END OF INITIALIZE_EVENTS')
         print(f'self.events_dict = {self.events_dict}')
 
-    def assign_locations(self, start_pos):
+    def assign_locations(self, start_pos, flipped=True):
         """
         assign events start and end positions (the single-sv-level version of choose_rand_pos originally)
         --> to be performed once source and target Blocks objects are populated and in the right order
@@ -240,8 +240,8 @@ class Blocks():
         self.target_blocks = []
         self.generate_blocks()
         # TODO: optional dispersion flip should be done in init step
-        if True:
-            self.dispersion_flip()
+        # if True:
+        #     self.dispersion_flip()
         self.track_original_symbol()
 
     def generate_blocks(self):
