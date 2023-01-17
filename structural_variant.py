@@ -159,7 +159,11 @@ class Structural_Variant():
         this method to actually modify the target_blocks' events objects to set the start/end positions
         """
         current_pos = start_pos
-        for block in self.target_symbol_blocks:
+        if flipped:
+            blocks = self.target_symbol_blocks
+        else:
+            blocks = self.target_symbol_blocks
+        for block in blocks:
             for ev in block:
                 if ev.symbol.startswith(Symbols.DIS.value):
                     current_pos += ev.length
