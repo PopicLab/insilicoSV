@@ -86,6 +86,22 @@ class Structural_Variant():
                 unique_id += 1
         return tuple(unique_transform)
 
+    @staticmethod
+    def get_event_frag(event, symbol):
+        # helper fn to get the ref frag for a given subevent
+        # event: source event from events_dict
+        # symbol: target symbol
+        decode_funcs = {"invert": lambda string: utils.complement(string[::-1]),
+                        "identity": lambda string: string,
+                        "complement": utils.complement,
+                        "diverge": lambda string: utils.divergence(string)}
+        if any(c.islower() for c in symbol):
+            return decode_funcs["invert"](event.source_frag)
+        elif symbol[-1] == '*':  # checks if the element ends in an *, representing a divergent duplicate
+            return decode_funcs["diverge"](event.source_frag)
+        else:  # take original fragment, no changes
+            return event.source_frag
+
     def initialize_events(self, lengths):
         '''
         Initializes event classes and creates a mapping of symbol to event
@@ -152,6 +168,8 @@ class Structural_Variant():
                 else:
                     ev.start = current_pos
                     ev.end = current_pos + ev.length
+                    source_event = self.events_dict[ev.symbol]
+                    ev.source_frag = self.get_event_frag(source_event, ev.symbol)
                     current_pos = ev.end
         # debug
         print(f'target_symbol_blocks: {self.target_symbol_blocks}')
@@ -288,26 +306,12 @@ class Blocks():
                 # used to find corresponding event from encoding, all keys in encoding are in uppercase
                 # upper_str = symbol[0].upper()
                 source_event = self.sv.events_dict[symbol[0].upper()]
-                target_event = Event(sv_parent=self.sv, length=source_event.length, length_range=None, symbol=symbol,
-                                     source_frag=self.get_event_frag(source_event, symbol))
+                target_event = Event(sv_parent=self.sv, length=source_event.length, length_range=None, symbol=symbol)#,
+                                     # source_frag=self.get_event_frag(source_event, symbol))
                 blocks[-1].append(target_event)
         return blocks
 
     @staticmethod
-    def get_event_frag(event, symbol):
-        # helper fn to get the ref frag for a given subevent
-        # event: source event from events_dict
-        # symbol: target symbol
-        decode_funcs = {"invert": lambda string: utils.complement(string[::-1]),
-                        "identity": lambda string: string,
-                        "complement": utils.complement,
-                        "diverge": lambda string: utils.divergence(string)}
-        if any(c.islower() for c in symbol):
-            return decode_funcs["invert"](event.source_frag)
-        elif symbol[-1] == '*':  # checks if the element ends in an *, representing a divergent duplicate
-            return decode_funcs["diverge"](event.source_frag)
-        else:  # take original fragment, no changes
-            return event.source_frag
 
     def dispersion_flip(self):
         # perform the optional flip of the blocks list dictated by the flipped dispersion

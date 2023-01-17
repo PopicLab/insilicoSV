@@ -456,9 +456,6 @@ class SV_Simulator():
                     continue
                 else:
                     start_pos = random_gen.randint(0, chr_len - sv.req_space)
-                    sv.assign_locations(start_pos)
-                    raise ValueError('DEBUGGING')
-                    # ---------------------- want to remove following logic until 'if valid:...'-----------------------------
                     # define the space in which SV operates
                     # we now also know where the target positions lie since we know the order and length of events
                     new_intervals = []  # tracks new ranges of blocks
@@ -493,6 +490,10 @@ class SV_Simulator():
                         continue
                     else:
                         new_intervals.append((block_start, sv.end))
+
+                    # can we just keep all of the above logic checking validity and populating the source_events frags?
+                    sv.assign_locations(start_pos)
+                    raise ValueError('DEBUGGING')
 
             # adds new SV to simulate only if chosen positions were valid
             if valid:
