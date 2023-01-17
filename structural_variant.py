@@ -38,6 +38,7 @@ class Structural_Variant():
         self.req_space = None  # required space for SV, sum of event lengths
         self.source_events = []  # list of Event classes for every symbol in source sequence
         self.events_dict = dict()  # maps every unique symbol in source and target to an Event class
+        self.changed_fragments = []  # list recording new fragments to be placed in the output ref
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
             self.initialize_events(length_ranges)
@@ -47,9 +48,6 @@ class Structural_Variant():
         print(f'==== sv_blocks object ====\n{sv_blocks}')
         self.source_symbol_blocks = sv_blocks.source_blocks
         self.target_symbol_blocks = sv_blocks.target_blocks
-
-        ## once the blocks are populated with initialized events, want to define their start/end positions
-        # self.assign_locations(randomized)
 
         # specifies if sv is unable to be simulated due to random placement issues
         # will be turned on later
@@ -170,7 +168,7 @@ class Structural_Variant():
                     ev.end = current_pos + ev.length
                     source_event = self.events_dict[ev.symbol[0].upper()]
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
-                    ev.source_chr = source_event.source_chr
+                    ev.source_chr = self.start_chr
                     current_pos = ev.end
         # debug
         print(f'===LOCATIONS ASSIGNED===\ntarget_symbol_blocks: {self.target_symbol_blocks}')
@@ -182,63 +180,50 @@ class Structural_Variant():
         changed_fragments = []
         assert (self.start is not None and self.end is not None), "Undefined SV start for {}".format(
             self)  # start & end should have been defined alongside event positions
-        block_start = self.start  # describes SV's start position - applies for the first "block"
-        curr_chr = self.start_chr
+        block_start = None
+        block_end = None
 
-        # TODO: move this logic into the Blocks class -- want to use this to create the Blocks.target list as a list of event objects
-        #  with the relevant position information already input
-        for idx, block in enumerate(self.target_symbol_blocks):
-            print(f'idx, block = {idx}, {block}')
-            new_frag = ""
-            for x, ele in enumerate(block):
-                # used to find corresponding event from encoding, all keys in encoding are in uppercase
-                upper_str = ele[0].upper()
-                event = encoding[upper_str[0]]
-                print(f'upper_str = {upper_str}\nevent = {event}')
-                # ** going to try to maintain a block_end that will be used for writing the changed fragment
-                block_end = event.end
+        # debug
+        print('===CHANGE_FRAGMENT===')
+        for block in self.target_symbol_blocks:
+            new_frag = ''
+            if block[0].symbol.startswith(Symbols.DIS.value):
+                continue
+            for i in range(len(block)):
+                ev = block[i]
+                new_frag += ev.source_frag
+                if i == 0:
+                    block_start = ev.start
+                elif i == len(block) - 1:
+                    block_end = ev.end
+            changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
+            print(f'new change fragment : {changed_fragments[-1]}')
 
-                if any(c.islower() for c in ele):  # checks if lowercase symbols exist in ele, represents an inversion
-                    new_frag += decode_funcs["invert"](event.source_frag)
-
-                elif ele[-1] == '*': # checks if the element ends in an *, representing a divergent duplicate
-                    new_frag += decode_funcs["diverge"](event.source_frag)
-
-                elif upper_str[0] in encoding:  # take original fragment, no changes
-                    new_frag += event.source_frag
-
-                elif ele.startswith(Symbols.DIS.value):  # DIS = dispersion event ("_")
-                    raise Exception("Dispersion event detected within block: {}".format(self.target_symbol_blocks))
-                else:
-                    raise Exception("Symbol {} failed to fall in any cases".format(ele))
-
-            # find dispersion event right after block to find position of next block
-            assert curr_chr != None, "Unvalid chr detected for SV {} and events_dict {}".format(self, self.events_dict)
-            if idx < len(self.target_symbol_blocks) - 1:
-                dis_event = self.events_dict[Symbols.DIS.value + str(idx + 1)]  # find the nth dispersion event
-                # debug
-                # ** Here dis_event.start is being used as "block_end" but in the case of a flipped dispersion, these
-                # ** won't be equal -- where can we establish the actual block_end?
-                print(f'appending to changed fragments (idx={idx}):\n{str([curr_chr, block_start, block_end, new_frag])}')
-                changed_fragments.append(
-                    # [curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
-                    [curr_chr, block_start, block_end, new_frag])  # <- block_end being the end of the last symbol in the block
-                block_start = dis_event.end  # move on to next block
-                print(f'block_start changed to {block_start}')
-                curr_chr = dis_event.source_chr
-            else:
-                # debug
-                print(f'appending to changed fragments (idx={idx}):\n{str([curr_chr, block_start, block_start, new_frag])}')
-                # ** for flipped dispersion self.end is in the wrong place (it should match with block_start)
-                # ** --> it gets set to sv.start + sv.req_space in choose_rand_pos()
-                changed_fragments.append([curr_chr, block_start, self.end, new_frag])
-                # ** this is what we want for dDUPs/INV_dDUPs but not for events without dispersions
-                # changed_fragments.append([curr_chr, block_start, block_start, new_frag])
+            # # find dispersion event right after block to find position of next block
+            # assert curr_chr != None, "Unvalid chr detected for SV {} and events_dict {}".format(self, self.events_dict)
+            # if idx < len(self.target_symbol_blocks) - 1:
+            #     dis_event = self.events_dict[Symbols.DIS.value + str(idx + 1)]  # find the nth dispersion event
+            #     # debug
+            #     # ** Here dis_event.start is being used as "block_end" but in the case of a flipped dispersion, these
+            #     # ** won't be equal -- where can we establish the actual block_end?
+            #     print(f'appending to changed fragments (idx={idx}):\n{str([curr_chr, block_start, block_end, new_frag])}')
+            #     changed_fragments.append(
+            #         # [curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
+            #         [curr_chr, block_start, block_end, new_frag])  # <- block_end being the end of the last symbol in the block
+            #     block_start = dis_event.end  # move on to next block
+            #     print(f'block_start changed to {block_start}')
+            #     curr_chr = dis_event.source_chr
+            # else:
+            #     # debug
+            #     print(f'appending to changed fragments (idx={idx}):\n{str([curr_chr, block_start, block_start, new_frag])}')
+            #     # ** for flipped dispersion self.end is in the wrong place (it should match with block_start)
+            #     # ** --> it gets set to sv.start + sv.req_space in choose_rand_pos()
+            #     changed_fragments.append([curr_chr, block_start, self.end, new_frag])
+            #     # ** this is what we want for dDUPs/INV_dDUPs but not for events without dispersions
+            #     # changed_fragments.append([curr_chr, block_start, block_start, new_frag])
 
         self.changed_fragments = changed_fragments
         self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
-        # TODO: THIS RETURN IS ONLY USED FOR THE TESTS THAT ARE WRITTEN -- DELETE THIS AND REFACTOR THOSE
-        # return changed_fragments
 
     def clean_event_storage(self):
         # remove source fragments from events to save space as they are no longer needed

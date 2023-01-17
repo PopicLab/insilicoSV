@@ -425,8 +425,6 @@ class SV_Simulator():
         random_gen: only relevant for unittesting
         -> returns list of tuples, represents position ranges for non-dispersion events
         '''
-        # debug
-        print('ENTERING CHOOSE_RAND_POS')
         active_svs_total = 0
         inactive_svs_total = 0
         time_start_local = 0
@@ -492,7 +490,6 @@ class SV_Simulator():
 
                     # can we just keep all of the above logic checking validity and populating the source_events frags?
                     sv.assign_locations(start_pos)
-                    raise ValueError('DEBUGGING')
 
             # adds new SV to simulate only if chosen positions were valid
             if valid:
