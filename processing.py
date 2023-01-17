@@ -138,7 +138,8 @@ class FormatterIO():
             curr_chr = sv.start_chr
             for idx, block in enumerate(sv.target_symbol_blocks):
                 order = 0
-                for x, symbol in enumerate(block):
+                for x, ev in enumerate(block):
+                    symbol = ev.symbol
                     event = encoding[symbol.upper()[0]]
 
                     # duplication/inverted-duplications

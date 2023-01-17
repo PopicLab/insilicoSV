@@ -194,10 +194,8 @@ class Structural_Variant():
                 new_frag += ev.source_frag
                 if i == 0:
                     block_start = ev.start
-                    print(f'setting block_start=ev.start for ev={ev}')
                 if i == len(block) - 1:
                     block_end = ev.end
-                    print(f'setting block_end=ev.end for ev={ev}')
             changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
             print(f'new change fragment : {changed_fragments[-1]}')
 
