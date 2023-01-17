@@ -160,7 +160,7 @@ class Structural_Variant():
         """
         current_pos = start_pos
         if flipped:
-            blocks = self.target_symbol_blocks
+            blocks = self.target_symbol_blocks[::-1]
         else:
             blocks = self.target_symbol_blocks
         for block in blocks:
