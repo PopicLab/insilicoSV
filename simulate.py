@@ -456,6 +456,9 @@ class SV_Simulator():
                     continue
                 else:
                     start_pos = random_gen.randint(0, chr_len - sv.req_space)
+                    sv.assign_locations(start_pos)
+                    raise ValueError('DEBUGGING')
+                    # ---------------------- want to remove following logic until 'if valid:...'-----------------------------
                     # define the space in which SV operates
                     # we now also know where the target positions lie since we know the order and length of events
                     new_intervals = []  # tracks new ranges of blocks

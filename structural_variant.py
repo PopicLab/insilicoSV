@@ -49,7 +49,6 @@ class Structural_Variant():
         self.target_symbol_blocks = sv_blocks.target_blocks
 
         ## once the blocks are populated with initialized events, want to define their start/end positions
-        ## and get their
         # self.assign_locations(randomized)
 
         # specifies if sv is unable to be simulated due to random placement issues
@@ -134,16 +133,28 @@ class Structural_Variant():
         print('END OF INITIALIZE_EVENTS')
         print(f'self.events_dict = {self.events_dict}')
 
-    def assign_locations(self):
+    def assign_locations(self, start_pos):
         """
         assign events start and end positions (the single-sv-level version of choose_rand_pos originally)
         --> to be performed once source and target Blocks objects are populated and in the right order
         --> (so the process will be to choose a start position for the SV and assign all the successive positions accordingly)
+        ** NB: will just apply this to target_blocks (the source representation doesn't appear to be necessary beyond
+        being queried for change_fragment())
+        ** usage: going to keep choose_rand_pos() in the simulator object and have that perform the drawing/checking of
+        a valid start position (since that needs access to the max_tries setting from the config), but going to invoke
+        this method to actually modify the target_blocks' events objects to set the start/end positions
         """
-        # TODO: moving choose_rand_pos() logic into SV object -- seems more appropriate as a step in the event
-        #  initialization process
-        #  --> choose_rand_pos() also has some extra logic to maintain info about active/inactive variants (not sure what the meaning is)
-        pass
+        current_pos = start_pos
+        for block in self.target_symbol_blocks:
+            for ev in block:
+                if ev.symbol.startswith(Symbols.DIS.value):
+                    current_pos += ev.length
+                else:
+                    ev.start = current_pos
+                    ev.end = current_pos + ev.length
+                    current_pos = ev.end
+        # debug
+        print(f'target_symbol_blocks: {self.target_symbol_blocks}')
 
     def change_fragment(self):
         '''
@@ -263,11 +274,15 @@ class Blocks():
     def find_blocks(self, transformation):
         # transformation: tuple of strings (source or target chars)
         # -> returns list of lists of subevents
-        # Ex. ("A","B","_","C","D") -> [[Event("A",...),Event("B",...)], [Event("C",...),Event("D",...)]]
-        # Ex. ("A","B","_","_") -> [[Event("A",...),Event("B",...)],[],[]]
+        # Ex. ("A","B","_","C","D") -> [[Event("A",...),Event("B",...)], [Event("_1")], [Event("C",...),Event("D",...)]]
+        # Ex. ("A","B","_","_") -> [[Event("A",...),Event("B",...)],[Event("_1")],[Event("_2")]]
         blocks = [[]]
         for symbol in transformation:
             if symbol.startswith(Symbols.DIS.value):
+                # going to add singleton lists with the dispersions where they occur so we can keep track of the sizes
+                source_event = self.sv.events_dict[symbol]
+                disp_event = Event(sv_parent=self.sv, length=source_event.length, length_range=None, symbol=symbol)
+                blocks.append([disp_event])
                 blocks.append([])
             else:
                 # used to find corresponding event from encoding, all keys in encoding are in uppercase
