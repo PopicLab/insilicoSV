@@ -170,9 +170,10 @@ class Structural_Variant():
                     ev.end = current_pos + ev.length
                     source_event = self.events_dict[ev.symbol[0].upper()]
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
+                    ev.source_chr = source_event.source_chr
                     current_pos = ev.end
         # debug
-        print(f'target_symbol_blocks: {self.target_symbol_blocks}')
+        print(f'===LOCATIONS ASSIGNED===\ntarget_symbol_blocks: {self.target_symbol_blocks}')
 
     def change_fragment(self):
         '''
@@ -182,9 +183,6 @@ class Structural_Variant():
         assert (self.start is not None and self.end is not None), "Undefined SV start for {}".format(
             self)  # start & end should have been defined alongside event positions
         block_start = self.start  # describes SV's start position - applies for the first "block"
-        # debug
-        print(f'about to iterate over target_symbol_blocks\nblock_start = {block_start}\n'
-              f'target_symbol_blocks = {self.target_symbol_blocks}')
         curr_chr = self.start_chr
 
         # TODO: move this logic into the Blocks class -- want to use this to create the Blocks.target list as a list of event objects
@@ -304,10 +302,8 @@ class Blocks():
                 blocks.append([])
             else:
                 # used to find corresponding event from encoding, all keys in encoding are in uppercase
-                # upper_str = symbol[0].upper()
                 source_event = self.sv.events_dict[symbol[0].upper()]
-                target_event = Event(sv_parent=self.sv, length=source_event.length, length_range=None, symbol=symbol)#,
-                                     # source_frag=self.get_event_frag(source_event, symbol))
+                target_event = Event(sv_parent=self.sv, length=source_event.length, length_range=None, symbol=symbol)
                 blocks[-1].append(target_event)
         return blocks
 
