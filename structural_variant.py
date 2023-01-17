@@ -168,7 +168,7 @@ class Structural_Variant():
                 else:
                     ev.start = current_pos
                     ev.end = current_pos + ev.length
-                    source_event = self.events_dict[ev.symbol]
+                    source_event = self.events_dict[ev.symbol[0].upper()]
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
                     current_pos = ev.end
         # debug
