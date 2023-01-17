@@ -407,7 +407,7 @@ class SV_Simulator():
                 time_start = time.time()
 
         # export variant data to BED file
-        # TODO: update export_to_bedpe to reflect new Block representation
+        # TODO: update export functions to work with new Block representation
         # self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file=initial_reset)
         # debug
         for sv in active_svs:
@@ -494,7 +494,7 @@ class SV_Simulator():
                         new_intervals.append((block_start, sv.end))
 
                     # function to set start/end positions in target Blocks list (ordered list of events)
-                    sv.assign_locations(start_pos)
+                    sv.assign_locations(sv.start)
 
             # adds new SV to simulate only if chosen positions were valid
             if valid:
