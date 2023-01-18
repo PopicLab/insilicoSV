@@ -36,6 +36,7 @@ class Structural_Variant():
         self.start = None  # defines the space in which SV operates
         self.end = None
         self.req_space = None  # required space for SV, sum of event lengths
+        # TODO: only used for iterating over events in choose_rand_pos() -- delete and replace with source_blocks?
         self.source_events = []  # list of Event classes for every symbol in source sequence
         self.events_dict = dict()  # maps every unique symbol in source and target to an Event class
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
@@ -164,14 +165,17 @@ class Structural_Variant():
         this method to actually modify the target_blocks' events objects to set the start/end positions
         """
         current_pos = start_pos
-        if self.dispersion_flip:
-            blocks = self.target_symbol_blocks[::-1]
-        else:
-            blocks = self.target_symbol_blocks
-        for block in blocks:
+        # if self.dispersion_flip:
+        #     # I think this might not be right...
+        #     blocks = self.target_symbol_blocks[::-1]
+        # else:
+        #     blocks = self.target_symbol_blocks
+        for block in self.target_symbol_blocks:
             for ev in block:
                 if ev.symbol.startswith(Symbols.DIS.value):
-                    current_pos += ev.length
+                    ev.start = current_pos
+                    ev.end = current_pos + ev.length
+                    current_pos = ev.end
                 else:
                     ev.start = current_pos
                     ev.end = current_pos + ev.length
@@ -248,9 +252,9 @@ class Blocks():
         self.source_blocks = []
         self.target_blocks = []
         self.generate_blocks()
-        # TODO: optional dispersion flip should be done in init step
-        # if True:
-        #     self.dispersion_flip()
+        # optional dispersion flip should be done in init step
+        if self.sv.type in [Variant_Type.TRA, Variant_Type.dDUP, Variant_Type.INV_dDUP] and self.sv.dispersion_flip:
+            self.flip_blocks()
         self.track_original_symbol()
 
     def generate_blocks(self):
@@ -278,13 +282,14 @@ class Blocks():
                 blocks[-1].append(target_event)
         return blocks
 
-    def dispersion_flip(self):
+    def flip_blocks(self):
         # perform the optional flip of the blocks list dictated by the flipped dispersion
         # --> caveats: - how to determine which section of the source/target blocks lists to flip?
         # -->          - how to trigger this/identify or mark a dispersion to be flipped?
         # -->          - should it be a quality of a whole dispersion-related event?
         # ===> Is it incorrect to just flip the entire list of target blocks? I don't think this is the completely
         # general rule, but for all of our dispersion events I think this will always be the case..
+        self.source_blocks = self.source_blocks[::-1]
         self.target_blocks = self.target_blocks[::-1]
 
     def track_original_symbol(self):
