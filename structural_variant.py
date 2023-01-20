@@ -43,8 +43,12 @@ class Structural_Variant():
         # TODO: how to articulate/determine whether we're considering a dispersion event that should be flipped
         self.dispersion_flip = False
         # while experimenting with this mode, setting the flip to true
-        if True:
-            self.dispersion_flip = True
+        # TODO:
+        #  1) check if flipping works for div_dDUPs
+        #  2) add TRAs to this list once dispersion-flipping logic is written for that case
+        if self.type in ["dDUP", "INV_dDUP", "div_dDUP"]:
+            if random.randint(0, 1):
+                self.dispersion_flip = True
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
             self.initialize_events(length_ranges)
