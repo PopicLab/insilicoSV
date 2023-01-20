@@ -200,6 +200,8 @@ class Structural_Variant():
         print('===CHANGE_FRAGMENT===')
         for block in self.target_symbol_blocks:
             new_frag = ''
+            if len(block) == 0:
+                continue
             if block[0].symbol.startswith(Symbols.DIS.value):
                 continue
             for i in range(len(block)):
