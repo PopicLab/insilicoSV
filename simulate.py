@@ -410,8 +410,12 @@ class SV_Simulator():
         # TODO: update export functions to work with new Block representation
         # self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file=initial_reset)
         # debug
+        print('-----ACTIVE SVS-----')
         for sv in active_svs:
-            print(f'sv.events_dict:{sv.events_dict}')
+            print(f'sv = {sv}')
+            print(f'sv.events_dict: {sv.events_dict}')
+            print(f'sv.source_blocks: {sv.source_symbol_blocks}')
+            print(f'sv.target_blocks: {sv.target_symbol_blocks}')
         self.formatter.export_to_vcf(active_svs, self.stats, vcffile=bedfile[:-4]+'.vcf')
 
         # create and export stats file

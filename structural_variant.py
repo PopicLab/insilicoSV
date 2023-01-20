@@ -165,11 +165,6 @@ class Structural_Variant():
         this method to actually modify the target_blocks' events objects to set the start/end positions
         """
         current_pos = start_pos
-        # if self.dispersion_flip:
-        #     # I think this might not be right...
-        #     blocks = self.target_symbol_blocks[::-1]
-        # else:
-        #     blocks = self.target_symbol_blocks
         for block in self.target_symbol_blocks:
             for ev in block:
                 if ev.symbol.startswith(Symbols.DIS.value):
@@ -183,6 +178,7 @@ class Structural_Variant():
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
                     ev.source_chr = self.start_chr
                     current_pos = ev.end
+        # TODO: also need to set start/end locations for source blocks (these will be used for export methods)
         # debug
         print(f'===LOCATIONS ASSIGNED===\ntarget_symbol_blocks: {self.target_symbol_blocks}')
 

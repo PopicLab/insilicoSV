@@ -222,25 +222,48 @@ class FormatterIO():
 
         for sv in svs:
             zyg = (1, 1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0, 1)
+            # TODO: should div_dDUP be a separate case? does it need to behave in a different way?
             if sv.type.value in ["div_dDUP", "dDUP", "INV_dDUP", "TRA"]:
-                if sv.type.value == 'TRA':
-                    if sv.events_dict['A'].length == 0:
-                        rec_start = sv.events_dict['B'].start
-                        rec_end = sv.events_dict['B'].end
-                        dispersion_target = sv.events_dict['A'].start
-                    else:
-                        rec_start = sv.events_dict['A'].start
-                        rec_end = sv.events_dict['A'].end
-                        dispersion_target = sv.events_dict['B'].start
+                # ** assumes structure of sv subevents in the case of these dispersion events
+                if sv.source_symbol_blocks[1][0].symbol.startswith(Symbols.DIS.value) and \
+                        sv.source_symbol_blocks[2][0].symbol.startswith("A"):
+                    # if second block (first block should be empty) is a dispersion, then record is a flipped disp. event
+                    dispersion_target = sv.source_symbol_blocks[1][0].start
+                    rec_start = sv.source_symbol_blocks[2][0].start
+                    rec_end = sv.source_symbol_blocks[2][0].end
+                elif sv.source_symbol_blocks[0][0].symbol.startswith("A") and \
+                        sv.source_symbol_blocks[1][0].symbol.startswith(Symbols.DIS.value):
+                    # o/w if the source interval is given first then the event is in normal orientation
+                    # NB: the first position is index=0 in this case bc the trailing [] will be at the end
+                    dispersion_target = sv.source_symbol_blocks[1][0].end
+                    rec_start = sv.source_symbol_blocks[0][0].start
+                    rec_end = sv.source_symbol_blocks[0][0].end
                 else:
-                    rec_start = sv.events_dict['A'].start
-                    rec_end = sv.events_dict['A'].end
-                    dispersion_target = sv.events_dict['_1'].end
+                    raise Exception(f'SV of type {sv.type.value} presenting source blocks in invalid order:\n{sv.source_symbol_blocks}')
+
+                # ---- old logic: only works for single-directional events ----
+                # if sv.type.value == 'TRA':
+                #     if sv.events_dict['A'].length == 0:
+                #         rec_start = sv.events_dict['B'].start
+                #         rec_end = sv.events_dict['B'].end
+                #         dispersion_target = sv.events_dict['A'].start
+                #     else:
+                #         rec_start = sv.events_dict['A'].start
+                #         rec_end = sv.events_dict['A'].end
+                #         dispersion_target = sv.events_dict['B'].start
+                # else:
+                #     rec_start = sv.events_dict['A'].start
+                #     rec_end = sv.events_dict['A'].end
+                #     dispersion_target = sv.events_dict['_1'].end
                 info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
                 if sv.type.value == 'div_dDUP':
+                    # div_dDUP should have target blocks [[Ev(A)],[Ev(A*)]] since the middle Ev(_) shouldn't contribute
+                    # a changed fragment (so changed_frags[1][-1] or "[-1][-1] should work)
                     divergent_repeat = sv.changed_fragments[1][-1]
                     info_field['DIV_REPEAT'] = divergent_repeat
             else:
+                # TODO: also change the logic for non-dispersion events to use the blocks lists
+                #  --> shouldn't make a difference, but would be good for consistency with the above case ^
                 rec_start, rec_end = sv.start, sv.end
                 info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
 
