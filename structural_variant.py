@@ -179,8 +179,15 @@ class Structural_Variant():
                     ev.source_chr = self.start_chr
                     current_pos = ev.end
         # TODO: also need to set start/end locations for source blocks (these will be used for export methods)
+        event_locations = {ev.symbol: (ev.start, ev.end) for bl in self.target_symbol_blocks for ev in bl}
+        for block in self.source_symbol_blocks:
+            for ev in block:
+                if ev.symbol in event_locations.keys():
+                    ev.start, ev.end = event_locations[ev.symbol]
+
         # debug
-        print(f'===LOCATIONS ASSIGNED===\ntarget_symbol_blocks: {self.target_symbol_blocks}')
+        print(f'===LOCATIONS ASSIGNED===\ntarget_symbol_blocks: {self.target_symbol_blocks}\n'
+              f'source_symbol_blocks: {self.source_symbol_blocks}')
 
     def change_fragment(self):
         '''
