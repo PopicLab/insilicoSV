@@ -45,11 +45,11 @@ class Structural_Variant():
         #  1) check if flipping works for div_dDUPs
         #  2) add TRAs to this list once dispersion-flipping logic is written for that case
         if self.type in ["dDUP", "INV_dDUP", "div_dDUP"]:
-            print(f'self.type = {self.type}')
             if random.randint(0, 1):
                 print('setting dispersion_flip to True')
                 self.dispersion_flip = True
         # debug
+        print(f'self.type = {self.type}')
         print(f'sv.dispersion_flip = {self.dispersion_flip}')
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
