@@ -237,7 +237,7 @@ class FormatterIO():
                         rec_end = sv.events_dict['A'].end
                         dispersion_target = sv.events_dict['B'].start
                 # ** assumes structure of sv subevents in the case of these dispersion events
-                elif sv.disperison_flip:
+                elif sv.dispersion_flip:
                     print(f'FLIPPED DISPERSION EVENT:')
                     dispersion_target = sv.source_symbol_blocks[1][0].start
                     rec_start = sv.source_symbol_blocks[2][0].start
