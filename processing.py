@@ -237,23 +237,18 @@ class FormatterIO():
                         rec_end = sv.events_dict['A'].end
                         dispersion_target = sv.events_dict['B'].start
                 # ** assumes structure of sv subevents in the case of these dispersion events
-                elif sv.source_symbol_blocks[1][0].symbol.startswith(Symbols.DIS.value) and \
-                        sv.source_symbol_blocks[2][0].symbol.startswith("A"):
-                    # if second block (first block should be empty) is a dispersion, then record is a flipped disp. event
+                elif sv.disperison_flip:
+                    print(f'FLIPPED DISPERSION EVENT:')
                     dispersion_target = sv.source_symbol_blocks[1][0].start
                     rec_start = sv.source_symbol_blocks[2][0].start
                     rec_end = sv.source_symbol_blocks[2][0].end
-                    print(f'FLIPPED DISPERSION EVENT:\nrec_start={rec_start}\nrec_end={rec_end}\ntarget={dispersion_target}')
-                elif sv.source_symbol_blocks[0][0].symbol.startswith("A") and \
-                        sv.source_symbol_blocks[1][0].symbol.startswith(Symbols.DIS.value):
-                    # o/w if the source interval is given first then the event is in normal orientation
-                    # NB: the first position is index=0 in this case bc the trailing [] will be at the end
+                    print(f'rec_start={rec_start}\nrec_end={rec_end}\ntarget={dispersion_target}')
+                else:
+                    print(f'NON-FLIPPED DISPERSION EVENT:')
                     dispersion_target = sv.source_symbol_blocks[1][0].end
                     rec_start = sv.source_symbol_blocks[0][0].start
                     rec_end = sv.source_symbol_blocks[0][0].end
-                    print(f'NON-FLIPPED DISPERSION EVENT:\nrec_start={rec_start}\nrec_end={rec_end}\ntarget={dispersion_target}')
-                else:
-                    raise Exception(f'SV of type {sv.type.value} presenting source blocks in invalid order:\n{sv.source_symbol_blocks}')
+                    print(f'rec_start={rec_start}\nrec_end={rec_end}\ntarget={dispersion_target}')
 
                 # else:
                 #     rec_start = sv.events_dict['A'].start
