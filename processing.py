@@ -231,6 +231,7 @@ class FormatterIO():
                     dispersion_target = sv.source_symbol_blocks[1][0].start
                     rec_start = sv.source_symbol_blocks[2][0].start
                     rec_end = sv.source_symbol_blocks[2][0].end
+                    print(f'FLIPPED DISPERSION EVENT:\nrec_start={rec_start}\nrec_end={rec_end}')
                 elif sv.source_symbol_blocks[0][0].symbol.startswith("A") and \
                         sv.source_symbol_blocks[1][0].symbol.startswith(Symbols.DIS.value):
                     # o/w if the source interval is given first then the event is in normal orientation
@@ -238,6 +239,7 @@ class FormatterIO():
                     dispersion_target = sv.source_symbol_blocks[1][0].end
                     rec_start = sv.source_symbol_blocks[0][0].start
                     rec_end = sv.source_symbol_blocks[0][0].end
+                    print(f'NON-FLIPPED DISPERSION EVENT:\nrec_start={rec_start}\nrec_end={rec_end}')
                 else:
                     raise Exception(f'SV of type {sv.type.value} presenting source blocks in invalid order:\n{sv.source_symbol_blocks}')
 
