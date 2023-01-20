@@ -46,11 +46,7 @@ class Structural_Variant():
         #  2) add TRAs to this list once dispersion-flipping logic is written for that case
         if self.type in [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP]:
             if random.randint(0, 1):
-                print('setting dispersion_flip to True')
                 self.dispersion_flip = True
-        # debug
-        print(f'self.type = {self.type}')
-        print(f'sv.dispersion_flip = {self.dispersion_flip}')
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
             self.initialize_events(length_ranges)
