@@ -40,24 +40,24 @@ class Structural_Variant():
         self.source_events = []  # list of Event classes for every symbol in source sequence
         self.events_dict = dict()  # maps every unique symbol in source and target to an Event class
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
-        # TODO: how to articulate/determine whether we're considering a dispersion event that should be flipped
         self.dispersion_flip = False
-        # while experimenting with this mode, setting the flip to true
         # TODO:
         #  1) check if flipping works for div_dDUPs
         #  2) add TRAs to this list once dispersion-flipping logic is written for that case
         if self.type in ["dDUP", "INV_dDUP", "div_dDUP"]:
             if random.randint(0, 1):
                 self.dispersion_flip = True
+        # debug
+        print(f'sv.dispersion_flip = {self.dispersion_flip}')
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
             self.initialize_events(length_ranges)
 
         sv_blocks = Blocks(self)
         # debug
-        print(f'==== sv_blocks object ====\n{sv_blocks}')
-        self.source_symbol_blocks = sv_blocks.source_blocks
-        self.target_symbol_blocks = sv_blocks.target_blocks
+        # print(f'==== sv_blocks object ====\n{sv_blocks}')
+        # self.source_symbol_blocks = sv_blocks.source_blocks
+        # self.target_symbol_blocks = sv_blocks.target_blocks
 
         # specifies if sv is unable to be simulated due to random placement issues
         # will be turned on later
@@ -162,8 +162,8 @@ class Structural_Variant():
         self.req_space = sum([event.length for event in self.source_events])
 
         # debug
-        print('END OF INITIALIZE_EVENTS')
-        print(f'self.events_dict = {self.events_dict}')
+        # print('END OF INITIALIZE_EVENTS')
+        # print(f'self.events_dict = {self.events_dict}')
 
     def assign_locations(self, start_pos):
         """
@@ -198,8 +198,8 @@ class Structural_Variant():
                     ev.start, ev.end = event_locations[ev.symbol]
 
         # debug
-        print(f'===LOCATIONS ASSIGNED===\ntarget_symbol_blocks: {self.target_symbol_blocks}\n'
-              f'source_symbol_blocks: {self.source_symbol_blocks}')
+        # print(f'===LOCATIONS ASSIGNED===\ntarget_symbol_blocks: {self.target_symbol_blocks}\n'
+        #       f'source_symbol_blocks: {self.source_symbol_blocks}')
 
     def change_fragment(self):
         '''
@@ -212,7 +212,7 @@ class Structural_Variant():
         block_end = None
 
         # debug
-        print('===CHANGE_FRAGMENT===')
+        # print('===CHANGE_FRAGMENT===')
         for block in self.target_symbol_blocks:
             new_frag = ''
             if len(block) == 0:
@@ -227,7 +227,7 @@ class Structural_Variant():
                 if i == len(block) - 1:
                     block_end = ev.end
             changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
-            print(f'new change fragment : {changed_fragments[-1]}')
+            # print(f'new change fragment : {changed_fragments[-1]}')
 
         self.changed_fragments = changed_fragments
         self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
