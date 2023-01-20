@@ -221,6 +221,9 @@ class FormatterIO():
         vcf_out_file = pysam.VariantFile(vcffile, 'w', header=vcf_file.header)
 
         for sv in svs:
+            # debug
+            print(f'exporting sv: {sv}')
+            print(f'sv.dispersion_flip = {sv.dispersion_flip}')
             zyg = (1, 1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0, 1)
             # Should div_dDUP be a separate case? does it need to behave in a different way?
             # --> I don't think so

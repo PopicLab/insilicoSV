@@ -45,7 +45,9 @@ class Structural_Variant():
         #  1) check if flipping works for div_dDUPs
         #  2) add TRAs to this list once dispersion-flipping logic is written for that case
         if self.type in ["dDUP", "INV_dDUP", "div_dDUP"]:
+            print(f'self.type = {self.type}')
             if random.randint(0, 1):
+                print('setting dispersion_flip to True')
                 self.dispersion_flip = True
         # debug
         print(f'sv.dispersion_flip = {self.dispersion_flip}')
@@ -56,8 +58,8 @@ class Structural_Variant():
         sv_blocks = Blocks(self)
         # debug
         # print(f'==== sv_blocks object ====\n{sv_blocks}')
-        # self.source_symbol_blocks = sv_blocks.source_blocks
-        # self.target_symbol_blocks = sv_blocks.target_blocks
+        self.source_symbol_blocks = sv_blocks.source_blocks
+        self.target_symbol_blocks = sv_blocks.target_blocks
 
         # specifies if sv is unable to be simulated due to random placement issues
         # will be turned on later
