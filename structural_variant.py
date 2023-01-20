@@ -138,6 +138,14 @@ class Structural_Variant():
         else:
             raise Exception("Lengths parameter expects at least one tuple")
 
+        # TODO: figure out the right way to model TRAs (following the new dispersion-flipping paradigm)
+        # if we're operating on a TRA, flip a coin to set the A or B interval to be of size 0
+        if self.type == Variant_Type.TRA:
+            if random.randint(0, 1):
+                symbols_dict['A'] = (0, (0, 0))
+            else:
+                symbols_dict['B'] = (0, (0, 0))
+
         # initialize event classes
         for idx, symbol in enumerate(all_symbols):
             # empty event - no source fragment yet

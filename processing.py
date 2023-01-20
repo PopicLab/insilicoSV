@@ -222,10 +222,22 @@ class FormatterIO():
 
         for sv in svs:
             zyg = (1, 1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0, 1)
-            # TODO: should div_dDUP be a separate case? does it need to behave in a different way?
+            # Should div_dDUP be a separate case? does it need to behave in a different way?
+            # --> I don't think so
             if sv.type.value in ["div_dDUP", "dDUP", "INV_dDUP", "TRA"]:
+                # ---- old logic for TRAs ----
+                # TODO: sort out TRAs logic under Blocks formulation
+                if sv.type.value == 'TRA':
+                    if sv.events_dict['A'].length == 0:
+                        rec_start = sv.events_dict['B'].start
+                        rec_end = sv.events_dict['B'].end
+                        dispersion_target = sv.events_dict['A'].start
+                    else:
+                        rec_start = sv.events_dict['A'].start
+                        rec_end = sv.events_dict['A'].end
+                        dispersion_target = sv.events_dict['B'].start
                 # ** assumes structure of sv subevents in the case of these dispersion events
-                if sv.source_symbol_blocks[1][0].symbol.startswith(Symbols.DIS.value) and \
+                elif sv.source_symbol_blocks[1][0].symbol.startswith(Symbols.DIS.value) and \
                         sv.source_symbol_blocks[2][0].symbol.startswith("A"):
                     # if second block (first block should be empty) is a dispersion, then record is a flipped disp. event
                     dispersion_target = sv.source_symbol_blocks[1][0].start
@@ -243,16 +255,6 @@ class FormatterIO():
                 else:
                     raise Exception(f'SV of type {sv.type.value} presenting source blocks in invalid order:\n{sv.source_symbol_blocks}')
 
-                # ---- old logic: only works for single-directional events ----
-                # if sv.type.value == 'TRA':
-                #     if sv.events_dict['A'].length == 0:
-                #         rec_start = sv.events_dict['B'].start
-                #         rec_end = sv.events_dict['B'].end
-                #         dispersion_target = sv.events_dict['A'].start
-                #     else:
-                #         rec_start = sv.events_dict['A'].start
-                #         rec_end = sv.events_dict['A'].end
-                #         dispersion_target = sv.events_dict['B'].start
                 # else:
                 #     rec_start = sv.events_dict['A'].start
                 #     rec_end = sv.events_dict['A'].end
