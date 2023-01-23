@@ -227,17 +227,17 @@ class FormatterIO():
             if sv.type.value in ["div_dDUP", "dDUP", "INV_dDUP", "TRA"]:
                 # ---- old logic for TRAs ----
                 # TODO: sort out TRAs logic under Blocks formulation
-                if sv.type.value == 'TRA':
-                    if sv.events_dict['A'].length == 0:
-                        rec_start = sv.events_dict['B'].start
-                        rec_end = sv.events_dict['B'].end
-                        dispersion_target = sv.events_dict['A'].start
-                    else:
-                        rec_start = sv.events_dict['A'].start
-                        rec_end = sv.events_dict['A'].end
-                        dispersion_target = sv.events_dict['B'].start
+                # if sv.type.value == 'TRA':
+                #     if sv.events_dict['A'].length == 0:
+                #         rec_start = sv.events_dict['B'].start
+                #         rec_end = sv.events_dict['B'].end
+                #         dispersion_target = sv.events_dict['A'].start
+                #     else:
+                #         rec_start = sv.events_dict['A'].start
+                #         rec_end = sv.events_dict['A'].end
+                #         dispersion_target = sv.events_dict['B'].start
                 # ** assumes structure of sv subevents in the case of these dispersion events
-                elif sv.dispersion_flip:
+                if sv.dispersion_flip:
                     print(f'FLIPPED DISPERSION EVENT:')
                     dispersion_target = sv.source_symbol_blocks[1][0].start
                     rec_start = sv.source_symbol_blocks[2][0].start

@@ -161,8 +161,8 @@ class Structural_Variant():
         self.req_space = sum([event.length for event in self.source_events])
 
         # debug
-        # print('END OF INITIALIZE_EVENTS')
-        # print(f'self.events_dict = {self.events_dict}')
+        print('END OF INITIALIZE_EVENTS')
+        print(f'self.events_dict = {self.events_dict}')
 
     def assign_locations(self, start_pos):
         """
