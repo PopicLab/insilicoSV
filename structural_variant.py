@@ -211,7 +211,6 @@ class Structural_Variant():
 
         # debug
         print('===CHANGE_FRAGMENT===')
-        print(f'target blocks = {self.target_symbol_blocks}')
         # special case: deletion -- len(target_symbol_blocks) == 0
         if self.target_symbol_blocks == [[]]:
             changed_fragments.append([self.start_chr, self.start, self.end, ''])
@@ -222,12 +221,8 @@ class Structural_Variant():
                 # --> getting the start/end position of the event on the opposite side of the dispersion
                 to_delete_target_event = self.target_symbol_blocks[idx + 2][0] if idx == 0 \
                     else self.target_symbol_blocks[idx - 2][0]
-                # debug
-                print(f'idx = {idx}')
-                print(f'to_delete_target_event = {to_delete_target_event}')
                 to_delete_source_event = self.events_dict[to_delete_target_event.symbol[0].upper()]
-                print(f'to_delete_source_event = {to_delete_source_event}')
-                block_start, block_end = to_delete_source_event.start, to_delete_target_event.end
+                block_start, block_end = to_delete_source_event.start, to_delete_source_event.end
                 changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
                 continue
             if block[0].symbol.startswith(Symbols.DIS.value):
