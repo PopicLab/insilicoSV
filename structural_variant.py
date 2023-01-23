@@ -211,6 +211,9 @@ class Structural_Variant():
 
         # debug
         # print('===CHANGE_FRAGMENT===')
+        # special case: deletion -- len(target_symbol_blocks) == 0
+        if len(self.target_symbol_blocks) == 0:
+            changed_fragments.append([self.start_chr, self.start, self.end, ''])
         for block in self.target_symbol_blocks:
             new_frag = ''
             if len(block) == 0:
