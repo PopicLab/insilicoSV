@@ -57,6 +57,8 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
           Variant_Type.INV: [("A",), ("a",)],
           Variant_Type.DUP: [("A",), ("A", "A'")],
           # Variant_Type.TRA: [("A", "_", "B"), ("B", "_", "A")],
+          # ** marking the target A as a duplication makes TRAs agree more with the current modeling logic
+          # ** --> is that super incorrect to do? Should we only add that marking internally at initialization?
           Variant_Type.TRA: [("A", "_"), ("_", "A'")],
           Variant_Type.dupINVdup: [("A", "B", "C"), ("A", "c'", "b", "a'", "C")],
           Variant_Type.delINVdel: [("A", "B", "C"), ("b",)],

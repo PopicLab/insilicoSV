@@ -214,9 +214,16 @@ class Structural_Variant():
         # special case: deletion -- len(target_symbol_blocks) == 0
         if self.target_symbol_blocks == [[]]:
             changed_fragments.append([self.start_chr, self.start, self.end, ''])
-        for block in self.target_symbol_blocks:
+        for idx, block in enumerate(self.target_symbol_blocks):
             new_frag = ''
             if len(block) == 0:
+                # this branch will be executed for TRAs; want a deletion segment to be added here
+                # --> getting the start/end position of the event on the opposite side of the dispersion
+                to_delete_target_event = self.target_symbol_blocks[idx + 2][0] if idx == 0 \
+                    else self.target_symbol_blocks[idx - 2][0]
+                to_delete_source_event = self.events_dict[to_delete_target_event.symbol[0].upper()]
+                block_start, block_end = to_delete_source_event.start, to_delete_target_event.end
+                changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
                 continue
             if block[0].symbol.startswith(Symbols.DIS.value):
                 continue
