@@ -223,12 +223,24 @@ class Structural_Variant():
             if len(block) == 0:
                 # this branch will be executed for TRAs; want a deletion segment to be added here
                 # --> getting the start/end position of the event on the opposite side of the dispersion
-                to_delete_target_event = self.target_symbol_blocks[idx + 2][0] if idx == 0 \
-                    else self.target_symbol_blocks[idx - 2][0]
-                to_delete_source_event = self.events_dict[to_delete_target_event.symbol[0].upper()]
-                print(f'to_delete_target_event = {to_delete_target_event}')
-                print(f'to_delete_source_event = {to_delete_source_event}')
-                block_start, block_end = to_delete_source_event.start, to_delete_source_event.end
+                # to_delete_target_event = self.target_symbol_blocks[idx + 2][0] if idx == 0 \
+                #     else self.target_symbol_blocks[idx - 2][0]
+                # to_delete_source_event = self.events_dict[to_delete_target_event.symbol[0].upper()]
+                # print(f'to_delete_target_event = {to_delete_target_event}')
+                # print(f'to_delete_source_event = {to_delete_source_event}')
+                # block_start, block_end = to_delete_source_event.start, to_delete_source_event.end
+                # ** different formulation of the logic -- want to delete the A-length interval on the opposite
+                # ** side of the dispersion as our A'
+                if idx == 0:
+                    del_ev = self.target_symbol_blocks[2][0]
+                    disp_end = self.target_symbol_blocks[1][0].end
+                    block_start = disp_end
+                    block_end = disp_end + (del_ev.end - del_ev.start)
+                else:
+                    del_ev = self.target_symbol_blocks[idx - 2][0]
+                    disp_start = self.target_symbol_blocks[idx - 1][0].start
+                    block_end = disp_start
+                    block_start = disp_end - (del_ev.end - del_ev.start)
                 changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
                 continue
             if block[0].symbol.startswith(Symbols.DIS.value):
