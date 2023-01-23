@@ -241,6 +241,9 @@ class Structural_Variant():
                     disp_start = self.target_symbol_blocks[idx - 1][0].start
                     block_end = disp_start
                     block_start = disp_start - (del_ev.end - del_ev.start)
+                    # debug
+                    print(f'disp_start = {disp_start}')
+                    print(f'block_start = {block_start}')
                 changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
                 continue
             if block[0].symbol.startswith(Symbols.DIS.value):
