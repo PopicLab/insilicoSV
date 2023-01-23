@@ -212,7 +212,7 @@ class Structural_Variant():
 
         # debug
         print('===CHANGE_FRAGMENT===')
-        # print(f'sv.events_dict = {self.events_dict}')
+        print(f'sv.events_dict = {self.events_dict}')
         print(f'source blocks = {self.source_symbol_blocks}')
         print(f'target blocks = {self.target_symbol_blocks}')
         # special case: deletion -- len(target_symbol_blocks) == 0
@@ -273,7 +273,9 @@ class Event():
 
     def __repr__(self):
         return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end,
-                                    "source_chr": self.source_chr, "source_frag": self.source_frag})
+                                    "source_chr": self.source_chr,
+                                    "source_frag": self.source_frag if not symbol.startswith(Symbols.DIS.value) else
+                                    'frag omitted'})
 
 
 class Blocks():
