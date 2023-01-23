@@ -212,7 +212,7 @@ class Structural_Variant():
 
         # debug
         print('===CHANGE_FRAGMENT===')
-        print(f'sv.events_dict = {self.events_dict}')
+        # print(f'sv.events_dict = {self.events_dict}')
         print(f'source blocks = {self.source_symbol_blocks}')
         print(f'target blocks = {self.target_symbol_blocks}')
         # special case: deletion -- len(target_symbol_blocks) == 0
@@ -226,6 +226,8 @@ class Structural_Variant():
                 to_delete_target_event = self.target_symbol_blocks[idx + 2][0] if idx == 0 \
                     else self.target_symbol_blocks[idx - 2][0]
                 to_delete_source_event = self.events_dict[to_delete_target_event.symbol[0].upper()]
+                print(f'to_delete_target_event = {to_delete_target_event}')
+                print(f'to_delete_source_event = {to_delete_source_event}')
                 block_start, block_end = to_delete_source_event.start, to_delete_source_event.end
                 changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
                 continue
