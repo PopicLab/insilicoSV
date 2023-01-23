@@ -45,7 +45,8 @@ class Structural_Variant():
         #  1) check if flipping works for div_dDUPs
         #  2) add TRAs to this list once dispersion-flipping logic is written for that case
         if self.type in [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP, Variant_Type.TRA]:
-            if random.randint(0, 1):
+            # if random.randint(0, 1):
+            if True:
                 self.dispersion_flip = True
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
@@ -211,6 +212,8 @@ class Structural_Variant():
 
         # debug
         print('===CHANGE_FRAGMENT===')
+        print(f'target blocks = {self.target_symbol_blocks}')
+        print(f'source blocks = {self.source_symbol_blocks}')
         # special case: deletion -- len(target_symbol_blocks) == 0
         if self.target_symbol_blocks == [[]]:
             changed_fragments.append([self.start_chr, self.start, self.end, ''])
