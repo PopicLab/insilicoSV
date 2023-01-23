@@ -299,7 +299,7 @@ class Blocks():
                 source_event = self.sv.events_dict[symbol[0].upper()]
                 target_event = Event(sv_parent=self.sv, length=source_event.length, length_range=None, symbol=symbol)
                 # if symbol different from source symbol then being added to input ref
-                if symbol != source_event.symbol:
+                if symbol.upper() != source_event.symbol:
                     target_event.length = 0
                 blocks[-1].append(target_event)
         return blocks
