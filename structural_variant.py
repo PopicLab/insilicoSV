@@ -275,7 +275,6 @@ class Blocks():
         self.track_original_symbol()
 
     def generate_blocks(self):
-        # *** DO WE EVER USE SOURCE BLOCKS?? DON'T WE JUST NEED THE TARGET BLOCKS WITH THE RIGHT REF FRAGS?
         self.source_blocks = self.find_blocks(self.sv.source_unique_char)
         self.target_blocks = self.find_blocks(self.sv.target_unique_char)
 
@@ -296,6 +295,9 @@ class Blocks():
                 # used to find corresponding event from encoding, all keys in encoding are in uppercase
                 source_event = self.sv.events_dict[symbol[0].upper()]
                 target_event = Event(sv_parent=self.sv, length=source_event.length, length_range=None, symbol=symbol)
+                # if symbol different from source symbol then being added to input ref
+                if symbol != source_event.symbol:
+                    target_event.length = 0
                 blocks[-1].append(target_event)
         return blocks
 
