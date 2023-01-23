@@ -238,10 +238,12 @@ class Structural_Variant():
                     block_end = disp_end + (del_ev.end - del_ev.start)
                 else:
                     del_ev = self.target_symbol_blocks[idx - 2][0]
-                    disp_start = self.target_symbol_blocks[idx - 1][0].start
+                    disp_ev = self.target_symbol_blocks[idx - 1][0]
+                    disp_start = disp_ev.start
                     block_end = disp_start
                     block_start = disp_start - (del_ev.end - del_ev.start)
                     # debug
+                    print(f'del_ev = {del_ev}')
                     print(f'disp_start = {disp_start}')
                     print(f'block_start = {block_start}')
                 changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
