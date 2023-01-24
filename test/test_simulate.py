@@ -272,6 +272,7 @@ class TestSVSimulator(unittest.TestCase):
     def test_bidirectional_dispersion_events(self):
         config = self.test_dispersion_objects[0]
         config.initialize_files()
+        curr_sim = SV_Simulator(config.ref, config.par)
 
     def nonrandom_test_produce_variant_genome(self):
 
