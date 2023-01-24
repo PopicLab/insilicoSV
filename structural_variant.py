@@ -197,8 +197,7 @@ class Structural_Variant():
                     ev.start, ev.end = event_locations[ev.symbol]
 
         # debug
-        # print(f'===LOCATIONS ASSIGNED===\ntarget_symbol_blocks: {self.target_symbol_blocks}\n'
-        #       f'source_symbol_blocks: {self.source_symbol_blocks}')
+        print(f'===LOCATIONS ASSIGNED===\ntarget_symbol_blocks: {self.target_symbol_blocks}')
 
     def change_fragment(self):
         '''
@@ -211,10 +210,10 @@ class Structural_Variant():
         block_end = None
 
         # # debug
-        print('===CHANGE_FRAGMENT===')
+        # print('===CHANGE_FRAGMENT===')
         # print(f'sv.events_dict = {self.events_dict}')
         # print(f'source blocks = {self.source_symbol_blocks}')
-        print(f'target blocks = {self.target_symbol_blocks}')
+        # print(f'target blocks = {self.target_symbol_blocks}')
         # special case: deletion -- len(target_symbol_blocks) == 0
         if self.target_symbol_blocks == [[]]:
             changed_fragments.append([self.start_chr, self.start, self.end, ''])
@@ -278,9 +277,9 @@ class Event():
         self.end = None
 
     def __repr__(self):
-        return "<Event {}>".format({"\nlength": self.length, "\nsymbol": self.symbol, "\nstart": self.start, "\nend": self.end,
-                                    "\nsource_chr": self.source_chr,
-                                    "\nsource_frag": self.source_frag if not self.symbol.startswith(Symbols.DIS.value) else
+        return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end,
+                                    "source_chr": self.source_chr,
+                                    "source_frag": self.source_frag if not self.symbol.startswith(Symbols.DIS.value) else
                                     'frag omitted'})
 
 
