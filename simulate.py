@@ -394,8 +394,8 @@ class SV_Simulator():
                 self.event_ranges[id].sort()
             self.log_to_file("Event Ranges: {}".format(self.event_ranges))
             self.log_to_file("Intervals for hap {}: {}".format(x, edits_dict))
-            print("Event Ranges: {}".format(self.event_ranges))
-            print("Intervals for hap {}: {}".format(x, edits_dict))
+            # print("Event Ranges: {}".format(self.event_ranges))
+            # print("Intervals for hap {}: {}".format(x, edits_dict))
 
             for id in self.order_ids:
                 # account for homozygous and heterogeneous variants
@@ -412,12 +412,12 @@ class SV_Simulator():
         # TODO: update export_to_bedpe to work with new Block representation
         # self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file=initial_reset)
         # debug
-        print('-----ACTIVE SVS-----')
-        for sv in active_svs:
-            print(f'sv = {sv}')
-            print(f'sv.events_dict: {sv.events_dict}')
-            print(f'sv.source_blocks: {sv.source_symbol_blocks}')
-            print(f'sv.target_blocks: {sv.target_symbol_blocks}')
+        # print('-----ACTIVE SVS-----')
+        # for sv in active_svs:
+        #     print(f'sv = {sv}')
+        #     print(f'sv.events_dict: {sv.events_dict}')
+        #     print(f'sv.source_blocks: {sv.source_symbol_blocks}')
+        #     print(f'sv.target_blocks: {sv.target_symbol_blocks}')
         self.formatter.export_to_vcf(active_svs, self.stats, vcffile=bedfile[:-4]+'.vcf')
 
         # create and export stats file
