@@ -45,8 +45,7 @@ class Structural_Variant():
         #  1) check if flipping works for div_dDUPs
         #  2) add TRAs to this list once dispersion-flipping logic is written for that case
         if self.type in [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP, Variant_Type.TRA]:
-            # if random.randint(0, 1):
-            if True:
+            if random.randint(0, 1):
                 self.dispersion_flip = True
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
@@ -232,21 +231,20 @@ class Structural_Variant():
                 # ** different formulation of the logic -- want to delete the A-length interval on the opposite
                 # ** side of the dispersion as our A'
                 if idx == 0:
-                    del_ev = self.target_symbol_blocks[2][0]
-                    disp_end = self.target_symbol_blocks[1][0].end
-                    block_start = disp_end
-                    block_end = disp_end + (del_ev.end - del_ev.start)
+                    del_len = len(self.target_symbol_blocks[2][0].source_frag)
+                    disp_ev = self.target_symbol_blocks[1][0]
+                    block_start = disp_ev.start - del_len
+                    block_end = disp_ev.start
                 else:
-                    del_ev = self.target_symbol_blocks[idx - 2][0]
+                    del_len = len(self.target_symbol_blocks[idx - 2][0].source_frag)
                     disp_ev = self.target_symbol_blocks[idx - 1][0]
-                    disp_start = disp_ev.start
-                    block_end = disp_start
-                    block_start = disp_start - (del_ev.end - del_ev.start)
-                    # debug
-                    print(f'del_ev = {del_ev}')
-                    print(f'disp_ev = {disp_ev}')
-                    print(f'disp_start = {disp_start}')
-                    print(f'block_start = {block_start}')
+                    block_start = disp_ev.end
+                    block_end = block_start + del_len
+                # debug
+                print(f'del_len = {del_len}')
+                print(f'disp_ev = {disp_ev}')
+                print(f'block_start = {block_start}')
+                print(f'block_end = {block_end}')
                 changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
                 continue
             if block[0].symbol.startswith(Symbols.DIS.value):
