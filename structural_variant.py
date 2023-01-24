@@ -220,16 +220,8 @@ class Structural_Variant():
         for idx, block in enumerate(self.target_symbol_blocks):
             new_frag = ''
             if len(block) == 0:
-                # this branch will be executed for TRAs; want a deletion segment to be added here
-                # --> getting the start/end position of the event on the opposite side of the dispersion
-                # to_delete_target_event = self.target_symbol_blocks[idx + 2][0] if idx == 0 \
-                #     else self.target_symbol_blocks[idx - 2][0]
-                # to_delete_source_event = self.events_dict[to_delete_target_event.symbol[0].upper()]
-                # print(f'to_delete_target_event = {to_delete_target_event}')
-                # print(f'to_delete_source_event = {to_delete_source_event}')
-                # block_start, block_end = to_delete_source_event.start, to_delete_source_event.end
-                # ** different formulation of the logic -- want to delete the A-length interval on the opposite
-                # ** side of the dispersion as our A'
+                # this branch will be executed for TRAs:
+                # --> want to delete the A-length interval on the opposite side of the dispersion as our A'
                 if idx == 0:
                     del_len = len(self.target_symbol_blocks[2][0].source_frag)
                     disp_ev = self.target_symbol_blocks[1][0]
@@ -240,11 +232,6 @@ class Structural_Variant():
                     disp_ev = self.target_symbol_blocks[idx - 1][0]
                     block_start = disp_ev.end
                     block_end = block_start + del_len
-                # debug
-                print(f'del_len = {del_len}')
-                print(f'disp_ev = {disp_ev}')
-                print(f'block_start = {block_start}')
-                print(f'block_end = {block_end}')
                 changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
                 continue
             if block[0].symbol.startswith(Symbols.DIS.value):
@@ -341,7 +328,7 @@ class Blocks():
         # -->          - how to trigger this/identify or mark a dispersion to be flipped?
         # -->          - should it be a quality of a whole dispersion-related event?
         # ===> Is it incorrect to just flip the entire list of target blocks? I don't think this is the completely
-        # general rule, but for all of our dispersion events I think this will always be the case..
+        # general rule, but for all of our dispersion events I think this will always be the case
         self.source_blocks = self.source_blocks[::-1]
         self.target_blocks = self.target_blocks[::-1]
 
