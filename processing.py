@@ -222,49 +222,70 @@ class FormatterIO():
 
         for sv in svs:
             zyg = (1, 1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0, 1)
-            # Should div_dDUP be a separate case? does it need to behave in a different way?
-            # --> I don't think so
-            if sv.type.value in ["div_dDUP", "dDUP", "INV_dDUP", "TRA"]:
-                # ---- old logic for TRAs ----
-                # TODO: sort out TRAs logic under Blocks formulation
-                # if sv.type.value == 'TRA':
-                #     if sv.events_dict['A'].length == 0:
-                #         rec_start = sv.events_dict['B'].start
-                #         rec_end = sv.events_dict['B'].end
-                #         dispersion_target = sv.events_dict['A'].start
-                #     else:
-                #         rec_start = sv.events_dict['A'].start
-                #         rec_end = sv.events_dict['A'].end
-                #         dispersion_target = sv.events_dict['B'].start
-                # ** assumes structure of sv subevents in the case of these dispersion events
-                if sv.dispersion_flip:
-                    print(f'FLIPPED DISPERSION EVENT:')
-                    dispersion_target = sv.source_symbol_blocks[1][0].start
-                    rec_start = sv.source_symbol_blocks[2][0].start
-                    rec_end = sv.source_symbol_blocks[2][0].end
-                    print(f'rec_start={rec_start}\nrec_end={rec_end}\ntarget={dispersion_target}')
+            # --- logic just based on sv.changed_fragments ---
+            # dispersion events will have two changed fragments
+            dispersion_target = None
+            if len(sv.changed_fragments) == 2:
+                intervalA = (sv.changed_fragments[0][1], sv.changed_fragments[0][2])
+                intervalB = (sv.changed_fragments[1][1], sv.changed_fragments[1][2])
+                if intervalA[1] - intervalA[0] == 0:
+                    dispersion_target = intervalA[0]
+                    rec_start = intervalB[0]
+                    rec_end = intervalB[1]
                 else:
-                    print(f'NON-FLIPPED DISPERSION EVENT:')
-                    dispersion_target = sv.source_symbol_blocks[1][0].end
-                    rec_start = sv.source_symbol_blocks[0][0].start
-                    rec_end = sv.source_symbol_blocks[0][0].end
-                    print(f'rec_start={rec_start}\nrec_end={rec_end}\ntarget={dispersion_target}')
-
-                # else:
-                #     rec_start = sv.events_dict['A'].start
-                #     rec_end = sv.events_dict['A'].end
-                #     dispersion_target = sv.events_dict['_1'].end
-                info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
-                if sv.type.value == 'div_dDUP':
-                    # div_dDUP should have target blocks [[Ev(A)],[Ev(A*)]] since the middle Ev(_) shouldn't contribute
-                    # a changed fragment (so changed_frags[1][-1] or "[-1][-1] should work)
-                    divergent_repeat = sv.changed_fragments[1][-1]
-                    info_field['DIV_REPEAT'] = divergent_repeat
+                    dispersion_target = intervalB[0]
+                    rec_start = intervalA[0]
+                    rec_end = intervalA[1]
             else:
-                # TODO: also change the logic for non-dispersion events to use the blocks lists
-                #  --> shouldn't make a difference, but would be good for consistency with the above case ^
-                rec_start, rec_end = sv.start, sv.end
+                rec_start, rec_end = sv.changed_fragments[0][1], sv.changed_fragments[0][2]
+            if dispersion_target is not None:
+                info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
+            else:
                 info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
+
+            # # Should div_dDUP be a separate case? does it need to behave in a different way?
+            # # --> I don't think so
+            # if sv.type.value in ["div_dDUP", "dDUP", "INV_dDUP", "TRA"]:
+            #     # ---- old logic for TRAs ----
+            #     # TODO: sort out TRAs logic under Blocks formulation
+            #     # if sv.type.value == 'TRA':
+            #     #     if sv.events_dict['A'].length == 0:
+            #     #         rec_start = sv.events_dict['B'].start
+            #     #         rec_end = sv.events_dict['B'].end
+            #     #         dispersion_target = sv.events_dict['A'].start
+            #     #     else:
+            #     #         rec_start = sv.events_dict['A'].start
+            #     #         rec_end = sv.events_dict['A'].end
+            #     #         dispersion_target = sv.events_dict['B'].start
+            #     # ** assumes structure of sv subevents in the case of these dispersion events
+            #     if sv.dispersion_flip:
+            #         print(f'FLIPPED DISPERSION EVENT:')
+            #         dispersion_target = sv.source_symbol_blocks[1][0].start
+            #         rec_start = sv.source_symbol_blocks[2][0].start
+            #         rec_end = sv.source_symbol_blocks[2][0].end
+            #         print(f'rec_start={rec_start}\nrec_end={rec_end}\ntarget={dispersion_target}')
+            #     else:
+            #         print(f'NON-FLIPPED DISPERSION EVENT:')
+            #         dispersion_target = sv.source_symbol_blocks[1][0].end
+            #         rec_start = sv.source_symbol_blocks[0][0].start
+            #         rec_end = sv.source_symbol_blocks[0][0].end
+            #         print(f'rec_start={rec_start}\nrec_end={rec_end}\ntarget={dispersion_target}')
+            #
+            #     # else:
+            #     #     rec_start = sv.events_dict['A'].start
+            #     #     rec_end = sv.events_dict['A'].end
+            #     #     dispersion_target = sv.events_dict['_1'].end
+            #     info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
+            #     if sv.type.value == 'div_dDUP':
+            #         # div_dDUP should have target blocks [[Ev(A)],[Ev(A*)]] since the middle Ev(_) shouldn't contribute
+            #         # a changed fragment (so changed_frags[1][-1] or "[-1][-1] should work)
+            #         divergent_repeat = sv.changed_fragments[1][-1]
+            #         info_field['DIV_REPEAT'] = divergent_repeat
+            # else:
+            #     # TODO: also change the logic for non-dispersion events to use the blocks lists
+            #     #  --> shouldn't make a difference, but would be good for consistency with the above case ^
+            #     rec_start, rec_end = sv.start, sv.end
+            #     info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
 
             vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=rec_start, stop=rec_end,
                                                         alleles=['N', sv.type.value], id=sv.type.value,
