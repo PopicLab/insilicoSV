@@ -270,7 +270,22 @@ class TestSVSimulator(unittest.TestCase):
 
     # debugging bidirectional dispersion events (under new event representation)
     def test_bidirectional_dispersion_events(self):
+        # TRA
         config = self.test_dispersion_objects[0]
+        config.initialize_files()
+        curr_sim = SV_Simulator(config.ref, config.par)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        print(f'[TRA] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
+        # dDUP
+        config = self.test_dispersion_objects[1]
+        config.initialize_files()
+        curr_sim = SV_Simulator(config.ref, config.par)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        print(f'[dDUP] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
+        # INV_dDUP
+        config = self.test_dispersion_objects[2]
         config.initialize_files()
         curr_sim = SV_Simulator(config.ref, config.par)
         curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
