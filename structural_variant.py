@@ -197,7 +197,9 @@ class Structural_Variant():
                     ev.start, ev.end = event_locations[ev.symbol]
 
         # debug
-        print(f'===LOCATIONS ASSIGNED===\ntarget_symbol_blocks: {self.target_symbol_blocks}')
+        print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
+        for bl in self.target_symbol_blocks:
+            print(bl)
 
     def change_fragment(self):
         '''
