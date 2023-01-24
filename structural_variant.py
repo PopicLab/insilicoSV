@@ -192,6 +192,10 @@ class Structural_Variant():
                     ev.end = current_pos + ev.length
                     source_event = self.events_dict[ev.symbol[0].upper()]
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
+                    # debug
+                    print(f'source_event = {source_event}')
+                    print(f'ev.symbol = {ev.symbol}')
+                    print(f'ev.source_frag = {ev.source_frag}')
                     ev.source_chr = self.start_chr
                     current_pos = ev.end
         # TODO: also need to set start/end locations for source blocks (these will be used for export methods)
