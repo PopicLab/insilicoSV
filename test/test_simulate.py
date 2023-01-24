@@ -274,6 +274,8 @@ class TestSVSimulator(unittest.TestCase):
         config.initialize_files()
         curr_sim = SV_Simulator(config.ref, config.par)
         curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        print(f'changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
 
     def nonrandom_test_produce_variant_genome(self):
 
