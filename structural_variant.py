@@ -160,8 +160,8 @@ class Structural_Variant():
         self.req_space = sum([event.length for event in self.source_events])
 
         # debug
-        print('END OF INITIALIZE_EVENTS')
-        print(f'self.events_dict = {self.events_dict}')
+        # print('END OF INITIALIZE_EVENTS')
+        # print(f'self.events_dict = {self.events_dict}')
 
     def assign_locations(self, start_pos):
         """
@@ -210,10 +210,10 @@ class Structural_Variant():
         block_end = None
 
         # # debug
-        # print('===CHANGE_FRAGMENT===')
+        print('===CHANGE_FRAGMENT===')
         # print(f'sv.events_dict = {self.events_dict}')
         # print(f'source blocks = {self.source_symbol_blocks}')
-        # print(f'target blocks = {self.target_symbol_blocks}')
+        print(f'target blocks = {self.target_symbol_blocks}')
         # special case: deletion -- len(target_symbol_blocks) == 0
         if self.target_symbol_blocks == [[]]:
             changed_fragments.append([self.start_chr, self.start, self.end, ''])
@@ -249,7 +249,7 @@ class Structural_Variant():
 
         self.changed_fragments = changed_fragments
         # debug
-        # print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
+        print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
         self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
 
     def clean_event_storage(self):
