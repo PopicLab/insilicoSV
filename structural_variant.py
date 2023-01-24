@@ -175,6 +175,11 @@ class Structural_Variant():
         a valid start position (since that needs access to the max_tries setting from the config), but going to invoke
         this method to actually modify the target_blocks' events objects to set the start/end positions
         """
+        # debug
+        print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
+        for bl in self.target_symbol_blocks:
+            print(bl)
+
         current_pos = start_pos
         for block in self.target_symbol_blocks:
             for ev in block:
