@@ -150,6 +150,15 @@ class Structural_Variant():
         for symbol in self.source_unique_char:
             self.source_events.append(self.events_dict[symbol])
 
+        # TODO: need to fix the way events in events_dict have their source_frags assigned (problem: the source
+        #  frag is being assigned with respect to the forward-facing subevent orientation whether or not our
+        #  SV is a flipped-dispersion event -- then in the case of a flipped-dispersion event, the source frags
+        #  taken from the dict wont be accurate)
+        #    ---> is it correct to just flip the order of source_events if our sv is meant to be flipped? (by the
+        #         source_frag assignment in choose_rand_pos, it looks like it's jsut determined by order in the list)
+        if self.dispersion_flip:
+            self.source_events = self.source_events[::-1]
+
         self.req_space = sum([event.length for event in self.source_events])
 
         # debug
