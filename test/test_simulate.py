@@ -135,6 +135,32 @@ class TestSVSimulator(unittest.TestCase):
                                                         {"type": "INS-iDEL", "number": 1, "min_length": 5, "max_length": 5},
                                                         {"type": "dDUP", "number": 1, "min_length": 5, "max_length": 5}]}],
                                         hap1, hap2, bed)]
+        # test objects for bidirectional tests
+        self.test_dispersion_objects = [TestObject([ref_file, {
+                                            "Chromosome19": "CT"}],
+                                                   [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                                       {"type": "TRA",
+                                                        "number": 1,
+                                                        "min_length": {1, 1},
+                                                        "max_length": {1, 1}}]}],
+                                                   hap1, hap2, bed),
+                                        TestObject([ref_file, {
+                                            "Chromosome19": "CT"}],
+                                                   [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                                       {"type": "dDUP",
+                                                        "number": 1,
+                                                        "min_length": {1, 1},
+                                                        "max_length": {1, 1}}]}],
+                                                   hap1, hap2, bed),
+                                        TestObject([ref_file, {
+                                            "Chromosome19": "CT"}],
+                                                   [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                                       {"type": "INV_dDUP",
+                                                        "number": 1,
+                                                        "min_length": {1, 1},
+                                                        "max_length": {1, 1}}]}],
+                                                   hap1, hap2, bed),
+                                        ]
         self.test_objects_ins = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
                                         [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "INS", "number": 1, "min_length": 5, "max_length": 5},
                                                         {"type": "delINV", "number": 1, "min_length": 5, "max_length": 5},
@@ -241,6 +267,11 @@ class TestSVSimulator(unittest.TestCase):
     def test_simple_inversions(self):
         self.helper_test_known_output_svs(self.test_objects_simple_invs[0], ['TG'])
         self.helper_test_known_output_svs(self.test_objects_simple_invs[1], ['G'])
+
+    # debugging bidirectional dispersion events (under new event representation)
+    def test_bidirectional_dispersion_events(self):
+        config = self.test_dispersion_objects[0]
+        config.initialize_files()
 
     def nonrandom_test_produce_variant_genome(self):
 
