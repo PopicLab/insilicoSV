@@ -252,6 +252,7 @@ class Structural_Variant():
         # debug
         print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
         self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
+        return changed_fragments
 
     def clean_event_storage(self):
         # remove source fragments from events to save space as they are no longer needed
