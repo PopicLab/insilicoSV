@@ -498,8 +498,8 @@ class SV_Simulator():
                     else:
                         new_intervals.append((block_start, sv.end))
 
-                    # function to set start/end positions in target Blocks list (ordered list of events)
-                    sv.assign_locations(sv.start)
+                    # # function to set start/end positions in target Blocks list (ordered list of events)
+                    # sv.assign_locations(sv.start)
 
             # adds new SV to simulate only if chosen positions were valid
             if valid:
@@ -512,6 +512,9 @@ class SV_Simulator():
                 for event in sv.events_dict.values():
                     if event.source_frag == None and event.length > 0:
                         event.source_frag = utils.generate_seq(event.length, random_gen)
+
+                # Need to call assign_locations() here because need novel INS sequences to be populated
+                sv.assign_locations(sv.start)
             else:
                 inactive_svs_total += 1
                 if tries != self.sim_settings["max_tries"] + 1:
