@@ -245,8 +245,8 @@ class Structural_Variant():
         # # debug
         # print('===CHANGE_FRAGMENT===')
         # print('sv.events_dict:')
-        for ev in self.events_dict.keys():
-            print(self.events_dict[ev])
+        # for ev in self.events_dict.keys():
+        #     print(self.events_dict[ev])
         # print(f'source blocks = {self.source_symbol_blocks}')
         # print(f'target blocks = {self.target_symbol_blocks}')
         # special case: deletion -- len(target_symbol_blocks) == 0
