@@ -208,6 +208,9 @@ class Structural_Variant():
         if len(flat_event_list) == 1 and flat_event_list[0].start is None:
             flat_event_list[0].start = start_pos
             flat_event_list[0].end = start_pos
+            # position assigned, need to get source frag
+            source_event = self.events_dict[ev.symbol[0].upper()]
+            ev.source_frag = self.get_event_frag(source_event, ev.symbol)
         else:
             for i in range(len(flat_event_list)):
                 ev = flat_event_list[i]

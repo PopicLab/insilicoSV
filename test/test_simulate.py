@@ -281,6 +281,7 @@ class TestSVSimulator(unittest.TestCase):
         #         config = self.test_dispersion_objects[j]
         #         config.initialize_files()
         #         curr_sim = SV_Simulator(config.ref, config.par)
+        # #       (this doesn't work to flip the sv in time for instantiation)
         #         if i == 1:
         #             for sv in curr_sim.svs:
         #                 sv.dispersion_flip = True
@@ -288,6 +289,8 @@ class TestSVSimulator(unittest.TestCase):
         #         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         #         self.assertEqual(targets[(i, j)] in [changed_frag_1, changed_frag_2], True)
 
+        # # not easy to toggle the events to be flipped or not from here
+        # # --> need to run the test switching orientation manually for now
         # TRA
         config = self.test_dispersion_objects[0]
         config.initialize_files()
