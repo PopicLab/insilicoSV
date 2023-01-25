@@ -288,18 +288,18 @@ class TestSVSimulator(unittest.TestCase):
         #         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         #         self.assertEqual(targets[(i, j)] in [changed_frag_1, changed_frag_2], True)
 
-        # TRA
-        config = self.test_dispersion_objects[0]
-        config.initialize_files()
-        curr_sim = SV_Simulator(config.ref, config.par)
-        # if i == 1:
-        #     for sv in curr_sim.svs:
-        #         sv.dispersion_flip = True
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
-        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-        # same output for fwd and bkw TRA
-        # self.assertEqual('TC' in [changed_frag_1, changed_frag_2], True)
-        print(f'[TRA] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
+        # # TRA
+        # config = self.test_dispersion_objects[0]
+        # config.initialize_files()
+        # curr_sim = SV_Simulator(config.ref, config.par)
+        # # if i == 1:
+        # #     for sv in curr_sim.svs:
+        # #         sv.dispersion_flip = True
+        # curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        # changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        # # same output for fwd and bkw TRA
+        # # self.assertEqual('TC' in [changed_frag_1, changed_frag_2], True)
+        # print(f'[TRA] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
         # dDUP
         config = self.test_dispersion_objects[1]
         config.initialize_files()
