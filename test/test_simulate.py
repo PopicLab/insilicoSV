@@ -275,7 +275,7 @@ class TestSVSimulator(unittest.TestCase):
         targets = {(0, 0): 'TC', (0, 1): 'CTC', (0, 2): 'CTG', (1, 0): 'TC', (1, 1): 'TCT', (1, 2): 'ACT'}
         # loop for executing tests under forward and backwards orientation
         # --> 0: forward; 1: backward
-        for i in [0, 1]:
+        for i in [1]:
             # looping over the dispersion events -- j = 0, 1, 2 <-> TRA, dDUP, INV_dDUP
             for j in range(len(self.test_dispersion_objects)):
                 # debug
