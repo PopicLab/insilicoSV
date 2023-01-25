@@ -201,6 +201,9 @@ class Structural_Variant():
         # ------> thus will just need to have start/end set to the nearest event boundary from the ones placed above^
         # --> position is just determined by event adjacency, easier to ignore block boundaries here
         flat_event_list = [ev for bl in self.target_symbol_blocks for ev in bl]
+        print('flat_event_list = ')
+        for e in flat_event_list:
+            print(e)
         # singleton event that's novel (i.e., INS)
         if len(flat_event_list) == 1 and flat_event_list[0].start is None:
             flat_event_list[0].start = start_pos
