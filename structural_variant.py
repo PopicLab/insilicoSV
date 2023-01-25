@@ -178,13 +178,13 @@ class Structural_Variant():
         a valid start position (since that needs access to the max_tries setting from the config), but going to invoke
         this method to actually modify the target_blocks' events objects to set the start/end positions
         """
-        # debug
-        print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
-        for bl in self.target_symbol_blocks:
-            print(bl)
-        print('events_dict:')
-        for ev in self.events_dict.keys():
-            print(self.events_dict[ev])
+        # # debug
+        # print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
+        # for bl in self.target_symbol_blocks:
+        #     print(bl)
+        # print('events_dict:')
+        # for ev in self.events_dict.keys():
+        #     print(self.events_dict[ev])
 
         # Trying logic based on the position assignment of source events in choose_rand_pos()
         # (now that we're flipping the sv.source_events list for flipped-dispersion events)
@@ -201,9 +201,6 @@ class Structural_Variant():
         # ------> thus will just need to have start/end set to the nearest event boundary from the ones placed above^
         # --> position is just determined by event adjacency, easier to ignore block boundaries here
         flat_event_list = [ev for bl in self.target_symbol_blocks for ev in bl]
-        print('flat_event_list = ')
-        for e in flat_event_list:
-            print(e)
         # singleton event that's novel (i.e., INS)
         if len(flat_event_list) == 1 and flat_event_list[0].start is None:
             ev = flat_event_list[0]
@@ -212,9 +209,6 @@ class Structural_Variant():
             # position assigned, need to get source frag
             source_event = self.events_dict[ev.symbol[0].upper()]
             ev.source_frag = self.get_event_frag(source_event, ev.symbol)
-            print(f'ev:\n{ev}')
-            print(f'source_event:\n{source_event}')
-            print(f'ev.source_frag: {ev.source_frag}')
         else:
             for i in range(len(flat_event_list)):
                 ev = flat_event_list[i]
@@ -234,9 +228,9 @@ class Structural_Variant():
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
 
         # debug
-        print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
-        for bl in self.target_symbol_blocks:
-            print(bl)
+        # print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
+        # for bl in self.target_symbol_blocks:
+        #     print(bl)
 
     def change_fragment(self):
         '''
@@ -249,8 +243,8 @@ class Structural_Variant():
         block_end = None
 
         # # debug
-        print('===CHANGE_FRAGMENT===')
-        print('sv.events_dict:')
+        # print('===CHANGE_FRAGMENT===')
+        # print('sv.events_dict:')
         for ev in self.events_dict.keys():
             print(self.events_dict[ev])
         # print(f'source blocks = {self.source_symbol_blocks}')
@@ -290,7 +284,7 @@ class Structural_Variant():
 
         self.changed_fragments = changed_fragments
         # debug
-        print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
+        # print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
         self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
         return changed_fragments
 
