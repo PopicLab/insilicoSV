@@ -298,30 +298,30 @@ class TestSVSimulator(unittest.TestCase):
         curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         # same output for fwd and bkw TRA
-        # self.assertEqual('TC' in [changed_frag_1, changed_frag_2], True)
+        self.assertEqual('TC' in [changed_frag_1, changed_frag_2], True)
         print(f'[TRA] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
-        # # dDUP
-        # config = self.test_dispersion_objects[1]
-        # config.initialize_files()
-        # curr_sim = SV_Simulator(config.ref, config.par)
-        # curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
-        # changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-        # # if not curr_sim.svs[0].dispersion_flip:
-        # #     self.assertEqual('CTC' in [changed_frag_1, changed_frag_2], True)
-        # # else:
-        # #     self.assertEqual('TCT' in [changed_frag_1, changed_frag_2], True)
-        # print(f'[dDUP] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
-        # # INV_dDUP
-        # config = self.test_dispersion_objects[2]
-        # config.initialize_files()
-        # curr_sim = SV_Simulator(config.ref, config.par)
-        # curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
-        # changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-        # # if not curr_sim.svs[0].dispersion_flip:
-        # #     self.assertEqual('CTG' in [changed_frag_1, changed_frag_2], True)
-        # # else:
-        # #     self.assertEqual('ACT' in [changed_frag_1, changed_frag_2], True)
-        # print(f'[INV_dDUP] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
+        # dDUP
+        config = self.test_dispersion_objects[1]
+        config.initialize_files()
+        curr_sim = SV_Simulator(config.ref, config.par)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        # if not curr_sim.svs[0].dispersion_flip:
+        #     self.assertEqual('CTC' in [changed_frag_1, changed_frag_2], True)
+        # else:
+        #     self.assertEqual('TCT' in [changed_frag_1, changed_frag_2], True)
+        print(f'[dDUP] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
+        # INV_dDUP
+        config = self.test_dispersion_objects[2]
+        config.initialize_files()
+        curr_sim = SV_Simulator(config.ref, config.par)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        # if not curr_sim.svs[0].dispersion_flip:
+        #     self.assertEqual('CTG' in [changed_frag_1, changed_frag_2], True)
+        # else:
+        #     self.assertEqual('ACT' in [changed_frag_1, changed_frag_2], True)
+        print(f'[INV_dDUP] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
 
     def nonrandom_test_produce_variant_genome(self):
 
