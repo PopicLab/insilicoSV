@@ -212,6 +212,8 @@ class Structural_Variant():
             # position assigned, need to get source frag
             source_event = self.events_dict[ev.symbol[0].upper()]
             ev.source_frag = self.get_event_frag(source_event, ev.symbol)
+            print(f'source_event:\n{source_event}')
+            print(f'ev.source_frag: {ev.source_frag}')
         else:
             for i in range(len(flat_event_list)):
                 ev = flat_event_list[i]
