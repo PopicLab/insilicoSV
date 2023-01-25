@@ -278,6 +278,8 @@ class TestSVSimulator(unittest.TestCase):
         for i in [0, 1]:
             # looping over the dispersion events -- j = 0, 1, 2 <-> TRA, dDUP, INV_dDUP
             for j in range(len(self.test_dispersion_objects)):
+                # debug
+                print(f'-=-=- i, j = ({i}, {j}) -=-=-')
                 config = self.test_dispersion_objects[j]
                 config.initialize_files()
                 curr_sim = SV_Simulator(config.ref, config.par)
@@ -286,6 +288,7 @@ class TestSVSimulator(unittest.TestCase):
                         sv.dispersion_flip = True
                 curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
                 changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+                print(f'changed_frag_1 = {changed_frag_1}, changed_frag_2 = {changed_frag_2}')
                 self.assertEqual(targets[(i, j)] in [changed_frag_1, changed_frag_2], True)
 
     def nonrandom_test_produce_variant_genome(self):
