@@ -186,33 +186,38 @@ class Structural_Variant():
         for ev in self.events_dict.keys():
             print(self.events_dict[ev])
 
-        current_pos = start_pos
+        # Trying logic based on the position assignment of source events in choose_rand_pos()
+        # (now that we're flipping the sv.source_events list for flipped-dispersion events)
         for block in self.target_symbol_blocks:
             for ev in block:
-                if ev.symbol.startswith(Symbols.DIS.value):
-                    ev.start = current_pos
-                    ev.end = current_pos + ev.length
-                    current_pos = ev.end
+                # if the event is one also found in the source, place it at the location given in events_dict
+                # --> the events that stay the same will need to be in the same place in both input and output ref
+                if ev.symbol in self.events_dict.keys():
+                    source_ev = self.events_dict[ev.symbol]
+                    ev.start = source_ev.start
+                    ev.end = source_ev.end
+                    ev.source_frag = source_ev.source_frag
+        # ===> then everything that wasn't just assigned will be a new event (all to be modeled as insertion fragments)
+        # ------> thus will just need to have start/end set to the nearest event boundary from the ones placed above^
+        # --> position is just determined by event adjacency, easier to ignore block boundaries here
+        flat_event_list = [ev for bl in self.target_symbol_blocks for ev in bl]
+        # singleton event that's novel (i.e., INS)
+        if len(flat_event_list) == 1 and flat_event_list[0].start is None:
+            flat_event_list[0].start = start_pos
+            flat_event_list[0].end = start_pos
+        else:
+            for i in range(len(flat_event_list)):
+                ev = flat_event_list[i]
+                if ev.start is None and i == 0:
+                    # if the first event is novel, set start/end to the start of the nearest event
+                    j = i + 1
+                    while flat_event_list[j].start is None:
+                        j += 1
+                    ev.start = flat_event_list[j].start
+                    ev.end = flat_event_list[j].start
                 else:
-                    ev.start = current_pos
-                    ev.end = current_pos + ev.length
-                    source_event = self.events_dict[ev.symbol[0].upper()]
-                    ev.source_frag = self.get_event_frag(source_event, ev.symbol)
-                    # debug
-                    # print('sv.events_dict:')
-                    # for ev in self.events_dict.keys():
-                    #     print(self.events_dict[ev])
-                    print(f'source_event = {source_event}')
-                    print(f'ev.symbol = {ev.symbol}')
-                    print(f'ev.source_frag = {ev.source_frag}')
-                    ev.source_chr = self.start_chr
-                    current_pos = ev.end
-        # TODO: also need to set start/end locations for source blocks (these will be used for export methods)
-        event_locations = {ev.symbol: (ev.start, ev.end) for bl in self.target_symbol_blocks for ev in bl}
-        for block in self.source_symbol_blocks:
-            for ev in block:
-                if ev.symbol in event_locations.keys():
-                    ev.start, ev.end = event_locations[ev.symbol]
+                    ev.start = flat_event_list[i - 1].end
+                    ev.end = flat_event_list[i - 1].end
 
         # debug
         print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
