@@ -4,7 +4,7 @@ import random
 
 
 class Structural_Variant():
-    def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None):
+    def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None, disp_flip=False):
         '''
         Initializes SV's transformation and sets up its events, along with several other basic attributes like zygosity
 
@@ -17,6 +17,7 @@ class Structural_Variant():
             position/is being read in from a vcf of known/fixed variants
         source: tuple representing source sequence, optional
         target: tuple representing target sequence, optional
+        disp_flip: flag to optionally initialize an SV with dispersion flipping (deterministically, not randomly)
         '''
         self.type = sv_type
         if self.type != Variant_Type.Custom:
@@ -40,12 +41,11 @@ class Structural_Variant():
         self.source_events = []  # list of Event classes for every symbol in source sequence
         self.events_dict = dict()  # maps every unique symbol in source and target to an Event class
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
-        self.dispersion_flip = False
+        self.dispersion_flip = disp_flip
         # TODO:
         #  1) check if flipping works for div_dDUPs
-        #  2) add TRAs to this list once dispersion-flipping logic is written for that case
         if self.type in [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP, Variant_Type.TRA]:
-            # if random.randint(0, 1):
+            # if not self.dispersion_flip and random.randint(0, 1):
             if True:
                 self.dispersion_flip = True
         # initialize_events sets the values of events_dict, source_dict, and req_space
