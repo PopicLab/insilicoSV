@@ -161,9 +161,11 @@ class Structural_Variant():
 
         self.req_space = sum([event.length for event in self.source_events])
 
-        # debug
-        print('END OF INITIALIZE_EVENTS')
-        print(f'self.events_dict = {self.events_dict}')
+        # # debug
+        # print('END OF INITIALIZE_EVENTS')
+        # print('sv.events_dict:')
+        # for ev in self.events_dict.keys():
+        #     print(self.events_dict[ev])
 
     def assign_locations(self, start_pos):
         """
@@ -180,6 +182,9 @@ class Structural_Variant():
         print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
         for bl in self.target_symbol_blocks:
             print(bl)
+        print('events_dict:')
+        for ev in self.events_dict.keys():
+            print(self.events_dict[ev])
 
         current_pos = start_pos
         for block in self.target_symbol_blocks:
@@ -194,7 +199,9 @@ class Structural_Variant():
                     source_event = self.events_dict[ev.symbol[0].upper()]
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
                     # debug
-                    print(f'self.events_dict = {self.events_dict}')
+                    # print('sv.events_dict:')
+                    # for ev in self.events_dict.keys():
+                    #     print(self.events_dict[ev])
                     print(f'source_event = {source_event}')
                     print(f'ev.symbol = {ev.symbol}')
                     print(f'ev.source_frag = {ev.source_frag}')
