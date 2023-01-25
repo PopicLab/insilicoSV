@@ -306,7 +306,7 @@ class TestSVSimulator(unittest.TestCase):
         curr_sim = SV_Simulator(config.ref, config.par)
         curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-        if curr_sim.svs[0].dispersion_flip:
+        if not curr_sim.svs[0].dispersion_flip:
             self.assertEqual('CTC' in [changed_frag_1, changed_frag_2], True)
         else:
             self.assertEqual('TCT' in [changed_frag_1, changed_frag_2], True)
@@ -317,7 +317,7 @@ class TestSVSimulator(unittest.TestCase):
         curr_sim = SV_Simulator(config.ref, config.par)
         curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-        if curr_sim.svs[0].dispersion_flip:
+        if not curr_sim.svs[0].dispersion_flip:
             self.assertEqual('CTG' in [changed_frag_1, changed_frag_2], True)
         else:
             self.assertEqual('ACT' in [changed_frag_1, changed_frag_2], True)
