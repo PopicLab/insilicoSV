@@ -222,6 +222,9 @@ class Structural_Variant():
                     else:
                         ev.start = flat_event_list[i - 1].end
                         ev.end = flat_event_list[i - 1].end
+                    # position assigned, need to get source frag
+                    source_event = self.events_dict[ev.symbol[0].upper()]
+                    ev.source_frag = self.get_event_frag(source_event, ev.symbol)
 
         # debug
         print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
