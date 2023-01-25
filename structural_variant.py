@@ -192,8 +192,8 @@ class Structural_Variant():
             for ev in block:
                 # if the event is one also found in the source, place it at the location given in events_dict
                 # --> the events that stay the same will need to be in the same place in both input and output ref
-                if ev.symbol in self.events_dict.keys():
-                    source_ev = self.events_dict[ev.symbol]
+                if ev.symbol.upper() in self.events_dict.keys():
+                    source_ev = self.events_dict[ev.symbol.upper()]
                     ev.start = source_ev.start
                     ev.end = source_ev.end
                     ev.source_frag = source_ev.source_frag
@@ -209,7 +209,7 @@ class Structural_Variant():
             flat_event_list[0].start = start_pos
             flat_event_list[0].end = start_pos
             # position assigned, need to get source frag
-            source_event = self.events_dict[ev.symbol[0].upper()]
+            source_event = self.events_dict[flat_event_list[0].symbol[0].upper()]
             ev.source_frag = self.get_event_frag(source_event, ev.symbol)
         else:
             for i in range(len(flat_event_list)):
