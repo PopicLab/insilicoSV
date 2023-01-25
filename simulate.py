@@ -394,6 +394,8 @@ class SV_Simulator():
                 self.event_ranges[id].sort()
             self.log_to_file("Event Ranges: {}".format(self.event_ranges))
             self.log_to_file("Intervals for hap {}: {}".format(x, edits_dict))
+            print("Event Ranges: {}".format(self.event_ranges))
+            print("Intervals for hap {}: {}".format(x, edits_dict))
 
             for id in self.order_ids:
                 # account for homozygous and heterogeneous variants
