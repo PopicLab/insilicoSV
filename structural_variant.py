@@ -211,16 +211,17 @@ class Structural_Variant():
         else:
             for i in range(len(flat_event_list)):
                 ev = flat_event_list[i]
-                if ev.start is None and i == 0:
-                    # if the first event is novel, set start/end to the start of the nearest event
-                    j = i + 1
-                    while flat_event_list[j].start is None:
-                        j += 1
-                    ev.start = flat_event_list[j].start
-                    ev.end = flat_event_list[j].start
-                else:
-                    ev.start = flat_event_list[i - 1].end
-                    ev.end = flat_event_list[i - 1].end
+                if ev.start is None:
+                    if i == 0:
+                        # if the first event is novel, set start/end to the start of the nearest event
+                        j = i + 1
+                        while flat_event_list[j].start is None:
+                            j += 1
+                        ev.start = flat_event_list[j].start
+                        ev.end = flat_event_list[j].start
+                    else:
+                        ev.start = flat_event_list[i - 1].end
+                        ev.end = flat_event_list[i - 1].end
 
         # debug
         print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
