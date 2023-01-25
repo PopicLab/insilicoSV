@@ -196,7 +196,7 @@ class Structural_Variant():
                     source_ev = self.events_dict[ev.symbol.upper()]
                     ev.start = source_ev.start
                     ev.end = source_ev.end
-                    ev.source_frag = source_ev.source_frag
+                    ev.source_frag = self.get_event_frag(source_ev, ev.symbol)
         # ===> then everything that wasn't just assigned will be a new event (all to be modeled as insertion fragments)
         # ------> thus will just need to have start/end set to the nearest event boundary from the ones placed above^
         # --> position is just determined by event adjacency, easier to ignore block boundaries here
@@ -206,10 +206,11 @@ class Structural_Variant():
             print(e)
         # singleton event that's novel (i.e., INS)
         if len(flat_event_list) == 1 and flat_event_list[0].start is None:
-            flat_event_list[0].start = start_pos
-            flat_event_list[0].end = start_pos
+            ev = flat_event_list[0]
+            ev.start = start_pos
+            ev.end = start_pos
             # position assigned, need to get source frag
-            source_event = self.events_dict[flat_event_list[0].symbol[0].upper()]
+            source_event = self.events_dict[ev.symbol[0].upper()]
             ev.source_frag = self.get_event_frag(source_event, ev.symbol)
         else:
             for i in range(len(flat_event_list)):
