@@ -200,29 +200,29 @@ class Structural_Variant():
         # ===> then everything that wasn't just assigned will be a new event (all to be modeled as insertion fragments)
         # ------> thus will just need to have start/end set to the nearest event boundary from the ones placed above^
         # --> position is just determined by event adjacency, easier to ignore block boundaries here
-        flat_event_list = [ev for bl in self.target_symbol_blocks for ev in bl]
+        target_events = [ev for bl in self.target_symbol_blocks for ev in bl]
         # singleton event that's novel (i.e., INS)
-        if len(flat_event_list) == 1 and flat_event_list[0].start is None:
-            ev = flat_event_list[0]
+        if len(target_events) == 1 and target_events[0].start is None:
+            ev = target_events[0]
             ev.start = start_pos
             ev.end = start_pos
             # position assigned, need to get source frag
             source_event = self.events_dict[ev.symbol[0].upper()]
             ev.source_frag = self.get_event_frag(source_event, ev.symbol)
         else:
-            for i in range(len(flat_event_list)):
-                ev = flat_event_list[i]
+            for i in range(len(target_events)):
+                ev = target_events[i]
                 if ev.start is None:
                     if i == 0:
                         # if the first event is novel, set start/end to the start of the nearest event
                         j = i + 1
-                        while flat_event_list[j].start is None:
+                        while target_events[j].start is None:
                             j += 1
-                        ev.start = flat_event_list[j].start
-                        ev.end = flat_event_list[j].start
+                        ev.start = target_events[j].start
+                        ev.end = target_events[j].start
                     else:
-                        ev.start = flat_event_list[i - 1].end
-                        ev.end = flat_event_list[i - 1].end
+                        ev.start = target_events[i - 1].end
+                        ev.end = target_events[i - 1].end
                     # position assigned, need to get source frag
                     source_event = self.events_dict[ev.symbol[0].upper()]
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
