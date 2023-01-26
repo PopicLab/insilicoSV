@@ -45,8 +45,8 @@ class Structural_Variant():
         # TODO:
         #  1) check if flipping works for div_dDUPs
         if self.type in [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP, Variant_Type.TRA]:
-            if not self.dispersion_flip and random.randint(0, 1):
-            # if True:
+            # if not self.dispersion_flip and random.randint(0, 1):
+            if True:
                 self.dispersion_flip = True
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
