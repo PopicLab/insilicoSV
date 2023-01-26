@@ -4,7 +4,7 @@ import random
 
 
 class Structural_Variant():
-    def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None, disp_flip=False):
+    def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None, vcf_rec=None):
         '''
         Initializes SV's transformation and sets up its events, along with several other basic attributes like zygosity
 
@@ -17,7 +17,7 @@ class Structural_Variant():
             position/is being read in from a vcf of known/fixed variants
         source: tuple representing source sequence, optional
         target: tuple representing target sequence, optional
-        disp_flip: flag to optionally initialize an SV with dispersion flipping (deterministically, not randomly)
+        vcf_rec: (to be used in fixed mode) vcf record giving sv information that will instantiate the event
         '''
         self.type = sv_type
         if self.type != Variant_Type.Custom:
@@ -34,6 +34,7 @@ class Structural_Variant():
             self.source), Structural_Variant.reformat_seq(self.target)
 
         # initialize event classes
+        # *** are these sv.start/end attributes even used?
         self.start = None  # defines the space in which SV operates
         self.end = None
         self.req_space = None  # required space for SV, sum of event lengths
@@ -41,9 +42,6 @@ class Structural_Variant():
         self.source_events = []  # list of Event classes for every symbol in source sequence
         self.events_dict = dict()  # maps every unique symbol in source and target to an Event class
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
-        self.dispersion_flip = disp_flip
-        # TODO:
-        #  1) check if flipping works for div_dDUPs
         if self.type in [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP, Variant_Type.TRA]:
             # if not self.dispersion_flip and random.randint(0, 1):
             if True:
@@ -51,6 +49,10 @@ class Structural_Variant():
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
             self.initialize_events(length_ranges)
+        else:
+            # ** in the case of fixed mode, the sim.process_vcf() method seems to act as the alternative initialization
+            # ** method -- better practice to have a fixed mode initialization method here that we'll feed the vcf record to?
+            self.initialize_events_fixed(vcf_rec)
 
         sv_blocks = Blocks(self)
         # debug
@@ -58,15 +60,19 @@ class Structural_Variant():
         self.source_symbol_blocks = sv_blocks.source_blocks
         self.target_symbol_blocks = sv_blocks.target_blocks
 
-        # specifies if sv is unable to be simulated due to random placement issues
-        # will be turned on later
-        self.active = False
+        if mode == 'randomized':
+            # specifies if sv is unable to be simulated due to random placement issues
+            # will be turned on later
+            self.active = False
 
-        # 1 = homozygous, 0 = heterozygous
-        self.ishomozygous = Zygosity.UNDEFINED
+            # 1 = homozygous, 0 = heterozygous
+            self.ishomozygous = Zygosity.UNDEFINED
 
-        # stores list of booleans specifying if SV will be applied to certain haplotype for assigned chromosome
-        self.hap = [False, False]
+            # stores list of booleans specifying if SV will be applied to certain haplotype for assigned chromosome
+            self.hap = [False, False]
+        else:
+            # if in fixed mode, will need to manually call assign_locations (since that is called by choose_rand_pos() in random mode)
+            self.assign_locations(self.start)
 
     def __repr__(self):
         return "<SV transformation \"{}\" -> \"{}\" taking up {} non-dispersion spaces>".format(
@@ -166,6 +172,21 @@ class Structural_Variant():
         # print('sv.events_dict:')
         # for ev in self.events_dict.keys():
         #     print(self.events_dict[ev])
+
+    def initialize_events_fixed(self, vcf_record):
+        """
+        initialization method for SV read in from vcf -- need to prepare objects needed for creation of target blocks
+        --> needs to fully populate events_dict with start/end (reflecting optional dispersion flip), lengths, and source frags
+        --> (with those in place, Blocks() and assign_locations() should have everything they need to run before change_frags())
+        """
+        # TODO: populate events_dict with information from vcf record
+        # debug
+        print('==== INITIALIZE_EVENTS (FIXED-MODE) ====')
+        print(f'source symbols : {self.source_unique_char}')
+        print(f'target symbols : {self.target_unique_char}')
+
+        # TODO: populate other SV attributes (everything populated in current process_vcf logic)
+        pass
 
     def assign_locations(self, start_pos):
         """

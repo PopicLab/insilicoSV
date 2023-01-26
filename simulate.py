@@ -231,7 +231,13 @@ class SV_Simulator():
             # print(f'self.event_ranges = {self.event_ranges}')
 
             # For SVs in fixed mode, length_ranges will just be the single length value
-            sv = Structural_Variant(sv_type=type, mode='fixed')
+            # TODO: check if record has TARGET fields (i.e., is a dispersion event)
+            #  -> if yes, check if rec.TARGET < rec.start (i.e., is a flipped dispersion event)
+            #  -> if yes, give disp_flip=True to SV constructor
+            #  *** (should just give the constructor the vcf record and all the logic will be executed in the SV class)
+            sv = Structural_Variant(sv_type=type, mode='fixed', vcf_rec=rec)
+            # TODO: going to move all (mostly all?) the logic below to SV.initialize_events_fixed()
+            #  -------------------------
             sv.start = rec.start
             # need to account for the 0/1-indexing that differs between the pysam start and stop fields
             # ** This will introduce an off-by-one error with input VCFs that were created by insilico (i.e. for
@@ -350,7 +356,7 @@ class SV_Simulator():
                 random.shuffle(self.svs)
         else:
             # branch for mode == "fixed"
-            # print('CALLING PROCESS_VCF')
+            print('CALLING PROCESS_VCF')
             self.process_vcf(self.vcf_path)
 
     def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta, bedfile, stats_file=None, initial_reset=True,
