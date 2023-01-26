@@ -179,11 +179,14 @@ class Structural_Variant():
         --> needs to fully populate events_dict with start/end (reflecting optional dispersion flip), lengths, and source frags
         --> (with those in place, Blocks() and assign_locations() should have everything they need to run before change_frags())
         """
-        # TODO: populate events_dict with information from vcf record
         # debug
         print('==== INITIALIZE_EVENTS (FIXED-MODE) ====')
         print(f'source symbols : {self.source_unique_char}')
         print(f'target symbols : {self.target_unique_char}')
+        # TODO: populate events_dict with information from vcf record
+        #  --> what's the best way to handle events with multiple input symbols?
+        #  ----> anything like that will have multiple vcf records, but not sure how to write that logic here when
+        #  ----> we're just looking at a single record
 
         # TODO: populate other SV attributes (everything populated in current process_vcf logic)
         pass
