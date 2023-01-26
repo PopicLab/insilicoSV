@@ -327,7 +327,8 @@ class Blocks():
         self.target_blocks = []
         self.generate_blocks()
         # optional dispersion flip should be done in init step
-        if self.sv.type in [Variant_Type.TRA, Variant_Type.dDUP, Variant_Type.INV_dDUP] and self.sv.dispersion_flip:
+        if self.sv.type in [Variant_Type.TRA, Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP] \
+                and self.sv.dispersion_flip:
             self.flip_blocks()
         self.track_original_symbol()
 
