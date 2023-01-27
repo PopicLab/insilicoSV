@@ -46,7 +46,7 @@ class Structural_Variant():
         self.dispersion_flip = False
         if self.type in [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP, Variant_Type.TRA]:
             # if not self.dispersion_flip and random.randint(0, 1):
-            if False:
+            if True:
                 self.dispersion_flip = True
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
@@ -219,6 +219,8 @@ class Structural_Variant():
         #  simulation flag identifying a divergent repeat simulation in which div_dDUP input types should be converted)
         if self.type == Variant_Type.div_dDUP:
             self.target_unique_char = ("A", "_1", "A'")
+            # debug
+            print(f'target symbols changed to : {self.target_unique_char}')
 
         # TODO: populate other SV attributes (everything populated in current process_vcf logic)
         pass
