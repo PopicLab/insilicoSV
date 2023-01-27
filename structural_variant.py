@@ -209,8 +209,8 @@ class Structural_Variant():
                 self.events_dict[symbol] = disp_ev
         # debug
         print('events_dict = ')
-        for ev in self.events_dict:
-            print(ev)
+        for ev in self.events_dict.keys():
+            print(self.events_dict[ev])
 
         # TODO: populate other SV attributes (everything populated in current process_vcf logic)
         pass
