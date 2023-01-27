@@ -4,7 +4,7 @@ import random
 
 
 class Structural_Variant():
-    def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None, vcf_rec=None):
+    def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None, vcf_rec=None, ref_fasta=None):
         '''
         Initializes SV's transformation and sets up its events, along with several other basic attributes like zygosity
 
@@ -18,6 +18,7 @@ class Structural_Variant():
         source: tuple representing source sequence, optional
         target: tuple representing target sequence, optional
         vcf_rec: (to be used in fixed mode) vcf record giving sv information that will instantiate the event
+        ref_fasta: for extracting reference frag for vcf records in fixed mode initialization
         '''
         self.type = sv_type
         if self.type != Variant_Type.Custom:
@@ -52,7 +53,7 @@ class Structural_Variant():
         else:
             # ** in the case of fixed mode, the sim.process_vcf() method seems to act as the alternative initialization
             # ** method -- better practice to have a fixed mode initialization method here that we'll feed the vcf record to?
-            self.initialize_events_fixed(vcf_rec)
+            self.initialize_events_fixed(vcf_rec, ref_fasta)
 
         sv_blocks = Blocks(self)
         # debug
@@ -173,7 +174,7 @@ class Structural_Variant():
         # for ev in self.events_dict.keys():
         #     print(self.events_dict[ev])
 
-    def initialize_events_fixed(self, vcf_record):
+    def initialize_events_fixed(self, vcf_record, ref_fasta):
         """
         initialization method for SV read in from vcf -- need to prepare objects needed for creation of target blocks
         --> needs to fully populate events_dict with start/end (reflecting optional dispersion flip), lengths, and source frags
@@ -187,6 +188,29 @@ class Structural_Variant():
         #  --> what's the best way to handle events with multiple input symbols?
         #  ----> anything like that will have multiple vcf records, but not sure how to write that logic here when
         #  ----> we're just looking at a single record
+        source_len = vcf_record.stop - vcf_record.start if 'SVLEN' not in vcf_record.info else vcf_record.info['SVLEN']
+        for symbol in self.source_unique_char:
+            if symbol == 'A':
+                source_ev = Event(self, symbol, source_len, (source_len, source_len), symbol)
+                source_ev.start = vcf_record.start
+                source_ev.end = vcf_record.stop
+                source_ev.source_chr = vcf_record.chrom
+                source_ev.source_frag = ref_fasta.fetch(source_ev.source_chr, source_ev.start, source_ev.end)
+                self.events_dict[symbol] = source_ev
+            if symbol.startswith(Symbols.DIS.value):
+                flipped_dispersion = vcf_record.info['TARGET'] < vcf_record.start
+                disp_len = vcf_record.info['TARGET'] - vcf_record.stop if not flipped_dispersion else \
+                    vcf_record.start - vcf_record.info['TARGET']
+                disp_ev = Event(self, symbol, disp_len, (disp_len, disp_len), symbol)
+                disp_ev.start = vcf_record.stop if not flipped_dispersion else vcf_record.info['TARGET']
+                disp_ev.end = vcf_record.info['TARGET'] if not flipped_dispersion else vcf_record.start
+                disp_ev.source_chr = vcf_record.chrom
+                disp_ev.source_frag = ref_fasta.fetch(disp_ev.source_chr, disp_ev.start, disp_ev.end)
+                self.events_dict[symbol] = disp_ev
+        # debug
+        print('events_dict = ')
+        for ev in self.events_dict:
+            print(ev)
 
         # TODO: populate other SV attributes (everything populated in current process_vcf logic)
         pass
@@ -329,8 +353,8 @@ class Event():
         self.length = length
         self.length_range = length_range
         self.symbol = symbol  # refers to symbol in SV's transformation
-        self.source_chr = None if not source_frag else source_frag
-        self.source_frag = None
+        self.source_chr = None
+        self.source_frag = None if not source_frag else source_frag
         self.start = None
         self.end = None
 

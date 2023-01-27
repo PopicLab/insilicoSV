@@ -235,7 +235,7 @@ class SV_Simulator():
             #  -> if yes, check if rec.TARGET < rec.start (i.e., is a flipped dispersion event)
             #  -> if yes, give disp_flip=True to SV constructor
             #  *** (should just give the constructor the vcf record and all the logic will be executed in the SV class)
-            sv = Structural_Variant(sv_type=type, mode='fixed', vcf_rec=rec)
+            sv = Structural_Variant(sv_type=type, mode='fixed', vcf_rec=rec, ref_fasta=self.ref_fasta)
             # TODO: going to move all (mostly all?) the logic below to SV.initialize_events_fixed()
             #  -------------------------
             sv.start = rec.start
