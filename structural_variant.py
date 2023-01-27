@@ -38,6 +38,7 @@ class Structural_Variant():
         # *** are these sv.start/end attributes even used?
         self.start = None  # defines the space in which SV operates
         self.end = None
+        self.start_chr = None
         self.req_space = None  # required space for SV, sum of event lengths
         # TODO: only used for iterating over events in choose_rand_pos() -- delete and replace with source_blocks?
         self.source_events = []  # list of Event classes for every symbol in source sequence
@@ -226,6 +227,7 @@ class Structural_Variant():
         # need to have self.start/end defined for change_fragment()
         self.start = self.events_dict['A'].start
         self.end = self.events_dict['A'].end if '_1' not in self.events_dict.keys() else self.events_dict['_1'].end
+        self.start_chr = vcf_record.chrom
 
         # handling for divergent repeat simulation logic
         # --> when reading in a div_dDUP in fixed mode, want to treat it as a dDUP (in practice we only expect to
