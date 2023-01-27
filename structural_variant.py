@@ -192,6 +192,7 @@ class Structural_Variant():
         for symbol in self.source_unique_char:
             # debug
             print(f'symbol: {symbol}')
+            print(f'type(symbol): {type(symbol)}')
             if symbol == 'A':
                 source_ev = Event(self, symbol, source_len, (source_len, source_len), symbol)
                 source_ev.start = vcf_record.start
