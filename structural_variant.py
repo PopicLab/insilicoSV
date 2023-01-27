@@ -185,10 +185,6 @@ class Structural_Variant():
         print('==== INITIALIZE_EVENTS (FIXED-MODE) ====')
         print(f'source symbols : {self.source_unique_char}')
         print(f'target symbols : {self.target_unique_char}')
-        # TODO: populate events_dict with information from vcf record
-        #  --> what's the best way to handle events with multiple input symbols?
-        #  ----> anything like that will have multiple vcf records, but not sure how to write that logic here when
-        #  ----> we're just looking at a single record
         source_len = vcf_record.stop - vcf_record.start if 'SVLEN' not in vcf_record.info else vcf_record.info['SVLEN']
         for symbol in self.source_unique_char:
             # debug
@@ -212,6 +208,17 @@ class Structural_Variant():
                 disp_ev.source_frag = ref_fasta.fetch(disp_ev.source_chr, disp_ev.start, disp_ev.end)
                 print(f'event: {disp_ev}')
                 self.events_dict[symbol] = disp_ev
+
+        # handling for divergent repeat simulation logic
+        # --> when reading in a div_dDUP in fixed mode, want to treat it as a dDUP (in practice we only expect to
+        # --> see div_dDUPs in fixed mode if we're reading in the edited reference that has had divergent repeats --
+        # --> modeled as div_dDUPs -- input into it, so to make the donor reference we want those positions to have
+        # --> dDUPs -- that is, A_A to the reference's A_A*), that is, changing the target to be A_A rather than A_A*
+        # TODO: this is bad practice and precludes the simulation of actual div_dDUPs in fixed mode -- not sure if
+        #  that's a realistic use case, but if it is then this logic will need to change (e.g., perhaps an additional
+        #  simulation flag identifying a divergent repeat simulation in which div_dDUP input types should be converted)
+        if self.type == Variant_Type.div_dDUP:
+            self.target_unique_char = ('A', '_1', 'A')
 
         # TODO: populate other SV attributes (everything populated in current process_vcf logic)
         pass
