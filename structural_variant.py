@@ -194,7 +194,7 @@ class Structural_Variant():
             print(f'symbol: {symbol}')
             print(f'type(symbol): {type(symbol)}')
             if symbol == 'A':
-                source_ev = Event(self, symbol, source_len, (source_len, source_len), symbol)
+                source_ev = Event(self, source_len, (source_len, source_len), symbol)
                 source_ev.start = vcf_record.start
                 source_ev.end = vcf_record.stop
                 source_ev.source_chr = vcf_record.chrom
@@ -204,7 +204,7 @@ class Structural_Variant():
                 flipped_dispersion = vcf_record.info['TARGET'] < vcf_record.start
                 disp_len = vcf_record.info['TARGET'] - vcf_record.stop if not flipped_dispersion else \
                     vcf_record.start - vcf_record.info['TARGET']
-                disp_ev = Event(self, symbol, disp_len, (disp_len, disp_len), symbol)
+                disp_ev = Event(self, disp_len, (disp_len, disp_len), symbol)
                 disp_ev.start = vcf_record.stop if not flipped_dispersion else vcf_record.info['TARGET']
                 disp_ev.end = vcf_record.info['TARGET'] if not flipped_dispersion else vcf_record.start
                 disp_ev.source_chr = vcf_record.chrom
