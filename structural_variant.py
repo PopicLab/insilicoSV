@@ -45,9 +45,10 @@ class Structural_Variant():
         self.events_dict = dict()  # maps every unique symbol in source and target to an Event class
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
         self.dispersion_flip = False
+        self.insseq_from_rec = None  # space to store INSSEQ for fixed-mode INS event
+
         if self.type in [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP, Variant_Type.TRA]:
-            if not self.dispersion_flip and random.randint(0, 1):
-            # if True:
+            if random.randint(0, 1):
                 self.dispersion_flip = True
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
@@ -187,19 +188,10 @@ class Structural_Variant():
         print(f'source symbols : {self.source_unique_char}')
         print(f'target symbols : {self.target_unique_char}')
 
-        # # logic to read insertion sequence if one is given (from process_vcf) -- what's the right way to do this?
-        # TODO: figure out where this goes (fixed-mode INS)
-        # sv_length = None
-        # if 'SVLEN' in vcf_record.info:
-        #     sv_length = vcf_record.info['SVLEN']
-        # insertion_sequence = None
-        # # *** NOTE: here we assume that insertion sequences will be specified in an INSSEQ info field
-        # # *** --> this is different that using the REF/ALT fields (as described in the VCF spec)
-        # if vcf_record.info['SVTYPE'] == 'INS':
-        #     if 'INSSEQ' in vcf_record.info:
-        #         insertion_sequence = vcf_record.info['INSSEQ'][0]
-        #     else:
-        #         insertion_sequence = utils.generate_seq(sv_length, random)
+        # for insertions with an insertion sequence given in the vcf, storing the seq in sv attribute
+        if vcf_record.info['SVTYPE'] == 'INS':
+            if 'INSSEQ' in vcf_record.info:
+                self.insseq_from_rec = vcf_record.info['INSSEQ'][0]
 
         source_len = vcf_record.stop - vcf_record.start if 'SVLEN' not in vcf_record.info else vcf_record.info['SVLEN']
         for symbol in self.source_unique_char:
@@ -291,7 +283,11 @@ class Structural_Variant():
             ev.end = start_pos
             # position assigned, need to get source frag
             source_event = self.events_dict[ev.symbol[0].upper()]
-            ev.source_frag = self.get_event_frag(source_event, ev.symbol)
+            # if we're in fixed mode and the vcf record specified an INSSEQ, use that here
+            if self.insseq_from_rec is not None:
+                ev.source_frag = self.insseq_from_rec
+            else:
+                ev.source_frag = self.get_event_frag(source_event, ev.symbol)
         else:
             for i in range(len(target_events)):
                 ev = target_events[i]
