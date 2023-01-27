@@ -218,7 +218,7 @@ class Structural_Variant():
         #  that's a realistic use case, but if it is then this logic will need to change (e.g., perhaps an additional
         #  simulation flag identifying a divergent repeat simulation in which div_dDUP input types should be converted)
         if self.type == Variant_Type.div_dDUP:
-            self.target_unique_char = ('A', '_1', 'A')
+            self.target_unique_char = ("A", "_1", "A'")
 
         # TODO: populate other SV attributes (everything populated in current process_vcf logic)
         pass
