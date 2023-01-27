@@ -214,17 +214,17 @@ class SV_Simulator():
         vcf = VariantFile(vcf_path)
         for rec in vcf.fetch():
             type = Variant_Type(rec.info['SVTYPE'])
-            sv_length = None
-            if 'SVLEN' in rec.info:
-                sv_length = rec.info['SVLEN']
-            insertion_sequence = None
-            # *** NOTE: here we assume that insertion sequences will be specified in an INSSEQ info field
-            # *** --> this is different that using the REF/ALT fields (as described in the VCF spec)
-            if rec.info['SVTYPE'] == 'INS':
-                if 'INSSEQ' in rec.info:
-                    insertion_sequence = rec.info['INSSEQ'][0]
-                else:
-                    insertion_sequence = utils.generate_seq(sv_length, random_gen)
+            # sv_length = None
+            # if 'SVLEN' in rec.info:
+            #     sv_length = rec.info['SVLEN']
+            # insertion_sequence = None
+            # # *** NOTE: here we assume that insertion sequences will be specified in an INSSEQ info field
+            # # *** --> this is different that using the REF/ALT fields (as described in the VCF spec)
+            # if rec.info['SVTYPE'] == 'INS':
+            #     if 'INSSEQ' in rec.info:
+            #         insertion_sequence = rec.info['INSSEQ'][0]
+            #     else:
+            #         insertion_sequence = utils.generate_seq(sv_length, random_gen)
 
             # add the SV interval to the event_ranges dict keyed on chromosome
             self.event_ranges[rec.chrom].append((rec.start, rec.stop))
@@ -236,91 +236,91 @@ class SV_Simulator():
             #  -> if yes, give disp_flip=True to SV constructor
             #  *** (should just give the constructor the vcf record and all the logic will be executed in the SV class)
             sv = Structural_Variant(sv_type=type, mode='fixed', vcf_rec=rec, ref_fasta=self.ref_fasta)
-            # TODO: going to move all (mostly all?) the logic below to SV.initialize_events_fixed()
-            #  -------------------------
-            sv.start = rec.start
-            # need to account for the 0/1-indexing that differs between the pysam start and stop fields
-            # ** This will introduce an off-by-one error with input VCFs that were created by insilico (i.e. for
-            # div_dDUPs -- important?)
-            sv.end = rec.stop - 1
-            sv.start_chr = rec.chrom
-            sv.active = True
-            # adding the logging statements from choose_rand_pos
+            self.svs.append(sv)
+            # # TODO: going to move all (mostly all?) the logic below to SV.initialize_events_fixed()
+            # #  -------------------------
+            # sv.start = rec.start
+            # # need to account for the 0/1-indexing that differs between the pysam start and stop fields
+            # # ** This will introduce an off-by-one error with input VCFs that were created by insilico (i.e. for
+            # # div_dDUPs -- important?)
+            # sv.end = rec.stop - 1
+            # sv.start_chr = rec.chrom
+            # sv.active = True
+            # # adding the logging statements from choose_rand_pos
             active_svs_total += 1
-            self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(self.event_ranges[rec.chrom],
-                                                                                        sv.start_chr, sv))
+            self.log_to_file("Intervals {} added to Chromosome \"{}\"".format(self.event_ranges[rec.chrom], rec.chrom))
 
             time_dif = time.time() - time_start_local
             # can't display this as a proportion of the total number of SVs because this is when
             # we're creating the total list of SVs
             print("{} SVs successfully placed ========== {} seconds".format(active_svs_total, time_dif), end="\r")
             time_start_local = time.time()
-
-            # Need to account for the fact that INSs have an empty source char and should thus take the symbol from target
-            frag = None
-            if rec.info['SVTYPE'] == 'INS':
-                sv_symbol = sv.target_unique_char[0]
-            # TODO: Don't model dDUPs as insertions?
-            elif rec.info['SVTYPE'] == 'dDUP':
-                # TODO: correct dDUPs (add whatever actions from the div_dDUP procedure are also applicable)
-                sv_symbol = sv.source_unique_char[0]
-                # dDUP case: copy and paste the reference interval inside (rec.start, rec.end)
-                # --> going to try as an insertion of the (start, end) interval at location TARGET
-                frag = self.ref_fasta.fetch(rec.chrom, rec.start, rec.stop)
-                # what if we just model this as an insertion...
-                sv.type = Variant_Type.INS
-                sv.source_unique_char = ()
-                sv.target_unique_char = ('A',)
-            elif rec.info['SVTYPE'] == 'div_dDUP':
-                sv_symbol = sv.source_unique_char[0]
-                # div_dDUP case: for an active strand, want to insert interval A at TARGET,
-                # for an inactive strand want to insert the sequence specified in rec.info['DIV_REPEAT'] at
-                # locus rec.info['TARGET'] (that is, match the edit we put in the reference)
-                # ----> Want to set frag_a to be the insertion sequence for an inactive strand,
-                # ----> want to set frag_A to be the insertion sequence for the active strand (remember: opposite of
-                # the edit we put in the reference)
-                # frag_a = rec.info['DIV_REPEAT']
-                # frag_A = self.ref_fasta.fetch(rec.chrom, rec.start, rec.stop)
-                frag = self.ref_fasta.fetch(rec.chrom, rec.start, rec.stop)
-                sv.type = Variant_Type.INS
-                sv.source_unique_char = ()
-                sv.target_unique_char = ('A',)
-                sv.source = ()
-                sv.target = ('A',)
-            else:
-                sv_symbol = sv.source_unique_char[0]
-                # source frag assignment in the non-ins case
-                frag = self.ref_fasta.fetch(rec.chrom, sv.start, sv.end)
-
-            sv_event = Event(sv_parent=sv, length=sv_length, length_range=None, symbol=sv_symbol)
-            # For dDUPs, we fake the INS nature of the event by getting the sv event start and end from TARGET
-            if rec.info['SVTYPE'] in ['dDUP', 'div_dDUP']:
-                sv_event.start = int(rec.info['TARGET'])
-                sv_event.end = int(rec.info['TARGET']) + 1
-                sv.start = int(rec.info['TARGET'])
-                sv.end = int(rec.info['TARGET'])
-            else:
-                sv_event.start = rec.start
-                sv_event.end = rec.stop
-            sv_event.source_frag = frag
-
-            if sv_event.source_frag is None and sv_event.length > 0:
-                # source grad assignment in the ins case
-                # *** We'll include div_dDUPs in this case and take the DIV_REPEAT sequence as the insertion sequence
-                sv_event.source_frag = insertion_sequence
-            sv.events_dict[sv_symbol] = sv_event
-
-            # ----------- just going to choose a random genotype for now ---------
-            # TODO: NOTE -- because heterozygous div_dDUPs act as two different insertions ('a' and 'A' for the two
-            #  strands) we'll just model homozygous ones for now
-            #  ---> for heterozygous case need to extend zygosity to create a second event with opposite insertion sequence
-            if random_gen.randint(0, 1) or rec.info['SVTYPE'] == 'div_dDUP':
-                sv.ishomozygous = Zygosity.HOMOZYGOUS
-                sv.hap = [True, True]
-            else:
-                sv.ishomozygous = Zygosity.HETEROZYGOUS
-                sv.hap = random.choice([[True, False], [False, True]])
-            self.svs.append(sv)
+            #
+            # # Need to account for the fact that INSs have an empty source char and should thus take the symbol from target
+            # frag = None
+            # if rec.info['SVTYPE'] == 'INS':
+            #     sv_symbol = sv.target_unique_char[0]
+            # # TODO: Don't model dDUPs as insertions?
+            # elif rec.info['SVTYPE'] == 'dDUP':
+            #     # TODO: correct dDUPs (add whatever actions from the div_dDUP procedure are also applicable)
+            #     sv_symbol = sv.source_unique_char[0]
+            #     # dDUP case: copy and paste the reference interval inside (rec.start, rec.end)
+            #     # --> going to try as an insertion of the (start, end) interval at location TARGET
+            #     frag = self.ref_fasta.fetch(rec.chrom, rec.start, rec.stop)
+            #     # what if we just model this as an insertion...
+            #     sv.type = Variant_Type.INS
+            #     sv.source_unique_char = ()
+            #     sv.target_unique_char = ('A',)
+            # elif rec.info['SVTYPE'] == 'div_dDUP':
+            #     sv_symbol = sv.source_unique_char[0]
+            #     # div_dDUP case: for an active strand, want to insert interval A at TARGET,
+            #     # for an inactive strand want to insert the sequence specified in rec.info['DIV_REPEAT'] at
+            #     # locus rec.info['TARGET'] (that is, match the edit we put in the reference)
+            #     # ----> Want to set frag_a to be the insertion sequence for an inactive strand,
+            #     # ----> want to set frag_A to be the insertion sequence for the active strand (remember: opposite of
+            #     # the edit we put in the reference)
+            #     # frag_a = rec.info['DIV_REPEAT']
+            #     # frag_A = self.ref_fasta.fetch(rec.chrom, rec.start, rec.stop)
+            #     frag = self.ref_fasta.fetch(rec.chrom, rec.start, rec.stop)
+            #     sv.type = Variant_Type.INS
+            #     sv.source_unique_char = ()
+            #     sv.target_unique_char = ('A',)
+            #     sv.source = ()
+            #     sv.target = ('A',)
+            # else:
+            #     sv_symbol = sv.source_unique_char[0]
+            #     # source frag assignment in the non-ins case
+            #     frag = self.ref_fasta.fetch(rec.chrom, sv.start, sv.end)
+            #
+            # sv_event = Event(sv_parent=sv, length=sv_length, length_range=None, symbol=sv_symbol)
+            # # For dDUPs, we fake the INS nature of the event by getting the sv event start and end from TARGET
+            # if rec.info['SVTYPE'] in ['dDUP', 'div_dDUP']:
+            #     sv_event.start = int(rec.info['TARGET'])
+            #     sv_event.end = int(rec.info['TARGET']) + 1
+            #     sv.start = int(rec.info['TARGET'])
+            #     sv.end = int(rec.info['TARGET'])
+            # else:
+            #     sv_event.start = rec.start
+            #     sv_event.end = rec.stop
+            # sv_event.source_frag = frag
+            #
+            # if sv_event.source_frag is None and sv_event.length > 0:
+            #     # source grad assignment in the ins case
+            #     # *** We'll include div_dDUPs in this case and take the DIV_REPEAT sequence as the insertion sequence
+            #     sv_event.source_frag = insertion_sequence
+            # sv.events_dict[sv_symbol] = sv_event
+            #
+            # # ----------- just going to choose a random genotype for now --------
+            # # TODO: NOTE -- because heterozygous div_dDUPs act as two different insertions ('a' and 'A' for the two
+            # #  strands) we'll just model homozygous ones for now
+            # #  ---> for heterozygous case need to extend zygosity to create a second event with opposite insertion sequence
+            # if random_gen.randint(0, 1) or rec.info['SVTYPE'] == 'div_dDUP':
+            #     sv.ishomozygous = Zygosity.HOMOZYGOUS
+            #     sv.hap = [True, True]
+            # else:
+            #     sv.ishomozygous = Zygosity.HETEROZYGOUS
+            #     sv.hap = random.choice([[True, False], [False, True]])
+            # self.svs.append(sv)
 
 
     def initialize_svs(self, random_gen=random):

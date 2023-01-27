@@ -45,8 +45,8 @@ class Structural_Variant():
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
         self.dispersion_flip = False
         if self.type in [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP, Variant_Type.TRA]:
-            # if not self.dispersion_flip and random.randint(0, 1):
-            if True:
+            if not self.dispersion_flip and random.randint(0, 1):
+            # if True:
                 self.dispersion_flip = True
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
@@ -185,6 +185,20 @@ class Structural_Variant():
         print('==== INITIALIZE_EVENTS (FIXED-MODE) ====')
         print(f'source symbols : {self.source_unique_char}')
         print(f'target symbols : {self.target_unique_char}')
+
+        # # logic to read insertion sequence if one is given (from process_vcf) -- what's the right way to do this?
+        # sv_length = None
+        # if 'SVLEN' in vcf_record.info:
+        #     sv_length = vcf_record.info['SVLEN']
+        # insertion_sequence = None
+        # # *** NOTE: here we assume that insertion sequences will be specified in an INSSEQ info field
+        # # *** --> this is different that using the REF/ALT fields (as described in the VCF spec)
+        # if vcf_record.info['SVTYPE'] == 'INS':
+        #     if 'INSSEQ' in vcf_record.info:
+        #         insertion_sequence = vcf_record.info['INSSEQ'][0]
+        #     else:
+        #         insertion_sequence = utils.generate_seq(sv_length, random)
+
         source_len = vcf_record.stop - vcf_record.start if 'SVLEN' not in vcf_record.info else vcf_record.info['SVLEN']
         for symbol in self.source_unique_char:
             # debug
@@ -222,8 +236,13 @@ class Structural_Variant():
             # debug
             print(f'target symbols changed to : {self.target_unique_char}')
 
-        # TODO: populate other SV attributes (everything populated in current process_vcf logic)
-        pass
+        self.active = True
+        if vcf_record.samples[0]['GT'] == (1, 1):
+            self.ishomozygous = Zygosity.HOMOZYGOUS
+            self.hap = [True, True]
+        else:
+            self.ishomozygous = Zygosity.HETEROZYGOUS
+            self.hap = random.choice([[True, False], [False, True]])
 
     def assign_locations(self, start_pos):
         """
