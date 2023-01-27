@@ -190,6 +190,8 @@ class Structural_Variant():
         #  ----> we're just looking at a single record
         source_len = vcf_record.stop - vcf_record.start if 'SVLEN' not in vcf_record.info else vcf_record.info['SVLEN']
         for symbol in self.source_unique_char:
+            # debug
+            print(f'symbol: {symbol}')
             if symbol == 'A':
                 source_ev = Event(self, symbol, source_len, (source_len, source_len), symbol)
                 source_ev.start = vcf_record.start
