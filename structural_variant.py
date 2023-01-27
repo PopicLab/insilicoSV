@@ -214,12 +214,12 @@ class Structural_Variant():
                 print(f'event: {source_ev}')
                 self.events_dict[symbol] = source_ev
             if symbol.startswith(Symbols.DIS.value):
-                flipped_dispersion = vcf_record.info['TARGET'] < vcf_record.start
-                disp_len = vcf_record.info['TARGET'] - vcf_record.stop if not flipped_dispersion else \
+                self.dispersion_flip = vcf_record.info['TARGET'] < vcf_record.start
+                disp_len = vcf_record.info['TARGET'] - vcf_record.stop if not self.dispersion_flip else \
                     vcf_record.start - vcf_record.info['TARGET']
                 disp_ev = Event(self, disp_len, (disp_len, disp_len), symbol)
-                disp_ev.start = vcf_record.stop if not flipped_dispersion else vcf_record.info['TARGET']
-                disp_ev.end = vcf_record.info['TARGET'] if not flipped_dispersion else vcf_record.start
+                disp_ev.start = vcf_record.stop if not self.dispersion_flip else vcf_record.info['TARGET']
+                disp_ev.end = vcf_record.info['TARGET'] if not self.dispersion_flip else vcf_record.start
                 disp_ev.source_chr = vcf_record.chrom
                 disp_ev.source_frag = ref_fasta.fetch(disp_ev.source_chr, disp_ev.start, disp_ev.end)
                 print(f'event: {disp_ev}')
