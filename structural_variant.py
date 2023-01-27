@@ -43,6 +43,7 @@ class Structural_Variant():
         self.source_events = []  # list of Event classes for every symbol in source sequence
         self.events_dict = dict()  # maps every unique symbol in source and target to an Event class
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
+        self.dispersion_flip = False
         if self.type in [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP, Variant_Type.TRA]:
             # if not self.dispersion_flip and random.randint(0, 1):
             if False:
