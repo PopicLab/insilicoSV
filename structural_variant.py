@@ -187,6 +187,7 @@ class Structural_Variant():
         print(f'target symbols : {self.target_unique_char}')
 
         # # logic to read insertion sequence if one is given (from process_vcf) -- what's the right way to do this?
+        # TODO: figure out where this goes (fixed-mode INS)
         # sv_length = None
         # if 'SVLEN' in vcf_record.info:
         #     sv_length = vcf_record.info['SVLEN']
@@ -222,6 +223,9 @@ class Structural_Variant():
                 disp_ev.source_frag = ref_fasta.fetch(disp_ev.source_chr, disp_ev.start, disp_ev.end)
                 print(f'event: {disp_ev}')
                 self.events_dict[symbol] = disp_ev
+        # need to have self.start/end defined for change_fragment()
+        self.start = self.events_dict['A'].start
+        self.end = self.events_dict['A'].end if '_1' not in self.events_dict.keys() else self.events_dict['_1'].end
 
         # handling for divergent repeat simulation logic
         # --> when reading in a div_dDUP in fixed mode, want to treat it as a dDUP (in practice we only expect to
