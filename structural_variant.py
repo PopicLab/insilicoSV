@@ -45,7 +45,7 @@ class Structural_Variant():
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
         if self.type in [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP, Variant_Type.TRA]:
             # if not self.dispersion_flip and random.randint(0, 1):
-            if True:
+            if False:
                 self.dispersion_flip = True
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
@@ -192,13 +192,13 @@ class Structural_Variant():
         for symbol in self.source_unique_char:
             # debug
             print(f'symbol: {symbol}')
-            print(f'type(symbol): {type(symbol)}')
             if symbol == 'A':
                 source_ev = Event(self, source_len, (source_len, source_len), symbol)
                 source_ev.start = vcf_record.start
                 source_ev.end = vcf_record.stop
                 source_ev.source_chr = vcf_record.chrom
                 source_ev.source_frag = ref_fasta.fetch(source_ev.source_chr, source_ev.start, source_ev.end)
+                print(f'event: {source_ev}')
                 self.events_dict[symbol] = source_ev
             if symbol.startswith(Symbols.DIS.value):
                 flipped_dispersion = vcf_record.info['TARGET'] < vcf_record.start
@@ -209,11 +209,8 @@ class Structural_Variant():
                 disp_ev.end = vcf_record.info['TARGET'] if not flipped_dispersion else vcf_record.start
                 disp_ev.source_chr = vcf_record.chrom
                 disp_ev.source_frag = ref_fasta.fetch(disp_ev.source_chr, disp_ev.start, disp_ev.end)
+                print(f'event: {disp_ev}')
                 self.events_dict[symbol] = disp_ev
-        # debug
-        print('events_dict = ')
-        for ev in self.events_dict.keys():
-            print(self.events_dict[ev])
 
         # TODO: populate other SV attributes (everything populated in current process_vcf logic)
         pass
