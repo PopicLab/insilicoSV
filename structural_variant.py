@@ -183,10 +183,10 @@ class Structural_Variant():
         --> needs to fully populate events_dict with start/end (reflecting optional dispersion flip), lengths, and source frags
         --> (with those in place, Blocks() and assign_locations() should have everything they need to run before change_frags())
         """
-        # debug
-        print('==== INITIALIZE_EVENTS (FIXED-MODE) ====')
-        print(f'source symbols : {self.source_unique_char}')
-        print(f'target symbols : {self.target_unique_char}')
+        # # debug
+        # print('==== INITIALIZE_EVENTS (FIXED-MODE) ====')
+        # print(f'source symbols : {self.source_unique_char}')
+        # print(f'target symbols : {self.target_unique_char}')
 
         # for insertions with an insertion sequence given in the vcf, storing the seq in sv attribute
         if vcf_record.info['SVTYPE'] == 'INS':
@@ -322,11 +322,11 @@ class Structural_Variant():
         block_end = None
 
         # # debug
-        print('===CHANGE_FRAGMENT===')
-        print('sv.events_dict:')
-        for ev in self.events_dict.keys():
-            print(self.events_dict[ev])
-        print(f'target blocks = {self.target_symbol_blocks}')
+        # print('===CHANGE_FRAGMENT===')
+        # print('sv.events_dict:')
+        # for ev in self.events_dict.keys():
+        #     print(self.events_dict[ev])
+        # print(f'target blocks = {self.target_symbol_blocks}')
         # special case: deletion -- len(target_symbol_blocks) == 0
         if self.target_symbol_blocks == [[]]:
             changed_fragments.append([self.start_chr, self.start, self.end, ''])
@@ -362,7 +362,7 @@ class Structural_Variant():
 
         self.changed_fragments = changed_fragments
         # debug
-        print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
+        # print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
         self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
         return changed_fragments
 
