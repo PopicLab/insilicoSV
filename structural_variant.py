@@ -195,15 +195,12 @@ class Structural_Variant():
 
         source_len = vcf_record.stop - vcf_record.start if 'SVLEN' not in vcf_record.info else vcf_record.info['SVLEN']
         for symbol in self.source_unique_char:
-            # debug
-            print(f'symbol: {symbol}')
             if symbol == 'A':
                 source_ev = Event(self, source_len, (source_len, source_len), symbol)
                 source_ev.start = vcf_record.start
                 source_ev.end = vcf_record.stop
                 source_ev.source_chr = vcf_record.chrom
                 source_ev.source_frag = ref_fasta.fetch(source_ev.source_chr, source_ev.start, source_ev.end)
-                print(f'event: {source_ev}')
                 self.events_dict[symbol] = source_ev
             if symbol.startswith(Symbols.DIS.value):
                 self.dispersion_flip = vcf_record.info['TARGET'] < vcf_record.start
@@ -214,7 +211,6 @@ class Structural_Variant():
                 disp_ev.end = vcf_record.info['TARGET'] if not self.dispersion_flip else vcf_record.start
                 disp_ev.source_chr = vcf_record.chrom
                 disp_ev.source_frag = ref_fasta.fetch(disp_ev.source_chr, disp_ev.start, disp_ev.end)
-                print(f'event: {disp_ev}')
                 self.events_dict[symbol] = disp_ev
         # need to have self.start/end defined for change_fragment()
         self.start = self.events_dict['A'].start
@@ -231,8 +227,6 @@ class Structural_Variant():
         #  simulation flag identifying a divergent repeat simulation in which div_dDUP input types should be converted)
         if self.type == Variant_Type.div_dDUP:
             self.target_unique_char = ("A", "_1", "A'")
-            # debug
-            print(f'target symbols changed to : {self.target_unique_char}')
 
         self.active = True
         if vcf_record.samples[0]['GT'] == (1, 1):
