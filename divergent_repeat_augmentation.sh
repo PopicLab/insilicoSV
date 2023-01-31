@@ -28,17 +28,12 @@ rm ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.1.12.fastq
 # map the R2 reads to R1 (either haplotype since we required div_dDUPs to be input to R1 as homozygous)
 bwa index ${OUTPUT_PREFIX}1.hapA.fa
 bwa mem -t20 -p ${OUTPUT_PREFIX}1.hapA.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.fastq | samtools view -Sb - > ${OUTPUT_PREFIX}.bwamem.bam
-samtools sort -@ 20 ${OUTPUT_PREFIX}.bwamem.bam -o ${OUTPUT_PREFIX}.bwamem.sorted.bam
-samtools index -@ 20 ${OUTPUT_PREFIX}.bwamem.sorted.bam
-## -- remove unsorted bam and fastq
+## -- remove fastq after bam is generated
 rm ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.fastq
+samtools sort -@ 20 ${OUTPUT_PREFIX}.bwamem.bam -o ${OUTPUT_PREFIX}.bwamem.sorted.bam
+## -- remove unsorted bam
 rm ${OUTPUT_PREFIX}.bwamem.bam
-# call position correcting script on R1 to make loci match with locations of repeats placed into genome
-# --> we assume this script and locus adjustment script (fix_fiv_dDUP_vcf.py) are in same directory
-# --> ... and need to process the simple/dDUP vcf to give us dDUP_A/B records, and to get rid of simple types we don't want (e.g., INS)
-# TODO: delete? This should be unnecessary if export_to_vcf() is working correctly in TARGET mode
-#python ${SCRIPT_PATH}/complex_bed_to_vcf.py --bed_file ${OUTPUT_PREFIX}2_EDIT.bed --vcf_file ${OUTPUT_PREFIX}2_EDIT_SIMPLE_DOUBLELABEL.vcf --template_vcf ${OUTPUT_PREFIX}2_EDIT.vcf --include_simple DEL DUP INV
-
+samtools index -@ 20 ${OUTPUT_PREFIX}.bwamem.sorted.bam
 ## optional step to create merged vcf with decoy div. repeats and non-decoy events listed together
 #python ${SCRIPT_PATH}/fix_div_dDUP_vcf.py --div_dDUP_vcf ${OUTPUT_PREFIX}1.vcf --merge_input_vcf ${OUTPUT_PREFIX}2_EDIT_SIMPLE_DOUBLELABEL.vcf --merge_output_vcf ${OUTPUT_PREFIX}1_MERGED.vcf --label_entire_event
 ## NB: flag --label_entire_event toggles whether the output vcf reports div. repeats in a single record, or
