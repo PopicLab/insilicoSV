@@ -164,6 +164,9 @@ class SV_Simulator():
         # list of repeatmasker events to be populated from optionally input bed file
         self.repeatmasker_events = None if "repeatmasker" not in config.keys \
             else utils.parse_bed_file(config.repeatmasker['bed'])
+        # debug
+        if self.repeatmasker_events is not None:
+            print(f'self.repeatmasker_events is not None')
         self.initialize_svs(random_gen=random_gen)
 
         print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
@@ -246,6 +249,8 @@ class SV_Simulator():
                             and len(self.repeatmasker_events) > 0:
                         # add RM target event for this
                         repeat_elt = self.repeatmasker_events.pop(0)
+                        # debug
+                        print(f'instantiating SV with RM event: {repeat_elt}')
                         sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                                 length_ranges=sv_config["length_ranges"], source=sv_config["source"],
                                                 target=sv_config["target"], repeatmasker_event=repeat_elt)
