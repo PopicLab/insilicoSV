@@ -304,9 +304,9 @@ class Structural_Variant():
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
 
         # debug
-        print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
-        for bl in self.target_symbol_blocks:
-            print(bl)
+        # print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
+        # for bl in self.target_symbol_blocks:
+        #     print(bl)
 
     def change_fragment(self):
         '''
@@ -359,7 +359,7 @@ class Structural_Variant():
 
         self.changed_fragments = changed_fragments
         # debug
-        # print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
+        print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
         self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
         return changed_fragments
 
