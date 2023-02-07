@@ -160,7 +160,7 @@ class Structural_Variant():
             # --> if we're trying to overlap a repeatmasker event, want to set this event's "A" subevent to
             # that repetitive element's interval
             if symbol == 'A' and self.repeatmasker_event is not None:
-                rm_event_len = self.repeatmasker_event[2] - self.repeatmasker_event[1]
+                rm_event_len = int(self.repeatmasker_event[2]) - int(self.repeatmasker_event[1])
                 event = Event(self, rm_event_len, (rm_event_len, rm_event_len), symbol)
             else:
                 event = Event(self, symbols_dict[symbol][0], symbols_dict[symbol][1], symbol)
