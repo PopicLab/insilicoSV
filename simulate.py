@@ -161,6 +161,12 @@ class SV_Simulator():
                 self.extract_vcf_event_intervals(d["avoid_intervals"])
 
         # print('CALLING INITIALIZE_SVS')
+        # list of repeatmasker events to be populated from optionally input bed file
+        self.repeatmasker_events = None if "repeatmasker" not in config.keys \
+            else utils.parse_bed_file(config.repeatmasker)
+        # debug
+        print(f'config.repeatmasker = {config.repeatmasker}')
+        print(f'self.repeatmasker_events = {self.repeatmasker_events}')
         self.initialize_svs(random_gen=random_gen)
 
         print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
@@ -232,6 +238,9 @@ class SV_Simulator():
         self.vcf_path: optional path that will be used if mode=="fixed"
         '''
         if self.mode == "randomized":
+            # repeatmasker_events will be initialized to [] if a repeatmasker bed file is given in the config
+            # if self.repeatmasker_events is not None:
+            #     self.repeatmasker_events = utils.parse_bed_file(self.config.repeatmasker)
             for sv_config in self.svs_config:
                 if "avoid_intervals" in sv_config:
                     continue

@@ -14,6 +14,11 @@ class Config():
         self.__dict__.update({"SVs": entries["SVs"]})
         if "sim_settings" in entries:   # if the user changed any of the default settings for the sim, they get updated here
             self.__dict__["sim_settings"].update(entries["sim_settings"])
+        # optional config feature storing the path to a repeatmasker bed file
+        if "repeatmasker" in entries:
+            self.__dict__["repeatmasker"].update(entries["repeatmasker"])
+        # artificial "keys" attribute to access the keys of config.__dict__
+        self.keys = self.__dict__.keys()
 
         if "vcf_path" not in self.__dict__["SVs"][0]:
             self.run_checks_randomized(entries)

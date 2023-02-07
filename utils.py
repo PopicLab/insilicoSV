@@ -86,3 +86,21 @@ def divergence(seq):
     # --> p given as the probability of changing the base, chosen from U(0.5,1.0)
     p = random.uniform(0.5,1.0)
     return ''.join([b if random.random() > p else random.choice(list({"A", "C", "T", "G"} - {b})) for b in seq.upper()])
+
+def parse_bed_file(bed_fname):
+    """
+    reads bed file (intended use: processing repeatmasker elements to be considered for randomized
+    event overlap) and returns list of (chr, start, end) tuples representing the intervals of each event in the file
+    --> logic taken from bed_iter() and parse_bed_line() in cue (seq/io.py)
+    """
+    intervals_list = []
+    with open(bed_fname, 'r') as bed_file:
+        for line in bed_file:
+            if line.startswith('#') or line.isspace():
+                continue
+            # parse line
+            fields = line.strip().split()
+            assert len(fields) >= 3, "Unexpected number of fields in BED: %s" % line
+            chr_name, start, end = fields[:3]
+            intervals_list.append((chr_name, start, end))
+    return intervals_list
