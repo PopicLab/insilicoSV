@@ -163,10 +163,7 @@ class SV_Simulator():
         # print('CALLING INITIALIZE_SVS')
         # list of repeatmasker events to be populated from optionally input bed file
         self.repeatmasker_events = None if "repeatmasker" not in config.keys \
-            else utils.parse_bed_file(config.repeatmasker)
-        # debug
-        print(f'config.repeatmasker = {config.repeatmasker}')
-        print(f'self.repeatmasker_events = {self.repeatmasker_events}')
+            else utils.parse_bed_file(config.repeatmasker['bed'])
         self.initialize_svs(random_gen=random_gen)
 
         print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
@@ -183,8 +180,10 @@ class SV_Simulator():
             key_to_func[key](info)
             # logging.debug(info)
 
-    def get_rand_chr(self, check_size=None, random_gen=random):
-        # random assignment of SV to a chromosome
+    def get_rand_chr(self, check_size=None, random_gen=random, fixed_chrom=None):
+        # random assignment of SV to a chromosome (unless we have a predetermined
+        # chromosome for this event, e.g., in the case of placing events
+        # at known repetitive element locations)
         # -> returns random chromosome and its length
         valid_chrs = self.order_ids
         # if parameter setting on, only choose random chr from those that are big enough
@@ -194,7 +193,7 @@ class SV_Simulator():
         if len(valid_chrs) == 0:
             raise Exception("SVs are too big for the reference!")
 
-        rand_id = valid_chrs[random_gen.randint(0, len(valid_chrs) - 1)]
+        rand_id = valid_chrs[random_gen.randint(0, len(valid_chrs) - 1)] if fixed_chrom is None else fixed_chrom
         chr_len = self.len_dict[rand_id]
         chr_event_ranges = self.event_ranges[rand_id]
         assert rand_id != None
@@ -238,16 +237,22 @@ class SV_Simulator():
         self.vcf_path: optional path that will be used if mode=="fixed"
         '''
         if self.mode == "randomized":
-            # repeatmasker_events will be initialized to [] if a repeatmasker bed file is given in the config
-            # if self.repeatmasker_events is not None:
-            #     self.repeatmasker_events = utils.parse_bed_file(self.config.repeatmasker)
             for sv_config in self.svs_config:
                 if "avoid_intervals" in sv_config:
                     continue
                 for num in range(sv_config["number"]):
-                    sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
-                                            length_ranges=sv_config["length_ranges"], source=sv_config["source"],
-                                            target=sv_config["target"])
+                    # for the first (sv_config["RM_overlaps"]) events, instantiate the SV with the next repeat elt interval
+                    if "RM_overlaps" in sv_config.keys() and num < sv_config["RM_overlaps"] \
+                            and len(self.repeatmasker_events) > 0:
+                        # add RM target event for this
+                        repeat_elt = self.repeatmasker_events.pop(0)
+                        sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
+                                                length_ranges=sv_config["length_ranges"], source=sv_config["source"],
+                                                target=sv_config["target"], repeatmasker_event=repeat_elt)
+                    else:
+                        sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
+                                                length_ranges=sv_config["length_ranges"], source=sv_config["source"],
+                                                target=sv_config["target"])
 
                     # Because of the two-staged procedure to generate reads with div_dDUPs, need
                     # to always treat div_dDUPs as homozygous (we need both haplotypes to reflect the event)
@@ -371,7 +376,11 @@ class SV_Simulator():
                     valid = False
                     break
 
-                rand_id, chr_len, chr_event_ranges = self.get_rand_chr(check_size=sv.req_space, random_gen=random_gen)
+                # choose chrom (either randomly or taking it deterministically from a repeatmasker event we want to
+                # overlap) and get chromosome length and occupied intervals
+                rand_id, chr_len, chr_event_ranges = self.get_rand_chr(check_size=sv.req_space, random_gen=random_gen,
+                                                                       fixed_chrom=(None if sv.repeatmasker_event is None
+                                                                                    else sv.repeatmasker_event[0]))
                 # only set to invalid if required space exceeds chromosome length
                 if chr_len - sv.req_space < 0:  # SV is too big for current chromosome
                     print('CHR_LEN - SV.REQ_SPACE < 0; SETTING SV TO INVALID')
@@ -386,6 +395,7 @@ class SV_Simulator():
                     sv.end = sv.start + sv.req_space
                     block_start = sv.start
 
+                    # start/end positions and reference source fragments defined for the subevents
                     for sv_event in sv.source_events:
                         # store start and end position and reference fragment
                         sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length

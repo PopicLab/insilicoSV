@@ -4,7 +4,8 @@ import random
 
 
 class Structural_Variant():
-    def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None, vcf_rec=None, ref_fasta=None):
+    def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None, vcf_rec=None, ref_fasta=None,
+                 repeatmasker_event=None):
         '''
         Initializes SV's transformation and sets up its events, along with several other basic attributes like zygosity
 
@@ -19,6 +20,7 @@ class Structural_Variant():
         target: tuple representing target sequence, optional
         vcf_rec: (to be used in fixed mode) vcf record giving sv information that will instantiate the event
         ref_fasta: for extracting reference frag for vcf records in fixed mode initialization
+        repeatmasker_event: (chr, start, end) tuple representing the repeatmasker event that this SV is meant to overlap
         '''
         self.type = sv_type
         if self.type != Variant_Type.Custom:
@@ -46,6 +48,7 @@ class Structural_Variant():
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
         self.dispersion_flip = False
         self.insseq_from_rec = None  # space to store INSSEQ for fixed-mode INS event
+        self.repeatmasker_event = repeatmasker_event
 
         if self.type in [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP, Variant_Type.TRA]:
             if random.randint(0, 1):
@@ -154,7 +157,13 @@ class Structural_Variant():
         # initialize event classes
         for idx, symbol in enumerate(all_symbols):
             # empty event - no source fragment yet
-            event = Event(self, symbols_dict[symbol][0], symbols_dict[symbol][1], symbol)
+            # --> if we're trying to overlap a repeatmasker event, want to set this event's "A" subevent to
+            # that repetitive element's interval
+            if symbol == 'A' and self.repeatmasker_event is not None:
+                rm_event_len = self.repeatmasker_event[2] - self.repeatmasker_event[1]
+                event = Event(self, rm_event_len, (rm_event_len, rm_event_len), symbol)
+            else:
+                event = Event(self, symbols_dict[symbol][0], symbols_dict[symbol][1], symbol)
             self.events_dict[symbol] = event
 
         for symbol in self.source_unique_char:
@@ -165,11 +174,11 @@ class Structural_Variant():
 
         self.req_space = sum([event.length for event in self.source_events])
 
-        # # debug
-        # print('END OF INITIALIZE_EVENTS')
-        # print('sv.events_dict:')
-        # for ev in self.events_dict.keys():
-        #     print(self.events_dict[ev])
+        # debug
+        print('END OF INITIALIZE_EVENTS')
+        print('sv.events_dict:')
+        for ev in self.events_dict.keys():
+            print(self.events_dict[ev])
 
     def initialize_events_fixed(self, vcf_record, ref_fasta):
         """
