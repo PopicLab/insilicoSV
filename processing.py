@@ -62,7 +62,7 @@ class Config():
         for parameter in self.sim_settings:
             if parameter not in valid_optional_par:
                 raise Exception("\"{}\" is an invalid argument under sim_settings".format(parameter))
-        valid_keys = ["sim_settings", "SVs"]  # valid arguments at the top level
+        valid_keys = ["sim_settings", "SVs", "repeatmasker"]  # valid arguments at the top level
         for key in entries:
             if key not in valid_keys:
                 raise Exception("Unknown argument \"{}\"".format(key))
