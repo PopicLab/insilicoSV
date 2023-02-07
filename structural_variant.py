@@ -174,11 +174,11 @@ class Structural_Variant():
 
         self.req_space = sum([event.length for event in self.source_events])
 
-        # debug
-        print('END OF INITIALIZE_EVENTS')
-        print('sv.events_dict:')
-        for ev in self.events_dict.keys():
-            print(self.events_dict[ev])
+        # # debug
+        # print('END OF INITIALIZE_EVENTS')
+        # print('sv.events_dict:')
+        # for ev in self.events_dict.keys():
+        #     print(self.events_dict[ev])
 
     def initialize_events_fixed(self, vcf_record, ref_fasta):
         """
@@ -251,12 +251,12 @@ class Structural_Variant():
         this method to actually modify the target_blocks' events objects to set the start/end positions
         """
         # # debug
-        # print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
-        # for bl in self.target_symbol_blocks:
-        #     print(bl)
-        # print('events_dict:')
-        # for ev in self.events_dict.keys():
-        #     print(self.events_dict[ev])
+        print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
+        for bl in self.target_symbol_blocks:
+            print(bl)
+        print('events_dict:')
+        for ev in self.events_dict.keys():
+            print(self.events_dict[ev])
 
         # Trying logic based on the position assignment of source events in choose_rand_pos()
         # (now that we're flipping the sv.source_events list for flipped-dispersion events)
@@ -304,9 +304,9 @@ class Structural_Variant():
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
 
         # debug
-        # print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
-        # for bl in self.target_symbol_blocks:
-        #     print(bl)
+        print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
+        for bl in self.target_symbol_blocks:
+            print(bl)
 
     def change_fragment(self):
         '''
