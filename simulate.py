@@ -405,36 +405,38 @@ class SV_Simulator():
                         sv.start, sv.start_chr = start_pos, rand_id
                         sv.end = sv.start + sv.req_space
                         block_start = sv.start
-
-                        # start/end positions and reference source fragments defined for the subevents
-                        for sv_event in sv.source_events:
-                            # store start and end position and reference fragment
-                            sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length
-                            sv_event.source_chr = rand_id
-                            frag = ref_fasta.fetch(rand_id, sv_event.start, sv_event.end)
-                            sv_event.source_frag = frag
-                            # prev_start -- store of previous start_pos in case we need to refer to it in the next event
-                            start_pos += sv_event.length
-
-                            # dispersion event should not impact whether position is valid or not, given that spacing is already guaranteed
-                            if sv_event.symbol.startswith(Symbols.DIS.value):
-                                # check to see if chosen spot is a valid position
-                                if utils.is_overlapping(chr_event_ranges, (
-                                        block_start, sv_event.start)):  # sv_event.start is the end of the current block
-                                    valid = False
-                                    break  # if ANY of the non-dispersion events within SV are in an invalid position, then immediately fail the try
-                                new_intervals.append((block_start, sv_event.start))
-                                block_start = sv_event.end  # remember that the end is actually the position right after the sv_event
-                            elif utils.percent_N(frag) > 0.05:
-                                valid = False
-                                break
                     else:
-                        # TODO: implement the logic by which we place the source events working backwards from the
-                        #  rep. event's end position (i.e. to be "A"'s end position)
-                        #  ---> NB: traversing the source events backwards might be a reasonable way to always place the
-                        #  ---> subevents for flipped dispersion events (not necessary if the current strategy works, but
-                        #  ---> would prevent this from being a singular case requiring different logic
-                        raise Exception("BRANCH NOT YET IMPLEMENTED")
+                        # can we just anchor the sv the end of "A" and get the start position like that, and just
+                        # proceed as before?
+                        end_pos = int(sv.repeatmasker_event[2])
+                        start_pos = end_pos - sv.req_space
+                        new_intervals = []  # tracks new ranges of blocks
+                        sv.start, sv.start_chr = start_pos, rand_id
+                        sv.end = end_pos
+                        block_start = sv.start
+
+                    # start/end positions and reference source fragments defined for the subevents
+                    for sv_event in sv.source_events:
+                        # store start and end position and reference fragment
+                        sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length
+                        sv_event.source_chr = rand_id
+                        frag = ref_fasta.fetch(rand_id, sv_event.start, sv_event.end)
+                        sv_event.source_frag = frag
+                        # prev_start -- store of previous start_pos in case we need to refer to it in the next event
+                        start_pos += sv_event.length
+
+                        # dispersion event should not impact whether position is valid or not, given that spacing is already guaranteed
+                        if sv_event.symbol.startswith(Symbols.DIS.value):
+                            # check to see if chosen spot is a valid position
+                            if utils.is_overlapping(chr_event_ranges, (
+                                    block_start, sv_event.start)):  # sv_event.start is the end of the current block
+                                valid = False
+                                break  # if ANY of the non-dispersion events within SV are in an invalid position, then immediately fail the try
+                            new_intervals.append((block_start, sv_event.start))
+                            block_start = sv_event.end  # remember that the end is actually the position right after the sv_event
+                        elif utils.percent_N(frag) > 0.05:
+                            valid = False
+                            break
                     # ------------------------------------
                     # catches the last (and perhaps only) block in sequence
                     if utils.is_overlapping(chr_event_ranges, (block_start, sv.end)):

@@ -251,9 +251,9 @@ class Structural_Variant():
         this method to actually modify the target_blocks' events objects to set the start/end positions
         """
         # # debug
-        print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
-        for bl in self.target_symbol_blocks:
-            print(bl)
+        # print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
+        # for bl in self.target_symbol_blocks:
+        #     print(bl)
         print('events_dict:')
         for ev in self.events_dict.keys():
             print(self.events_dict[ev])
@@ -304,9 +304,9 @@ class Structural_Variant():
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
 
         # debug
-        # print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
-        # for bl in self.target_symbol_blocks:
-        #     print(bl)
+        print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
+        for bl in self.target_symbol_blocks:
+            print(bl)
 
     def change_fragment(self):
         '''
