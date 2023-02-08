@@ -221,6 +221,8 @@ class FormatterIO():
         vcf_file.header.info.add('SVMETHOD', number=1, type='String', description="SV detection method")
         vcf_file.header.info.add('TARGET', number=1, type='Integer', description="Target location for divergent repeat")
         vcf_file.header.info.add('DIV_REPEAT', number=1, type='String', description="Divergent repeat segment places at target locus")
+        vcf_file.header.info.add('RM_OVERLAP', number=1, type='String', description="Bool. indicator for the event being"
+                                                                                    "placed at a repeatmasker interval")
         vcf_file.header.formats.add('GT', number=1, type='String', description="Genotype")
 
         vcf_out_file = pysam.VariantFile(vcffile, 'w', header=vcf_file.header)
@@ -247,6 +249,8 @@ class FormatterIO():
                 info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
             else:
                 info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
+            if sv.repeatmasker_event is not None:
+                info_field['RM_OVERLAP'] = 'True'
 
             vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=rec_start, stop=rec_end,
                                                         alleles=['N', sv.type.value], id=sv.type.value,

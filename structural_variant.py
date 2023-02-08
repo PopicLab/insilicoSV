@@ -254,9 +254,9 @@ class Structural_Variant():
         # print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
         # for bl in self.target_symbol_blocks:
         #     print(bl)
-        print('events_dict:')
-        for ev in self.events_dict.keys():
-            print(self.events_dict[ev])
+        # print('events_dict:')
+        # for ev in self.events_dict.keys():
+        #     print(self.events_dict[ev])
 
         # Trying logic based on the position assignment of source events in choose_rand_pos()
         # (now that we're flipping the sv.source_events list for flipped-dispersion events)
@@ -304,9 +304,9 @@ class Structural_Variant():
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
 
         # debug
-        print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
-        for bl in self.target_symbol_blocks:
-            print(bl)
+        # print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
+        # for bl in self.target_symbol_blocks:
+        #     print(bl)
 
     def change_fragment(self):
         '''
@@ -359,9 +359,9 @@ class Structural_Variant():
 
         self.changed_fragments = changed_fragments
         # debug
-        print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
-        self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
-        return changed_fragments
+        # print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
+        # self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
+        # return changed_fragments
 
     def clean_event_storage(self):
         # remove source fragments from events to save space as they are no longer needed
