@@ -249,8 +249,8 @@ class SV_Simulator():
                             and len(self.repeatmasker_events) > 0:
                         # add RM target event for this
                         repeat_elt = self.repeatmasker_events.pop(0)
-                        # debug
-                        print(f'instantiating SV with RM event: {repeat_elt}')
+                        # # debug
+                        # print(f'instantiating SV with RM event: {repeat_elt}')
                         sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                                 length_ranges=sv_config["length_ranges"], source=sv_config["source"],
                                                 target=sv_config["target"], repeatmasker_event=repeat_elt)
@@ -392,10 +392,6 @@ class SV_Simulator():
                     valid = False
                     continue
                 else:
-                    # ------------------------------------
-                    # ** we can place our SV's "A" subevent at the repeatmasker event interval using this logic
-                    # ** unless we have a flipped dispersion event, in which case the start position of the rep. event
-                    # ** (i.e. the start position to be assigned to "A") cannot be used as the overall SV start
                     if not (sv.dispersion_flip and sv.repeatmasker_event is not None):
                         start_pos = random_gen.randint(0, chr_len - sv.req_space) if sv.repeatmasker_event is None else \
                             int(sv.repeatmasker_event[1])
@@ -406,8 +402,8 @@ class SV_Simulator():
                         sv.end = sv.start + sv.req_space
                         block_start = sv.start
                     else:
-                        # can we just anchor the sv the end of "A" and get the start position like that, and just
-                        # proceed as before?
+                        # to assign subevent "A" to a repeat interval in a flipped dispersion event, need to
+                        # anchor the sv the end of "A" and get the start position by subtracting off the total size
                         end_pos = int(sv.repeatmasker_event[2])
                         start_pos = end_pos - sv.req_space
                         new_intervals = []  # tracks new ranges of blocks
@@ -437,7 +433,6 @@ class SV_Simulator():
                         elif utils.percent_N(frag) > 0.05:
                             valid = False
                             break
-                    # ------------------------------------
                     # catches the last (and perhaps only) block in sequence
                     if utils.is_overlapping(chr_event_ranges, (block_start, sv.end)):
                         valid = False

@@ -103,6 +103,8 @@ class TestSVSimulator(unittest.TestCase):
         hap2 = "test/inputs/test2.fna"
         bed = "test/inputs/out.bed"
 
+        test_repeatmasker_bed = "test/inputs/example_repeatmasker.bed"
+
         self.test_objects_no_dis = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
                                         [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "delINVdup", "number": 1, "max_length": 5, "min_length": 5}]}],
                                         hap1, hap2, bed),
@@ -211,6 +213,24 @@ class TestSVSimulator(unittest.TestCase):
                                                            "SVs": [{"type": "INV", "number": 1,
                                                                     "min_length": 1, "max_length": 1}]}],
                                                     hap1, hap2, bed)]
+        # ---------- test objects for repeatmasker-aware event placement ------------
+        self.test_objects_repeatmasker_simple = [TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
+                                                            [par, {"sim_settings": {"prioritize_top": True},
+                                                                   "repeatmasker": {"bed": test_repeatmasker_bed},
+                                                                   "SVs": [{"type": "DEL", "number": 1,
+                                                                            "min_length": 2, "max_length": 2,
+                                                                            "RM_overlaps": 1}]}],
+                                                            hap1, hap2, bed),
+                                                 TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
+                                                            [par, {"sim_settings": {"prioritize_top": True},
+                                                                   "repeatmasker": {"bed": test_repeatmasker_bed},
+                                                                   "SVs": [{"type": "DUP", "number": 1,
+                                                                            "min_length": 2, "max_length": 2,
+                                                                            "RM_overlaps": 1},
+                                                                           {"type": "INV", "number": 1,
+                                                                            "min_length": 2, "max_length": 2,
+                                                                            "RM_overlaps": 1}]}],
+                                                            hap1, hap2, bed)]
 
     def test_is_overlapping(self):
         # non-insertion cases
@@ -322,6 +342,21 @@ class TestSVSimulator(unittest.TestCase):
         else:
             self.assertEqual('ACT' in [changed_frag_1, changed_frag_2], True)
         print(f'[INV_dDUP] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
+
+    def test_repeatmasker_placement(self):
+        # simple events -- with respect to toy reference chr21: CTCCGTCGTA
+        simple_targets = {'DEL': 'CTGTCGTA',
+                          'DUP, INV': 'CTCCCCGTACGA'}
+        for i in range(len(self.test_objects_repeatmasker_simple)):
+            type = list(simple_targets.keys())[i]
+            config = self.test_objects_repeatmasker_simple[i]
+            config.initialize_files()
+            curr_sim = SV_Simulator(config.ref, config.par)
+            curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+            changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+            # print(f'[{type}] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
+            self.assertEqual(simple_targets[type] in [changed_frag_1, changed_frag_2], True)
+        # TODO: dispersion tests -- best way to test flipped and non-flipped?
 
     def nonrandom_test_produce_variant_genome(self):
 
