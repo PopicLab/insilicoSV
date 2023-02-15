@@ -11,7 +11,7 @@ python ${SCRIPT_PATH}/simulate.py ${FASTA_PATH} ${CONFIG} ${OUTPUT_PREFIX}
 mv ${OUTPUT_PREFIX}.dwgsim.hap.0.12.fastq ${OUTPUT_PREFIX}.dwgsim.hap.12.fastq
 cat ${OUTPUT_PREFIX}.dwgsim.hap.1.12.fastq >> ${OUTPUT_PREFIX}.dwgsim.hap.12.fastq
 rm ${OUTPUT_PREFIX}.dwgsim.hap.1.12.fastq
-bwa mem -t20 -p ${FASTA_PATH} ${OUTPUT_PREFIX}.dwgsim.hap.12.fastq | samtools view -Sb - > ${OUTPUT_PREFIX}.bwamem.bam
+bwa mem -t 20 -p ${FASTA_PATH} ${OUTPUT_PREFIX}.dwgsim.hap.12.fastq | samtools view -Sb - > ${OUTPUT_PREFIX}.bwamem.bam
 rm ${OUTPUT_PREFIX}.dwgsim.hap.12.fastq
 samtools sort -@ 20 ${OUTPUT_PREFIX}.bwamem.bam > ${OUTPUT_PREFIX}.bwamem.sorted.bam
 rm ${OUTPUT_PREFIX}.bwamem.bam

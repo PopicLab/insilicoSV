@@ -192,6 +192,46 @@ SVs:
 python simulate.py <ref.fna> <par.yaml> <prefix>
 ```
 
+### Example 4 - Placing events at known repetitive element intervals
+To augment a randomized simulation of events onto an input reference, the user can include in the simulation config
+file the path to a .bed file containing repetitive element intervals (i.e., RepeatMasker events). In addition to
+providing the path to the RepeatMasker .bed file, the user will also need to specify how many of each event type they
+wish to be placed at events from the .bed file. An example config with these inputs is:
+```yaml
+sim_settings:
+    max_tries: 200
+    prioritize_top: True
+repeatmasker:
+    bed: '/athena/ihlab/scratch/crohlice/software/insilicoSV/repeatmasker_feature/repeatmasker_hg38_chr21_5k_10k.bed'
+SVs:
+    - type: "DEL"
+      number: 10
+      min_length:
+        - 5
+      max_length:
+        - 5
+      RM_overlaps: 5
+    - type: "DUP"
+      number: 10
+      min_length:
+        - 5
+      max_length:
+        - 5
+      RM_overlaps: 2
+```
+While the simulator is placing each set of events, the first (`RM_overlaps`) events of that type will have their location
+given an event from the .bed file given in the `repeatmasker` field. Events from the `repeatmasker` .bed file will be
+taken in the order in which they appear in the file, so the user is expected to perform any necessary shuffling or
+filtering such that all records can be taken as valid event interval (e.g., the simulator won't perform any checks to ensure
+that an interval taken from the .bed file is within a desired size range).
+
+The output .vcf file will label which events were placed at RepeatMasker intervals with the additional INFO field
+`RM_OVERLAP=True', as in this example record:
+```
+chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;RM_OVERLAP=True  GT  0/1
+```
+The current set of event types that are amenable to this feature are DEL, DUP, INV, dDUP, INV_dDUP, and TRA.
+
 ## How to Contribute
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate. If you'd like to contribute, please fork the repository and make changes as you'd like.
 
