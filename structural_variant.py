@@ -359,7 +359,7 @@ class Structural_Variant():
 
         self.changed_fragments = changed_fragments
         # debug
-        # print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
+        print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
         # self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
         # return changed_fragments
 

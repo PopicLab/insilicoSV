@@ -232,6 +232,13 @@ class TestSVSimulator(unittest.TestCase):
                                                                             "RM_overlaps": 1}]}],
                                                             hap1, hap2, bed)]
 
+        # ---------- test objects for divergence event ------------
+        self.test_objects_divergence_event = [TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
+                                                         [par, {"sim_settings": {"prioritize_top": True},
+                                                                "SVs": [{"type": "DIVERGENCE", "number": 1,
+                                                                         "min_length": 5, "max_length": 5}]}],
+                                                         hap1, hap2, bed)]
+
     def test_is_overlapping(self):
         # non-insertion cases
         print(utils.is_overlapping([(3,4),(5,10)], (4,5)))
@@ -357,6 +364,17 @@ class TestSVSimulator(unittest.TestCase):
             # print(f'[{type}] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
             self.assertEqual(simple_targets[type] in [changed_frag_1, changed_frag_2], True)
         # TODO: dispersion tests -- best way to test flipped and non-flipped?
+
+    def test_divergence_events(self):
+        # the divergence operator will mutate each base in an event interval with probability p
+        # --> going to check for randomized placement of a divergence by checking that the output sequence
+        # --> is not contained in the unedited reference (for event of length 5 and dummy reference: CTCCGTCGTA)
+        config = self.test_objects_divergence_event[0]
+        config.initialize_files()
+        curr_sim = SV_Simulator(config.ref, config.par)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        self.assertEqual(changed_frag_1 not in config.ref or changed_frag_2 not in config.ref, True)
 
     def nonrandom_test_produce_variant_genome(self):
 
