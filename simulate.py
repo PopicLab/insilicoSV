@@ -260,6 +260,12 @@ class SV_Simulator():
                     else:
                         # if the svtype being simulated is given in the list of non-SV events (e.g., DIVERGENCE)
                         # then want to add the non-sv flag to the SV object constructor (bad practice?)
+                        # # debug
+                        print('sv_type = %s' % sv_config['type'])
+                        if constants.Nonvariant_Event_Type.has_value(sv_config["type"]):
+                            print('nonsv event')
+                        else:
+                            print('sv event')
                         sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                                 length_ranges=sv_config["length_ranges"], source=sv_config["source"],
                                                 target=sv_config["target"],
