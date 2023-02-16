@@ -253,12 +253,12 @@ class Structural_Variant():
         this method to actually modify the target_blocks' events objects to set the start/end positions
         """
         # debug
-        print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
-        for bl in self.target_symbol_blocks:
-            print(bl)
-        print('events_dict:')
-        for ev in self.events_dict.keys():
-            print(self.events_dict[ev])
+        # print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
+        # for bl in self.target_symbol_blocks:
+        #     print(bl)
+        # print('events_dict:')
+        # for ev in self.events_dict.keys():
+        #     print(self.events_dict[ev])
 
         # Trying logic based on the position assignment of source events in choose_rand_pos()
         # (now that we're flipping the sv.source_events list for flipped-dispersion events)
@@ -314,9 +314,9 @@ class Structural_Variant():
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
 
         # debug
-        print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
-        for bl in self.target_symbol_blocks:
-            print(bl)
+        # print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
+        # for bl in self.target_symbol_blocks:
+        #     print(bl)
 
     def change_fragment(self):
         '''
@@ -330,10 +330,10 @@ class Structural_Variant():
 
         # # debug
         # print('===CHANGE_FRAGMENT===')
-        print('sv.events_dict:')
-        for ev in self.events_dict.keys():
-            print(self.events_dict[ev])
-        print(f'target blocks = {self.target_symbol_blocks}')
+        # print('sv.events_dict:')
+        # for ev in self.events_dict.keys():
+        #     print(self.events_dict[ev])
+        # print(f'target blocks = {self.target_symbol_blocks}')
         # special case: deletion -- len(target_symbol_blocks) == 0
         if self.target_symbol_blocks == [[]]:
             changed_fragments.append([self.start_chr, self.start, self.end, ''])
@@ -369,7 +369,7 @@ class Structural_Variant():
 
         self.changed_fragments = changed_fragments
         # debug
-        print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
+        # print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
         # self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
         # return changed_fragments
 
@@ -396,6 +396,9 @@ class Event():
         self.start = None
         self.end = None
         # boolean field to indicate whether the event is an SV or a background/non-SV event (e.g., DIVERGENCE)
+        # --> I don't think this field is ultimately necessary (it looks like we can get away with just using
+        # --> the non_sv attribute in the StructuralVariant() object), but it still seems like a useful piece of info
+        # --> to have when we inspect the event objects ... (going to keep it for now)
         self.non_sv = non_sv
 
     def __repr__(self):
