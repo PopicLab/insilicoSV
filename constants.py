@@ -33,7 +33,8 @@ class Nonvariant_Event_Type(Enum):
     @classmethod
     def has_value(cls, value):
         # adding a helper method to check containment
-        return value in cls._value2member_map_
+        # return value in cls._value2member_map_
+        return value in cls
 
 
 class Operations(Enum):
