@@ -33,8 +33,11 @@ class Config():
                 # make sure max_length >= min_length >= 0
                 assert all(max_len >= min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
 
-                # use Enum for variant type
-                config_sv["type"] = Variant_Type(config_sv["type"])
+                # use Enum for variant type and nonvariant event type
+                if Nonvariant_Event_Type.has_value(config_sv["type"]):
+                    config_sv["type"] = Nonvariant_Event_Type(config_sv["type"])
+                else:
+                    config_sv["type"] = Variant_Type(config_sv["type"])
                 if config_sv["type"] != Variant_Type.Custom:
                     config_sv["source"] = None
                     config_sv["target"] = None
