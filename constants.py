@@ -24,6 +24,8 @@ class Variant_Type(Enum):
     Custom = "Custom"
     INV_dDUP = "INV_dDUP"
     div_dDUP = "div_dDUP"
+    # provisionally treating DIVERGENCE as a variant
+    DIVERGENCE = "DIVERGENCE"
 
 
 class Operations(Enum):
@@ -73,7 +75,10 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
           Variant_Type.INVdup: [("A", "B"), ("b'", "a", "B")],
           Variant_Type.dDUP: [("A", "_"), ("A", "_", "A'")],
           Variant_Type.INV_dDUP: [("A", "_"), ("A", "_", "a'")],
-          Variant_Type.div_dDUP: [("A", "_"), ("A", "_", "A*")]}
+          Variant_Type.div_dDUP: [("A", "_"), ("A", "_", "A*")],
+          # Event mimicking divergence of a source sequence -- not quite an SV but a common form of decoy event
+          # --> better to create a different class for non-SV decoy events?
+          Variant_Type.DIVERGENCE: [("A",), ("A*",)]}
 
 DEFAULT_CONFIG = {"sim_settings": {"max_tries": 100,
                                    "fail_if_placement_issues": False,
