@@ -5,7 +5,7 @@ import random
 
 class Structural_Variant():
     def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None, vcf_rec=None, ref_fasta=None,
-                 repeatmasker_event=None):
+                 repeatmasker_event=None, nonsv_event=False):
         '''
         Initializes SV's transformation and sets up its events, along with several other basic attributes like zygosity
 
@@ -21,6 +21,7 @@ class Structural_Variant():
         vcf_rec: (to be used in fixed mode) vcf record giving sv information that will instantiate the event
         ref_fasta: for extracting reference frag for vcf records in fixed mode initialization
         repeatmasker_event: (chr, start, end) tuple representing the repeatmasker event that this SV is meant to overlap
+        nonsv_event: boolean flag to identify variant objects that are actually non-sv decoy events (e.g., DIVERGENCE)
         '''
         self.type = sv_type
         if self.type != Variant_Type.Custom:
@@ -49,6 +50,7 @@ class Structural_Variant():
         self.dispersion_flip = False
         self.insseq_from_rec = None  # space to store INSSEQ for fixed-mode INS event
         self.repeatmasker_event = repeatmasker_event
+        self.nonsv_event = nonsv_event
 
         if self.type in [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP, Variant_Type.TRA]:
             if random.randint(0, 1):
@@ -250,13 +252,13 @@ class Structural_Variant():
         a valid start position (since that needs access to the max_tries setting from the config), but going to invoke
         this method to actually modify the target_blocks' events objects to set the start/end positions
         """
-        # # debug
-        # print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
-        # for bl in self.target_symbol_blocks:
-        #     print(bl)
-        # print('events_dict:')
-        # for ev in self.events_dict.keys():
-        #     print(self.events_dict[ev])
+        # debug
+        print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
+        for bl in self.target_symbol_blocks:
+            print(bl)
+        print('events_dict:')
+        for ev in self.events_dict.keys():
+            print(self.events_dict[ev])
 
         # Trying logic based on the position assignment of source events in choose_rand_pos()
         # (now that we're flipping the sv.source_events list for flipped-dispersion events)
@@ -385,6 +387,8 @@ class Event():
         self.source_frag = None if not source_frag else source_frag
         self.start = None
         self.end = None
+        # boolean field to indicate whether the event is an SV or a background/non-SV event (e.g., DIVERGENCE)
+        self.is_SV = None
 
     def __repr__(self):
         return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end,

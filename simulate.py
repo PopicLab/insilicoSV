@@ -2,6 +2,8 @@ from os import write
 import random
 from pysam import FastaFile
 from pysam import VariantFile
+
+import constants
 from processing import FormatterIO, collect_args
 import utils
 from constants import *
@@ -253,11 +255,15 @@ class SV_Simulator():
                         # print(f'instantiating SV with RM event: {repeat_elt}')
                         sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                                 length_ranges=sv_config["length_ranges"], source=sv_config["source"],
-                                                target=sv_config["target"], repeatmasker_event=repeat_elt)
+                                                target=sv_config["target"], repeatmasker_event=repeat_elt,
+                                                nonsv_event=constants.Nonvariant_Event_Type.has_value(sv_config["type"]))
                     else:
+                        # if the svtype being simulated is given in the list of non-SV events (e.g., DIVERGENCE)
+                        # then want to add the non-sv flag to the SV object constructor (bad practice?)
                         sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                                 length_ranges=sv_config["length_ranges"], source=sv_config["source"],
-                                                target=sv_config["target"])
+                                                target=sv_config["target"],
+                                                nonsv_event=constants.Nonvariant_Event_Type.has_value(sv_config["type"]))
 
                     # Because of the two-staged procedure to generate reads with div_dDUPs, need
                     # to always treat div_dDUPs as homozygous (we need both haplotypes to reflect the event)
