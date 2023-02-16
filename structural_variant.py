@@ -163,9 +163,9 @@ class Structural_Variant():
             # that repetitive element's interval
             if symbol == 'A' and self.repeatmasker_event is not None:
                 rm_event_len = int(self.repeatmasker_event[2]) - int(self.repeatmasker_event[1])
-                event = Event(self, rm_event_len, (rm_event_len, rm_event_len), symbol)
+                event = Event(self, rm_event_len, (rm_event_len, rm_event_len), symbol, non_sv=self.nonsv_event)
             else:
-                event = Event(self, symbols_dict[symbol][0], symbols_dict[symbol][1], symbol)
+                event = Event(self, symbols_dict[symbol][0], symbols_dict[symbol][1], symbol, non_sv=self.nonsv_event)
             self.events_dict[symbol] = event
 
         for symbol in self.source_unique_char:
@@ -375,7 +375,7 @@ class Structural_Variant():
 class Event():
     '''represents the symbols, also known as the "events," within a SV transformation'''
 
-    def __init__(self, sv_parent, length, length_range, symbol, source_frag=None):
+    def __init__(self, sv_parent, length, length_range, symbol, source_frag=None, non_sv=False):
         '''
         sv_parent: Structural Variant, event is always part of larger SV
         '''
@@ -388,13 +388,14 @@ class Event():
         self.start = None
         self.end = None
         # boolean field to indicate whether the event is an SV or a background/non-SV event (e.g., DIVERGENCE)
-        self.is_SV = None
+        self.non_sv = non_sv
 
     def __repr__(self):
         return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end,
                                     "source_chr": self.source_chr,
                                     "source_frag": self.source_frag if not self.symbol.startswith(Symbols.DIS.value) else
-                                    'frag omitted'})
+                                    'frag omitted',
+                                    "non_sv": self.non_sv})
 
 
 class Blocks():
