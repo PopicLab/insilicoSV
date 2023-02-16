@@ -271,6 +271,14 @@ class Structural_Variant():
                     ev.start = source_ev.start
                     ev.end = source_ev.end
                     ev.source_frag = self.get_event_frag(source_ev, ev.symbol)
+                # additional branch for handling nonsv-events (right now just DIVERGENCE A -> A* events)
+                elif self.nonsv_event and ev.symbol == 'A*':
+                    source_ev = self.events_dict[ev.symbol[0]]
+                    ev.start = source_ev.start
+                    ev.end = source_ev.end
+                    ev.source_frag = self.get_event_frag(source_ev, ev.symbol)
+                    ev.non_sv = True
+
         # ===> then everything that wasn't just assigned will be a new event (all to be modeled as insertion fragments)
         # ------> thus will just need to have start/end set to the nearest event boundary from the ones placed above^
         # --> position is just determined by event adjacency, easier to ignore block boundaries here
@@ -306,9 +314,9 @@ class Structural_Variant():
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
 
         # debug
-        # print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
-        # for bl in self.target_symbol_blocks:
-        #     print(bl)
+        print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
+        for bl in self.target_symbol_blocks:
+            print(bl)
 
     def change_fragment(self):
         '''
