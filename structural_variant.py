@@ -119,7 +119,7 @@ class Structural_Variant():
                         "diverge": lambda string: utils.divergence(string)}
         if any(c.islower() for c in symbol):
             return decode_funcs["invert"](event.source_frag)
-        elif symbol[-1] == '*':  # checks if the element ends in an *, representing a divergent duplicate
+        elif symbol[-1] == Symbols.DIV.value:  # checks if the element ends in an *, representing a divergent duplicate
             return decode_funcs["diverge"](event.source_frag)
         else:  # take original fragment, no changes
             return event.source_frag

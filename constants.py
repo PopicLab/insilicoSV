@@ -58,7 +58,6 @@ class Zygosity(Enum):
 class Symbols(Enum):
     DIS = "_"  # dispersion event
     DUP_MARKING = "'"  # attached to symbols that are not the original one from source sequence
-    # TODO: DIV should probably be renamed to DIV_MARKING to make it clear that it's a modification rather than an event
     DIV = "*"  # divergent interval, attached to symbols that vary from the original by low-probability base error
 
 
