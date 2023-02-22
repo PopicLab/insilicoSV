@@ -11,9 +11,6 @@ class Structural_Variant():
 
         sv_type: Enum either specifying one of the prewritten classes or a Custom transformation, in which case source and target are required
         mode: flag to indicate whether we're in fixed or randomized mode
-            ---> is there a better way to do this (subclass this and create an alternate constructor for the fixed case
-                where a lot of this code isn't necessary)
-        Params given in randomized mode:
         length_ranges: list containing tuple(s) (min_length, max_length) OR singleton int given if the SV is of known
             position/is being read in from a vcf of known/fixed variants
         source: tuple representing source sequence, optional
@@ -176,11 +173,11 @@ class Structural_Variant():
 
         self.req_space = sum([event.length for event in self.source_events])
 
-        # # debug
-        # print('END OF INITIALIZE_EVENTS')
-        # print('sv.events_dict:')
-        # for ev in self.events_dict.keys():
-        #     print(self.events_dict[ev])
+        # debug
+        print('END OF INITIALIZE_EVENTS')
+        print('sv.events_dict:')
+        for ev in self.events_dict.keys():
+            print(self.events_dict[ev])
 
     def initialize_events_fixed(self, vcf_record, ref_fasta):
         """
@@ -253,12 +250,12 @@ class Structural_Variant():
         this method to actually modify the target_blocks' events objects to set the start/end positions
         """
         # debug
-        # print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
-        # for bl in self.target_symbol_blocks:
-        #     print(bl)
-        # print('events_dict:')
-        # for ev in self.events_dict.keys():
-        #     print(self.events_dict[ev])
+        print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
+        for bl in self.target_symbol_blocks:
+            print(bl)
+        print('events_dict:')
+        for ev in self.events_dict.keys():
+            print(self.events_dict[ev])
 
         # Trying logic based on the position assignment of source events in choose_rand_pos()
         # (now that we're flipping the sv.source_events list for flipped-dispersion events)
@@ -314,9 +311,9 @@ class Structural_Variant():
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
 
         # debug
-        # print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
-        # for bl in self.target_symbol_blocks:
-        #     print(bl)
+        print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
+        for bl in self.target_symbol_blocks:
+            print(bl)
 
     def change_fragment(self):
         '''
@@ -328,12 +325,13 @@ class Structural_Variant():
         block_start = None
         block_end = None
 
-        # # debug
-        # print('===CHANGE_FRAGMENT===')
-        # print('sv.events_dict:')
-        # for ev in self.events_dict.keys():
-        #     print(self.events_dict[ev])
-        # print(f'target blocks = {self.target_symbol_blocks}')
+        # debug
+        print('===CHANGE_FRAGMENT===')
+        print('(before exec)')
+        print('sv.events_dict:')
+        for ev in self.events_dict.keys():
+            print(self.events_dict[ev])
+        print(f'target blocks = {self.target_symbol_blocks}')
         # special case: deletion -- len(target_symbol_blocks) == 0
         if self.target_symbol_blocks == [[]]:
             changed_fragments.append([self.start_chr, self.start, self.end, ''])
@@ -369,8 +367,9 @@ class Structural_Variant():
 
         self.changed_fragments = changed_fragments
         # debug
-        # print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
-        # self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
+        print('(after exec)')
+        print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
+        self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
         # return changed_fragments
 
     def clean_event_storage(self):
