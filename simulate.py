@@ -251,8 +251,6 @@ class SV_Simulator():
                             and len(self.repeatmasker_events) > 0:
                         # add RM target event for this
                         repeat_elt = self.repeatmasker_events.pop(0)
-                        # # debug
-                        # print(f'instantiating SV with RM event: {repeat_elt}')
                         sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                                 length_ranges=sv_config["length_ranges"], source=sv_config["source"],
                                                 target=sv_config["target"], repeatmasker_event=repeat_elt,
