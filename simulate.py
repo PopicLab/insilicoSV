@@ -166,9 +166,6 @@ class SV_Simulator():
         # list of repeatmasker events to be populated from optionally input bed file
         self.repeatmasker_events = None if "repeatmasker" not in config.keys \
             else utils.parse_bed_file(config.repeatmasker['bed'])
-        # debug
-        if self.repeatmasker_events is not None:
-            print(f'self.repeatmasker_events is not None')
         self.initialize_svs(random_gen=random_gen)
 
         print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
