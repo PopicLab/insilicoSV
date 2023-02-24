@@ -359,8 +359,9 @@ class SV_Simulator():
 
         svs: list of Structural Variant objects
         ref_fasta: FastaFile with access to reference file
-        random_gen: only relevant for unittesting
-        -> returns list of tuples, represents position ranges for non-dispersion events
+        random_gen: only relevant for unittesting #<- TODO: phase this out
+        --> finds valid placement for SV and invokes sv.assign_locations()
+        --> to populate position fields in SV object attributes
         '''
         active_svs_total = 0
         inactive_svs_total = 0
