@@ -371,7 +371,7 @@ class Structural_Variant():
             # debug --> something about this check is happening when it's not supposed to
             print(f'target_symbols = {target_symbols}')
             for source_sym in self.events_dict.keys():
-                if source_sym not in target_symbols:
+                if not source_sym.startswith(Symbols.DIS.value) and source_sym not in target_symbols:
                     print(f'{source_sym} not in target_symbols')
                     del_ev = self.events_dict[source_sym]
                     changed_fragments.append([del_ev.source_chr, del_ev.start, del_ev.end, ''])
