@@ -441,7 +441,9 @@ class TestSVSimulator(unittest.TestCase):
     def test_repeatmasker_placement(self):
         # simple events -- with respect to toy reference chr21: CTCCGTCGTA
         simple_targets = {'DEL': 'CTGTCGTA',
-                          'DUP, INV': 'CTCCCCGTACGA'}
+                          # for multiple events, they can occur on opposite haplotypes so we'll just check
+                          # for string containment of the two new sequences that should arise
+                          'DUP,INV': ('CCCC', 'TACGA')}
         for i in range(len(self.test_objects_repeatmasker_simple)):
             type = list(simple_targets.keys())[i]
             config = self.test_objects_repeatmasker_simple[i]
@@ -450,7 +452,14 @@ class TestSVSimulator(unittest.TestCase):
             curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
             changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
             print(f'[{type}] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
-            self.assertEqual(simple_targets[type] in [changed_frag_1, changed_frag_2], True)
+            if type == 'DEL':
+                self.assertEqual(simple_targets[type] in [changed_frag_1, changed_frag_2], True)
+            else:
+                self.assertEqual(simple_targets[type][0] in changed_frag_1 or
+                                 simple_targets[type][0] in changed_frag_2, True)
+                self.assertEqual(simple_targets[type][1] in changed_frag_1 or
+                                 simple_targets[type][1] in changed_frag_2, True)
+
         # TODO: dispersion tests -- best way to test flipped and non-flipped?
 
     def test_divergence_events(self):
