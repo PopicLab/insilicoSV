@@ -20,11 +20,12 @@ def is_overlapping(event_ranges, addition, called_from_helper=False):
         #         print(f'event={event}; addition={addition}')
         #         return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
         if event[1] > addition[0] and event[0] < addition[1]:
-            print('is_overlapping: case 3')
+            # it seems we just want the expection to be raised if we're calling this from
+            # fail_if_any_overlapping -- bad practice, fix this
             if called_from_helper:
-                return True
-            else:
                 raise Exception("Overlap between {} and {}".format(event[0:2], addition[0:2]))
+            else:
+                return True
 
     return False
 
@@ -36,8 +37,9 @@ def fail_if_any_overlapping(arr):
     for x, ele in enumerate(arr):
         print(f'{x}, {ele}')
         # instead of this, moving the exception to be raised by is_overlapping()
-        if is_overlapping(arr[:x], ele, called_from_helper=True):
-            raise Exception(is_overlapping(arr[:x], ele)[1])
+        is_overlapping(arr[:x], ele, called_from_helper=True)
+        # if is_overlapping(arr[:x], ele, called_from_helper=True):
+        #     raise Exception(is_overlapping(arr[:x], ele)[1])
 
 def validate_symbols(source, target):
     '''
