@@ -294,14 +294,14 @@ class TestSVSimulator(unittest.TestCase):
         print(utils.is_overlapping([(3,4),(5,10)], (4,5)))
         self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (4,5)), False)
         # insertion cases
-        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (4,4))[0], False)
-        self.assertEqual(utils.is_overlapping([(3,4),(5,10), (10,15)], (10,10))[0], False)
-        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (10,10))[0], False)
-        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (20,20))[0], False)
-        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (20,21))[0], False)
-        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (19,20))[0], False)
+        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (4,4)), False)
+        self.assertEqual(utils.is_overlapping([(3,4),(5,10), (10,15)], (10,10)), False)
+        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (10,10)), False)
+        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (20,20)), False)
+        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (20,21)), False)
+        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (19,20)), False)
         self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (21,21)), False)
-        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (5,5))[0], False)
+        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (5,5)), False)
 
     # helper method for tests where the output will be in a known list of possibilities
     def helper_test_known_output_svs(self, config_event_obj, target_frags):
