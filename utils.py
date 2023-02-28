@@ -7,16 +7,18 @@ def is_overlapping(event_ranges, addition):
     # event_ranges: list containing tuples
     # checks if addition overlaps with any of the events already stored
 
+    # *** these need to be strict inequalities to allow for abutting insertions/deletions
     for event in event_ranges:
-        if addition[1] == addition[0]: # addition is an insertion
-            if addition[0] >= event[0] and addition[1] <= event[1]:
-                print('is_overlapping: case 1')
-                return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
-        if event[0] == event[1]:  # event is insertion
-            if event[0] >= addition[0] and event[0] <= addition[1]:
-                print('is_overlapping: case 2')
-                print(f'event={event}; addition={addition}')
-                return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
+        # *** ... and with strict inequalities these are all given by the same expression
+        # if addition[1] == addition[0]: # addition is an insertion
+        #     if addition[0] > event[0] and addition[1] < event[1]:
+        #         print('is_overlapping: case 1')
+        #         return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
+        # if event[0] == event[1]:  # event is insertion
+        #     if event[0] > addition[0] and event[0] < addition[1]:
+        #         print('is_overlapping: case 2')
+        #         print(f'event={event}; addition={addition}')
+        #         return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
         if event[1] > addition[0] and event[0] < addition[1]:
             print('is_overlapping: case 3')
             return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
