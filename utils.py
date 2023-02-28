@@ -32,10 +32,7 @@ def is_overlapping(event_ranges, addition, called_from_helper=False):
 def fail_if_any_overlapping(arr):
     # will raise Exception if any overlap between intervals is found
     # arr: list of tuples
-    # debug
-    print(f'overlap check on {arr}')
     for x, ele in enumerate(arr):
-        print(f'{x}, {ele}')
         # instead of this, moving the exception to be raised by is_overlapping()
         is_overlapping(arr[:x], ele, called_from_helper=True)
         # if is_overlapping(arr[:x], ele, called_from_helper=True):

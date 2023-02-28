@@ -449,7 +449,7 @@ class TestSVSimulator(unittest.TestCase):
             curr_sim = SV_Simulator(config.ref, config.par)
             curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
             changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-            # print(f'[{type}] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
+            print(f'[{type}] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
             self.assertEqual(simple_targets[type] in [changed_frag_1, changed_frag_2], True)
         # TODO: dispersion tests -- best way to test flipped and non-flipped?
 
