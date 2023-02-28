@@ -79,8 +79,10 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
           Variant_Type.dDUP_iDEL: [("A", "_", "B"), ("A", "_", "A'")],
           Variant_Type.INS_iDEL: [("A", "_", "B"), ("_", "A'")],
           # TODO: dupINV/INVdup should be changed to just have a single source fragment, but what should the difference be?
+          # -----------
           Variant_Type.dupINV: [("A", "B"), ("A", "b", "a'")],
           Variant_Type.INVdup: [("A", "B"), ("b'", "a", "B")],
+          # -----------
           Variant_Type.dDUP: [("A", "_"), ("A", "_", "A'")],
           Variant_Type.INV_dDUP: [("A", "_"), ("A", "_", "a'")],
           Variant_Type.div_dDUP: [("A", "_"), ("A", "_", "A*")],

@@ -161,6 +161,23 @@ class TestSVSimulator(unittest.TestCase):
                                                     "number": 1,
                                                     "min_length": {2, 2, 2},
                                                     "max_length": {2, 2, 2}}]}],
+                                               hap1, hap2, bed),
+                                    # objects for delINV and INVdel
+                                    TestObject([ref_file, {
+                                        "Chromosome19": "CTCCGT"}],
+                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                                   {"type": "delINV",
+                                                    "number": 1,
+                                                    "min_length": {3, 3},
+                                                    "max_length": {3, 3}}]}],
+                                               hap1, hap2, bed),
+                                    TestObject([ref_file, {
+                                        "Chromosome19": "CTCCGT"}],
+                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                                   {"type": "INVdel",
+                                                    "number": 1,
+                                                    "min_length": {3, 3},
+                                                    "max_length": {3, 3}}]}],
                                                hap1, hap2, bed)
                                     ]
         # self.test_objects_with_dis = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
@@ -457,6 +474,20 @@ class TestSVSimulator(unittest.TestCase):
         for i in range(4):
             type = list(targets.keys())[i]
             config = self.test_objects_no_dis[i + 5]
+            config.initialize_files()
+            curr_sim = SV_Simulator(config.ref, config.par)
+            curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+            changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+            print(f'[{type}] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
+            self.assertEqual(targets[type] in [changed_frag_1, changed_frag_2], True)
+
+    def test_delINV_INVdel_events(self):
+        # starter reference CTCCGT; each event of length 3
+        targets = {'delINV': 'ACG',
+                   'INVdel': 'GAG'}
+        for i in range(2):
+            type = list(targets.keys())[i]
+            config = self.test_objects_no_dis[i + 10]
             config.initialize_files()
             curr_sim = SV_Simulator(config.ref, config.par)
             curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
