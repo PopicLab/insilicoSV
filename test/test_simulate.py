@@ -121,8 +121,8 @@ class TestSVSimulator(unittest.TestCase):
                                                                 ]}],
                                                 hap1, hap2, bed),
                                     TestObject([ref_file, {"Chromosome19": "ACACTAGTCCACAGGTGAGAATCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
-                                                [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "dupINV", "number": 1, "max_length": 5, "min_length": 5},
-                                                                {"type": "INVdup", "number": 1, "min_length": 5, "max_length": 5}
+                                                [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "dup_INV", "number": 1, "max_length": 5, "min_length": 5},
+                                                                {"type": "INV_dup", "number": 1, "min_length": 5, "max_length": 5}
                                                                 ]}],
                                                 hap1, hap2, bed),
                                     TestObject([ref_file, {"chr19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
@@ -178,6 +178,15 @@ class TestSVSimulator(unittest.TestCase):
                                                     "number": 1,
                                                     "min_length": {3, 3},
                                                     "max_length": {3, 3}}]}],
+                                               hap1, hap2, bed),
+                                    # object for inverted duplication
+                                    TestObject([ref_file, {
+                                        "Chromosome19": "CGT"}],
+                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                                   {"type": "INVdup",
+                                                    "number": 1,
+                                                    "min_length": 3,
+                                                    "max_length": 3}]}],
                                                hap1, hap2, bed)
                                     ]
         # self.test_objects_with_dis = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
@@ -504,85 +513,16 @@ class TestSVSimulator(unittest.TestCase):
             print(f'[{type}] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
             self.assertEqual(targets[type] in [changed_frag_1, changed_frag_2], True)
 
-    def nonrandom_test_produce_variant_genome(self):
-
-        # ====== Test SVs without dispersions ======
-        # also tests whether overlapping detected
-
-        # dupINVdup, delINVdel, delINVdup
-        config_no_dis = self.test_objects_no_dis[1]
-        config_no_dis.initialize_files()    # generate reference and parameter files
-        curr_sim = SV_Simulator(config_no_dis.ref, config_no_dis.par, random_gen = RandomSim(0, "max"))   # random_gen ensures that SVs are all homozygous
-        self.assertEqual(curr_sim.produce_variant_genome(config_no_dis.hap1, config_no_dis.hap2, config_no_dis.ref,
-                                                         config_no_dis.bed, random_gen=RandomSim(10)), True)
-        changed_frag = config_no_dis.get_actual_frag()   # fetch fragment produced by simulator to compare with answer
-        config_no_dis.remove_test_files()   # remove any output files and .fai files
-        # Work
-        # CTCCG TCGTA CTAGA CAGCT CCCGA CAGAG CACTG GTGTC TTGTT TCTTT AAACA CCAGT ATTTA GATGCACTATCTCTCCGT
-        # TCTAG TACGA CTAGA CAGCT _____ CTCTG _____ GTGTC TTGTT TGTTTAAAGAAACAA AAACA CCAGT ATTTA GATGCACTATCTCTCCGT
-        self.assertEqual(changed_frag, "TCTAGTACGACTAGACAGCTCTCTGGTGTCTTGTTTGTTTAAAGAAACAAAAACACCAGTATTTAGATGCACTATCTCTCCGT")
-
-        # dupINVdel, delINV, INVdel
-        config_no_dis = self.test_objects_no_dis[2]
-        config_no_dis.initialize_files()
-        curr_sim = SV_Simulator(config_no_dis.ref, config_no_dis.par, random_gen = RandomSim(0, "max"))
-        self.assertEqual(curr_sim.produce_variant_genome(config_no_dis.hap1, config_no_dis.hap2, config_no_dis.ref,
-                                                         config_no_dis.bed, random_gen = RandomSim(10)), True)
-        changed_frag = config_no_dis.get_actual_frag()
-        config_no_dis.remove_test_files()
-        # CTCCG TCGTA CTAGA CAGCT CCCGA GTCAG GGAGC AAAAA AGTGT GACAC TAGTC CACAG GTGAGAAACACAAATATTCAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
-        # CTCCG TACGA CGGAG CAGCT _____ CTGAC GCTCC _____ AGTGT GACAC TAGTC CACAG GTGAGAAACACAAATATTCAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
-        self.assertEqual(changed_frag, "CTCCGTACGACGGAGCAGCTCTGACGCTCCAGTGTGACACTAGTCCACAGGTGAGAAACACAAATATTCAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT")
-        # #ACACTAGTCCACAGGTGAGAATCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
-        #
-        # dupINV, INVdup
-        config_no_dis = self.test_objects_no_dis[3]
-        config_no_dis.initialize_files()
-        curr_sim = SV_Simulator(config_no_dis.ref, config_no_dis.par, random_gen = RandomSim(0, "max"))
-        self.assertEqual(curr_sim.produce_variant_genome(config_no_dis.hap1, config_no_dis.hap2, config_no_dis.ref,
-                                                         config_no_dis.bed, random_gen = RandomSim(10)), True)
-        changed_frag = config_no_dis.get_actual_frag()
-        config_no_dis.remove_test_files()
-        # ACACT AGTCC ACAGG TGAGA ATCTT GTTTC TTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
-        # ACACT GGACTAGTGT TCTCACCTGT TGAGA ATCTT GTTTC TTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
-        self.assertEqual(changed_frag, "ACACTGGACTAGTGTTCTCACCTGTTGAGAATCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT")
-
-        # ====== Test SVs with dispersions ======
-        # TRA
-        # config_with_dis = self.test_objects_with_dis[0]
-        # config_with_dis.initialize_files()
-        # curr_sim = SV_Simulator(config_with_dis.ref, config_with_dis.par, random_gen = RandomSim(10, "max"))
-        # self.assertEqual(curr_sim.produce_variant_genome(config_with_dis.hap1, config_with_dis.hap2, config_no_dis.ref,
-        #                                                  config_with_dis.bed, random_gen = RandomSim(10)), True)
-        # changed_frag = config_with_dis.get_actual_frag()
-        # config_with_dis.remove_test_files()
-        # # CTCCG TCGTA CTAGA CAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
-        # # TCTAG TACGA CTAGA CAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
-        # self.assertEqual(changed_frag, "CTAGATCGTACTCCGCAGCTCACTGCAGAGCCCGAGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT")
-
-        # dDUP-iDEL, INS-IDEL, dDUP
-        # config_with_dis = self.test_objects_with_dis[1]
-        # config_with_dis.initialize_files()
-        # curr_sim = SV_Simulator(config_with_dis.ref, config_with_dis.par, random_gen = RandomSim(10, "max"))
-        # self.assertEqual(curr_sim.produce_variant_genome(config_with_dis.hap1, config_with_dis.hap2, config_no_dis.ref,
-        #                                                  config_with_dis.bed, random_gen = RandomSim(5)), True)
-        # changed_frag = config_with_dis.get_actual_frag()
-        # config_with_dis.remove_test_files()
-        # # CTCCG TCGTA CTAGA CAGGG TATAT GTCTG TGTCT CAGTG AGACA CTTAGCATGCAACTCAGTCTGTACTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
-        # # CTCCG _____ CTCCG TCGTA TATAT GTCTG TATATTGTCT CAGTG AGACA CTTAGCATGCAACTCAGTCTGTACTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
-        # self.assertEqual(changed_frag, "CTCCGCTCCGTCGTATATATGTCTGTATATTGTCTCAGTGAGACACTTAGCATGCAACTCAGTCTGTACTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT")
-
-        # INS
-        config_with_dis = self.test_objects_ins[0]
-        config_with_dis.initialize_files()
-        curr_sim = SV_Simulator(config_with_dis.ref, config_with_dis.par, random_gen = RandomSim(10, "max"))
-        self.assertEqual(curr_sim.produce_variant_genome(config_with_dis.hap1, config_with_dis.hap2, config_no_dis.ref,
-                                                         config_with_dis.bed, random_gen = RandomSim(5)), True)
-        changed_frag = config_with_dis.get_actual_frag()
-        config_with_dis.remove_test_files()
-        # CTCCG TCGTA CTAGA CAGCT CCCGA CAGAG CACTG GTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
-        # AAAAACTCCG _____ TCTAG CAGCT AAAAACCCGA CAGAG CACTG GTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT
-        self.assertEqual(changed_frag, "AAAAACTCCGTCTAGCAGCTAAAAACCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT")
+    def test_inverted_duplication_events(self):
+        # inverted dup as simulated by SURVIVOR (A -> aa')
+        # reference CGT (min A length 3) --> desired output: ACGACG
+        config = self.test_objects_no_dis[11]
+        config.initialize_files()
+        curr_sim = SV_Simulator(config.ref, config.par)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        print(f'[INVdup] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
+        self.assertEqual('ACGACG' in [changed_frag_1, changed_frag_2], True)
 
     # TODO: rewrite to account for randomness (i.e., version with random_gen = random)
     def nonrandom_test_choose_rand_pos(self):
