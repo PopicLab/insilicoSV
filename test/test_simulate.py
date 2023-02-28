@@ -487,7 +487,7 @@ class TestSVSimulator(unittest.TestCase):
                    'INVdel': 'GAG'}
         for i in range(2):
             type = list(targets.keys())[i]
-            config = self.test_objects_no_dis[i + 10]
+            config = self.test_objects_no_dis[i + 9]
             config.initialize_files()
             curr_sim = SV_Simulator(config.ref, config.par)
             curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
