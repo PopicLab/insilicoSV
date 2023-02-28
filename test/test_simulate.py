@@ -196,6 +196,22 @@ class TestSVSimulator(unittest.TestCase):
                                                         "min_length": {1, 1},
                                                         "max_length": {1, 1}}]}],
                                                    hap1, hap2, bed),
+                                        TestObject([ref_file, {
+                                            "Chromosome19": "CTG"}],
+                                                   [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                                       {"type": "dDUP_iDEL",
+                                                        "number": 1,
+                                                        "min_length": {1, 1, 1},
+                                                        "max_length": {1, 1, 1}}]}],
+                                                   hap1, hap2, bed),
+                                        TestObject([ref_file, {
+                                            "Chromosome19": "CTG"}],
+                                                   [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                                       {"type": "INS_iDEL",
+                                                        "number": 1,
+                                                        "min_length": {1, 1, 1},
+                                                        "max_length": {1, 1, 1}}]}],
+                                                   hap1, hap2, bed)
                                         ]
         self.test_objects_ins = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
                                         [par, {"sim_settings": {"prioritize_top": True}, "SVs": [{"type": "INS", "number": 1, "min_length": 5, "max_length": 5},
@@ -383,6 +399,29 @@ class TestSVSimulator(unittest.TestCase):
         else:
             self.assertEqual('ACT' in [changed_frag_1, changed_frag_2], True)
         print(f'[INV_dDUP] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
+        # dDUP_iDEL
+        config = self.test_dispersion_objects[3]
+        config.initialize_files()
+        curr_sim = SV_Simulator(config.ref, config.par)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        if not curr_sim.svs[0].dispersion_flip:
+            self.assertEqual('CTG' in [changed_frag_1, changed_frag_2], True)
+        else:
+            self.assertEqual('GTG' in [changed_frag_1, changed_frag_2], True)
+        print(f'[dDUP_iDEL] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
+        # INS_iDEL
+        config = self.test_dispersion_objects[4]
+        config.initialize_files()
+        curr_sim = SV_Simulator(config.ref, config.par)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        if not curr_sim.svs[0].dispersion_flip:
+            self.assertEqual('TC' in [changed_frag_1, changed_frag_2], True)
+        else:
+            self.assertEqual('GT' in [changed_frag_1, changed_frag_2], True)
+        print(f'[INS_iDEL] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
+
 
     def test_repeatmasker_placement(self):
         # simple events -- with respect to toy reference chr21: CTCCGTCGTA
