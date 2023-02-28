@@ -332,39 +332,38 @@ class Structural_Variant():
         for ev in self.events_dict.keys():
             print(self.events_dict[ev])
         print(f'target blocks = {self.target_symbol_blocks}')
-        # # --> old DEL logic; only works for simple DEL, not for DELs within complex events
-        # # special case: deletion -- len(target_symbol_blocks) == 0
-        # if self.target_symbol_blocks == [[]]:
-        #     changed_fragments.append([self.start_chr, self.start, self.end, ''])
-        # else:
-        for idx, block in enumerate(self.target_symbol_blocks):
-            new_frag = ''
-            if len(block) == 0:
-                # this branch will be executed for TRAs:
-                # --> want to delete the A-length interval on the opposite side of the dispersion as our A'
-                if idx == 0:
-                    del_len = len(self.target_symbol_blocks[2][0].source_frag)
-                    disp_ev = self.target_symbol_blocks[1][0]
-                    block_start = disp_ev.start - del_len
-                    block_end = disp_ev.start
-                else:
-                    del_len = len(self.target_symbol_blocks[idx - 2][0].source_frag)
-                    disp_ev = self.target_symbol_blocks[idx - 1][0]
-                    block_start = disp_ev.end
-                    block_end = block_start + del_len
+        # special case: simple deletion -- len(target_symbol_blocks) == 0
+        if self.target_symbol_blocks == [[]]:
+            changed_fragments.append([self.start_chr, self.start, self.end, ''])
+        else:
+            for idx, block in enumerate(self.target_symbol_blocks):
+                new_frag = ''
+                if len(block) == 0:
+                    # this branch will be executed for TRAs:
+                    # --> want to delete the A-length interval on the opposite side of the dispersion as our A'
+                    if idx == 0:
+                        del_len = len(self.target_symbol_blocks[2][0].source_frag)
+                        disp_ev = self.target_symbol_blocks[1][0]
+                        block_start = disp_ev.start - del_len
+                        block_end = disp_ev.start
+                    else:
+                        del_len = len(self.target_symbol_blocks[idx - 2][0].source_frag)
+                        disp_ev = self.target_symbol_blocks[idx - 1][0]
+                        block_start = disp_ev.end
+                        block_end = block_start + del_len
+                    changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
+                    continue
+                if block[0].symbol.startswith(Symbols.DIS.value):
+                    continue
+                for i in range(len(block)):
+                    ev = block[i]
+                    new_frag += ev.source_frag
+                    if i == 0:
+                        block_start = ev.start
+                    if i == len(block) - 1:
+                        block_end = ev.end
                 changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
-                continue
-            if block[0].symbol.startswith(Symbols.DIS.value):
-                continue
-            for i in range(len(block)):
-                ev = block[i]
-                new_frag += ev.source_frag
-                if i == 0:
-                    block_start = ev.start
-                if i == len(block) - 1:
-                    block_end = ev.end
-            changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
-            # print(f'new change fragment : {changed_fragments[-1]}')
+                # print(f'new change fragment : {changed_fragments[-1]}')
         # general DEL logic: for all source events whose symbol doesn't appear (in any form) in the target symbols,
         # create a deletion fragment over that interval
         # # collect reference list of all source
