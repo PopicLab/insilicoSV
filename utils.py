@@ -15,6 +15,7 @@ def is_overlapping(event_ranges, addition):
         if event[0] == event[1]:  # event is insertion
             if event[0] >= addition[0] and event[0] <= addition[1]:
                 print('is_overlapping: case 2')
+                print(f'event={event}; addition={addition}')
                 return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
         if event[1] > addition[0] and event[0] < addition[1]:
             print('is_overlapping: case 3')
