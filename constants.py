@@ -77,8 +77,8 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
           Variant_Type.delINV: [("A", "B"), ("b",)],
           Variant_Type.INVdel: [("A", "B"), ("a",)],
           Variant_Type.dDUP_iDEL: [("A", "_", "B"), ("A", "_", "A'")],
-          # TODO: The first occurrence of A doesn't seem to get deleted here, we get the same out as dDUP_iDEL
-          Variant_Type.INS_iDEL: [("A", "_", "B"), ("_", "A")],
+          Variant_Type.INS_iDEL: [("A", "_", "B"), ("_", "A'")],
+          # TODO: dupINV/INVdup should be changed to just have a single source fragment, but what should the difference be?
           Variant_Type.dupINV: [("A", "B"), ("A", "b", "a'")],
           Variant_Type.INVdup: [("A", "B"), ("b'", "a", "B")],
           Variant_Type.dDUP: [("A", "_"), ("A", "_", "A'")],
