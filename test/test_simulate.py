@@ -407,7 +407,7 @@ class TestSVSimulator(unittest.TestCase):
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         print(f'[dDUP_iDEL] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
         if not curr_sim.svs[0].dispersion_flip:
-            self.assertEqual('CTG' in [changed_frag_1, changed_frag_2], True)
+            self.assertEqual('CTC' in [changed_frag_1, changed_frag_2], True)
         else:
             self.assertEqual('GTG' in [changed_frag_1, changed_frag_2], True)
         # INS_iDEL
