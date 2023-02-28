@@ -405,22 +405,22 @@ class TestSVSimulator(unittest.TestCase):
         curr_sim = SV_Simulator(config.ref, config.par)
         curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        print(f'[dDUP_iDEL] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
         if not curr_sim.svs[0].dispersion_flip:
             self.assertEqual('CTG' in [changed_frag_1, changed_frag_2], True)
         else:
             self.assertEqual('GTG' in [changed_frag_1, changed_frag_2], True)
-        print(f'[dDUP_iDEL] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
         # INS_iDEL
         config = self.test_dispersion_objects[4]
         config.initialize_files()
         curr_sim = SV_Simulator(config.ref, config.par)
         curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        print(f'[INS_iDEL] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
         if not curr_sim.svs[0].dispersion_flip:
             self.assertEqual('TC' in [changed_frag_1, changed_frag_2], True)
         else:
             self.assertEqual('GT' in [changed_frag_1, changed_frag_2], True)
-        print(f'[INS_iDEL] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
 
 
     def test_repeatmasker_placement(self):
