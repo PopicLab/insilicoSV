@@ -9,12 +9,15 @@ def is_overlapping(event_ranges, addition):
 
     for event in event_ranges:
         if addition[1] == addition[0]: # addition is an insertion
-            if addition[0] >= event[0] and addition[1] <= event[1]: 
+            if addition[0] >= event[0] and addition[1] <= event[1]:
+                print('is_overlapping: case 1')
                 return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
         if event[0] == event[1]:  # event is insertion
             if event[0] >= addition[0] and event[0] <= addition[1]:
+                print('is_overlapping: case 2')
                 return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
         if event[1] > addition[0] and event[0] < addition[1]:
+            print('is_overlapping: case 3')
             return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
 
     return False
@@ -22,7 +25,10 @@ def is_overlapping(event_ranges, addition):
 def fail_if_any_overlapping(arr):
     # will raise Exception if any overlap between intervals is found
     # arr: list of tuples
+    # debug
+    print(f'overlap check on {arr}')
     for x, ele in enumerate(arr):
+        print(f'{x}, {ele}')
         if is_overlapping(arr[:x], ele):
             raise Exception(is_overlapping(arr[:x], ele)[1])
 

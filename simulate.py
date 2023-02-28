@@ -327,7 +327,7 @@ class SV_Simulator():
             for id in self.order_ids:
                 # account for homozygous and heterogeneous variants
                 edits_x = edits_dict[id]
-                # utils.fail_if_any_overlapping(edits_x)
+                utils.fail_if_any_overlapping(edits_x)
 
                 # export edited chromosomes to FASTA files
                 self.formatter.export_variants_to_fasta(id, edits_x, fasta_out, ref_fasta, verbose=verbose)
