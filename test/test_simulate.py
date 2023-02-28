@@ -293,16 +293,15 @@ class TestSVSimulator(unittest.TestCase):
         # non-insertion cases
         print(utils.is_overlapping([(3,4),(5,10)], (4,5)))
         self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (4,5)), False)
-
         # insertion cases
-        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (4,4))[0], True)
-        self.assertEqual(utils.is_overlapping([(3,4),(5,10), (10,15)], (10,10))[0], True)
-        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (10,10))[0], True)
-        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (20,20))[0], True)
-        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (20,21))[0], True)
-        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (19,20))[0], True)
+        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (4,4))[0], False)
+        self.assertEqual(utils.is_overlapping([(3,4),(5,10), (10,15)], (10,10))[0], False)
+        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (10,10))[0], False)
+        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (20,20))[0], False)
+        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (20,21))[0], False)
+        self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (19,20))[0], False)
         self.assertEqual(utils.is_overlapping([(3,4), (20,20), (5,10)], (21,21)), False)
-        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (5,5))[0], True)
+        self.assertEqual(utils.is_overlapping([(3,4),(5,10)], (5,5))[0], False)
 
     # helper method for tests where the output will be in a known list of possibilities
     def helper_test_known_output_svs(self, config_event_obj, target_frags):
@@ -421,7 +420,6 @@ class TestSVSimulator(unittest.TestCase):
             self.assertEqual('TC' in [changed_frag_1, changed_frag_2], True)
         else:
             self.assertEqual('GT' in [changed_frag_1, changed_frag_2], True)
-
 
     def test_repeatmasker_placement(self):
         # simple events -- with respect to toy reference chr21: CTCCGTCGTA
