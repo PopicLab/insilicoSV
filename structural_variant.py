@@ -364,14 +364,14 @@ class Structural_Variant():
                         block_end = ev.end
                 changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
                 # print(f'new change fragment : {changed_fragments[-1]}')
-        # general DEL logic: for all source events whose symbol doesn't appear (in any form) in the target symbols,
-        # create a deletion fragment over that interval
-        # # collect reference list of all source
-        target_symbols = [ev.symbol[0].upper() for bl in self.target_symbol_blocks for ev in bl]
-        for source_sym in self.events_dict.keys():
-            if source_sym not in target_symbols:
-                del_ev = self.events_dict[source_sym]
-                changed_fragments.append([del_ev.source_chr, del_ev.start, del_ev.end, ''])
+            # general DEL logic: for all source events whose symbol doesn't appear (in any form) in the target symbols,
+            # create a deletion fragment over that interval
+            # # collect reference list of all source
+            target_symbols = [ev.symbol[0].upper() for bl in self.target_symbol_blocks for ev in bl]
+            for source_sym in self.events_dict.keys():
+                if source_sym not in target_symbols:
+                    del_ev = self.events_dict[source_sym]
+                    changed_fragments.append([del_ev.source_chr, del_ev.start, del_ev.end, ''])
 
         self.changed_fragments = changed_fragments
         # debug
