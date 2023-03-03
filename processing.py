@@ -98,7 +98,7 @@ class FormatterIO():
         reset_file: True = delete any previous content in bed file, False = append
         '''
         def write_to_file(sv, source_chr, source_s, source_e, target_chr, target_s, target_e, transform, symbol, event, order = 0):
-            assert (not event.symbol.startswith(Symbols.DIS.value))
+            assert (not event.symbol.startswith(Symbols.DIS_MARKING.value))
             # consider insertions
             if transform == Operations.INS.value:
                 transform_length = event.length
@@ -191,14 +191,14 @@ class FormatterIO():
 
                 # find dispersion event right after block to update position and chromosome to edit on
                 if idx < len(sv.target_symbol_blocks) - 1:
-                    dis_event = encoding[Symbols.DIS.value + str(idx + 1)]  # find the nth dispersion event
+                    dis_event = encoding[Symbols.DIS_MARKING.value + str(idx + 1)]  # find the nth dispersion event
                     curr_pos = dis_event.end
                     curr_chr = dis_event.source_chr
 
             # deletions - any original symbols not detected in target sequence are deleted
             for symbol in source:
                 # do not delete dispersion events or symbols already in target
-                if not symbol.startswith(Symbols.DIS.value) and symbol not in target and symbol.lower() not in target:
+                if not symbol.startswith(Symbols.DIS_MARKING.value) and symbol not in target and symbol.lower() not in target:
                     event = encoding[symbol]
                     order = 0
                     write_to_file(sv, event.source_chr, event.start, event.end, event.source_chr, event.start, event.start, Operations.DEL.value, event.symbol, event, order)

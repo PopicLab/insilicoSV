@@ -50,7 +50,7 @@ def validate_symbols(source, target):
     for symbol in source:
         if symbol in present:
             raise Exception("Source transformation {} does not have unique symbols!".format(source))
-        elif symbol != Symbols.DIS.value:   # exclude dispersion events because they will always appear the same for user inputs
+        elif symbol != Symbols.DIS_MARKING.value:   # exclude dispersion events because they will always appear the same for user inputs
             present[symbol] = True
 
         if Symbols.DUP_MARKING.value in symbol:
@@ -58,7 +58,7 @@ def validate_symbols(source, target):
         if any(c.islower() for c in symbol):
             raise Exception("Only original symbols may appear in source sequence, and they must also be uppercase: {}".format(source))
     
-    assert sum([1 for symbol in source if symbol.startswith(Symbols.DIS.value)]) == sum([1 for symbol in target if symbol.startswith(Symbols.DIS.value)]), "Number of dispersion events must be equal between source and target sequence"
+    assert sum([1 for symbol in source if symbol.startswith(Symbols.DIS_MARKING.value)]) == sum([1 for symbol in target if symbol.startswith(Symbols.DIS_MARKING.value)]), "Number of dispersion events must be equal between source and target sequence"
 
 def remove_file(file):
     # removes file if it exists
