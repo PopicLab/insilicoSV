@@ -19,8 +19,9 @@ python ${SCRIPT_PATH}/fix_div_dDUP_vcf.py --div_dDUP_vcf ${OUTPUT_PREFIX}1.vcf -
 python ${SCRIPT_PATH}/simulate.py ${OUTPUT_PREFIX}2.hapA.fa ${CONFIG_SIMPLE_EDIT} ${OUTPUT_PREFIX}2_EDIT
 # --> NB: the vcf output of this will only specify the simple and dDUP events (we will use this in the merge step)
 # generate reads from R2_EDIT (ref with div. repeats and simple events/dDUPs)
-/athena/ihlab/scratch/vpopic/software/LRSIM/dwgsim -C 30 -1 151 -2 151 -y 0 -S 0 -c 0 -m /dev/null -H -R 0.30 -X 0.5 ${OUTPUT_PREFIX}2_EDIT.hapA.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.0
-/athena/ihlab/scratch/vpopic/software/LRSIM/dwgsim -C 30 -1 151 -2 151 -y 0 -S 0 -c 0 -m /dev/null -H -R 0.30 -X 0.5 ${OUTPUT_PREFIX}2_EDIT.hapB.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.1
+#/athena/ihlab/scratch/vpopic/software/LRSIM/dwgsim
+/athena/ihlab/scratch/crohlice/software/DWGSIM/dwgsim -C 30 -1 151 -2 151 -y 0 -S 0 -c 0 -m /dev/null -H -R 0.30 -X 0.5 ${OUTPUT_PREFIX}2_EDIT.hapA.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.0
+/athena/ihlab/scratch/crohlice/software/DWGSIM/dwgsim -C 30 -1 151 -2 151 -y 0 -S 0 -c 0 -m /dev/null -H -R 0.30 -X 0.5 ${OUTPUT_PREFIX}2_EDIT.hapB.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.1
 # concat the R2 fastqs
 mv ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.0.12.fastq ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.fastq
 cat ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.1.12.fastq >> ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.fastq
