@@ -27,6 +27,11 @@ class Variant_Type(Enum):
     div_dDUP = "div_dDUP"
 
 
+# list of dispersion-based events (listing explicitly to prevent having to parse from symbols)
+DISPERSION_TYPES = [Variant_Type.dDUP, Variant_Type.INV_dDUP,
+                    Variant_Type.TRA, Variant_Type.div_dDUP,
+                    Variant_Type.dDUP_iDEL, Variant_Type.INS_iDEL]
+
 # treating DIVERGENCE as a non-variant event
 class Nonvariant_Event_Type(Enum):
     DIVERGENCE = "DIVERGENCE"

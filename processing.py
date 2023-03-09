@@ -232,22 +232,33 @@ class FormatterIO():
 
         for sv in svs:
             zyg = (1, 1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0, 1)
-            # --- logic just based on sv.changed_fragments ---
-            # dispersion events will have two changed fragments
             dispersion_target = None
-            if len(sv.changed_fragments) == 2:
-                intervalA = (sv.changed_fragments[0][1], sv.changed_fragments[0][2])
-                intervalB = (sv.changed_fragments[1][1], sv.changed_fragments[1][2])
-                if intervalA[1] - intervalA[0] == 0:
-                    dispersion_target = intervalA[0]
-                    rec_start = intervalB[0]
-                    rec_end = intervalB[1]
+            if sv.type in DISPERSION_TYPES:
+                # intervalA = (sv.changed_fragments[0][1], sv.changed_fragments[0][2])
+                # intervalB = (sv.changed_fragments[1][1], sv.changed_fragments[1][2])
+                # if intervalA[1] - intervalA[0] == 0:
+                #     dispersion_target = intervalA[0]
+                #     rec_start = intervalB[0]
+                #     rec_end = intervalB[1]
+                # else:
+                #     dispersion_target = intervalB[0]
+                #     rec_start = intervalA[0]
+                #     rec_end = intervalA[1]
+                # --> going to read the source and target intervals off the start/end positions of the events dict
+                source_event = sv.events_dict['A']
+                disp_event = sv.events_dict['_1']
+                rec_start = source_event.start
+                rec_end = source_event.end
+                # setting TARGET to the correct end of the dispersion
+                if disp_event.start == source_event.end:
+                    dispersion_target = disp_event.end
                 else:
-                    dispersion_target = intervalB[0]
-                    rec_start = intervalA[0]
-                    rec_end = intervalA[1]
+                    dispersion_target = disp_event.start
             else:
-                rec_start, rec_end = sv.changed_fragments[0][1], sv.changed_fragments[0][2]
+                # need to remove trailing/leading deletion fragments on complex events
+                filtered_changed_frags = [frag for frag in sv.changed_fragments if frag[3] != '']
+                # rec_start, rec_end = sv.changed_fragments[0][1], sv.changed_fragments[0][2]
+                rec_start, rec_end = filtered_changed_frags[0][1], filtered_changed_frags[0][2]
             if dispersion_target is not None:
                 info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
             else:

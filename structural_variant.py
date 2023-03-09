@@ -49,7 +49,7 @@ class Structural_Variant():
         self.repeatmasker_event = repeatmasker_event
         self.nonsv_event = nonsv_event
 
-        if self.type in [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP, Variant_Type.TRA]:
+        if self.type in DISPERSION_TYPES:
             if random.randint(0, 1):
                 self.dispersion_flip = True
         # initialize_events sets the values of events_dict, source_dict, and req_space
@@ -425,7 +425,7 @@ class Blocks():
         self.target_blocks = []
         self.generate_blocks()
         # optional dispersion flip should be done in init step
-        if self.sv.type in [Variant_Type.TRA, Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.div_dDUP] \
+        if self.sv.type in DISPERSION_TYPES \
                 and self.sv.dispersion_flip:
             self.flip_blocks()
         self.track_original_symbol()
