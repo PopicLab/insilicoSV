@@ -256,7 +256,9 @@ class FormatterIO():
                     dispersion_target = disp_event.start
             else:
                 # need to remove trailing/leading deletion fragments on complex events
-                filtered_changed_frags = [frag for frag in sv.changed_fragments if frag[3] != '']
+                # --> i.e. only want to strip deletions if there is more than a single changed frag (simple DEL)
+                filtered_changed_frags = [frag for frag in sv.changed_fragments if (frag[3] != '') or
+                                          len(sv.changed_fragments) == 1]
                 # rec_start, rec_end = sv.changed_fragments[0][1], sv.changed_fragments[0][2]
                 rec_start, rec_end = filtered_changed_frags[0][1], filtered_changed_frags[0][2]
             if dispersion_target is not None:
