@@ -245,18 +245,19 @@ class FormatterIO():
                 else:
                     dispersion_target = disp_event.start
             else:
-                if sv.type == Variant_Type.INS:  #<-- also need to account for other events with INS components?
-                    pass
-                else:
-                    # need to remove trailing/leading deletion fragments on complex events
-                    # --> i.e. only want to strip deletions if there is more than a single changed frag (simple DEL)
-                    filtered_changed_frags = [frag for frag in sv.changed_fragments if (frag[3] != '') or
-                                              len(sv.changed_fragments) == 1]
-                    rec_start, rec_end = filtered_changed_frags[0][1], filtered_changed_frags[0][2]
+                # need to remove trailing/leading deletion fragments on complex events
+                # --> i.e. only want to strip deletions if there is more than a single changed frag (simple DEL)
+                filtered_changed_frags = [frag for frag in sv.changed_fragments if (frag[3] != '') or
+                                          len(sv.changed_fragments) == 1]
+                rec_start, rec_end = filtered_changed_frags[0][1], filtered_changed_frags[0][2]
             if dispersion_target is not None:
                 info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start, 'TARGET': dispersion_target}
             else:
-                info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
+                if sv.type == Variant_Type.INS:
+                    # special case of simple INS: sv length \neq (sv end - sv start)
+                    info_field = {'SVTYPE': sv.type.value, 'SVLEN': sv.events_dict['A'].length}
+                else:
+                    info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
             if sv.repeatmasker_event is not None:
                 info_field['RM_OVERLAP'] = 'True'
 
