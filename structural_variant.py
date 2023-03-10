@@ -467,6 +467,11 @@ class Blocks():
         self.source_blocks = self.source_blocks[::-1]
         self.target_blocks = self.target_blocks[::-1]
 
+    def generate_target_events_dict(self):
+        # fn to generate an events dict from target blocks
+        return {ev.symbol: ev for b in self.target_blocks for ev in b}
+
+    # TODO: delete -- not used (or shouldn't be anymore)
     def track_original_symbol(self):
         # finds which region/block the original symbol is in
         # if symbol is later found in another region, then translocation detected

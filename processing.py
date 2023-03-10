@@ -89,7 +89,7 @@ class FormatterIO():
         config = Config(**config_entries)
         return config
 
-    def write_to_file(self, sv, bedfile, source_chr, source_s, source_e, target_chr, target_s, target_e, transform, symbol, event, order = 0):
+    def write_to_file(self, sv, bedfile, source_s, source_e, target_s, target_e, transform, event, order=0):
         assert (not event.symbol.startswith(Symbols.DIS_MARKING.value))
         # consider insertions
         if transform == Operations.INS.value:
@@ -100,10 +100,10 @@ class FormatterIO():
         # do not write events of size 0
         if event.length > 0:
             with open(bedfile, "a") as fout:
-                row = [str(source_chr),
+                row = [str(event.source_chr),
                        str(source_s),
                        str(source_e + 1),
-                       str(target_chr),
+                       str(event.source_chr),
                        str(target_s),
                        str(target_e + 1),
                        transform,
@@ -128,7 +128,93 @@ class FormatterIO():
             fout_ins.write(">{}_{}\n".format(chr, start_pos))
             fout_ins.write("{}\n".format(seq))
 
-    def export_to_bedpe(self, svs, bedfile, ins_fasta, reset_file = True):
+    @staticmethod
+    def get_composite_sv_event_info(ev, target_events_dict, source_events_dict):
+        # helper function to return target_intvl and operation for multi-source events
+        # need to enumerate the possible modifications to set the right operation
+        # A -> A'
+        if ev + Symbols.DUP_MARKING.value in target_events_dict.keys():
+            trg_sym = ev + Symbols.DUP_MARKING.value
+            return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.DUP.value
+        # A -> a'
+        elif ev.lower() + Symbols.DUP_MARKING.value in target_events_dict.keys():
+            trg_sym = ev.lower() + Symbols.DUP_MARKING.value
+            return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.INVDUP.value
+        # A -> a
+        elif ev.lower() in target_events_dict.keys():
+            trg_sym = ev.lower()
+            return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.INV.value
+        # A -> A* (in the case of a custom event in which an event is divergently duplicated)
+        elif ev + Symbols.DIV_MARKING in target_events_dict.keys():
+            trg_sym = ev + Symbols.DIV_MARKING
+            return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.DIV.value
+        # otherwise unknown mapping
+        else:
+            return (source_events_dict[ev].start, source_events_dict[ev].end), Operations.UNDEFINED.value
+
+    def export_to_bedpe(self, svs, bedfile, ins_fasta, reset_file=True):
+        if reset_file:
+            utils.reset_file(bedfile)
+            utils.reset_file(ins_fasta)
+        ## for reference, the input arguments to write_to_file:
+        # sv, bedfile, source_s, source_e, target_s, target_e, transform, symbol, event, order = 0
+        for sv in svs:
+            # create target events dict for lookup of corresponding source/target events within SV
+            target_events_dict = sv.target_symbol_blocks.generate_target_events_dict()
+            # SVs with multiple source events will be split into multiple bed records (one for each)
+            if len(sv.events_dict) < 2:
+                # simple DEL
+                if len(sv.events_dict) == 1:
+                    ev = list(sv.events_dict.values())[0]
+                    op = Operations.DEL.value
+                # simple INS
+                else:
+                    ev = list(target_events_dict.values())[0]
+                    op = Operations.INS.value
+                record_info = {'source_s': ev.start,
+                               'source_e': ev.end,
+                               'target_s': ev.start,
+                               'target_e': ev.end,
+                               'transform': op,
+                               'sv': sv,
+                               'event': ev,
+                               'bedfile': bedfile}
+                self.write_to_file(**record_info)
+            else:
+                # TODO: add logic to calculate 'order' value for each relevant composite event
+                # multiple source events: source intervals taken from the source events
+                # and target intervals taken from corresponding target events (if no match, then deletion)
+                # --> dict keyed on source symbol with values giving source and target intervals
+                sv_record_info = {}
+                for ev in sv.events_dict.keys():
+                    # --> target intvl and transform will be determined in each of the specific cases of how the
+                    # --> source event is mapped into the target
+                    sv_record_info[ev] = {'source_s': sv.events_dict[ev].start,
+                                          'source_e': sv.events_dict[ev].end,
+                                          'sv': sv,
+                                          'event': ev,
+                                          'bedfile': bedfile}
+                    # source event appears unaltered in target: identity subevent
+                    if ev in target_events_dict.keys():
+                        sv_record_info[ev]['target_s'] = target_events_dict[ev].start
+                        sv_record_info[ev]['target_e'] = target_events_dict[ev].end
+                        sv_record_info[ev]['transform'] = Operations.IDENTITY.value
+                    # source event appears altered in target: dup, inv, etc.
+                    elif ev in [sym[0].upper() for sym in target_events_dict.keys()]:
+                        (target_s, target_e), operation = self.get_composite_sv_event_info(ev, target_events_dict, sv.events_dict)
+                        sv_record_info[ev]['target_s'] = target_s
+                        sv_record_info[ev]['target_e'] = target_e
+                        sv_record_info[ev]['transform'] = operation
+                    # source event doesn't appear in any form in target events (deletion)
+                    else:
+                        sv_record_info[ev]['target_s'] = sv.events_dict[ev].start
+                        sv_record_info[ev]['target_e'] = sv.events_dict[ev].end
+                        sv_record_info[ev]['transform'] = Operations.DEL.value
+                # --> write bed records from interval_dict contents in the order of source interval start
+                for param_dict in sorted([params for params in sv_record_info.values()], key=lambda params: params.source_s):
+                    self.write_to_file(**param_dict)
+
+    def export_to_bedpe_OLD(self, svs, bedfile, ins_fasta, reset_file = True):
         '''
         Exports SVs changes to bedfile and foreign insertions to separate fasta file, uses target "blocks" to identify which subtype event is (INS, DUP, TRA, etc.)
         svs: list of Structural Variant objects
