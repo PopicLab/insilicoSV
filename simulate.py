@@ -336,8 +336,7 @@ class SV_Simulator():
                 time_start = time.time()
 
         # export variant data to BED file
-        # TODO: update export_to_bedpe to work with new Block representation
-        # self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file=initial_reset)
+        self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file=initial_reset)
         # debug
         # print('-----ACTIVE SVS-----')
         # for sv in active_svs:

@@ -89,6 +89,43 @@ class FormatterIO():
         config = Config(**config_entries)
         return config
 
+    def write_to_file(self, sv, bedfile, source_chr, source_s, source_e, target_chr, target_s, target_e, transform, symbol, event, order = 0):
+        assert (not event.symbol.startswith(Symbols.DIS_MARKING.value))
+        # consider insertions
+        if transform == Operations.INS.value:
+            transform_length = event.length
+        else:
+            transform_length = source_e - source_s
+
+        # do not write events of size 0
+        if event.length > 0:
+            with open(bedfile, "a") as fout:
+                row = [str(source_chr),
+                       str(source_s),
+                       str(source_e + 1),
+                       str(target_chr),
+                       str(target_s),
+                       str(target_e + 1),
+                       transform,
+                       str(transform_length),
+                       str(int(sv.ishomozygous.value)) + "/1",
+                       sv.name,
+                       str(self.bedpe_counter),
+                       str(order)]
+
+                fout.write("\t".join(row) + "\n")
+
+    def symbol_is_inversion(symbol):
+        return any(c.islower() for c in symbol)
+
+    def export_insertions(chr, start_pos, seq, ins_fasta):
+        '''
+        Exports foreign insertion sequences to separate fasta file, append only
+        '''
+        with open(ins_fasta, "a") as fout_ins:
+            fout_ins.write(">{}_{}\n".format(chr, start_pos))
+            fout_ins.write("{}\n".format(seq))
+
     def export_to_bedpe(self, svs, bedfile, ins_fasta, reset_file = True):
         '''
         Exports SVs changes to bedfile and foreign insertions to separate fasta file, uses target "blocks" to identify which subtype event is (INS, DUP, TRA, etc.)
@@ -97,41 +134,6 @@ class FormatterIO():
         ins_fasta: File location to export foreign insertions
         reset_file: True = delete any previous content in bed file, False = append
         '''
-        def write_to_file(sv, source_chr, source_s, source_e, target_chr, target_s, target_e, transform, symbol, event, order = 0):
-            assert (not event.symbol.startswith(Symbols.DIS_MARKING.value))
-            # consider insertions
-            if transform == Operations.INS.value:
-                transform_length = event.length
-            else:
-                transform_length = source_e - source_s
-
-            # do not write events of size 0
-            if event.length > 0:
-                with open(bedfile, "a") as fout:
-                    row = [str(source_chr),
-                            str(source_s),
-                            str(source_e + 1),
-                            str(target_chr),
-                            str(target_s),
-                            str(target_e + 1),
-                            transform,
-                            str(transform_length),
-                            str(int(sv.ishomozygous.value)) + "/1",
-                            sv.name,
-                            str(self.bedpe_counter),
-                            str(order)]
-
-                    fout.write("\t".join(row) + "\n")
-        def symbol_is_inversion(symbol):
-            return any(c.islower() for c in symbol)
-
-        def export_insertions(chr, start_pos, seq, ins_fasta):
-            '''
-            Exports foreign insertion sequences to separate fasta file, append only
-            '''
-            with open(ins_fasta, "a") as fout_ins:
-                fout_ins.write(">{}_{}\n".format(chr, start_pos))
-                fout_ins.write("{}\n".format(seq))
 
         if reset_file:
             utils.reset_file(bedfile)
@@ -152,7 +154,7 @@ class FormatterIO():
 
                     # duplication/inverted-duplications
                     if len(symbol) > 1 and symbol[1] == Symbols.DUP_MARKING.value:
-                        if symbol_is_inversion(symbol):
+                        if self.symbol_is_inversion(symbol):
                             event_name = Operations.INVDUP.value
                         else:
                             event_name = Operations.DUP.value
@@ -160,29 +162,29 @@ class FormatterIO():
                         if event.end != curr_pos or event.source_chr != curr_chr:
                             event_name = "d" + event_name
                         order += 1
-                        write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, event, order)
+                        self.write_to_file(sv, bedfile, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, event, order)
 
                     else:  # symbol is an original
                         # insertions
                         if symbol[0].upper() not in sv.source_unique_char:
                             order += 1
-                            write_to_file(sv, curr_chr, curr_pos, curr_pos, curr_chr, curr_pos, curr_pos, Operations.INS.value, event.symbol, event, order)
-                            export_insertions(curr_chr, curr_pos, event.source_frag, ins_fasta)   # foreign insertion sequences need to be exported separate from bed file
+                            self.write_to_file(sv, bedfile, curr_chr, curr_pos, curr_pos, curr_chr, curr_pos, curr_pos, Operations.INS.value, event.symbol, event, order)
+                            self.export_insertions(curr_chr, curr_pos, event.source_frag, ins_fasta)   # foreign insertion sequences need to be exported separate from bed file
 
                         # translocations - original symbol
                         elif len(symbol) == 1 and idx != event.original_block_idx:
                             order += 1
-                            if symbol_is_inversion(symbol):
+                            if self.symbol_is_inversion(symbol):
                                 event_name = Operations.INVTRA.value
                             else:
                                 event_name = Operations.TRA.value
-                            write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, event, order)
+                            self.write_to_file(sv, bedfile, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, event, order)
 
                         # inversions
-                        elif symbol_is_inversion(symbol):
+                        elif self.symbol_is_inversion(symbol):
                             order = 0
                             curr_pos = event.end       # this symbol was already in source
-                            write_to_file(sv, event.source_chr, event.start, event.end, curr_chr, event.start, event.end, Operations.INV.value, event.symbol, event, order)
+                            self.write_to_file(sv, bedfile, event.source_chr, event.start, event.end, curr_chr, event.start, event.end, Operations.INV.value, event.symbol, event, order)
 
                         # identity - original symbol did not change or move
                         else:
@@ -201,7 +203,7 @@ class FormatterIO():
                 if not symbol.startswith(Symbols.DIS_MARKING.value) and symbol not in target and symbol.lower() not in target:
                     event = encoding[symbol]
                     order = 0
-                    write_to_file(sv, event.source_chr, event.start, event.end, event.source_chr, event.start, event.start, Operations.DEL.value, event.symbol, event, order)
+                    self.write_to_file(sv, bedfile, event.source_chr, event.start, event.end, event.source_chr, event.start, event.start, Operations.DEL.value, event.symbol, event, order)
             self.bedpe_counter += 1
 
     def export_to_vcf(self, svs, stats, vcffile):
