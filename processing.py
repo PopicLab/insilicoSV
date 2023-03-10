@@ -115,9 +115,11 @@ class FormatterIO():
 
                 fout.write("\t".join(row) + "\n")
 
+    @staticmethod
     def symbol_is_inversion(symbol):
         return any(c.islower() for c in symbol)
 
+    @staticmethod
     def export_insertions(chr, start_pos, seq, ins_fasta):
         '''
         Exports foreign insertion sequences to separate fasta file, append only
