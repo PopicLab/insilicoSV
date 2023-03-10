@@ -409,9 +409,9 @@ class Event():
 
     def __repr__(self):
         return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end,
-                                    # "source_chr": self.source_chr,
-                                    "source_frag": self.source_frag if not self.symbol.startswith(Symbols.DIS_MARKING.value) else
-                                    'frag omitted',
+                                    "source_chr": self.source_chr,
+                                    # "source_frag": self.source_frag if not self.symbol.startswith(Symbols.DIS_MARKING.value) else
+                                    # 'frag omitted',
                                     "non_sv": self.non_sv})
 
 
