@@ -172,13 +172,13 @@ class FormatterIO():
                             self.export_insertions(curr_chr, curr_pos, event.source_frag, ins_fasta)   # foreign insertion sequences need to be exported separate from bed file
 
                         # translocations - original symbol
-                        elif len(symbol) == 1 and idx != event.original_block_idx:
-                            order += 1
-                            if self.symbol_is_inversion(symbol):
-                                event_name = Operations.INVTRA.value
-                            else:
-                                event_name = Operations.TRA.value
-                            self.write_to_file(sv, bedfile, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, event, order)
+                        # elif len(symbol) == 1 and idx != event.original_block_idx:
+                        #     order += 1
+                        #     if self.symbol_is_inversion(symbol):
+                        #         event_name = Operations.INVTRA.value
+                        #     else:
+                        #         event_name = Operations.TRA.value
+                        #     self.write_to_file(sv, bedfile, event.source_chr, event.start, event.end, curr_chr, curr_pos, curr_pos, event_name, event.symbol, event, order)
 
                         # inversions
                         elif self.symbol_is_inversion(symbol):
