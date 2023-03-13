@@ -160,17 +160,17 @@ class FormatterIO():
         # sv, bedfile, source_s, source_e, target_s, target_e, transform, symbol, event, order = 0
         for sv in svs:
             # create target events dict for lookup of corresponding source/target events within SV
-            # target_events_dict = sv.sv_blocks.target_events_dict
             # SVs with multiple source events will be split into multiple bed records (one for each)
             if len(sv.events_dict) < 2:
-                # simple DEL
-                if len(sv.events_dict) == 1:
+                # simple events
+                if len(sv.events_dict) == 1 and len(sv.sv_blocks.target_events_dict) == 0:
+                    # DEL/DUP/INV; getting operation using symbol logic in composite event helper fn
                     ev = list(sv.events_dict.values())[0]
-                    op = Operations.DEL.value
-                # simple INS
+                    op = self.get_composite_sv_event_info(ev, sv.sv_blocks.target_events_dict, sv.events_dict)[1]
                 else:
+                    # simple INS
                     ev = list(sv.sv_blocks.target_events_dict.values())[0]
-                    op = Operations.INS.value
+                    op = Operations.UNDEFINED.value
                 record_info = {'source_s': ev.start,
                                'source_e': ev.end,
                                'target_s': ev.start,
