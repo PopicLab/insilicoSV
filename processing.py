@@ -102,10 +102,10 @@ class FormatterIO():
             with open(bedfile, "a") as fout:
                 row = [str(event.source_chr),
                        str(source_s),
-                       str(source_e + 1),
+                       str(source_e),
                        str(event.source_chr),
                        str(target_s),
-                       str(target_e + 1),
+                       str(target_e),
                        transform,
                        str(transform_length),
                        str(int(sv.ishomozygous.value)) + "/1",
@@ -186,6 +186,9 @@ class FormatterIO():
                 # --> dict keyed on source symbol with values giving source and target intervals
                 sv_record_info = {}
                 for ev in sv.events_dict.values():
+                    # skip dispersion events
+                    if ev.symbol.startswith(Symbols.DIS_MARKING.value):
+                        continue
                     # --> target intvl and transform will be determined in each of the specific cases of how the
                     # --> source event is mapped into the target
                     sv_record_info[ev] = {'source_s': ev.start, 'source_e': ev.end,
