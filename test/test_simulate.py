@@ -334,7 +334,7 @@ class TestSVSimulator(unittest.TestCase):
         config = config_event_obj
         config.initialize_files()
         curr_sim = SV_Simulator(config.ref, config.par)
-        self.assertEqual(curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed), True)
+        self.assertEqual(curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False), True)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         config.remove_test_files()
         print(f'changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
@@ -359,7 +359,7 @@ class TestSVSimulator(unittest.TestCase):
         config = self.test_objects_simple_inss[0]
         config.initialize_files()
         curr_sim = SV_Simulator(config.ref, config.par)
-        self.assertEqual(curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed), True)
+        self.assertEqual(curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False), True)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         config.remove_test_files()
         print(f'changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
@@ -397,7 +397,7 @@ class TestSVSimulator(unittest.TestCase):
         config = self.test_dispersion_objects[0]
         config.initialize_files()
         curr_sim = SV_Simulator(config.ref, config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         # same output for fwd and bkw TRA
         self.assertEqual('TC' in [changed_frag_1, changed_frag_2], True)
@@ -406,7 +406,7 @@ class TestSVSimulator(unittest.TestCase):
         config = self.test_dispersion_objects[1]
         config.initialize_files()
         curr_sim = SV_Simulator(config.ref, config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         if not curr_sim.svs[0].dispersion_flip:
             self.assertEqual('CTC' in [changed_frag_1, changed_frag_2], True)
@@ -417,7 +417,7 @@ class TestSVSimulator(unittest.TestCase):
         config = self.test_dispersion_objects[2]
         config.initialize_files()
         curr_sim = SV_Simulator(config.ref, config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         if not curr_sim.svs[0].dispersion_flip:
             self.assertEqual('CTG' in [changed_frag_1, changed_frag_2], True)
@@ -428,7 +428,7 @@ class TestSVSimulator(unittest.TestCase):
         config = self.test_dispersion_objects[3]
         config.initialize_files()
         curr_sim = SV_Simulator(config.ref, config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         print(f'[dDUP_iDEL] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
         if not curr_sim.svs[0].dispersion_flip:
@@ -439,7 +439,7 @@ class TestSVSimulator(unittest.TestCase):
         config = self.test_dispersion_objects[4]
         config.initialize_files()
         curr_sim = SV_Simulator(config.ref, config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         print(f'[INS_iDEL] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
         if not curr_sim.svs[0].dispersion_flip:
@@ -458,7 +458,7 @@ class TestSVSimulator(unittest.TestCase):
             config = self.test_objects_repeatmasker_simple[i]
             config.initialize_files()
             curr_sim = SV_Simulator(config.ref, config.par)
-            curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+            curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
             changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
             print(f'[{type}] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
             if type == 'DEL':
@@ -478,7 +478,7 @@ class TestSVSimulator(unittest.TestCase):
         config = self.test_objects_divergence_event[0]
         config.initialize_files()
         curr_sim = SV_Simulator(config.ref, config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         self.assertEqual(changed_frag_1 not in config.ref or changed_frag_2 not in config.ref, True)
 
@@ -494,7 +494,7 @@ class TestSVSimulator(unittest.TestCase):
             config = self.test_objects_no_dis[i + 5]
             config.initialize_files()
             curr_sim = SV_Simulator(config.ref, config.par)
-            curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+            curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
             changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
             print(f'[{type}] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
             self.assertEqual(targets[type] in [changed_frag_1, changed_frag_2], True)
@@ -508,7 +508,7 @@ class TestSVSimulator(unittest.TestCase):
             config = self.test_objects_no_dis[i + 9]
             config.initialize_files()
             curr_sim = SV_Simulator(config.ref, config.par)
-            curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+            curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
             changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
             print(f'[{type}] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
             self.assertEqual(targets[type] in [changed_frag_1, changed_frag_2], True)
@@ -519,7 +519,7 @@ class TestSVSimulator(unittest.TestCase):
         config = self.test_objects_no_dis[11]
         config.initialize_files()
         curr_sim = SV_Simulator(config.ref, config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         print(f'[INVdup] changed_frag_1 = {changed_frag_1}; changed_frag_2 = {changed_frag_2}')
         self.assertEqual('ACGACG' in [changed_frag_1, changed_frag_2], True)

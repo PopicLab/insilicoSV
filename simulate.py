@@ -281,7 +281,7 @@ class SV_Simulator():
             self.process_vcf(self.vcf_path)
 
     def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta, bedfile, stats_file=None, initial_reset=True,
-                               random_gen=random, verbose=False):
+                               random_gen=random, verbose=False, export_to_file=True):
         '''
         initial_reset: boolean to indicate if output file should be overwritten (True) or appended to (False)
         random_gen: only relevant in testing
@@ -335,16 +335,10 @@ class SV_Simulator():
                 print("ID {} exported to fasta file {} in {} seconds".format(id, fasta_out, time.time() - time_start))
                 time_start = time.time()
 
-        # export variant data to BED file
-        self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file=initial_reset)
-        # debug
-        # print('-----ACTIVE SVS-----')
-        # for sv in active_svs:
-        #     print(f'sv = {sv}')
-        #     print(f'sv.events_dict: {sv.events_dict}')
-        #     print(f'sv.source_blocks: {sv.source_symbol_blocks}')
-        #     print(f'sv.target_blocks: {sv.target_symbol_blocks}')
-        self.formatter.export_to_vcf(active_svs, self.stats, vcffile=bedfile[:-4]+'.vcf')
+        # export variant data to BED/VCF file
+        if export_to_file:
+            self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta, reset_file=initial_reset)
+            self.formatter.export_to_vcf(active_svs, self.stats, vcffile=bedfile[:-4]+'.vcf')
 
         # create and export stats file
         if stats_file:
