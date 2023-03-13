@@ -145,8 +145,8 @@ class FormatterIO():
             trg_sym = ev.lower()
             return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.INV.value
         # A -> A* (in the case of a custom event in which an event is divergently duplicated)
-        elif ev + Symbols.DIV_MARKING in target_events_dict.keys():
-            trg_sym = ev + Symbols.DIV_MARKING
+        elif ev + Symbols.DIV_MARKING.value in target_events_dict.keys():
+            trg_sym = ev + Symbols.DIV_MARKING.value
             return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.DIV.value
         # otherwise unknown mapping
         else:
