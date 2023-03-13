@@ -150,9 +150,10 @@ class FormatterIO():
         elif ev + Symbols.DIV_MARKING.value in target_events_dict.keys():
             trg_sym = ev + Symbols.DIV_MARKING.value
             return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.DIV.value
-        # A -> A
+        # A -> A (insertion if source A is undefined, identity otherwise)
         elif ev in target_events_dict.keys():
-            return (target_events_dict[ev].start, target_events_dict[ev].end), Operations.IDENTITY.value
+            return (target_events_dict[ev].start, target_events_dict[ev].end), \
+                Operations.INS.value if source_events_dict[ev].start is None else Operations.IDENTITY.value
         # A -> [none]
         elif ev not in [sym[0] for sym in target_events_dict.keys()]:
             return (source_events_dict[ev].start, source_events_dict[ev].end), Operations.DEL.value
@@ -169,16 +170,10 @@ class FormatterIO():
         for sv in svs:
             # create target events dict for lookup of corresponding source/target events within SV
             # SVs with multiple source events will be split into multiple bed records (one for each)
-            if len(sv.events_dict) < 2:
-                # simple events
-                if len(sv.events_dict) == 1:
-                    # DEL/DUP/INV; getting operation using symbol logic in composite event helper fn
-                    ev = list(sv.events_dict.values())[0]
-                    op = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)[1]
-                else:
-                    # simple INS
-                    ev = list(sv.sv_blocks.target_events_dict.values())[0]
-                    op = Operations.INS.value
+            if len(sv.events_dict) == 1:
+                # DEL/DUP/INV/INS; getting operation using symbol logic in composite event helper fn
+                ev = list(sv.events_dict.values())[0]
+                op = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)[1]
                 record_info = {'source_s': ev.start, 'source_e': ev.end, 'target_s': ev.start, 'target_e': ev.end,
                                'transform': op, 'sv': sv, 'event': ev, 'bedfile': bedfile}
                 # debug
