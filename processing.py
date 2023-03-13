@@ -185,12 +185,12 @@ class FormatterIO():
                 # and target intervals taken from corresponding target events (if no match, then deletion)
                 # --> dict keyed on source symbol with values giving source and target intervals
                 sv_record_info = {}
-                for ev in sv.events_dict.keys():
+                for ev in sv.events_dict.values():
                     # --> target intvl and transform will be determined in each of the specific cases of how the
                     # --> source event is mapped into the target
-                    sv_record_info[ev] = {'source_s': sv.events_dict[ev].start, 'source_e': sv.events_dict[ev].end,
+                    sv_record_info[ev] = {'source_s': ev.start, 'source_e': ev.end,
                                           'sv': sv, 'event': ev, 'bedfile': bedfile}
-                    (target_s, target_e), operation = self.get_event_target_operation(ev, sv.sv_blocks.target_events_dict, sv.events_dict)
+                    (target_s, target_e), operation = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)
                     sv_record_info[ev]['target_s'] = target_s
                     sv_record_info[ev]['target_e'] = target_e
                     sv_record_info[ev]['transform'] = operation
