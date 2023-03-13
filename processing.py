@@ -211,7 +211,7 @@ class FormatterIO():
                         sv_record_info[ev]['target_e'] = sv.events_dict[ev].end
                         sv_record_info[ev]['transform'] = Operations.DEL.value
                 # --> write bed records from interval_dict contents in the order of source interval start
-                for param_dict in sorted([params for params in sv_record_info.values()], key=lambda params: params.source_s):
+                for param_dict in sorted([params for params in sv_record_info.values()], key=lambda params: params['source_s']):
                     self.write_to_file(**param_dict)
 
     def export_to_bedpe_OLD(self, svs, bedfile, ins_fasta, reset_file = True):
