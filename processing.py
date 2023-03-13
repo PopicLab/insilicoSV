@@ -132,6 +132,8 @@ class FormatterIO():
     def get_composite_sv_event_info(ev, target_events_dict, source_events_dict):
         # helper function to return target_intvl and operation for multi-source events
         # need to enumerate the possible modifications to set the right operation
+        # debug
+        print(f'ev = {ev}\ntarget_events_dict = {target_events_dict}\nsource_events_dict = {source_events_dict}')
         # A -> A'
         if ev + Symbols.DUP_MARKING.value in target_events_dict.keys():
             trg_sym = ev + Symbols.DUP_MARKING.value
