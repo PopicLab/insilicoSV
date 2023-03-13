@@ -134,10 +134,11 @@ class FormatterIO():
         # need to enumerate the possible modifications to set the right operation
         # debug
         print(f'ev = {ev}\ntarget_events_dict = {target_events_dict}\nsource_events_dict = {source_events_dict}')
-        # A -> A'
+        # A -> A' (duplication if A is still in the target, translocation if A' replaces A)
         if ev + Symbols.DUP_MARKING.value in target_events_dict.keys():
             trg_sym = ev + Symbols.DUP_MARKING.value
-            return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.DUP.value
+            return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), \
+                   Operations.DUP.value if ev in target_events_dict.keys() else Operations.TRA.value
         # A -> a'
         elif ev.lower() + Symbols.DUP_MARKING.value in target_events_dict.keys():
             trg_sym = ev.lower() + Symbols.DUP_MARKING.value
