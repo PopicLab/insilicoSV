@@ -160,7 +160,7 @@ class FormatterIO():
         # sv, bedfile, source_s, source_e, target_s, target_e, transform, symbol, event, order = 0
         for sv in svs:
             # create target events dict for lookup of corresponding source/target events within SV
-            target_events_dict = sv.sv_blocks.target_events_dict()
+            # target_events_dict = sv.sv_blocks.target_events_dict
             # SVs with multiple source events will be split into multiple bed records (one for each)
             if len(sv.events_dict) < 2:
                 # simple DEL
@@ -169,7 +169,7 @@ class FormatterIO():
                     op = Operations.DEL.value
                 # simple INS
                 else:
-                    ev = list(target_events_dict.values())[0]
+                    ev = list(sv.sv_blocks.target_events_dict.values())[0]
                     op = Operations.INS.value
                 record_info = {'source_s': ev.start,
                                'source_e': ev.end,
@@ -195,13 +195,13 @@ class FormatterIO():
                                           'event': ev,
                                           'bedfile': bedfile}
                     # source event appears unaltered in target: identity subevent
-                    if ev in target_events_dict.keys():
-                        sv_record_info[ev]['target_s'] = target_events_dict[ev].start
-                        sv_record_info[ev]['target_e'] = target_events_dict[ev].end
+                    if ev in sv.sv_blocks.target_events_dict.keys():
+                        sv_record_info[ev]['target_s'] = sv.sv_blocks.target_events_dict[ev].start
+                        sv_record_info[ev]['target_e'] = sv.sv_blocks.target_events_dict[ev].end
                         sv_record_info[ev]['transform'] = Operations.IDENTITY.value
                     # source event appears altered in target: dup, inv, etc.
-                    elif ev in [sym[0].upper() for sym in target_events_dict.keys()]:
-                        (target_s, target_e), operation = self.get_composite_sv_event_info(ev, target_events_dict, sv.events_dict)
+                    elif ev in [sym[0].upper() for sym in sv.sv_blocks.target_events_dict.keys()]:
+                        (target_s, target_e), operation = self.get_composite_sv_event_info(ev, sv.sv_blocks.target_events_dict, sv.events_dict)
                         sv_record_info[ev]['target_s'] = target_s
                         sv_record_info[ev]['target_e'] = target_e
                         sv_record_info[ev]['transform'] = operation
