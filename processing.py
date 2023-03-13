@@ -171,7 +171,7 @@ class FormatterIO():
             # SVs with multiple source events will be split into multiple bed records (one for each)
             if len(sv.events_dict) < 2:
                 # simple events
-                if len(sv.events_dict) == 1 and len(sv.sv_blocks.target_events_dict) == 0:
+                if len(sv.events_dict) == 1:
                     # DEL/DUP/INV; getting operation using symbol logic in composite event helper fn
                     ev = list(sv.events_dict.values())[0]
                     op = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)[1]
