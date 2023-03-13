@@ -161,7 +161,7 @@ class FormatterIO():
             target_operation_tuples.append(((target_events_dict[ev].start, target_events_dict[ev].end),
                                             Operations.INS.value if source_events_dict[ev].start is None else Operations.IDENTITY.value))
         # A -> [none]
-        if ev not in [sym[0] for sym in target_events_dict.keys()]:
+        if ev.low() not in [sym[0].lower() for sym in target_events_dict.keys()]:
             target_operation_tuples.append(((source_events_dict[ev].start, source_events_dict[ev].end),
                                             Operations.DEL.value))
         # otherwise unknown mapping
