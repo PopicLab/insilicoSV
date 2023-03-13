@@ -310,9 +310,6 @@ class FormatterIO():
             if sv.type in DISPERSION_TYPES:
                 # --> going to read the source and target intervals off the start/end positions of the events dict
                 source_event = sv.events_dict['A']
-                # special case: dDUP/INS_iDEL in flipped orientation (result: 'B' event placed before 'A')
-                if 'B' in sv.events_dict.keys() and sv.events_dict['B'].start < sv.events_dict['A'].start:
-                    source_event = sv.events_dict['B']
                 disp_event = sv.events_dict['_1']
                 rec_start = source_event.start
                 rec_end = source_event.end
