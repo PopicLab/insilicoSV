@@ -160,7 +160,7 @@ class FormatterIO():
         # sv, bedfile, source_s, source_e, target_s, target_e, transform, symbol, event, order = 0
         for sv in svs:
             # create target events dict for lookup of corresponding source/target events within SV
-            target_events_dict = sv.target_symbol_blocks.generate_target_events_dict()
+            target_events_dict = sv.sv_blocks.target_events_dict()
             # SVs with multiple source events will be split into multiple bed records (one for each)
             if len(sv.events_dict) < 2:
                 # simple DEL

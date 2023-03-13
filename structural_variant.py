@@ -60,11 +60,11 @@ class Structural_Variant():
             # ** method -- better practice to have a fixed mode initialization method here that we'll feed the vcf record to?
             self.initialize_events_fixed(vcf_rec, ref_fasta)
 
-        sv_blocks = Blocks(self)
+        self.sv_blocks = Blocks(self)
         # debug
         # print(f'==== sv_blocks object ====\n{sv_blocks}')
-        self.source_symbol_blocks = sv_blocks.source_blocks
-        self.target_symbol_blocks = sv_blocks.target_blocks
+        self.source_symbol_blocks = self.sv_blocks.source_blocks
+        self.target_symbol_blocks = self.sv_blocks.target_blocks
 
         if mode == 'randomized':
             # specifies if sv is unable to be simulated due to random placement issues
@@ -310,6 +310,9 @@ class Structural_Variant():
                     source_event = self.events_dict[ev.symbol[0].upper()]
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
 
+        # locations of target events are assigned, can populate target_events_dict
+        self.sv_blocks.generate_target_events_dict()
+
         # debug
         print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
         for bl in self.target_symbol_blocks:
@@ -428,7 +431,8 @@ class Blocks():
         if self.sv.type in DISPERSION_TYPES \
                 and self.sv.dispersion_flip:
             self.flip_blocks()
-        self.track_original_symbol()
+        # self.track_original_symbol()
+        self.target_events_dict = None
 
     def generate_blocks(self):
         self.source_blocks = self.find_blocks(self.sv.source_unique_char)
@@ -468,8 +472,10 @@ class Blocks():
         self.target_blocks = self.target_blocks[::-1]
 
     def generate_target_events_dict(self):
-        # fn to generate an events dict from target blocks
-        return {ev.symbol: ev for b in self.target_blocks for ev in b}
+        # setter for target_events_dict attribute (to be populated after location assignment of target events)
+        self.target_events_dict = {ev.symbol: ev for b in self.target_blocks for ev in b}
+        # debug
+        print(f'set sv_blocks.target_events_dict: {self.target_events_dict}')
 
     # TODO: delete -- not used (or shouldn't be anymore)
     def track_original_symbol(self):
