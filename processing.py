@@ -129,7 +129,7 @@ class FormatterIO():
             fout_ins.write("{}\n".format(seq))
 
     @staticmethod
-    def get_composite_sv_event_info(ev, target_events_dict, source_events_dict):
+    def get_event_target_operation(ev, target_events_dict, source_events_dict):
         # helper function to return target_intvl and operation for multi-source events
         # need to enumerate the possible modifications to set the right operation
         # debug
@@ -150,6 +150,12 @@ class FormatterIO():
         elif ev + Symbols.DIV_MARKING.value in target_events_dict.keys():
             trg_sym = ev + Symbols.DIV_MARKING.value
             return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.DIV.value
+        # A -> A
+        elif ev in target_events_dict.keys():
+            return (target_events_dict[ev].start, target_events_dict[ev].end), Operations.IDENTITY.value
+        # A -> [none]
+        elif ev not in [sym[0] for sym in target_events_dict.keys()]:
+            return (source_events_dict[ev].start, source_events_dict[ev].end), Operations.DEL.value
         # otherwise unknown mapping
         else:
             return (source_events_dict[ev].start, source_events_dict[ev].end), Operations.UNDEFINED.value
@@ -168,19 +174,13 @@ class FormatterIO():
                 if len(sv.events_dict) == 1 and len(sv.sv_blocks.target_events_dict) == 0:
                     # DEL/DUP/INV; getting operation using symbol logic in composite event helper fn
                     ev = list(sv.events_dict.values())[0]
-                    op = self.get_composite_sv_event_info(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)[1]
+                    op = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)[1]
                 else:
                     # simple INS
                     ev = list(sv.sv_blocks.target_events_dict.values())[0]
-                    op = Operations.UNDEFINED.value
-                record_info = {'source_s': ev.start,
-                               'source_e': ev.end,
-                               'target_s': ev.start,
-                               'target_e': ev.end,
-                               'transform': op,
-                               'sv': sv,
-                               'event': ev,
-                               'bedfile': bedfile}
+                    op = Operations.INS.value
+                record_info = {'source_s': ev.start, 'source_e': ev.end, 'target_s': ev.start, 'target_e': ev.end,
+                               'transform': op, 'sv': sv, 'event': ev, 'bedfile': bedfile}
                 # debug
                 print(f'bedpe record info for {sv.type}: {record_info}')
                 self.write_to_file(**record_info)
@@ -193,27 +193,12 @@ class FormatterIO():
                 for ev in sv.events_dict.keys():
                     # --> target intvl and transform will be determined in each of the specific cases of how the
                     # --> source event is mapped into the target
-                    sv_record_info[ev] = {'source_s': sv.events_dict[ev].start,
-                                          'source_e': sv.events_dict[ev].end,
-                                          'sv': sv,
-                                          'event': ev,
-                                          'bedfile': bedfile}
-                    # source event appears unaltered in target: identity subevent
-                    if ev in sv.sv_blocks.target_events_dict.keys():
-                        sv_record_info[ev]['target_s'] = sv.sv_blocks.target_events_dict[ev].start
-                        sv_record_info[ev]['target_e'] = sv.sv_blocks.target_events_dict[ev].end
-                        sv_record_info[ev]['transform'] = Operations.IDENTITY.value
-                    # source event appears altered in target: dup, inv, etc.
-                    elif ev in [sym[0].upper() for sym in sv.sv_blocks.target_events_dict.keys()]:
-                        (target_s, target_e), operation = self.get_composite_sv_event_info(ev, sv.sv_blocks.target_events_dict, sv.events_dict)
-                        sv_record_info[ev]['target_s'] = target_s
-                        sv_record_info[ev]['target_e'] = target_e
-                        sv_record_info[ev]['transform'] = operation
-                    # source event doesn't appear in any form in target events (deletion)
-                    else:
-                        sv_record_info[ev]['target_s'] = sv.events_dict[ev].start
-                        sv_record_info[ev]['target_e'] = sv.events_dict[ev].end
-                        sv_record_info[ev]['transform'] = Operations.DEL.value
+                    sv_record_info[ev] = {'source_s': sv.events_dict[ev].start, 'source_e': sv.events_dict[ev].end,
+                                          'sv': sv, 'event': ev, 'bedfile': bedfile}
+                    (target_s, target_e), operation = self.get_event_target_operation(ev, sv.sv_blocks.target_events_dict, sv.events_dict)
+                    sv_record_info[ev]['target_s'] = target_s
+                    sv_record_info[ev]['target_e'] = target_e
+                    sv_record_info[ev]['transform'] = operation
                 # --> write bed records from interval_dict contents in the order of source interval start
                 for param_dict in sorted([params for params in sv_record_info.values()], key=lambda params: params['source_s']):
                     self.write_to_file(**param_dict)
