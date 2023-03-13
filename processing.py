@@ -168,7 +168,7 @@ class FormatterIO():
         if len(target_operation_tuples) == 0:
             target_operation_tuples.append(((source_events_dict[ev].start, source_events_dict[ev].end),
                                             Operations.UNDEFINED.value))
-        return target_operation_tuples
+        return list(set(target_operation_tuples))
 
     def export_to_bedpe(self, svs, bedfile, ins_fasta, reset_file=True):
         if reset_file:
