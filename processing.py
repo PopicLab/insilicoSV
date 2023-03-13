@@ -166,7 +166,7 @@ class FormatterIO():
                 if len(sv.events_dict) == 1 and len(sv.sv_blocks.target_events_dict) == 0:
                     # DEL/DUP/INV; getting operation using symbol logic in composite event helper fn
                     ev = list(sv.events_dict.values())[0]
-                    op = self.get_composite_sv_event_info(ev, sv.sv_blocks.target_events_dict, sv.events_dict)[1]
+                    op = self.get_composite_sv_event_info(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)[1]
                 else:
                     # simple INS
                     ev = list(sv.sv_blocks.target_events_dict.values())[0]
