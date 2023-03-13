@@ -261,6 +261,7 @@ class Structural_Variant():
         # (now that we're flipping the sv.source_events list for flipped-dispersion events)
         for block in self.target_symbol_blocks:
             for ev in block:
+                ev.source_chr = self.start_chr
                 # if the event is one also found in the source, place it at the location given in events_dict
                 # --> the events that stay the same will need to be in the same place in both input and output ref
                 if ev.symbol.upper() in self.events_dict.keys():
