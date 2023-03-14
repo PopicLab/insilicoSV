@@ -476,8 +476,6 @@ class Blocks():
     def generate_target_events_dict(self):
         # setter for target_events_dict attribute (to be populated after location assignment of target events)
         self.target_events_dict = {ev.symbol: ev for b in self.target_blocks for ev in b}
-        # debug
-        print(f'set sv_blocks.target_events_dict: {self.target_events_dict}')
 
     # TODO: delete -- not used (or shouldn't be anymore)
     def track_original_symbol(self):

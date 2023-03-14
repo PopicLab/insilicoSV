@@ -133,7 +133,7 @@ class FormatterIO():
         # helper function to return target_intvl and operation for multi-source events
         # need to enumerate the possible modifications to set the right operation
         # debug
-        print(f'ev = {ev}\ntarget_events_dict = {target_events_dict}\nsource_events_dict = {source_events_dict}')
+        # print(f'ev = {ev}\ntarget_events_dict = {target_events_dict}\nsource_events_dict = {source_events_dict}')
         # A -> A'
         if ev + Symbols.DUP_MARKING.value in target_events_dict.keys():
             trg_sym = ev + Symbols.DUP_MARKING.value
@@ -161,10 +161,13 @@ class FormatterIO():
         else:
             return (source_events_dict[ev].start, source_events_dict[ev].end), Operations.UNDEFINED.value
 
-    def export_to_bedpe(self, svs, bedfile, ins_fasta, reset_file=True):
+    # TODO:
+    #  add ins_fasta parameter
+    #  add order logic for complex events
+    def export_to_bedpe(self, svs, bedfile, reset_file=True):
         if reset_file:
             utils.reset_file(bedfile)
-            utils.reset_file(ins_fasta)
+            # utils.reset_file(ins_fasta)
         for sv in svs:
             # SVs with multiple source events will be split into multiple bed records (one for each)
             if len(sv.events_dict) == 1:
