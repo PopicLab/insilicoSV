@@ -173,11 +173,11 @@ class Structural_Variant():
 
         self.req_space = sum([event.length for event in self.source_events])
 
-        # debug
-        print('END OF INITIALIZE_EVENTS')
-        print('sv.events_dict:')
-        for ev in self.events_dict.keys():
-            print(self.events_dict[ev])
+        # # debug
+        # print('END OF INITIALIZE_EVENTS')
+        # print('sv.events_dict:')
+        # for ev in self.events_dict.keys():
+        #     print(self.events_dict[ev])
 
     def initialize_events_fixed(self, vcf_record, ref_fasta):
         """
@@ -249,13 +249,13 @@ class Structural_Variant():
         a valid start position (since that needs access to the max_tries setting from the config), but going to invoke
         this method to actually modify the target_blocks' events objects to set the start/end positions
         """
-        # debug
-        print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
-        for bl in self.target_symbol_blocks:
-            print(bl)
-        print('events_dict:')
-        for ev in self.events_dict.keys():
-            print(self.events_dict[ev])
+        # # debug
+        # print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
+        # for bl in self.target_symbol_blocks:
+        #     print(bl)
+        # print('events_dict:')
+        # for ev in self.events_dict.keys():
+        #     print(self.events_dict[ev])
 
         # Trying logic based on the position assignment of source events in choose_rand_pos()
         # (now that we're flipping the sv.source_events list for flipped-dispersion events)
@@ -314,10 +314,11 @@ class Structural_Variant():
         # locations of target events are assigned, can populate target_events_dict
         self.sv_blocks.generate_target_events_dict()
 
-        # debug
-        print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
-        for bl in self.target_symbol_blocks:
-            print(bl)
+        # # debug
+        # print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
+        # for bl in self.target_symbol_blocks:
+        #     print(bl)
+        print(f'target_events_dict = {self.sv_blocks.target_events_dict}\nsource_events_dict = {self.events_dict}')
 
     def change_fragment(self):
         '''
@@ -329,13 +330,13 @@ class Structural_Variant():
         block_start = None
         block_end = None
 
-        # debug
-        print('===CHANGE_FRAGMENT===')
-        print('(before exec)')
-        print('sv.events_dict:')
-        for ev in self.events_dict.keys():
-            print(self.events_dict[ev])
-        print(f'target blocks = {self.target_symbol_blocks}')
+        # # debug
+        # print('===CHANGE_FRAGMENT===')
+        # print('(before exec)')
+        # print('sv.events_dict:')
+        # for ev in self.events_dict.keys():
+        #     print(self.events_dict[ev])
+        # print(f'target blocks = {self.target_symbol_blocks}')
         # special case: simple deletion -- len(target_symbol_blocks) == 0
         if self.target_symbol_blocks == [[]]:
             changed_fragments.append([self.start_chr, self.start, self.end, ''])
@@ -377,9 +378,9 @@ class Structural_Variant():
                     changed_fragments.append([del_ev.source_chr, del_ev.start, del_ev.end, ''])
 
         self.changed_fragments = changed_fragments
-        # debug
-        print('(after exec)')
-        print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
+        # # debug
+        # print('(after exec)')
+        # print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
         self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
         # return changed_fragments
 
