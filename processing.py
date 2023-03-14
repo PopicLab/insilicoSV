@@ -29,6 +29,9 @@ class Config():
                 if isinstance(config_sv["min_length"], int):
                     config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
                 else:
+                    # debug -- this is parsing incorrectly in the case of multiple min/max lengths given
+                    print('config_sv.min_length = ' + str(config_sv['min_length']))
+                    print('config_sv.max_length = ' + str(config_sv['max_length']))
                     config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
                 # make sure max_length >= min_length >= 0
                 assert all(max_len >= min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
@@ -83,6 +86,8 @@ class FormatterIO():
     def yaml_to_var_list(self):
         try:
             config_entries = yaml.full_load(open(self.par_file))
+            # debug
+            print(f'config_entries = {config_entries}')
         except:
             raise Exception("YAML File {} failed to be open".format(self.par_file))
 
