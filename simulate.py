@@ -192,6 +192,10 @@ class SV_Simulator():
         if check_size != None and self.sim_settings["filter_small_chr"]:
             # allow for chromosome size being equal to check size
             valid_chrs = [chr for chr, chr_size in self.len_dict.items() if chr_size >= check_size]
+            # debug
+            print(f'check_size = {check_size}')
+            print(f'len_dict = {self.len_dict}')
+            print(f'valid_chrs = {valid_chrs}')
         if len(valid_chrs) == 0:
             raise Exception("SVs are too big for the reference!")
 
