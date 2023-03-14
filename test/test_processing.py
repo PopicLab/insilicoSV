@@ -5,6 +5,7 @@ from pysam import FastaFile
 import unittest
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -39,24 +40,53 @@ class TestProcessing(unittest.TestCase):
         self.bed = "test/inputs/out.bed"
         self.vcf = "test/inputs/out.vcf"
 
-        self.test_objects_simple_events = {'DEL': TestProcObject([self.ref_file, {"chr19": "CTC"}],
+        self.test_objects_simple_events = {'DEL': TestProcObject([self.ref_file, {"chr19": "CTG"}],
                                                                  [self.par, {"sim_settings": {"prioritize_top": True},
                                                                              "SVs": [{"type": "DEL", "number": 1,
                                                                                       "max_length": 3,
                                                                                       "min_length": 3}]}],
                                                                  self.hap1, self.hap2, self.bed, self.vcf),
-                                           'DUP': TestProcObject([self.ref_file, {"chr19": "CTC"}],
+                                           'DUP': TestProcObject([self.ref_file, {"chr19": "CTG"}],
                                                                  [self.par, {"sim_settings": {"prioritize_top": True},
                                                                              "SVs": [{"type": "DUP", "number": 1,
                                                                                       "max_length": 3,
                                                                                       "min_length": 3}]}],
                                                                  self.hap1, self.hap2, self.bed, self.vcf),
-                                           'INV': TestProcObject([self.ref_file, {"chr19": "CTC"}],
+                                           'INV': TestProcObject([self.ref_file, {"chr19": "CTG"}],
                                                                  [self.par, {"sim_settings": {"prioritize_top": True},
                                                                              "SVs": [{"type": "INV", "number": 1,
                                                                                       "max_length": 3,
                                                                                       "min_length": 3}]}],
                                                                  self.hap1, self.hap2, self.bed, self.vcf)}
+        self.test_objects_flanked_inversions = {'dupINVdup': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
+                                                                            [self.par,
+                                                                             {"sim_settings": {"prioritize_top": True},
+                                                                              "SVs": [{"type": "dupINVdup", "number": 1,
+                                                                                       "max_length": {2, 2, 2},
+                                                                                       "min_length": {2, 2, 2}}]}],
+                                                                            self.hap1, self.hap2, self.bed, self.vcf),
+                                                'delINVdel': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
+                                                                            [self.par,
+                                                                             {"sim_settings": {"prioritize_top": True},
+                                                                              "SVs": [{"type": "delINVdel", "number": 1,
+                                                                                       "max_length": {2, 2, 2},
+                                                                                       "min_length": {2, 2, 2}}]}],
+                                                                            self.hap1, self.hap2, self.bed, self.vcf),
+                                                'dupINVdel': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
+                                                                            [self.par,
+                                                                             {"sim_settings": {"prioritize_top": True},
+                                                                              "SVs": [{"type": "dupINVdel", "number": 1,
+                                                                                       "max_length": {2, 2, 2},
+                                                                                       "min_length": {2, 2, 2}}]}],
+                                                                            self.hap1, self.hap2, self.bed, self.vcf),
+                                                'delINVdup': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
+                                                                            [self.par,
+                                                                             {"sim_settings": {"prioritize_top": True},
+                                                                              "SVs": [{"type": "delINVdup", "number": 1,
+                                                                                       "max_length": {2, 2, 2},
+                                                                                       "min_length": {2, 2, 2}}]}],
+                                                                            self.hap1, self.hap2, self.bed, self.vcf)
+                                                }
 
         self.formatter = FormatterIO(self.par)
 
@@ -73,6 +103,54 @@ class TestProcessing(unittest.TestCase):
             self.assertTrue(record['source_e'] == record['target_e'] == '3')
             self.assertTrue(record['ev_type'] == record['parent_type'] == ev_type)
             self.assertTrue(record['len'] == '3')
+
+    def test_export_bedpe_flanked_inversions(self):
+        for ev_type in ['dupINVdup', 'delINVdel', 'dupINVdel', 'delINVdup']:
+            config = self.test_objects_flanked_inversions[ev_type]
+            config.initialize_files()
+            curr_sim = SV_Simulator(config.ref, config.par)
+            curr_sim.apply_transformations(FastaFile(curr_sim.ref_file))
+            self.formatter.export_to_bedpe(curr_sim.svs, self.bed)
+            records = config.extract_bed_records()
+            # checks of record fields that will be consistent across all four types
+            self.assertTrue(all([record['source_chr'] == record['target_chr'] == 'chr19' for record in records]))
+            self.assertTrue(all([record['parent_type'] == ev_type for record in records]))
+            self.assertTrue(all([record['len'] == '2' for record in records]))
+            self.assertTrue(records[0]['zyg'] == records[1]['zyg'] == records[2]['zyg'])
+            for i in range(2):
+                # example events set such that the source events must be placed at positions 0,2,4
+                self.assertTrue(records[i]['source_s'] == str(2 * i) and records[i]['source_e'] == str(2 * i + 2))
+            # type-wise checks for breakdown under fixed example event
+            if ev_type == 'dupINVdup':
+                self.assertTrue(records[0]['target_s'] == records[0]['target_e'] == '4')
+                self.assertTrue(records[0]['ev_type'] == 'INVDUP')
+                self.assertTrue(records[1]['target_s'] == '2')
+                self.assertTrue(records[1]['target_e'] == '4')
+                self.assertTrue(records[1]['ev_type'] == 'INV')
+                self.assertTrue(records[2]['target_s'] == records[2]['target_e'] == '2')
+                self.assertTrue(records[2]['ev_type'] == 'INVDUP')
+            elif ev_type == 'delINVdel':
+                self.assertTrue(all([record['source_s'] == record['target_s'] for record in records]))
+                self.assertTrue(all([record['source_e'] == record['target_e'] for record in records]))
+                self.assertTrue(records[0]['ev_type'] == 'DEL')
+                self.assertTrue(records[1]['ev_type'] == 'INV')
+                self.assertTrue(records[2]['ev_type'] == 'DEL')
+            elif ev_type == 'dupINVdel':
+                self.assertTrue(records[0]['target_s'] == records[0]['target_e'] == '4')
+                self.assertTrue(all([record['source_s'] == record['target_s'] for record in records[1:]]))
+                self.assertTrue(all([record['source_e'] == record['target_e'] for record in records[1:]]))
+                self.assertTrue(records[0]['ev_type'] == 'INVDUP')
+                self.assertTrue(records[1]['ev_type'] == 'INV')
+                self.assertTrue(records[2]['ev_type'] == 'DEL')
+            else:  # <- delINVdup
+                self.assertTrue(all([record['source_s'] == record['target_s'] for record in records[:2]]))
+                self.assertTrue(all([record['source_e'] == record['target_e'] for record in records[:2]]))
+                self.assertTrue(records[2]['target_s'] == records[2]['target_e'] == '2')
+                self.assertTrue(records[0]['ev_type'] == 'DEL')
+                self.assertTrue(records[1]['ev_type'] == 'INV')
+                self.assertTrue(records[2]['ev_type'] == 'INVDUP')
+
+
 
 
 if __name__ == "__main__":

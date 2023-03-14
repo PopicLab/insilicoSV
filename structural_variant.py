@@ -318,7 +318,7 @@ class Structural_Variant():
         # print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
         # for bl in self.target_symbol_blocks:
         #     print(bl)
-        print(f'target_events_dict = {self.sv_blocks.target_events_dict}\nsource_events_dict = {self.events_dict}')
+        # print(f'target_events_dict = {self.sv_blocks.target_events_dict}\nsource_events_dict = {self.events_dict}')
 
     def change_fragment(self):
         '''

@@ -177,7 +177,7 @@ class FormatterIO():
                 record_info = {'source_s': ev.start, 'source_e': ev.end, 'target_s': ev.start, 'target_e': ev.end,
                                'transform': op, 'sv': sv, 'event': ev, 'bedfile': bedfile}
                 # debug
-                print(f'bedpe record info for {sv.type}: {record_info}')
+                # print(f'bedpe record info for {sv.type}: {record_info}')
                 self.write_to_file(**record_info)
             else:
                 # TODO: add logic to calculate 'order' value for each relevant composite event
