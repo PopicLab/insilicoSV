@@ -372,25 +372,6 @@ class TestSVSimulator(unittest.TestCase):
 
     # debugging bidirectional dispersion events (under new event representation)
     def test_bidirectional_dispersion_events(self):
-        # # dict of outputs for test ref of 'CT' under different event/orientation combinations
-        # # --> keyed on (orientation, event) tuples -- i.e., (0,0) = forward TRA
-        # targets = {(0, 0): 'TC', (0, 1): 'CTC', (0, 2): 'CTG', (1, 0): 'TC', (1, 1): 'TCT', (1, 2): 'ACT'}
-        # # loop for executing tests under forward and backwards orientation
-        # # --> 0: forward; 1: backward
-        # for i in [0, 1]:
-        #     # looping over the dispersion events -- j = 0, 1, 2 <-> TRA, dDUP, INV_dDUP
-        #     for j in range(len(self.test_dispersion_objects)):
-        #         config = self.test_dispersion_objects[j]
-        #         config.initialize_files()
-        #         curr_sim = SV_Simulator(config.ref, config.par)
-        # #       (this doesn't work to flip the sv in time for instantiation)
-        #         if i == 1:
-        #             for sv in curr_sim.svs:
-        #                 sv.dispersion_flip = True
-        #         curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
-        #         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-        #         self.assertEqual(targets[(i, j)] in [changed_frag_1, changed_frag_2], True)
-
         # # not easy to toggle the events to be flipped or not from here
         # # --> need to run the test switching orientation manually for now
         # TRA

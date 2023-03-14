@@ -165,10 +165,7 @@ class FormatterIO():
         if reset_file:
             utils.reset_file(bedfile)
             utils.reset_file(ins_fasta)
-        ## for reference, the input arguments to write_to_file:
-        # sv, bedfile, source_s, source_e, target_s, target_e, transform, symbol, event, order = 0
         for sv in svs:
-            # create target events dict for lookup of corresponding source/target events within SV
             # SVs with multiple source events will be split into multiple bed records (one for each)
             if len(sv.events_dict) == 1:
                 ev = list(sv.sv_blocks.target_events_dict.values())[0] if sv.type == Variant_Type.INS\
