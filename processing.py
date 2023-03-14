@@ -137,7 +137,8 @@ class FormatterIO():
         # A -> A'
         if ev + Symbols.DUP_MARKING.value in target_events_dict.keys():
             trg_sym = ev + Symbols.DUP_MARKING.value
-            return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.DUP.value
+            return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), \
+                   Operations.DUP.value if ev in target_events_dict.keys() else Operations.TRA.value
         # A -> a'
         elif ev.lower() + Symbols.DUP_MARKING.value in target_events_dict.keys():
             trg_sym = ev.lower() + Symbols.DUP_MARKING.value

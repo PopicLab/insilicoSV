@@ -85,19 +85,66 @@ class TestProcessing(unittest.TestCase):
                                                                               "SVs": [{"type": "delINVdup", "number": 1,
                                                                                        "max_length": {2, 2, 2},
                                                                                        "min_length": {2, 2, 2}}]}],
-                                                                            self.hap1, self.hap2, self.bed, self.vcf)
-                                                }
+                                                                            self.hap1, self.hap2, self.bed, self.vcf)}
+        self.test_objects_dispersions = {'dDUP': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
+                                                                [self.par,
+                                                                 {"sim_settings": {"prioritize_top": True},
+                                                                  "SVs": [{"type": "dDUP", "number": 1,
+                                                                           "max_length": {3, 3},
+                                                                           "min_length": {3, 3}}]}],
+                                                                self.hap1, self.hap2, self.bed, self.vcf),
+                                         'INV_dDUP': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
+                                                                    [self.par,
+                                                                     {"sim_settings": {"prioritize_top": True},
+                                                                      "SVs": [{"type": "INV_dDUP", "number": 1,
+                                                                               "max_length": {3, 3},
+                                                                               "min_length": {3, 3}}]}],
+                                                                    self.hap1, self.hap2, self.bed, self.vcf),
+                                         'TRA': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
+                                                               [self.par,
+                                                                {"sim_settings": {"prioritize_top": True},
+                                                                 "SVs": [{"type": "TRA", "number": 1,
+                                                                          "max_length": {3, 3},
+                                                                          "min_length": {3, 3}}]}],
+                                                               self.hap1, self.hap2, self.bed, self.vcf)}
+        self.test_objects_del_inv = {'delINV': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
+                                                              [self.par,
+                                                               {"sim_settings": {"prioritize_top": True},
+                                                                "SVs": [{"type": "delINV", "number": 1,
+                                                                         "max_length": {3, 3},
+                                                                         "min_length": {3, 3}}]}],
+                                                              self.hap1, self.hap2, self.bed, self.vcf),
+                                     'INVdel': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
+                                                              [self.par,
+                                                               {"sim_settings": {"prioritize_top": True},
+                                                                "SVs": [{"type": "INVdel", "number": 1,
+                                                                         "max_length": {3, 3},
+                                                                         "min_length": {3, 3}}]}],
+                                                              self.hap1, self.hap2, self.bed, self.vcf)}
 
         self.formatter = FormatterIO(self.par)
 
+    def initialize_test(self, test_objects_dict, ev_type, output_type='bed'):
+        # function to execute the shared logic for simulating SVs from test objects and generating bed/vcf output
+        config = test_objects_dict[ev_type]
+        config.initialize_files()
+        curr_sim = SV_Simulator(config.ref, config.par)
+        curr_sim.apply_transformations(FastaFile(curr_sim.ref_file))
+        records = None
+        if output_type == 'bed':
+            self.formatter.export_to_bedpe(curr_sim.svs, self.bed)
+            records = config.extract_bed_records()
+        elif output_type == 'vcf':
+            pass
+            # self.formatter.export_to_vcf(curr_sim, curr_sim.stats, vcffile=self.vcf)
+            # TODO: write an extract_vcf_records() function
+        else:
+            raise ValueError('output_type must be \'bed\' or \'vcf\'')
+        return records
+
     def test_export_bedpe_simple_events(self):
         for ev_type in ['DEL', 'DUP', 'INV']:
-            config = self.test_objects_simple_events[ev_type]
-            config.initialize_files()
-            curr_sim = SV_Simulator(config.ref, config.par)
-            curr_sim.apply_transformations(FastaFile(curr_sim.ref_file))
-            self.formatter.export_to_bedpe(curr_sim.svs, self.bed)
-            record = config.extract_bed_records()[0]
+            record = self.initialize_test(self.test_objects_simple_events, ev_type)[0]
             self.assertTrue(record['source_chr'] == record['target_chr'] == 'chr19')
             self.assertTrue(record['source_s'] == record['target_s'] == '0')
             self.assertTrue(record['source_e'] == record['target_e'] == '3')
@@ -106,12 +153,7 @@ class TestProcessing(unittest.TestCase):
 
     def test_export_bedpe_flanked_inversions(self):
         for ev_type in ['dupINVdup', 'delINVdel', 'dupINVdel', 'delINVdup']:
-            config = self.test_objects_flanked_inversions[ev_type]
-            config.initialize_files()
-            curr_sim = SV_Simulator(config.ref, config.par)
-            curr_sim.apply_transformations(FastaFile(curr_sim.ref_file))
-            self.formatter.export_to_bedpe(curr_sim.svs, self.bed)
-            records = config.extract_bed_records()
+            records = self.initialize_test(self.test_objects_flanked_inversions, ev_type)
             # checks of record fields that will be consistent across all four types
             self.assertTrue(all([record['source_chr'] == record['target_chr'] == 'chr19' for record in records]))
             self.assertTrue(all([record['parent_type'] == ev_type for record in records]))
@@ -150,7 +192,39 @@ class TestProcessing(unittest.TestCase):
                 self.assertTrue(records[1]['ev_type'] == 'INV')
                 self.assertTrue(records[2]['ev_type'] == 'INVDUP')
 
+    def test_export_bedpe_dispersions(self):
+        for ev_type in ['dDUP', 'INV_dDUP', 'TRA']:
+            record = self.initialize_test(self.test_objects_dispersions, ev_type)[0]
+            self.assertTrue(record['source_chr'] == record['target_chr'] == 'chr19')
+            self.assertTrue(record['parent_type'] == ev_type)
+            self.assertTrue(record['len'] == '3')
+            # interval checks accounting for forward or backward orientation of dispersion
+            self.assertTrue((record['source_s'], record['source_e']) in [('0', '3'), ('3', '6')])
+            self.assertTrue((record['target_s'], record['target_e']) in [('0', '0'), ('6', '6')])
+            if ev_type == 'dDUP':
+                self.assertTrue(record['ev_type'] == 'DUP')
+            elif ev_type == 'INV_dDUP':
+                self.assertTrue(record['ev_type'] == 'INVDUP')
+            else:  # <- TRA
+                self.assertTrue(record['ev_type'] == 'TRA')
 
+    def test_export_bedpe_del_inv(self):
+        for ev_type in ['delINV', 'INVdel']:
+            records = self.initialize_test(self.test_objects_del_inv, ev_type)
+            self.assertTrue(all([record['source_chr'] == record['target_chr'] == 'chr19' for record in records]))
+            self.assertTrue(all([record['parent_type'] == ev_type for record in records]))
+            self.assertTrue(all([record['len'] == '3' for record in records]))
+            self.assertTrue(records[0]['zyg'] == records[1]['zyg'])
+            self.assertTrue((records[0]['source_s'], records[0]['source_e']) ==
+                            (records[0]['target_s'], records[0]['target_e']) == ('0', '3'))
+            self.assertTrue((records[1]['source_s'], records[1]['source_e']) ==
+                            (records[1]['target_s'], records[1]['target_e']) == ('3', '6'))
+            if ev_type == 'delINV':
+                self.assertTrue(records[0]['ev_type'] == 'DEL')
+                self.assertTrue(records[1]['ev_type'] == 'INV')
+            else:  # <- INVdel
+                self.assertTrue(records[0]['ev_type'] == 'INV')
+                self.assertTrue(records[1]['ev_type'] == 'DEL')
 
 
 if __name__ == "__main__":
