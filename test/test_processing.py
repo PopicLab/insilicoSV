@@ -2,6 +2,7 @@ from simulate import SV_Simulator
 from processing import FormatterIO
 from test_simulate import TestObject
 from pysam import FastaFile
+from pysam import VariantFile
 import unittest
 import sys
 import os
@@ -135,6 +136,20 @@ class TestProcessing(unittest.TestCase):
                                                                         "max_length": [3, 3, 2],
                                                                         "min_length": [3, 3, 2]}]}],
                                                              self.hap1, self.hap2, self.bed, self.vcf)}
+        self.test_objects_dup_inv = {'dup_INV': TestProcObject([self.ref_file, {"chr19": "ACTGTCAG"}],
+                                                               [self.par,
+                                                                {"sim_settings": {"prioritize_top": True},
+                                                                 "SVs": [{"type": "dup_INV", "number": 1,
+                                                                          "max_length": [4, 4],
+                                                                          "min_length": [4, 4]}]}],
+                                                               self.hap1, self.hap2, self.bed, self.vcf),
+                                     'INV_dup': TestProcObject([self.ref_file, {"chr19": "ACTGTCAG"}],
+                                                               [self.par,
+                                                                {"sim_settings": {"prioritize_top": True},
+                                                                 "SVs": [{"type": "INV_dup", "number": 1,
+                                                                          "max_length": [4, 4],
+                                                                          "min_length": [4, 4]}]}],
+                                                               self.hap1, self.hap2, self.bed, self.vcf)}
 
         self.formatter = FormatterIO(self.par)
 
@@ -262,6 +277,27 @@ class TestProcessing(unittest.TestCase):
                         self.assertTrue(record['ev_type'] == 'DUP')
                     else:
                         self.assertTrue(record['ev_type'] == 'TRA')
+
+    def test_export_bedpe_dup_inv(self):
+        for sv_type in ['dup_INV', 'INV_dup']:
+            records = self.initialize_test(self.test_objects_dup_inv, sv_type)
+            self.assertTrue((records[0]['source_s'], records[0]['source_e']) == ('0', '4'))
+            self.assertTrue((records[1]['source_s'], records[1]['source_e']) == ('4', '8'))
+            self.assertTrue(all([record['parent_type'] == sv_type for record in records]))
+            self.assertTrue(all([record['len'] == '4' for record in records]))
+            self.assertTrue(records[0]['zyg'] == records[1]['zyg'])
+            # for dup_INV the first record will have matching source and target, for INV_dup it will be the second (indexing accordingly)
+            self.assertTrue(records[int(sv_type == 'dup_INV')]['target_s'] == records[int(sv_type == 'dup_INV')]['source_s'])
+            self.assertTrue(records[int(sv_type == 'dup_INV')]['target_e'] == records[int(sv_type == 'dup_INV')]['source_e'])
+            if sv_type == 'dup_INV':
+                self.assertTrue(records[0]['target_s'] == records[0]['target_e'] == '8')
+                self.assertTrue(records[0]['ev_type'] == 'INVDUP')
+                self.assertTrue(records[1]['ev_type'] == 'INV')
+            else:
+                self.assertTrue(records[1]['target_s'] == records[1]['target_e'] == '0')
+                self.assertTrue(records[0]['ev_type'] == 'INV')
+                self.assertTrue(records[1]['ev_type'] == 'INVDUP')
+
 
 
 if __name__ == "__main__":
