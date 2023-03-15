@@ -115,7 +115,7 @@ class FormatterIO():
                        str(transform_length),
                        str(int(sv.ishomozygous.value)) + "/1",
                        sv.name,
-                       str(nth_sv),# str(self.bedpe_counter),
+                       str(nth_sv),
                        str(order)]
 
                 fout.write("\t".join(row) + "\n")
@@ -137,8 +137,6 @@ class FormatterIO():
     def get_event_target_operation(ev, target_events_dict, source_events_dict):
         # helper function to return target_intvl and operation for multi-source events
         # need to enumerate the possible modifications to set the right operation
-        # debug
-        # print(f'ev = {ev}\ntarget_events_dict = {target_events_dict}\nsource_events_dict = {source_events_dict}')
         # A -> A'
         if ev + Symbols.DUP_MARKING.value in target_events_dict.keys():
             trg_sym = ev + Symbols.DUP_MARKING.value
@@ -206,7 +204,9 @@ class FormatterIO():
                         else list(sv.events_dict.values())[0]
                 op = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)[1]
                 record_info = {'source_s': ev.start, 'source_e': ev.end, 'target_s': ev.start, 'target_e': ev.end,
-                               'transform': op, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv}
+                               'transform': op, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv,
+                               # for simple events, order cant be > 1 and only depends on event type
+                               'order': int(op in [Operations.INS.value, Operations.DUP.value])}
                 self.write_to_file(**record_info)
                 # simple INS -> option to write novel inserted sequences to separate .fa at ins_fasta
                 if op == Operations.INS.value:

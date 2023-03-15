@@ -207,6 +207,8 @@ class TestProcessing(unittest.TestCase):
             self.assertTrue(record['source_chr'] == record['target_chr'] == 'chr19')
             self.assertTrue(record['ev_type'] == record['parent_type'] == sv_type)
             self.assertTrue(record['len'] == '3')
+            self.assertTrue(record['nth_sv'] == '1')
+            self.assertTrue(record['order'] == str(int(record['ev_type'] in ['INS', 'DUP'])))
             if sv_type == 'INS':
                 self.assertTrue((record['source_s'], record['source_e']) in [('0', '0'), ('1', '1')])
                 self.assertTrue((record['source_s'], record['source_e']) == (record['target_s'], record['target_e']))
