@@ -166,6 +166,14 @@ class TestProcessing(unittest.TestCase):
                                                                         "max_length": 4,
                                                                         "min_length": 4}]}],
                                                              self.hap1, self.hap2, self.bed, self.vcf)}
+        self.test_objects_multievent = {'INVdup': TestProcObject([self.ref_file, {"chr19": "ACTGCTAATGCGTTC"}],
+                                                                 [self.par,
+                                                                  {"sim_settings":
+                                                                       {"max_tries": 50, "prioritize_top": True},
+                                                                   "SVs": [{"type": "INVdup", "number": 3,
+                                                                            "max_length": 4,
+                                                                            "min_length": 2}]}],
+                                                                 self.hap1, self.hap2, self.bed, self.vcf)}
 
         self.formatter = FormatterIO(self.par)
 
@@ -339,8 +347,14 @@ class TestProcessing(unittest.TestCase):
     def test_export_bedpe_INVdup(self):
         record = self.initialize_test(self.test_objects_INVdup, 'INVdup')[0]
         self.singleton_event_bed_tests([record], 'INVdup', 'chr19', '4')
-        self.assertTrue((record['source_s'], record['source_e']) == (record['target_s'], record['target_e']) == ('0', '4'))
+        self.assertTrue(
+            (record['source_s'], record['source_e']) == (record['target_s'], record['target_e']) == ('0', '4'))
         self.assertTrue(record['ev_type'] == 'INVDUP')
+
+    def test_nth_sv_entry(self):
+        records = self.initialize_test(self.test_objects_multievent, 'INVdup')
+        for i in range(len(records)):
+            self.assertTrue(records[i]['nth_sv'] == str(i + 1))
 
 if __name__ == "__main__":
     unittest.main()
