@@ -32,6 +32,7 @@ DISPERSION_TYPES = [Variant_Type.dDUP, Variant_Type.INV_dDUP,
                     Variant_Type.TRA, Variant_Type.div_dDUP,
                     Variant_Type.dDUP_iDEL, Variant_Type.INS_iDEL]
 
+
 # treating DIVERGENCE as a non-variant event
 class Nonvariant_Event_Type(Enum):
     DIVERGENCE = "DIVERGENCE"
@@ -54,6 +55,11 @@ class Operations(Enum):
     IDENTITY = "IDENTITY"
     UNDEFINED = "UNDEFINED"
     DIV = "DIV"
+
+
+# list of operations corresponding to events that should have bed record with order > 0
+NONZERO_ORDER_OPERATIONS = [Operations.TRA.value, Operations.INS.value, Operations.DUP.value, Operations.INVDUP.value,
+                            Operations.INVTRA.value, Operations.DIV.value]
 
 
 class Zygosity(Enum):

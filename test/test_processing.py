@@ -7,6 +7,7 @@ import unittest
 import sys
 import os
 import utils
+import constants
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -200,15 +201,23 @@ class TestProcessing(unittest.TestCase):
                     insseq = line.rstrip()  # <- strip trailing '\n'
         return chrom_header, insseq
 
+    def singleton_event_bed_tests(self, records, sv_type, chrom, len):
+        # helper function to perform the bed file checks shared by all singleton event tests
+        self.assertTrue(all([record['source_chr'] == record['target_chr'] == chrom for record in records]))
+        self.assertTrue(all([record['parent_type'] == sv_type for record in records]))
+        self.assertTrue(all([record['len'] == len for record in records]))
+        self.assertTrue(all([record['nth_sv'] == '1' for record in records]))
+        self.assertTrue(
+            all([record['order'] == str(int(record['ev_type'] in constants.NONZERO_ORDER_OPERATIONS)) for record in
+                 records]))
+        self.assertTrue(set([record['zyg'] for record in records]) in [{'1/1'}, {'0/1'}])
+
     def test_export_bedpe_simple_events(self):
         for sv_type in ['DEL', 'DUP', 'INV', 'INS']:
             record = self.initialize_test(self.test_objects_simple_events, sv_type,
                                           ins_fasta=(self.ins_fasta if sv_type == 'INS' else None))[0]
-            self.assertTrue(record['source_chr'] == record['target_chr'] == 'chr19')
-            self.assertTrue(record['ev_type'] == record['parent_type'] == sv_type)
-            self.assertTrue(record['len'] == '3')
-            self.assertTrue(record['nth_sv'] == '1')
-            self.assertTrue(record['order'] == str(int(record['ev_type'] in ['INS', 'DUP'])))
+            self.assertTrue(record['ev_type'] == sv_type)
+            self.singleton_event_bed_tests(records=[record], sv_type=sv_type, chrom='chr19', len='3')
             if sv_type == 'INS':
                 self.assertTrue((record['source_s'], record['source_e']) in [('0', '0'), ('1', '1')])
                 self.assertTrue((record['source_s'], record['source_e']) == (record['target_s'], record['target_e']))
@@ -224,10 +233,7 @@ class TestProcessing(unittest.TestCase):
         for sv_type in ['dupINVdup', 'delINVdel', 'dupINVdel', 'delINVdup']:
             records = self.initialize_test(self.test_objects_flanked_inversions, sv_type)
             # checks of record fields that will be consistent across all four types
-            self.assertTrue(all([record['source_chr'] == record['target_chr'] == 'chr19' for record in records]))
-            self.assertTrue(all([record['parent_type'] == sv_type for record in records]))
-            self.assertTrue(all([record['len'] == '2' for record in records]))
-            self.assertTrue(records[0]['zyg'] == records[1]['zyg'] == records[2]['zyg'])
+            self.singleton_event_bed_tests(records, sv_type, 'chr19', '2')
             for i in range(2):
                 # example events set such that the source events must be placed at positions 0,2,4
                 self.assertTrue(records[i]['source_s'] == str(2 * i) and records[i]['source_e'] == str(2 * i + 2))
@@ -264,9 +270,7 @@ class TestProcessing(unittest.TestCase):
     def test_export_bedpe_dispersions(self):
         for sv_type in ['dDUP', 'INV_dDUP', 'TRA']:
             record = self.initialize_test(self.test_objects_dispersions, sv_type)[0]
-            self.assertTrue(record['source_chr'] == record['target_chr'] == 'chr19')
-            self.assertTrue(record['parent_type'] == sv_type)
-            self.assertTrue(record['len'] == '3')
+            self.singleton_event_bed_tests([record], sv_type, 'chr19', '3')
             # interval checks accounting for forward or backward orientation of dispersion
             self.assertTrue((record['source_s'], record['source_e']) in [('0', '3'), ('3', '6')])
             self.assertTrue((record['target_s'], record['target_e']) in [('0', '0'), ('6', '6')])
@@ -280,10 +284,7 @@ class TestProcessing(unittest.TestCase):
     def test_export_bedpe_del_inv(self):
         for sv_type in ['delINV', 'INVdel']:
             records = self.initialize_test(self.test_objects_del_inv, sv_type)
-            self.assertTrue(all([record['source_chr'] == record['target_chr'] == 'chr19' for record in records]))
-            self.assertTrue(all([record['parent_type'] == sv_type for record in records]))
-            self.assertTrue(all([record['len'] == '3' for record in records]))
-            self.assertTrue(records[0]['zyg'] == records[1]['zyg'])
+            self.singleton_event_bed_tests(records, sv_type, 'chr19', '3')
             self.assertTrue((records[0]['source_s'], records[0]['source_e']) ==
                             (records[0]['target_s'], records[0]['target_e']) == ('0', '3'))
             self.assertTrue((records[1]['source_s'], records[1]['source_e']) ==
@@ -298,10 +299,7 @@ class TestProcessing(unittest.TestCase):
     def test_export_bedpe_idel(self):
         for sv_type in ['dDUP_iDEL', 'INS_iDEL']:
             records = self.initialize_test(self.test_objects_idel, sv_type)
-            self.assertTrue(all([record['source_chr'] == record['target_chr'] == 'chr19' for record in records]))
-            self.assertTrue(all([record['parent_type'] == sv_type for record in records]))
-            self.assertTrue(all([record['len'] == '3' for record in records]))
-            self.assertTrue(records[0]['zyg'] == records[1]['zyg'])
+            self.singleton_event_bed_tests(records, sv_type, 'chr19', '3')
             # necessary locations of example event / accounting for forward or backward orientation
             self.assertTrue((records[0]['source_s'], records[0]['source_e']) == ('0', '3'))
             self.assertTrue((records[1]['source_s'], records[1]['source_e']) == ('5', '8'))
@@ -321,12 +319,9 @@ class TestProcessing(unittest.TestCase):
     def test_export_bedpe_dup_inv(self):
         for sv_type in ['dup_INV', 'INV_dup']:
             records = self.initialize_test(self.test_objects_dup_inv, sv_type)
-            self.assertTrue(all([record['source_chr'] == record['target_chr'] == 'chr19' for record in records]))
+            self.singleton_event_bed_tests(records, sv_type, 'chr19', '4')
             self.assertTrue((records[0]['source_s'], records[0]['source_e']) == ('0', '4'))
             self.assertTrue((records[1]['source_s'], records[1]['source_e']) == ('4', '8'))
-            self.assertTrue(all([record['parent_type'] == sv_type for record in records]))
-            self.assertTrue(all([record['len'] == '4' for record in records]))
-            self.assertTrue(records[0]['zyg'] == records[1]['zyg'])
             # for dup_INV the first record will have matching source and target, for INV_dup it will be the second (indexing accordingly)
             self.assertTrue(
                 records[int(sv_type == 'dup_INV')]['target_s'] == records[int(sv_type == 'dup_INV')]['source_s'])
@@ -343,12 +338,9 @@ class TestProcessing(unittest.TestCase):
 
     def test_export_bedpe_INVdup(self):
         record = self.initialize_test(self.test_objects_INVdup, 'INVdup')[0]
-        self.assertTrue(record['source_chr'] == record['target_chr'] == 'chr19')
+        self.singleton_event_bed_tests([record], 'INVdup', 'chr19', '4')
         self.assertTrue((record['source_s'], record['source_e']) == (record['target_s'], record['target_e']) == ('0', '4'))
-        self.assertTrue(record['parent_type'] == 'INVdup')
         self.assertTrue(record['ev_type'] == 'INVDUP')
-        self.assertTrue(record['len'] == '4')
-
 
 if __name__ == "__main__":
     unittest.main()

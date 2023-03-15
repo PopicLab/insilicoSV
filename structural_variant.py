@@ -141,8 +141,6 @@ class Structural_Variant():
         # determine length of events/symbols
         symbols_dict = dict()
         if len(lengths) > 1:  # values given by user represents custom ranges for each event symbol of variant in lexicographical order
-            # debug
-            print(f'lengths = {lengths}\nall_symbols = {all_symbols}')
             assert (len(lengths) == len(all_symbols)), \
                 "Number of lengths entered does not match the number of symbols (remember foreign insertions and dispersions) present!"
             for idx, symbol in enumerate(all_symbols):
@@ -320,7 +318,7 @@ class Structural_Variant():
         # print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
         # for bl in self.target_symbol_blocks:
         #     print(bl)
-        print(f'target_events_dict = {self.sv_blocks.target_events_dict}\nsource_events_dict = {self.events_dict}')
+        # print(f'target_events_dict = {self.sv_blocks.target_events_dict}\nsource_events_dict = {self.events_dict}')
 
     def change_fragment(self):
         '''

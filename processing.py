@@ -1,5 +1,7 @@
 import yaml
 import sys
+
+import constants
 from constants import *
 from pysam import FastaFile
 import pysam
@@ -29,9 +31,6 @@ class Config():
                 if isinstance(config_sv["min_length"], int):
                     config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
                 else:
-                    # debug -- this is parsing incorrectly in the case of multiple min/max lengths given
-                    print('config_sv.min_length = ' + str(config_sv['min_length']))
-                    print('config_sv.max_length = ' + str(config_sv['max_length']))
                     config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
                 # make sure max_length >= min_length >= 0
                 assert all(max_len >= min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
@@ -86,8 +85,6 @@ class FormatterIO():
     def yaml_to_var_list(self):
         try:
             config_entries = yaml.full_load(open(self.par_file))
-            # debug
-            print(f'config_entries = {config_entries}')
         except:
             raise Exception("YAML File {} failed to be open".format(self.par_file))
 
@@ -175,10 +172,11 @@ class FormatterIO():
         ins_pos = None
         for block in sv.target_symbol_blocks:
             for target_event in block:
-                if target_event.symbol.startswith(Symbols.DIS_MARKING.value):
+                if target_event.symbol.startswith(Symbols.DIS_MARKING.value) or \
+                        target_event.symbol in sv_record_info.keys():  # <- prevent collision with A' and A if both in target
                     continue
                 src_sym = target_event.symbol[0].upper()
-                if sv_record_info[src_sym]['transform'] in ['TRA', 'INS', 'DUP']:
+                if sv_record_info[src_sym]['transform'] in constants.NONZERO_ORDER_OPERATIONS:
                     if ins_pos is None:
                         ins_pos = sv_record_info[src_sym]['target_s']
                         order += 1
@@ -206,7 +204,7 @@ class FormatterIO():
                 record_info = {'source_s': ev.start, 'source_e': ev.end, 'target_s': ev.start, 'target_e': ev.end,
                                'transform': op, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv,
                                # for simple events, order cant be > 1 and only depends on event type
-                               'order': int(op in [Operations.INS.value, Operations.DUP.value])}
+                               'order': int(op in constants.NONZERO_ORDER_OPERATIONS)}
                 self.write_to_file(**record_info)
                 # simple INS -> option to write novel inserted sequences to separate .fa at ins_fasta
                 if op == Operations.INS.value:
