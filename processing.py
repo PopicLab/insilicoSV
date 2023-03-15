@@ -94,7 +94,7 @@ class FormatterIO():
         config = Config(**config_entries)
         return config
 
-    def write_to_file(self, sv, bedfile, source_s, source_e, target_s, target_e, transform, event, order=0):
+    def write_to_file(self, sv, bedfile, source_s, source_e, target_s, target_e, transform, event, nth_sv, order=0):
         assert (not event.symbol.startswith(Symbols.DIS_MARKING.value))
         # consider insertions
         if transform == Operations.INS.value:
@@ -115,7 +115,7 @@ class FormatterIO():
                        str(transform_length),
                        str(int(sv.ishomozygous.value)) + "/1",
                        sv.name,
-                       str(self.bedpe_counter),
+                       str(nth_sv),# str(self.bedpe_counter),
                        str(order)]
 
                 fout.write("\t".join(row) + "\n")
@@ -167,47 +167,66 @@ class FormatterIO():
         else:
             return (source_events_dict[ev].start, source_events_dict[ev].end), Operations.UNDEFINED.value
 
-    # TODO:
-    #  add ins_fasta parameter
-    #  add order logic for complex events
+    @staticmethod
+    def postprocess_record_params(sv, sv_record_info):
+        # arrange the bed_record parameter dictionaries in order of ascending source interval start position
+        # and assign order values to the relevant entries
+        # --> for TRA/INS/DUP events with the same target position, 'order' describes the order in which they
+        # --> are compiled (i.e., the order in which they appear in the target sequence)
+        order = 0
+        ins_pos = None
+        for block in sv.target_symbol_blocks:
+            for target_event in block:
+                if target_event.symbol.startswith(Symbols.DIS_MARKING.value):
+                    continue
+                src_sym = target_event.symbol[0].upper()
+                if sv_record_info[src_sym]['transform'] in ['TRA', 'INS', 'DUP']:
+                    if ins_pos is None:
+                        ins_pos = sv_record_info[src_sym]['target_s']
+                        order += 1
+                    elif sv_record_info[src_sym]['target_s'] == ins_pos:
+                        order += 1
+                else:
+                    ins_pos = None
+                    order = 0
+                sv_record_info[src_sym]['order'] = order
+        return sorted([params for params in sv_record_info.values()], key=lambda params: params['source_s'])
+
     def export_to_bedpe(self, svs, bedfile, ins_fasta=None, reset_file=True):
         if reset_file:
             utils.reset_file(bedfile)
-            # utils.reset_file(ins_fasta)
+            if ins_fasta:
+                utils.reset_file(ins_fasta)
+        nth_sv = 0
         for sv in svs:
+            nth_sv += 1
             # SVs with multiple source events will be split into multiple bed records (one for each)
             if len(sv.events_dict) == 1:
                 ev = list(sv.sv_blocks.target_events_dict.values())[0] if sv.type == Variant_Type.INS\
                         else list(sv.events_dict.values())[0]
                 op = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)[1]
                 record_info = {'source_s': ev.start, 'source_e': ev.end, 'target_s': ev.start, 'target_e': ev.end,
-                               'transform': op, 'sv': sv, 'event': ev, 'bedfile': bedfile}
-                # debug
-                # print(f'bedpe record info for {sv.type}: {record_info}')
+                               'transform': op, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv}
                 self.write_to_file(**record_info)
                 # simple INS -> option to write novel inserted sequences to separate .fa at ins_fasta
                 if op == Operations.INS.value:
                     self.export_insertions(sv.start_chr, ev.start, ev.source_frag, ins_fasta)
             else:
-                # TODO: add logic to calculate 'order' value for each relevant composite event
                 # multiple source events: source intervals taken from the source events
                 # and target intervals taken from corresponding target events (if no match, then deletion)
-                # --> dict keyed on source symbol with values giving source and target intervals
-                sv_record_info = []
+                sv_record_info = {}
                 for ev in sv.events_dict.values():
                     # skip dispersion events
                     if ev.symbol.startswith(Symbols.DIS_MARKING.value):
                         continue
                     # --> target intvl and transform will be determined in each of the specific cases of how the
                     # --> source event is mapped into the target
-                    base_params = {'source_s': ev.start, 'source_e': ev.end, 'sv': sv, 'event': ev, 'bedfile': bedfile}
+                    sv_record_info[ev.symbol] = {'source_s': ev.start, 'source_e': ev.end, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv}
                     (target_s, target_e), operation = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)
-                    base_params['target_s'] = target_s
-                    base_params['target_e'] = target_e
-                    base_params['transform'] = operation
-                    sv_record_info.append(base_params)
-                # --> write bed records from interval_dict contents in the order of source interval start
-                for param_dict in sorted([params for params in sv_record_info], key=lambda params: params['source_s']):
+                    sv_record_info[ev.symbol]['target_s'] = target_s
+                    sv_record_info[ev.symbol]['target_e'] = target_e
+                    sv_record_info[ev.symbol]['transform'] = operation
+                for param_dict in self.postprocess_record_params(sv, sv_record_info):
                     self.write_to_file(**param_dict)
 
     def export_to_bedpe_OLD(self, svs, bedfile, ins_fasta, reset_file = True):
