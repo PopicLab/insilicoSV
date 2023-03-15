@@ -6,6 +6,7 @@ from pysam import VariantFile
 import unittest
 import sys
 import os
+import utils
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -40,6 +41,7 @@ class TestProcessing(unittest.TestCase):
         self.hap2 = "test/inputs/test2.fa"
         self.bed = "test/inputs/out.bed"
         self.vcf = "test/inputs/out.vcf"
+        self.ins_fasta = "test/inputs/ins_fasta.fa"
 
         self.test_objects_simple_events = {'DEL': TestProcObject([self.ref_file, {"chr19": "CTG"}],
                                                                  [self.par, {"sim_settings": {"prioritize_top": True},
@@ -56,6 +58,12 @@ class TestProcessing(unittest.TestCase):
                                            'INV': TestProcObject([self.ref_file, {"chr19": "CTG"}],
                                                                  [self.par, {"sim_settings": {"prioritize_top": True},
                                                                              "SVs": [{"type": "INV", "number": 1,
+                                                                                      "max_length": 3,
+                                                                                      "min_length": 3}]}],
+                                                                 self.hap1, self.hap2, self.bed, self.vcf),
+                                           'INS': TestProcObject([self.ref_file, {"chr19": "C"}],
+                                                                 [self.par, {"sim_settings": {"prioritize_top": True},
+                                                                             "SVs": [{"type": "INS", "number": 1,
                                                                                       "max_length": 3,
                                                                                       "min_length": 3}]}],
                                                                  self.hap1, self.hap2, self.bed, self.vcf)}
@@ -160,7 +168,7 @@ class TestProcessing(unittest.TestCase):
 
         self.formatter = FormatterIO(self.par)
 
-    def initialize_test(self, test_objects_dict, sv_type, output_type='bed'):
+    def initialize_test(self, test_objects_dict, sv_type, output_type='bed', ins_fasta=None):
         # function to execute the shared logic for simulating SVs from test objects and generating bed/vcf output
         config = test_objects_dict[sv_type]
         config.initialize_files()
@@ -168,7 +176,9 @@ class TestProcessing(unittest.TestCase):
         curr_sim.apply_transformations(FastaFile(curr_sim.ref_file))
         records = None
         if output_type == 'bed':
-            self.formatter.export_to_bedpe(curr_sim.svs, self.bed)
+            if ins_fasta:
+                utils.remove_file(ins_fasta)
+            self.formatter.export_to_bedpe(curr_sim.svs, self.bed, ins_fasta=ins_fasta)
             records = config.extract_bed_records()
         elif output_type == 'vcf':
             pass
@@ -178,14 +188,35 @@ class TestProcessing(unittest.TestCase):
             raise ValueError('output_type must be \'bed\' or \'vcf\'')
         return records
 
+    def extract_ins_fasta(self):
+        # extracts single INSSEQ entry from self.ins_fasta (meant for use in isolated INS tests)
+        # NB: chrom header output in the form ">chr{number}_{insertion_index}"
+        chrom_header, insseq = None, None
+        with open(self.ins_fasta) as f:
+            for line in f:
+                if line[0] == '>':
+                    chrom_header = line
+                else:
+                    insseq = line.rstrip()  # <- strip trailing '\n'
+        return chrom_header, insseq
+
     def test_export_bedpe_simple_events(self):
-        for sv_type in ['DEL', 'DUP', 'INV']:
-            record = self.initialize_test(self.test_objects_simple_events, sv_type)[0]
+        for sv_type in ['DEL', 'DUP', 'INV', 'INS']:
+            record = self.initialize_test(self.test_objects_simple_events, sv_type,
+                                          ins_fasta=(self.ins_fasta if sv_type == 'INS' else None))[0]
             self.assertTrue(record['source_chr'] == record['target_chr'] == 'chr19')
-            self.assertTrue(record['source_s'] == record['target_s'] == '0')
-            self.assertTrue(record['source_e'] == record['target_e'] == '3')
             self.assertTrue(record['ev_type'] == record['parent_type'] == sv_type)
             self.assertTrue(record['len'] == '3')
+            if sv_type == 'INS':
+                self.assertTrue((record['source_s'], record['source_e']) in [('0', '0'), ('1', '1')])
+                self.assertTrue((record['source_s'], record['source_e']) == (record['target_s'], record['target_e']))
+                # test of writing of novel insertion sequences to separate output fasta
+                chrom_header, insseq = self.extract_ins_fasta()
+                self.assertTrue(chrom_header[1:].split('_')[0] == record['source_chr'])
+                self.assertTrue(str(len(insseq)) == record['len'])
+            else:
+                self.assertTrue(record['source_s'] == record['target_s'] == '0')
+                self.assertTrue(record['source_e'] == record['target_e'] == '3')
 
     def test_export_bedpe_flanked_inversions(self):
         for sv_type in ['dupINVdup', 'delINVdel', 'dupINVdel', 'delINVdup']:

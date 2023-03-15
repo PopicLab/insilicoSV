@@ -170,7 +170,7 @@ class FormatterIO():
     # TODO:
     #  add ins_fasta parameter
     #  add order logic for complex events
-    def export_to_bedpe(self, svs, bedfile, reset_file=True):
+    def export_to_bedpe(self, svs, bedfile, ins_fasta=None, reset_file=True):
         if reset_file:
             utils.reset_file(bedfile)
             # utils.reset_file(ins_fasta)
@@ -185,26 +185,29 @@ class FormatterIO():
                 # debug
                 # print(f'bedpe record info for {sv.type}: {record_info}')
                 self.write_to_file(**record_info)
+                # simple INS -> option to write novel inserted sequences to separate .fa at ins_fasta
+                if op == Operations.INS.value:
+                    self.export_insertions(sv.start_chr, ev.start, ev.source_frag, ins_fasta)
             else:
                 # TODO: add logic to calculate 'order' value for each relevant composite event
                 # multiple source events: source intervals taken from the source events
                 # and target intervals taken from corresponding target events (if no match, then deletion)
                 # --> dict keyed on source symbol with values giving source and target intervals
-                sv_record_info = {}
+                sv_record_info = []
                 for ev in sv.events_dict.values():
                     # skip dispersion events
                     if ev.symbol.startswith(Symbols.DIS_MARKING.value):
                         continue
                     # --> target intvl and transform will be determined in each of the specific cases of how the
                     # --> source event is mapped into the target
-                    sv_record_info[ev] = {'source_s': ev.start, 'source_e': ev.end,
-                                          'sv': sv, 'event': ev, 'bedfile': bedfile}
+                    base_params = {'source_s': ev.start, 'source_e': ev.end, 'sv': sv, 'event': ev, 'bedfile': bedfile}
                     (target_s, target_e), operation = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)
-                    sv_record_info[ev]['target_s'] = target_s
-                    sv_record_info[ev]['target_e'] = target_e
-                    sv_record_info[ev]['transform'] = operation
+                    base_params['target_s'] = target_s
+                    base_params['target_e'] = target_e
+                    base_params['transform'] = operation
+                    sv_record_info.append(base_params)
                 # --> write bed records from interval_dict contents in the order of source interval start
-                for param_dict in sorted([params for params in sv_record_info.values()], key=lambda params: params['source_s']):
+                for param_dict in sorted([params for params in sv_record_info], key=lambda params: params['source_s']):
                     self.write_to_file(**param_dict)
 
     def export_to_bedpe_OLD(self, svs, bedfile, ins_fasta, reset_file = True):
