@@ -5,7 +5,7 @@ import random
 
 class Structural_Variant():
     def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None, vcf_rec=None, ref_fasta=None,
-                 repeatmasker_event=None, nonsv_event=False):
+                 overlap_event=None):
         '''
         Initializes SV's transformation and sets up its events, along with several other basic attributes like zygosity
 
@@ -17,8 +17,7 @@ class Structural_Variant():
         target: tuple representing target sequence, optional
         vcf_rec: (to be used in fixed mode) vcf record giving sv information that will instantiate the event
         ref_fasta: for extracting reference frag for vcf records in fixed mode initialization
-        repeatmasker_event: (chr, start, end) tuple representing the repeatmasker event that this SV is meant to overlap
-        nonsv_event: boolean flag to identify variant objects that are actually non-sv decoy events (e.g., DIVERGENCE)
+        overlap_event: (chr, start, end) tuple representing the repeatmasker event that this SV is meant to overlap
         '''
         self.type = sv_type
         if self.type != Variant_Type.Custom:
@@ -46,8 +45,7 @@ class Structural_Variant():
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
         self.dispersion_flip = False
         self.insseq_from_rec = None  # space to store INSSEQ for fixed-mode INS event
-        self.repeatmasker_event = repeatmasker_event
-        self.nonsv_event = nonsv_event
+        self.overlap_event = overlap_event
 
         if self.type in DISPERSION_TYPES:
             if random.randint(0, 1):
@@ -158,11 +156,11 @@ class Structural_Variant():
             # empty event - no source fragment yet
             # --> if we're trying to overlap a repeatmasker event, want to set this event's "A" subevent to
             # that repetitive element's interval
-            if symbol == 'A' and self.repeatmasker_event is not None:
-                rm_event_len = int(self.repeatmasker_event[2]) - int(self.repeatmasker_event[1])
-                event = Event(self, rm_event_len, (rm_event_len, rm_event_len), symbol, non_sv=self.nonsv_event)
+            if symbol == 'A' and self.overlap_event is not None:
+                rm_event_len = int(self.overlap_event[2]) - int(self.overlap_event[1])
+                event = Event(self, rm_event_len, (rm_event_len, rm_event_len), symbol)
             else:
-                event = Event(self, symbols_dict[symbol][0], symbols_dict[symbol][1], symbol, non_sv=self.nonsv_event)
+                event = Event(self, symbols_dict[symbol][0], symbols_dict[symbol][1], symbol)
             self.events_dict[symbol] = event
 
         for symbol in self.source_unique_char:
@@ -257,8 +255,6 @@ class Structural_Variant():
         # for ev in self.events_dict.keys():
         #     print(self.events_dict[ev])
 
-        # Trying logic based on the position assignment of source events in choose_rand_pos()
-        # (now that we're flipping the sv.source_events list for flipped-dispersion events)
         for block in self.target_symbol_blocks:
             for ev in block:
                 ev.source_chr = self.start_chr
@@ -269,13 +265,6 @@ class Structural_Variant():
                     ev.start = source_ev.start
                     ev.end = source_ev.end
                     ev.source_frag = self.get_event_frag(source_ev, ev.symbol)
-                # additional branch for handling nonsv-events (right now just DIVERGENCE A -> A* events)
-                elif self.nonsv_event and ev.symbol == 'A*':
-                    source_ev = self.events_dict[ev.symbol[0]]
-                    ev.start = source_ev.start
-                    ev.end = source_ev.end
-                    ev.source_frag = self.get_event_frag(source_ev, ev.symbol)
-                    ev.non_sv = True
 
         # ===> then everything that wasn't just assigned will be a new event (all to be modeled as insertion fragments)
         # ------> thus will just need to have start/end set to the nearest event boundary from the ones placed above^
@@ -410,14 +399,14 @@ class Event():
         # --> I don't think this field is ultimately necessary (it looks like we can get away with just using
         # --> the non_sv attribute in the StructuralVariant() object), but it still seems like a useful piece of info
         # --> to have when we inspect the event objects ... (going to keep it for now)
-        self.non_sv = non_sv
+        # self.non_sv = non_sv
 
     def __repr__(self):
         return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end,
-                                    "source_chr": self.source_chr,
+                                    "source_chr": self.source_chr})
                                     # "source_frag": self.source_frag if not self.symbol.startswith(Symbols.DIS_MARKING.value) else
                                     # 'frag omitted',
-                                    "non_sv": self.non_sv})
+                                    # "non_sv": self.non_sv})
 
 
 class Blocks():

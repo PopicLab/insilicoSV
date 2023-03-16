@@ -16,9 +16,9 @@ class Config():
         self.__dict__.update({"SVs": entries["SVs"]})
         if "sim_settings" in entries:   # if the user changed any of the default settings for the sim, they get updated here
             self.__dict__["sim_settings"].update(entries["sim_settings"])
-        # optional config feature storing the path to a repeatmasker bed file
-        if "repeatmasker" in entries:
-            self.__dict__["repeatmasker"] = entries["repeatmasker"]
+        # optional config feature storing the path to a overlap_events bed file
+        if "overlap_events" in entries:
+            self.__dict__["overlap_events"] = entries["overlap_events"]
         # artificial "keys" attribute to access the keys of config.__dict__
         self.keys = self.__dict__.keys()
 
@@ -35,11 +35,7 @@ class Config():
                 # make sure max_length >= min_length >= 0
                 assert all(max_len >= min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
 
-                # use Enum for variant type and nonvariant event type
-                if Nonvariant_Event_Type.has_value(config_sv["type"]):
-                    config_sv["type"] = Nonvariant_Event_Type(config_sv["type"])
-                else:
-                    config_sv["type"] = Variant_Type(config_sv["type"])
+                config_sv["type"] = Variant_Type(config_sv["type"])
                 if config_sv["type"] != Variant_Type.Custom:
                     config_sv["source"] = None
                     config_sv["target"] = None
@@ -72,7 +68,7 @@ class Config():
         for parameter in self.sim_settings:
             if parameter not in valid_optional_par:
                 raise Exception("\"{}\" is an invalid argument under sim_settings".format(parameter))
-        valid_keys = ["sim_settings", "SVs", "repeatmasker"]  # valid arguments at the top level
+        valid_keys = ["sim_settings", "SVs", "overlap_events"]  # valid arguments at the top level
         for key in entries:
             if key not in valid_keys:
                 raise Exception("Unknown argument \"{}\"".format(key))
@@ -247,8 +243,8 @@ class FormatterIO():
         vcf_file.header.info.add('SVMETHOD', number=1, type='String', description="SV detection method")
         vcf_file.header.info.add('TARGET', number=1, type='Integer', description="Target location for divergent repeat")
         vcf_file.header.info.add('DIV_REPEAT', number=1, type='String', description="Divergent repeat segment places at target locus")
-        vcf_file.header.info.add('RM_OVERLAP', number=1, type='String', description="Bool. indicator for the event being"
-                                                                                    "placed at a repeatmasker interval")
+        vcf_file.header.info.add('OVERLAP_EV', number=1, type='String', description="Bool. indicator for the event being"
+                                                                                    "placed at an overlap_events interval")
         vcf_file.header.formats.add('GT', number=1, type='String', description="Genotype")
 
         vcf_out_file = pysam.VariantFile(vcffile, 'w', header=vcf_file.header)
@@ -279,8 +275,8 @@ class FormatterIO():
                     info_field = {'SVTYPE': sv.type.value, 'SVLEN': sv.events_dict['A'].length}
                 else:
                     info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
-            if sv.repeatmasker_event is not None:
-                info_field['RM_OVERLAP'] = 'True'
+            if sv.overlap_event is not None:
+                info_field['OVERLAP_EV'] = 'True'
 
             vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=rec_start, stop=rec_end,
                                                         alleles=['N', sv.type.value], id=sv.type.value,

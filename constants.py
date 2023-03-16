@@ -25,23 +25,13 @@ class Variant_Type(Enum):
     Custom = "Custom"
     INV_dDUP = "INV_dDUP"
     div_dDUP = "div_dDUP"
+    DIVERGENCE = "DIVERGENCE"
 
 
 # list of dispersion-based events (listing explicitly to prevent having to parse from symbols)
 DISPERSION_TYPES = [Variant_Type.dDUP, Variant_Type.INV_dDUP,
                     Variant_Type.TRA, Variant_Type.div_dDUP,
                     Variant_Type.dDUP_iDEL, Variant_Type.INS_iDEL]
-
-
-# treating DIVERGENCE as a non-variant event
-class Nonvariant_Event_Type(Enum):
-    DIVERGENCE = "DIVERGENCE"
-
-    @classmethod
-    def has_value(cls, value):
-        # adding a helper method to check containment
-        # return value in cls._value2member_map_
-        return value in cls or value in cls._value2member_map_
 
 
 class Operations(Enum):
@@ -97,7 +87,7 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
           Variant_Type.div_dDUP: [("A", "_"), ("A", "_", "A*")],
           # Event mimicking divergence of a source sequence -- not quite an SV but a common form of decoy event
           # --> better to create a different class for non-SV decoy events?
-          Nonvariant_Event_Type.DIVERGENCE: [("A",), ("A*",)]}
+          Variant_Type.DIVERGENCE: [("A",), ("A*",)]}
 
 DEFAULT_CONFIG = {"sim_settings": {"max_tries": 100,
                                    "fail_if_placement_issues": False,

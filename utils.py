@@ -6,22 +6,8 @@ def is_overlapping(event_ranges, addition, called_from_helper=False):
     # addition: tuple (start, end)
     # event_ranges: list containing tuples
     # checks if addition overlaps with any of the events already stored
-
-    # *** these need to be strict inequalities to allow for abutting insertions/deletions
     for event in event_ranges:
-        # *** ... and with strict inequalities these are all given by the same expression
-        # if addition[1] == addition[0]: # addition is an insertion
-        #     if addition[0] > event[0] and addition[1] < event[1]:
-        #         print('is_overlapping: case 1')
-        #         return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
-        # if event[0] == event[1]:  # event is insertion
-        #     if event[0] > addition[0] and event[0] < addition[1]:
-        #         print('is_overlapping: case 2')
-        #         print(f'event={event}; addition={addition}')
-        #         return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
         if event[1] > addition[0] and event[0] < addition[1]:
-            # it seems we just want the expection to be raised if we're calling this from
-            # fail_if_any_overlapping -- bad practice, fix this
             if called_from_helper:
                 raise Exception("Overlap between {} and {}".format(event[0:2], addition[0:2]))
             else:
@@ -99,11 +85,13 @@ def divergence(seq):
     p = random.uniform(0.5,1.0)
     return ''.join([b if random.random() > p else random.choice(list({"A", "C", "T", "G"} - {b})) for b in seq.upper()])
 
-def parse_bed_file(bed_fname):
+def parse_bed_file(bed_fname, keep_type=False):
     """
     reads bed file (intended use: processing repeatmasker elements to be considered for randomized
     event overlap) and returns list of (chr, start, end) tuples representing the intervals of each event in the file
     --> logic taken from bed_iter() and parse_bed_line() in cue (seq/io.py)
+    - keep_type: optional flag to extract intervals with the fourth column string that in the case of a repeatmasker
+                    bed file will give the repetitive element type
     """
     intervals_list = []
     with open(bed_fname, 'r') as bed_file:
@@ -114,5 +102,25 @@ def parse_bed_file(bed_fname):
             fields = line.strip().split()
             assert len(fields) >= 3, "Unexpected number of fields in BED: %s" % line
             chr_name, start, end = fields[:3]
-            intervals_list.append((chr_name, start, end))
+            if keep_type:
+                intervals_list.append((chr_name, start, end, fields[3]))
+            else:
+                intervals_list.append((chr_name, start, end))
     return intervals_list
+
+def process_overlap_events(config):
+    overlap_events = []
+    if type(config.overlap_events['bed']) is list:
+        overlap_events = []
+        for bed_path in config.overlap_events['bed']:
+            # need to extract bed record intervals with the element type given in column 4 (keep_type=True)
+            overlap_events.extend(parse_bed_file(bed_path, keep_type=True))
+    else:
+        overlap_events = parse_bed_file(config.overlap_events['bed'], keep_type=True)
+    random.shuffle(overlap_events)
+    # filter on allowed repetitive element types (if any are given)
+    # --> if given, allow_types must be given as a list of strings
+    if 'allow_types' in config.overlap_events.keys():
+        # remove the repetitive element type at the filtering step (we just care that it's an allowed type)
+        overlap_events = [ev[:-1] for ev in overlap_events if ev[-1] in config.overlap_events['allow_types']]
+    return overlap_events

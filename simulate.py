@@ -163,9 +163,12 @@ class SV_Simulator():
                 self.extract_vcf_event_intervals(d["avoid_intervals"])
 
         # print('CALLING INITIALIZE_SVS')
-        # list of repeatmasker events to be populated from optionally input bed file
-        self.repeatmasker_events = None if "repeatmasker" not in config.keys \
-            else utils.parse_bed_file(config.repeatmasker['bed'])
+        # list of overlap_event events to be populated from optionally input bed file
+        # self.overlap_events = None if "overlap_events" not in config.keys \
+        #     else utils.parse_bed_file(config.overlap_events['bed'])
+        self.overlap_events = None if "overlap_events" not in config.keys \
+            else utils.process_overlap_events(config)
+
         self.initialize_svs(random_gen=random_gen)
 
         print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
@@ -243,22 +246,26 @@ class SV_Simulator():
                 if "avoid_intervals" in sv_config:
                     continue
                 for num in range(sv_config["number"]):
-                    # for the first (sv_config["RM_overlaps"]) events, instantiate the SV with the next repeat elt interval
-                    if "RM_overlaps" in sv_config.keys() and num < sv_config["RM_overlaps"] \
-                            and len(self.repeatmasker_events) > 0:
-                        # add RM target event for this
-                        repeat_elt = self.repeatmasker_events.pop(0)
+                    # for the first (sv_config["num_overlap"]) events, instantiate the SV with the next repeat elt interval
+                    if "num_overlap" in sv_config.keys() and num < sv_config["num_overlap"] \
+                            and len(self.overlap_events) > 0:
+                        # add overlap event target event for this
+                        # --> Filter by size: traverse the list until one is found with length within range for sv
+                        for i in range(len(self.overlap_events)):
+                            if sv_config["length_ranges"][0][0] <= \
+                                    (int(self.overlap_events[i][2]) - int(self.overlap_events[i][1])) \
+                                    <= sv_config["length_ranges"][0][1]:
+                                repeat_elt = self.overlap_events.pop(i)
+                                break
                         sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                                 length_ranges=sv_config["length_ranges"], source=sv_config["source"],
-                                                target=sv_config["target"], repeatmasker_event=repeat_elt,
-                                                nonsv_event=constants.Nonvariant_Event_Type.has_value(sv_config["type"]))
+                                                target=sv_config["target"], overlap_event=repeat_elt)
                     else:
                         # if the svtype being simulated is given in the list of non-SV events (e.g., DIVERGENCE)
                         # then want to add the non-sv flag to the SV object constructor (bad practice?)
                         sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                                 length_ranges=sv_config["length_ranges"], source=sv_config["source"],
-                                                target=sv_config["target"],
-                                                nonsv_event=constants.Nonvariant_Event_Type.has_value(sv_config["type"]))
+                                                target=sv_config["target"])
 
                     # Because of the two-staged procedure to generate reads with div_dDUPs, need
                     # to always treat div_dDUPs as homozygous (we need both haplotypes to reflect the event)
@@ -379,17 +386,17 @@ class SV_Simulator():
                 # choose chrom (either randomly or taking it deterministically from a repeatmasker event we want to
                 # overlap) and get chromosome length and occupied intervals
                 rand_id, chr_len, chr_event_ranges = self.get_rand_chr(check_size=sv.req_space, random_gen=random_gen,
-                                                                       fixed_chrom=(None if sv.repeatmasker_event is None
-                                                                                    else sv.repeatmasker_event[0]))
+                                                                       fixed_chrom=(None if sv.overlap_event is None
+                                                                                    else sv.overlap_event[0]))
                 # only set to invalid if required space exceeds chromosome length
                 if chr_len - sv.req_space < 0:  # SV is too big for current chromosome
                     print('CHR_LEN - SV.REQ_SPACE < 0; SETTING SV TO INVALID')
                     valid = False
                     continue
                 else:
-                    if not (sv.dispersion_flip and sv.repeatmasker_event is not None):
-                        start_pos = random_gen.randint(0, chr_len - sv.req_space) if sv.repeatmasker_event is None else \
-                            int(sv.repeatmasker_event[1])
+                    if not (sv.dispersion_flip and sv.overlap_event is not None):
+                        start_pos = random_gen.randint(0, chr_len - sv.req_space) if sv.overlap_event is None else \
+                            int(sv.overlap_event[1])
                         # define the space in which SV operates
                         # we now also know where the target positions lie since we know the order and length of events
                         new_intervals = []  # tracks new ranges of blocks
@@ -399,7 +406,7 @@ class SV_Simulator():
                     else:
                         # to assign subevent "A" to a repeat interval in a flipped dispersion event, need to
                         # anchor the sv the end of "A" and get the start position by subtracting off the total size
-                        end_pos = int(sv.repeatmasker_event[2])
+                        end_pos = int(sv.overlap_event[2])
                         start_pos = end_pos - sv.req_space
                         new_intervals = []  # tracks new ranges of blocks
                         sv.start, sv.start_chr = start_pos, rand_id
