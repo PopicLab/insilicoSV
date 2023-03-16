@@ -10,8 +10,8 @@ dwgsim -C 30 -1 151 -2 151 -y 0 -S 0 -c 0 -m /dev/null -H ${OUTPUT_PREFIX}.hapB.
 mv ${OUTPUT_PREFIX}.dwgsim.hap.0.bfast.fastq.gz ${OUTPUT_PREFIX}.dwgsim.hap.12.fastq.gz
 cat ${OUTPUT_PREFIX}.dwgsim.hap.1.bfast.fastq.gz >> ${OUTPUT_PREFIX}.dwgsim.hap.12.fastq.gz
 rm ${OUTPUT_PREFIX}.dwgsim.hap.1.bfast.fastq.gz
-bwa mem -t 20 -p ${FASTA_PATH} ${OUTPUT_PREFIX}.dwgsim.hap.12.fastq | samtools view -Sb - > ${OUTPUT_PREFIX}.bwamem.bam
-rm ${OUTPUT_PREFIX}.dwgsim.hap.12.fastq
+bwa mem -t 20 -p ${FASTA_PATH} ${OUTPUT_PREFIX}.dwgsim.hap.12.fastq.gz | samtools view -Sb - > ${OUTPUT_PREFIX}.bwamem.bam
+rm ${OUTPUT_PREFIX}.dwgsim.hap.12.fastq.gz
 samtools sort -@ 20 ${OUTPUT_PREFIX}.bwamem.bam > ${OUTPUT_PREFIX}.bwamem.sorted.bam
 rm ${OUTPUT_PREFIX}.bwamem.bam
 samtools index -@ 20 ${OUTPUT_PREFIX}.bwamem.sorted.bam
