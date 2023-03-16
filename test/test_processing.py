@@ -356,5 +356,6 @@ class TestProcessing(unittest.TestCase):
         for i in range(len(records)):
             self.assertTrue(records[i]['nth_sv'] == str(i + 1))
 
+
 if __name__ == "__main__":
     unittest.main()
