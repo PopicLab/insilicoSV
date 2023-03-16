@@ -13,7 +13,7 @@ CONFIG_SIMPLE_EDIT=$5  #<-- (...and input divergent repeat intervals in SVs sect
 python ${SCRIPT_PATH}/simulate.py ${SOURCE_REF} ${CONFIG_R1} ${OUTPUT_PREFIX}1
 python ${SCRIPT_PATH}/simulate.py ${SOURCE_REF} ${CONFIG_R2} ${OUTPUT_PREFIX}2
 # create the vcf whose intervals represent A and A' for all events in R2
-python ${SCRIPT_PATH}/fix_div_dDUP_vcf.py --div_dDUP_vcf ${OUTPUT_PREFIX}1.vcf --avoid_intervals
+python ${SCRIPT_PATH}/div_repeat_postproc.py --div_dDUP_vcf ${OUTPUT_PREFIX}1.vcf --avoid_intervals
 # --> output of the above: R1_avoid_intervals.vcf (to be included in the simple_edit config file)
 # add the simple events to R2, avoiding the intervals taken up by the divergent repeats now inserted into R2
 python ${SCRIPT_PATH}/simulate.py ${OUTPUT_PREFIX}2.hapA.fa ${CONFIG_SIMPLE_EDIT} ${OUTPUT_PREFIX}2_EDIT
