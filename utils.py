@@ -19,10 +19,7 @@ def fail_if_any_overlapping(arr):
     # will raise Exception if any overlap between intervals is found
     # arr: list of tuples
     for x, ele in enumerate(arr):
-        # instead of this, moving the exception to be raised by is_overlapping()
         is_overlapping(arr[:x], ele, called_from_helper=True)
-        # if is_overlapping(arr[:x], ele, called_from_helper=True):
-        #     raise Exception(is_overlapping(arr[:x], ele)[1])
 
 def validate_symbols(source, target):
     '''
@@ -56,11 +53,11 @@ def reset_file(filename):
     with open(filename, "w") as f_reset:
         f_reset.truncate()
 
-def generate_seq(length, random_gen=None):
+def generate_seq(length):
     # helper function for insertions
     # generates random sequence of bases of given length
     base_map = {1:"A", 2: "T", 3: "G", 4: "C"}
-    return ''.join([base_map[random_gen.randint(1, 4)] for _ in range(length)])
+    return ''.join([base_map[random.randint(1, 4)] for _ in range(length)])
 
 def percent_N(seq):
     return 0 if len(seq) == 0 else seq.count('N') / len(seq)
@@ -79,8 +76,7 @@ def complement(seq):
     return output
 
 def divergence(seq):
-    # function to create slightly mutated version of an input sequence (to be used to create
-    # the quasi-repeated section of a divergent repeat/divergent dDUP)
+    # function to create slightly mutated version of an input sequence
     # --> p given as the probability of changing the base, chosen from U(0.5,1.0)
     p = random.uniform(0.5,1.0)
     return ''.join([b if random.random() > p else random.choice(list({"A", "C", "T", "G"} - {b})) for b in seq.upper()])
@@ -109,7 +105,6 @@ def parse_bed_file(bed_fname, keep_type=False):
     return intervals_list
 
 def process_overlap_events(config):
-    overlap_events = []
     if type(config.overlap_events['bed']) is list:
         overlap_events = []
         for bed_path in config.overlap_events['bed']:

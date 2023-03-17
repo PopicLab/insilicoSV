@@ -221,7 +221,7 @@ SVs:
 ```
 Multiple .bed files can be given as input and their records will be combined and drawn from during event placement (in this
 case the user should provide a list of paths). Additionally, the user can provide a list of repetitive element types that
-will be allowed for event placement during simulation (.bed records of all other types being ignored). And example entry
+will be allowed for event placement during simulation (.bed records of all other types being ignored). An example entry
 with multiple .bed files and specified allowed types is:
 ```yaml
 overlap_events:
@@ -231,7 +231,8 @@ overlap_events:
 While the simulator is placing each set of events, the first (`num_overlap`) events of that type will have their location
 given by an event from the .bed file given in the `overlap_events` field that falls within the specified size range for 
 that SV type. Events from the `overlap_events` .bed file(s) will be shuffled on input, and the file is required to have
-the first four columns of standard .bed records (chrom, chromStart, chromEnd, name).
+the first four columns of standard .bed records (chrom, chromStart, chromEnd, name), and only contain events from chromosomes
+included in the base reference used for the simulation.
 
 The output .vcf file will label which events were placed at RepeatMasker intervals with the additional INFO field
 `OVERLAP_EV=True', as in this example record:
@@ -259,6 +260,11 @@ SVs:
 ```
 chr21   16630076        DIVERGENCE      N       DIVERGENCE      100     PASS    END=16630080;SVTYPE=DIVERGENCE;SVLEN=5  GT      0/1
 ```
+
+### Automated pipeline bash scripts
+#### `edit_ref.sh`
+
+#### `divergent_repeat_augmentation.sh`
 
 ## How to Contribute
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate. If you'd like to contribute, please fork the repository and make changes as you'd like.

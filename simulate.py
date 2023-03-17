@@ -107,11 +107,10 @@ class StatsCollection():
 
 
 class SV_Simulator():
-    def __init__(self, ref_file, par_file, random_gen=random, log_file=None):
+    def __init__(self, ref_file, par_file, log_file=None):
         '''
         ref_file: file location to reference genome (.fasta or .fna or .fa)
         par_file: file location to configuration file (.yaml)
-        random_gen: only relevant for unittesting
         log_file: location to store log file with diagnostic information if config parameters indicate so
         '''
         global time_start
@@ -165,7 +164,7 @@ class SV_Simulator():
         self.overlap_events = None if "overlap_events" not in config.keys \
             else utils.process_overlap_events(config)
 
-        self.initialize_svs(random_gen=random_gen)
+        self.initialize_svs()
 
         print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
         time_start = time.time()
@@ -181,7 +180,7 @@ class SV_Simulator():
             key_to_func[key](info)
             # logging.debug(info)
 
-    def get_rand_chr(self, check_size=None, random_gen=random, fixed_chrom=None):
+    def get_rand_chr(self, check_size=None, fixed_chrom=None):
         # random assignment of SV to a chromosome (unless we have a predetermined
         # chromosome for this event, e.g., in the case of placing events
         # at known repetitive element locations)
@@ -194,7 +193,7 @@ class SV_Simulator():
         if len(valid_chrs) == 0:
             raise Exception("SVs are too big for the reference!")
 
-        rand_id = valid_chrs[random_gen.randint(0, len(valid_chrs) - 1)] if fixed_chrom is None else fixed_chrom
+        rand_id = valid_chrs[random.randint(0, len(valid_chrs) - 1)] if fixed_chrom is None else fixed_chrom
         chr_len = self.len_dict[rand_id]
         chr_event_ranges = self.event_ranges[rand_id]
         assert rand_id != None
@@ -210,7 +209,7 @@ class SV_Simulator():
         for rec in vcf.fetch():
             self.event_ranges[rec.chrom].append((rec.start, rec.stop))
 
-    def process_vcf(self, vcf_path, random_gen=random):
+    def process_vcf(self, vcf_path):
         '''
         Method to process vcf containing SVs to be added (deterministically) to reference
         '''
@@ -231,7 +230,7 @@ class SV_Simulator():
             print("{} SVs successfully placed ========== {} seconds".format(active_svs_total, time_dif), end="\r")
             time_start_local = time.time()
 
-    def initialize_svs(self, random_gen=random):
+    def initialize_svs(self):
         '''
         Creates Structural_Variant objects for every SV to simulate and decides zygosity
         self.mode: flag indicating whether SVs are to be randomly generated or read in from VCF
@@ -242,30 +241,24 @@ class SV_Simulator():
                 if "avoid_intervals" in sv_config:
                     continue
                 for num in range(sv_config["number"]):
-                    # for the first (sv_config["num_overlap"]) events, instantiate the SV with the next repeat elt interval
+                    # logic for placing events at intervals given in overlap bed file:
+                    # for the first (sv_config["num_overlap"]) events, instantiate the SV at the next valid repeat elt interval
+                    repeat_elt = None
                     if "num_overlap" in sv_config.keys() and num < sv_config["num_overlap"] \
                             and len(self.overlap_events) > 0:
-                        # add overlap event target event for this
-                        # --> Filter by size: traverse the list until one is found with length within range for sv
-                        repeat_elt = None
+                        # filter by size: traverse the list until one is found with length within range for sv
                         for i in range(len(self.overlap_events)):
                             if sv_config["length_ranges"][0][0] <= \
                                     (int(self.overlap_events[i][2]) - int(self.overlap_events[i][1])) \
                                     <= sv_config["length_ranges"][0][1]:
                                 repeat_elt = self.overlap_events.pop(i)
                                 break
-                        sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
-                                                length_ranges=sv_config["length_ranges"], source=sv_config["source"],
-                                                target=sv_config["target"], overlap_event=repeat_elt)
-                    else:
-                        # if the svtype being simulated is given in the list of non-SV events (e.g., DIVERGENCE)
-                        # then want to add the non-sv flag to the SV object constructor (bad practice?)
-                        sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
-                                                length_ranges=sv_config["length_ranges"], source=sv_config["source"],
-                                                target=sv_config["target"])
+                    sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
+                                            length_ranges=sv_config["length_ranges"], source=sv_config["source"],
+                                            target=sv_config["target"], overlap_event=repeat_elt)
 
                     # For divergent repeat simulation, need div_dDUP to be homozygous
-                    if random_gen.randint(0, 1) or sv.type == Variant_Type.div_dDUP:
+                    if random.randint(0, 1) or sv.type == Variant_Type.div_dDUP:
                         sv.ishomozygous = Zygosity.HOMOZYGOUS
                         sv.hap = [True, True]
                     else:
@@ -281,10 +274,9 @@ class SV_Simulator():
             self.process_vcf(self.vcf_path)
 
     def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta, bedfile, stats_file=None, initial_reset=True,
-                               random_gen=random, verbose=False, export_to_file=True):
+                               verbose=False, export_to_file=True):
         '''
         initial_reset: boolean to indicate if output file should be overwritten (True) or appended to (False)
-        random_gen: only relevant in testing
         stats_file: whether a stats file summarizing SVs simulated will be generated in same directory the reference genome is located in
         '''
         global time_start
@@ -293,7 +285,7 @@ class SV_Simulator():
             utils.reset_file(fasta2_out)
         # edit chromosome
         ref_fasta = self.ref_fasta
-        self.apply_transformations(ref_fasta, random_gen)
+        self.apply_transformations(ref_fasta)
         print("Finished SV placements and transformations in {} seconds".format(time.time() - time_start))
         time_start = time.time()
 
@@ -321,8 +313,6 @@ class SV_Simulator():
                 self.event_ranges[id].sort()
             self.log_to_file("Event Ranges: {}".format(self.event_ranges))
             self.log_to_file("Intervals for hap {}: {}".format(x, edits_dict))
-            # print("Event Ranges: {}".format(self.event_ranges))
-            # print("Intervals for hap {}: {}".format(x, edits_dict))
 
             for id in self.order_ids:
                 # account for homozygous and heterogeneous variants
@@ -345,15 +335,12 @@ class SV_Simulator():
             self.stats.get_info(self.svs)
             self.stats.export_data(stats_file)
 
-    def choose_rand_pos(self, svs, ref_fasta, random_gen=random, verbose=False):
+    def choose_rand_pos(self, svs, ref_fasta, verbose=False):
         '''
         randomly positions SVs and stores reference fragments in SV events
 
         svs: list of Structural Variant objects
         ref_fasta: FastaFile with access to reference file
-        random_gen: only relevant for unittesting #<- TODO: phase this out
-        --> finds valid placement for SV and invokes sv.assign_locations()
-        --> to populate position fields in SV object attributes
         '''
         active_svs_total = 0
         inactive_svs_total = 0
@@ -375,9 +362,7 @@ class SV_Simulator():
                     valid = False
                     break
 
-                # choose chrom (either randomly or taking it deterministically from a repeatmasker event we want to
-                # overlap) and get chromosome length and occupied intervals
-                rand_id, chr_len, chr_event_ranges = self.get_rand_chr(check_size=sv.req_space, random_gen=random_gen,
+                rand_id, chr_len, chr_event_ranges = self.get_rand_chr(check_size=sv.req_space,
                                                                        fixed_chrom=(None if sv.overlap_event is None
                                                                                     else sv.overlap_event[0]))
                 # only set to invalid if required space exceeds chromosome length
@@ -387,8 +372,7 @@ class SV_Simulator():
                     continue
                 else:
                     if not (sv.dispersion_flip and sv.overlap_event is not None):
-                        start_pos = random_gen.randint(0, chr_len - sv.req_space) if sv.overlap_event is None else \
-                            int(sv.overlap_event[1])
+                        start_pos = random.randint(0, chr_len - sv.req_space) if sv.overlap_event is None else int(sv.overlap_event[1])
                         # define the space in which SV operates
                         # we now also know where the target positions lie since we know the order and length of events
                         new_intervals = []  # tracks new ranges of blocks
@@ -400,7 +384,7 @@ class SV_Simulator():
                         # anchor the sv the end of "A" and get the start position by subtracting off the total size
                         end_pos = int(sv.overlap_event[2])
                         start_pos = end_pos - sv.req_space
-                        new_intervals = []  # tracks new ranges of blocks
+                        new_intervals = []
                         sv.start, sv.start_chr = start_pos, rand_id
                         sv.end = end_pos
                         block_start = sv.start
@@ -434,9 +418,6 @@ class SV_Simulator():
                     else:
                         new_intervals.append((block_start, sv.end))
 
-                    # # function to set start/end positions in target Blocks list (ordered list of events)
-                    # sv.assign_locations(sv.start)
-
             # adds new SV to simulate only if chosen positions were valid
             if valid:
                 active_svs_total += 1
@@ -447,7 +428,7 @@ class SV_Simulator():
                 # populates insertions with random sequence - these event symbols only show up in target transformation
                 for event in sv.events_dict.values():
                     if event.source_frag == None and event.length > 0:
-                        event.source_frag = utils.generate_seq(event.length, random_gen)
+                        event.source_frag = utils.generate_seq(event.length)
 
                 # Need to call assign_locations() here because need novel INS sequences to be populated
                 sv.assign_locations(sv.start)
@@ -463,7 +444,7 @@ class SV_Simulator():
                     active_svs_total, len(svs), inactive_svs_total, len(svs), tries, time_dif), end="\r")
             time_start_local = time.time()
 
-    def apply_transformations(self, ref_fasta, random_gen=random):
+    def apply_transformations(self, ref_fasta):
         '''
         Randomly chooses positions for all SVs and carries out all edits
         Populates event classes within SVs with reference fragments and start & end positions
@@ -474,7 +455,7 @@ class SV_Simulator():
         '''
         if self.mode == "randomized":
             # select random positions for SVs
-            self.choose_rand_pos(self.svs, ref_fasta, random_gen)
+            self.choose_rand_pos(self.svs, ref_fasta)
         # in fixed mode self.event_ranges() is populated in process_vcf()
 
         print("Starting edit process...")

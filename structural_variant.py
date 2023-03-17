@@ -164,12 +164,6 @@ class Structural_Variant():
 
         self.req_space = sum([event.length for event in self.source_events])
 
-        # # debug
-        # print('END OF INITIALIZE_EVENTS')
-        # print('sv.events_dict:')
-        # for ev in self.events_dict.keys():
-        #     print(self.events_dict[ev])
-
     def initialize_events_fixed(self, vcf_record, ref_fasta):
         """
         initialization method for SV read in from vcf -- need to prepare objects needed for creation of target blocks
@@ -206,13 +200,7 @@ class Structural_Variant():
         self.start_chr = vcf_record.chrom
 
         # handling for divergent repeat simulation logic
-        # --> when reading in a div_dDUP in fixed mode, want to treat it as a dDUP (in practice we only expect to
-        # --> see div_dDUPs in fixed mode if we're reading in the edited reference that has had divergent repeats --
-        # --> modeled as div_dDUPs -- input into it, so to make the donor reference we want those positions to have
-        # --> dDUPs -- that is, A_A to the reference's A_A*), that is, changing the target to be A_A rather than A_A*
-        # TODO: this is bad practice and precludes the simulation of actual div_dDUPs in fixed mode -- not sure if
-        #  that's a realistic use case, but if it is then this logic will need to change (e.g., perhaps an additional
-        #  simulation flag identifying a divergent repeat simulation in which div_dDUP input types should be converted)
+        # (div_dDUPs placed into R1 need to correspond to dDUPs in R2)
         if self.type == Variant_Type.div_dDUP:
             self.target_unique_char = ("A", "_1", "A'")
 
@@ -226,23 +214,8 @@ class Structural_Variant():
 
     def assign_locations(self, start_pos):
         """
-        assign events start and end positions (the single-sv-level version of choose_rand_pos originally)
-        --> to be performed once source and target Blocks objects are populated and in the right order
-        --> (so the process will be to choose a start position for the SV and assign all the successive positions accordingly)
-        ** NB: will just apply this to target_blocks (the source representation doesn't appear to be necessary beyond
-        being queried for change_fragment())
-        ** usage: going to keep choose_rand_pos() in the simulator object and have that perform the drawing/checking of
-        a valid start position (since that needs access to the max_tries setting from the config), but going to invoke
-        this method to actually modify the target_blocks' events objects to set the start/end positions
+        assign events start and end positions (once target blocks are populated and in the right order)
         """
-        # # debug
-        # print('===LOCATIONS NOT ASSIGNED YET===\ntarget_symbol_blocks:')
-        # for bl in self.target_symbol_blocks:
-        #     print(bl)
-        # print('events_dict:')
-        # for ev in self.events_dict.keys():
-        #     print(self.events_dict[ev])
-
         for block in self.target_symbol_blocks:
             for ev in block:
                 ev.source_chr = self.start_chr
@@ -254,9 +227,7 @@ class Structural_Variant():
                     ev.end = source_ev.end
                     ev.source_frag = self.get_event_frag(source_ev, ev.symbol)
 
-        # ===> then everything that wasn't just assigned will be a new event (all to be modeled as insertion fragments)
-        # ------> thus will just need to have start/end set to the nearest event boundary from the ones placed above^
-        # --> position is just determined by event adjacency, easier to ignore block boundaries here
+        # everything that wasn't assigned above will be modeled as insertion fragment placed at the nearest event boundary
         target_events = [ev for bl in self.target_symbol_blocks for ev in bl]
         # singleton event that's novel (i.e., INS)
         if len(target_events) == 1 and target_events[0].start is None:
@@ -288,14 +259,8 @@ class Structural_Variant():
                     source_event = self.events_dict[ev.symbol[0].upper()]
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
 
-        # locations of target events are assigned, can populate target_events_dict
+        # populating target_events_dict for use in export functions
         self.sv_blocks.generate_target_events_dict()
-
-        # # debug
-        # print('===LOCATIONS ASSIGNED===\ntarget_symbol_blocks:')
-        # for bl in self.target_symbol_blocks:
-        #     print(bl)
-        # print(f'target_events_dict = {self.sv_blocks.target_events_dict}\nsource_events_dict = {self.events_dict}')
 
     def change_fragment(self):
         '''
@@ -307,13 +272,6 @@ class Structural_Variant():
         block_start = None
         block_end = None
 
-        # # debug
-        # print('===CHANGE_FRAGMENT===')
-        # print('(before exec)')
-        # print('sv.events_dict:')
-        # for ev in self.events_dict.keys():
-        #     print(self.events_dict[ev])
-        # print(f'target blocks = {self.target_symbol_blocks}')
         # special case: simple deletion -- len(target_symbol_blocks) == 0
         if self.target_symbol_blocks == [[]]:
             changed_fragments.append([self.start_chr, self.start, self.end, ''])
@@ -355,11 +313,7 @@ class Structural_Variant():
                     changed_fragments.append([del_ev.source_chr, del_ev.start, del_ev.end, ''])
 
         self.changed_fragments = changed_fragments
-        # # debug
-        # print('(after exec)')
-        # print(f'=== CHANGED_FRAGMENTS FOR {self.type} ===\n{self.changed_fragments}')
-        self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
-        # return changed_fragments
+        self.clean_event_storage()
 
     def clean_event_storage(self):
         # remove source fragments from events to save space as they are no longer needed
@@ -391,7 +345,7 @@ class Event():
 
 class Blocks:
     """
-    Groups together target symbols between dispersion events (_)
+    Groups together target symbols between dispersion events
     """
     def __init__(self, sv):
         self.sv = sv
@@ -408,7 +362,7 @@ class Blocks:
 
     def find_blocks(self, transformation):
         # transformation: tuple of strings (source or target chars)
-        # -> returns list of lists of subevents
+        # -> returns list of lists of events
         # Ex. ("A","B","_","C","D") -> [[Event("A",...),Event("B",...)], [Event("_1")], [Event("C",...),Event("D",...)]]
         # Ex. ("A","B","_","_") -> [[Event("A",...),Event("B",...)],[Event("_1")],[Event("_2")]]
         blocks = [[]]
