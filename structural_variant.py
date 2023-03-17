@@ -34,12 +34,10 @@ class Structural_Variant():
             self.source), Structural_Variant.reformat_seq(self.target)
 
         # initialize event classes
-        # *** are these sv.start/end attributes even used?
         self.start = None  # defines the space in which SV operates
         self.end = None
         self.start_chr = None
         self.req_space = None  # required space for SV, sum of event lengths
-        # TODO: only used for iterating over events in choose_rand_pos() -- delete and replace with source_blocks?
         self.source_events = []  # list of Event classes for every symbol in source sequence
         self.events_dict = dict()  # maps every unique symbol in source and target to an Event class
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
@@ -54,14 +52,9 @@ class Structural_Variant():
         if mode == 'randomized':
             self.initialize_events(length_ranges)
         else:
-            # ** in the case of fixed mode, the sim.process_vcf() method seems to act as the alternative initialization
-            # ** method -- better practice to have a fixed mode initialization method here that we'll feed the vcf record to?
             self.initialize_events_fixed(vcf_rec, ref_fasta)
 
         self.sv_blocks = Blocks(self)
-        # debug
-        # print(f'==== sv_blocks object ====\n{sv_blocks}')
-        self.source_symbol_blocks = self.sv_blocks.source_blocks
         self.target_symbol_blocks = self.sv_blocks.target_blocks
 
         if mode == 'randomized':
@@ -75,7 +68,7 @@ class Structural_Variant():
             # stores list of booleans specifying if SV will be applied to certain haplotype for assigned chromosome
             self.hap = [False, False]
         else:
-            # if in fixed mode, will need to manually call assign_locations (since that is called by choose_rand_pos() in random mode)
+            # manual call to assign_locations in fixed mode
             self.assign_locations(self.start)
 
     def __repr__(self):
@@ -183,11 +176,6 @@ class Structural_Variant():
         --> needs to fully populate events_dict with start/end (reflecting optional dispersion flip), lengths, and source frags
         --> (with those in place, Blocks() and assign_locations() should have everything they need to run before change_frags())
         """
-        # # debug
-        # print('==== INITIALIZE_EVENTS (FIXED-MODE) ====')
-        # print(f'source symbols : {self.source_unique_char}')
-        # print(f'target symbols : {self.target_unique_char}')
-
         # for insertions with an insertion sequence given in the vcf, storing the seq in sv attribute
         if vcf_record.info['SVTYPE'] == 'INS':
             if 'INSSEQ' in vcf_record.info:
@@ -395,38 +383,27 @@ class Event():
         self.source_frag = None if not source_frag else source_frag
         self.start = None
         self.end = None
-        # boolean field to indicate whether the event is an SV or a background/non-SV event (e.g., DIVERGENCE)
-        # --> I don't think this field is ultimately necessary (it looks like we can get away with just using
-        # --> the non_sv attribute in the StructuralVariant() object), but it still seems like a useful piece of info
-        # --> to have when we inspect the event objects ... (going to keep it for now)
-        # self.non_sv = non_sv
 
     def __repr__(self):
         return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end,
                                     "source_chr": self.source_chr})
-                                    # "source_frag": self.source_frag if not self.symbol.startswith(Symbols.DIS_MARKING.value) else
-                                    # 'frag omitted',
-                                    # "non_sv": self.non_sv})
 
 
-class Blocks():
+class Blocks:
     """
-    Groups together source and target symbols between dispersion events (_)
+    Groups together target symbols between dispersion events (_)
     """
     def __init__(self, sv):
         self.sv = sv
-        self.source_blocks = []
         self.target_blocks = []
         self.generate_blocks()
         # optional dispersion flip should be done in init step
         if self.sv.type in DISPERSION_TYPES \
                 and self.sv.dispersion_flip:
             self.flip_blocks()
-        # self.track_original_symbol()
         self.target_events_dict = None
 
     def generate_blocks(self):
-        self.source_blocks = self.find_blocks(self.sv.source_unique_char)
         self.target_blocks = self.find_blocks(self.sv.target_unique_char)
 
     def find_blocks(self, transformation):
@@ -454,28 +431,12 @@ class Blocks():
 
     def flip_blocks(self):
         # perform the optional flip of the blocks list dictated by the flipped dispersion
-        # --> caveats: - how to determine which section of the source/target blocks lists to flip?
-        # -->          - how to trigger this/identify or mark a dispersion to be flipped?
-        # -->          - should it be a quality of a whole dispersion-related event?
-        # ===> Is it incorrect to just flip the entire list of target blocks? I don't think this is the completely
-        # general rule, but for all of our dispersion events I think this will always be the case
-        self.source_blocks = self.source_blocks[::-1]
         self.target_blocks = self.target_blocks[::-1]
 
     def generate_target_events_dict(self):
         # setter for target_events_dict attribute (to be populated after location assignment of target events)
         self.target_events_dict = {ev.symbol: ev for b in self.target_blocks for ev in b}
 
-    # TODO: delete -- not used (or shouldn't be anymore)
-    def track_original_symbol(self):
-        # finds which region/block the original symbol is in
-        # if symbol is later found in another region, then translocation detected
-        # blocks: list of lists of symbols
-        for idx, block in enumerate(self.source_blocks):
-            for event in block:
-                if len(event.symbol) == 1:  # means it's an original symbol
-                    event.original_block_idx = idx
-
     def __repr__(self):
-        return f"SOURCE_BLOCKS: {self.source_blocks}\n" \
-               f"TARGET_BLOCKS: {self.target_blocks}"
+        return f"TARGET_BLOCKS: {self.target_blocks}"
+

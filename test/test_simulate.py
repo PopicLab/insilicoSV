@@ -167,36 +167,36 @@ class TestSVSimulator(unittest.TestCase):
                                                    [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
                                                        {"type": "TRA",
                                                         "number": 1,
-                                                        "min_length": {1, 1},
-                                                        "max_length": {1, 1}}]}],
+                                                        "min_length": [1, 1],
+                                                        "max_length": [1, 1]}]}],
                                                    hap1, hap2, bed),
                                         TestObject([ref_file, {"Chromosome19": "CT"}],
                                                    [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
                                                        {"type": "dDUP",
                                                         "number": 1,
-                                                        "min_length": {1, 1},
-                                                        "max_length": {1, 1}}]}],
+                                                        "min_length": [1, 1],
+                                                        "max_length": [1, 1]}]}],
                                                    hap1, hap2, bed),
                                         TestObject([ref_file, {"Chromosome19": "CT"}],
                                                    [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
                                                        {"type": "INV_dDUP",
                                                         "number": 1,
-                                                        "min_length": {1, 1},
-                                                        "max_length": {1, 1}}]}],
+                                                        "min_length": [1, 1],
+                                                        "max_length": [1, 1]}]}],
                                                    hap1, hap2, bed),
                                         TestObject([ref_file, {"Chromosome19": "CTG"}],
                                                    [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
                                                        {"type": "dDUP_iDEL",
                                                         "number": 1,
-                                                        "min_length": {1, 1, 1},
-                                                        "max_length": {1, 1, 1}}]}],
+                                                        "min_length": [1, 1, 1],
+                                                        "max_length": [1, 1, 1]}]}],
                                                    hap1, hap2, bed),
                                         TestObject([ref_file, {"Chromosome19": "CTG"}],
                                                    [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
                                                        {"type": "INS_iDEL",
                                                         "number": 1,
-                                                        "min_length": {1, 1, 1},
-                                                        "max_length": {1, 1, 1}}]}],
+                                                        "min_length": [1, 1, 1],
+                                                        "max_length": [1, 1, 1]}]}],
                                                    hap1, hap2, bed)
                                         ]
         self.test_objects_ins = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
@@ -268,6 +268,7 @@ class TestSVSimulator(unittest.TestCase):
                                                                        "min_length": 2, "max_length": 2,
                                                                        "num_overlap": 1}]}],
                                                        hap1, hap2, bed),
+                                            # combine two input files, filter all but one event by type
                                             TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTA"}],
                                                        [par, {"sim_settings": {"prioritize_top": True},
                                                               "overlap_events": {"bed": [test_overlap_bed, test_overlap_bed_2],
@@ -276,7 +277,40 @@ class TestSVSimulator(unittest.TestCase):
                                                                        "min_length": 2, "max_length": 5,
                                                                        "num_overlap": 1}]}],
                                                        hap1, hap2, bed),
+                                            # combine two input files, filter all by length
+                                            TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTA"}],
+                                                       [par, {"sim_settings": {"prioritize_top": True},
+                                                              "overlap_events": {"bed": [test_overlap_bed, test_overlap_bed_2]},
+                                                              "SVs": [{"type": "DEL", "number": 1,
+                                                                       "min_length": 10, "max_length": 10,
+                                                                       "num_overlap": 1}]}],
+                                                       hap1, hap2, bed)
                                             ]
+        self.test_objects_overlap_cplx = [TestObject([ref_file, {"chr21": "CTGAT"}],
+                                                     [par, {"sim_settings": {"prioritize_top": True},
+                                                            "overlap_events": {"bed": [test_overlap_bed, test_overlap_bed_2],
+                                                                               "allow_types": ["L1HS"]},
+                                                            "SVs": [{"type": "dDUP", "number": 1,
+                                                                     "min_length": [2, 1],
+                                                                     "max_length": [2, 1],
+                                                                     "num_overlap": 1}]}],
+                                                     hap1, hap2, bed),
+                                          TestObject([ref_file, {"chr21": "CTGATATGGAC"}],
+                                                     [par, {"sim_settings": {"prioritize_top": True},
+                                                            "overlap_events": {
+                                                                "bed": [test_overlap_bed, test_overlap_bed_2],
+                                                                "allow_types": ["L1HS", "AluSz6"]},
+                                                            "SVs": [{"type": "TRA", "number": 1,
+                                                                     "min_length": [4, 1],
+                                                                     "max_length": [6, 1],
+                                                                     "num_overlap": 1},
+                                                                    {"type": "INV_dDUP", "number": 1,
+                                                                     "min_length": [1, 1],
+                                                                     "max_length": [1, 1],
+                                                                     "num_overlap": 1}
+                                                                    ]}],
+                                                     hap1, hap2, bed)
+                                          ]
 
         # ---------- test objects for divergence event ------------
         self.test_objects_divergence_event = [TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
@@ -288,6 +322,7 @@ class TestSVSimulator(unittest.TestCase):
     def test_is_overlapping(self):
         # non-insertion cases
         self.assertFalse(utils.is_overlapping([(3, 4), (5, 10)], (4, 5)))
+        self.assertTrue(utils.is_overlapping([(3, 4), (5, 10)], (3, 5)))
         # insertion cases
         self.assertFalse(utils.is_overlapping([(3, 4), (5, 10)], (4, 4)))
         self.assertFalse(utils.is_overlapping([(3, 4), (5, 10), (10, 15)], (10, 10)))
@@ -299,14 +334,17 @@ class TestSVSimulator(unittest.TestCase):
         self.assertFalse(utils.is_overlapping([(3, 4), (5, 10)], (5, 5)))
 
     # helper method for tests where the output will be in a known list of possibilities
-    def helper_test_known_output_svs(self, config_event_obj, target_frags):
+    def helper_test_known_output_svs(self, config_event_obj, target_frags=None):
+        # target_frags: optional input frags to be checked for match with output frags
         config = config_event_obj
         config.initialize_files()
         curr_sim = SV_Simulator(config.ref, config.par)
-        self.assertTrue(curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False))
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         config.remove_test_files()
-        self.assertTrue(changed_frag_1 in target_frags or changed_frag_2 in target_frags)
+        if target_frags is not None:
+            self.assertTrue(changed_frag_1 in target_frags or changed_frag_2 in target_frags)
+        return changed_frag_1, changed_frag_2
 
     def test_simple_deletions(self):
         self.helper_test_known_output_svs(self.test_objects_simple_dels[0], ['CA', 'CT', 'AT'])
@@ -320,12 +358,7 @@ class TestSVSimulator(unittest.TestCase):
     def test_simple_insertions(self):
         # test for INS with random insertion sequences -- going to check the post-mutation length and for the
         # correct placement of the original characters
-        config = self.test_objects_simple_inss[0]
-        config.initialize_files()
-        curr_sim = SV_Simulator(config.ref, config.par)
-        self.assertTrue(curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False))
-        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-        config.remove_test_files()
+        changed_frag_1, changed_frag_2 = self.helper_test_known_output_svs(self.test_objects_simple_inss[0])
         hap_bools = [len(frag) == 7 and (frag[0] == 'C' or frag[-1] == 'A') for frag in
                      [changed_frag_1, changed_frag_2]]
         self.assertTrue(any(hap_bools))
@@ -336,58 +369,21 @@ class TestSVSimulator(unittest.TestCase):
 
     def test_bidirectional_dispersion_events(self):
         # TRA
-        config = self.test_dispersion_objects[0]
-        config.initialize_files()
-        curr_sim = SV_Simulator(config.ref, config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
-        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-        # same output for fwd and bkw TRA
-        self.assertTrue('TC' in [changed_frag_1, changed_frag_2])
+        # same output for forward and backward TRA
+        self.helper_test_known_output_svs(self.test_dispersion_objects[0], ['TC'])
         # dDUP
-        config = self.test_dispersion_objects[1]
-        config.initialize_files()
-        curr_sim = SV_Simulator(config.ref, config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
-        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-        if not curr_sim.svs[0].dispersion_flip:
-            self.assertTrue('CTC' in [changed_frag_1, changed_frag_2])
-        else:
-            self.assertTrue('TCT' in [changed_frag_1, changed_frag_2])
+        # different output for forward and backward dDUP
+        self.helper_test_known_output_svs(self.test_dispersion_objects[1], ['CTC', 'TCT'])
         # INV_dDUP
-        config = self.test_dispersion_objects[2]
-        config.initialize_files()
-        curr_sim = SV_Simulator(config.ref, config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
-        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-        if not curr_sim.svs[0].dispersion_flip:
-            self.assertTrue('CTG' in [changed_frag_1, changed_frag_2])
-        else:
-            self.assertTrue('ACT' in [changed_frag_1, changed_frag_2])
+        self.helper_test_known_output_svs(self.test_dispersion_objects[2], ['CTG', 'ACT'])
         # dDUP_iDEL
-        config = self.test_dispersion_objects[3]
-        config.initialize_files()
-        curr_sim = SV_Simulator(config.ref, config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
-        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-        if not curr_sim.svs[0].dispersion_flip:
-            self.assertTrue('CTC' in [changed_frag_1, changed_frag_2])
-        else:
-            self.assertTrue('GTG' in [changed_frag_1, changed_frag_2])
+        self.helper_test_known_output_svs(self.test_dispersion_objects[3], ['CTC', 'GTG'])
         # INS_iDEL
-        config = self.test_dispersion_objects[4]
-        config.initialize_files()
-        curr_sim = SV_Simulator(config.ref, config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
-        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-        if not curr_sim.svs[0].dispersion_flip:
-            self.assertTrue('TC' in [changed_frag_1, changed_frag_2])
-        else:
-            self.assertTrue('GT' in [changed_frag_1, changed_frag_2])
+        self.helper_test_known_output_svs(self.test_dispersion_objects[4], ['TC', 'GT'])
 
     def test_overlap_placement(self):
-        # simple events -- with respect to toy reference chr21: CTCCGTCGTA
+        # simple events
         for i in range(len(self.test_objects_overlap_simple)):
-            # type = list(simple_targets.keys())[i]
             config = self.test_objects_overlap_simple[i]
             config.initialize_files()
             curr_sim = SV_Simulator(config.ref, config.par)
@@ -396,23 +392,36 @@ class TestSVSimulator(unittest.TestCase):
             if i == 0:
                 self.assertTrue('CTGTCGTA' in [changed_frag_1, changed_frag_2])
             elif i == 1:
+                self.assertEqual(len(curr_sim.overlap_events), 1)
                 self.assertTrue('CCCC' in changed_frag_1 or 'CCCC' in changed_frag_2)
             elif i == 2:
                 self.assertTrue('AA' not in changed_frag_1 or 'AA' not in changed_frag_2)
-
+            elif i == 3:
+                self.assertIsNone(curr_sim.svs[0].overlap_event)
+        # complex events
+        for i in range(len(self.test_objects_overlap_cplx)):
+            if i == 0:
+                self.helper_test_known_output_svs(self.test_objects_overlap_cplx[i], ['CTGATGA', 'CGATGAT'])
+            elif i == 1:
+                # TRA [5,10) -> [10]; INV_dDUP [1,2) -> [0] or [3] - source ref: CTGATATGGAC
+                changed_frag_1, changed_frag_2 = self.helper_test_known_output_svs(self.test_objects_overlap_cplx[i])
+                # need to account for the events being placed on opposite haplotypes, so will check for each separately
+                # just forward TRA: CTGAT[->]C[ATGGA]; just backwards TRA: CTGA[ATGGA]T[<-]C
+                # just forward INV_dDUP: C[T->]G[A]ATATGGAC; just backwards INV_dDUP: [A]C[<-T]GATATGGAC
+                # --> check for INV_dDUP in first four characters of output refs
+                self.assertTrue(changed_frag_1[:4] in ['CTGA', 'ACTG'] or changed_frag_2[:4] in ['CTGA', 'ACTG'])
+                # --> check for TRA in second half of refs
+                self.assertTrue(changed_frag_1[-7:] in ['TCATGGA', 'ATGGATC'] or changed_frag_2[-7:] in ['TCATGGA', 'ATGGATC'])
 
     def test_divergence_events(self):
         # the divergence operator will mutate each base in an event interval with probability p
         # --> going to check for randomized placement of a divergence by checking that the output sequence
         # --> is not contained in the unedited reference (for event of length 5 and dummy reference: CTCCGTCGTA)
-        config = self.test_objects_divergence_event[0]
-        config.initialize_files()
-        curr_sim = SV_Simulator(config.ref, config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
-        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-        self.assertTrue(changed_frag_1 not in config.ref or changed_frag_2 not in config.ref)
+        changed_frag_1, changed_frag_2 = self.helper_test_known_output_svs(self.test_objects_divergence_event[0])
+        self.assertTrue(changed_frag_1 not in self.test_objects_divergence_event[0].ref or
+                        changed_frag_2 not in self.test_objects_divergence_event[0].ref)
 
-    def test_flanked_events(self):
+    def test_flanked_inversions(self):
         # tests for dupINVdup, delINVdel, etc.
         # --> all getting the reference CTCCGT
         targets = {'dupINVdup': 'CTACGGAGGT',
@@ -420,36 +429,19 @@ class TestSVSimulator(unittest.TestCase):
                    'delINVdup': 'ACGGGT',
                    'dupINVdel': 'CTGGAG'}
         for i in range(4):
-            type = list(targets.keys())[i]
-            config = self.test_objects_no_dis[i + 5]
-            config.initialize_files()
-            curr_sim = SV_Simulator(config.ref, config.par)
-            curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
-            changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-            self.assertTrue(targets[type] in [changed_frag_1, changed_frag_2])
+            self.helper_test_known_output_svs(self.test_objects_no_dis[i + 5], [targets[list(targets.keys())[i]]])
 
     def test_delINV_INVdel_events(self):
         # starter reference CTCCGT; each event of length 3
         targets = {'delINV': 'ACG',
                    'INVdel': 'GAG'}
         for i in range(2):
-            type = list(targets.keys())[i]
-            config = self.test_objects_no_dis[i + 9]
-            config.initialize_files()
-            curr_sim = SV_Simulator(config.ref, config.par)
-            curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
-            changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-            self.assertTrue(targets[type] in [changed_frag_1, changed_frag_2])
+            self.helper_test_known_output_svs(self.test_objects_no_dis[i + 9], [targets[list(targets.keys())[i]]])
 
     def test_inverted_duplication_events(self):
         # inverted dup as simulated by SURVIVOR (A -> aa')
         # reference CGT (min A length 3) --> desired output: ACGACG
-        config = self.test_objects_no_dis[11]
-        config.initialize_files()
-        curr_sim = SV_Simulator(config.ref, config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
-        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-        self.assertTrue('ACGACG' in [changed_frag_1, changed_frag_2])
+        self.helper_test_known_output_svs(self.test_objects_no_dis[11], ['ACGACG'])
 
     def test_avoid_intervals(self):
         # test of calling choose_rand_pos and avoiding pre-specified intervals

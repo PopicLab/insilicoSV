@@ -162,10 +162,6 @@ class SV_Simulator():
                 # add intervals from vcf to event range
                 self.extract_vcf_event_intervals(d["avoid_intervals"])
 
-        # print('CALLING INITIALIZE_SVS')
-        # list of overlap_event events to be populated from optionally input bed file
-        # self.overlap_events = None if "overlap_events" not in config.keys \
-        #     else utils.parse_bed_file(config.overlap_events['bed'])
         self.overlap_events = None if "overlap_events" not in config.keys \
             else utils.process_overlap_events(config)
 
@@ -251,6 +247,7 @@ class SV_Simulator():
                             and len(self.overlap_events) > 0:
                         # add overlap event target event for this
                         # --> Filter by size: traverse the list until one is found with length within range for sv
+                        repeat_elt = None
                         for i in range(len(self.overlap_events)):
                             if sv_config["length_ranges"][0][0] <= \
                                     (int(self.overlap_events[i][2]) - int(self.overlap_events[i][1])) \
@@ -267,8 +264,7 @@ class SV_Simulator():
                                                 length_ranges=sv_config["length_ranges"], source=sv_config["source"],
                                                 target=sv_config["target"])
 
-                    # Because of the two-staged procedure to generate reads with div_dDUPs, need
-                    # to always treat div_dDUPs as homozygous (we need both haplotypes to reflect the event)
+                    # For divergent repeat simulation, need div_dDUP to be homozygous
                     if random_gen.randint(0, 1) or sv.type == Variant_Type.div_dDUP:
                         sv.ishomozygous = Zygosity.HOMOZYGOUS
                         sv.hap = [True, True]
@@ -276,9 +272,6 @@ class SV_Simulator():
                         sv.ishomozygous = Zygosity.HETEROZYGOUS
                         sv.hap = random.choice([[True, False], [False, True]])
 
-                    # debug
-                    # print(f'sv = {sv}')
-                    # print(f'sv.events_dict = {sv.events_dict}')
                     self.svs.append(sv)
             # shuffle svs if we are not prioritizing the simulation of the SVs inputted first
             if not self.sim_settings["prioritize_top"]:
@@ -351,7 +344,6 @@ class SV_Simulator():
         if stats_file:
             self.stats.get_info(self.svs)
             self.stats.export_data(stats_file)
-        return True
 
     def choose_rand_pos(self, svs, ref_fasta, random_gen=random, verbose=False):
         '''

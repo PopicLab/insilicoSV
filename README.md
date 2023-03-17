@@ -194,15 +194,15 @@ python simulate.py <ref.fna> <par.yaml> <prefix>
 
 ### Example 4 - Placing events at known repetitive element intervals
 To augment a randomized simulation of events onto an input reference, the user can include in the simulation config
-file the path to a .bed file containing repetitive element intervals (i.e., RepeatMasker events). In addition to
-providing the path to the RepeatMasker .bed file, the user will also need to specify how many of each event type they
+file the path to a .bed file containing repetitive element intervals (e.g., RepeatMasker events). In addition to
+providing the path to the relevant .bed file(s), the user will also need to specify how many of each event type they
 wish to be placed at events from the .bed file. An example config with these inputs is:
 ```yaml
 sim_settings:
     max_tries: 200
     prioritize_top: True
-repeatmasker:
-    bed: '/athena/ihlab/scratch/crohlice/software/insilicoSV/repeatmasker_feature/repeatmasker_hg38_chr21_5k_10k.bed'
+overlap_events:
+    bed: '/{path_to}/{candidate_overlap_events}.bed'
 SVs:
     - type: "DEL"
       number: 10
@@ -210,25 +210,33 @@ SVs:
         - 5
       max_length:
         - 5
-      RM_overlaps: 5
+      num_overlap: 5
     - type: "DUP"
       number: 10
       min_length:
         - 5
       max_length:
         - 5
-      RM_overlaps: 2
+      num_overlap: 2
 ```
-While the simulator is placing each set of events, the first (`RM_overlaps`) events of that type will have their location
-given an event from the .bed file given in the `repeatmasker` field. Events from the `repeatmasker` .bed file will be
-taken in the order in which they appear in the file, so the user is expected to perform any necessary shuffling or
-filtering such that all records can be taken as valid event interval (e.g., the simulator won't perform any checks to ensure
-that an interval taken from the .bed file is within a desired size range).
+Multiple .bed files can be given as input and their records will be combined and drawn from during event placement (in this
+case the user should provide a list of paths). Additionally, the user can provide a list of repetitive element types that
+will be allowed for event placement during simulation (.bed records of all other types being ignored). And example entry
+with multiple .bed files and specified allowed types is:
+```yaml
+overlap_events:
+    bed: ['/{path_to}/{candidate_overlap_events_1}.bed','/{path_to}/{candidate_overlap_events_2}.bed']
+    allow_types: ['L1HS', 'L1PA3']
+```
+While the simulator is placing each set of events, the first (`num_overlap`) events of that type will have their location
+given by an event from the .bed file given in the `overlap_events` field that falls within the specified size range for 
+that SV type. Events from the `overlap_events` .bed file(s) will be shuffled on input, and the file is required to have
+the first four columns of standard .bed records (chrom, chromStart, chromEnd, name).
 
 The output .vcf file will label which events were placed at RepeatMasker intervals with the additional INFO field
-`RM_OVERLAP=True', as in this example record:
+`OVERLAP_EV=True', as in this example record:
 ```
-chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;RM_OVERLAP=True  GT  0/1
+chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVERLAP_EV=True  GT  0/1
 ```
 The current set of event types that are amenable to this feature are DEL, DUP, INV, dDUP, INV_dDUP, and TRA.
 
