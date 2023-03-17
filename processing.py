@@ -272,6 +272,8 @@ class FormatterIO():
             else:
                 if sv.type == Variant_Type.INS:
                     # special case of simple INS: sv length \neq (sv end - sv start)
+                    # **pysam will delete END fields that are equal to POS, therefore INS records won't have an END
+                    rec_end += 1
                     info_field = {'SVTYPE': sv.type.value, 'SVLEN': sv.events_dict['A'].length}
                 else:
                     info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}

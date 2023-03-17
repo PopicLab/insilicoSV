@@ -1,8 +1,7 @@
 from simulate import SV_Simulator
 from processing import FormatterIO
 from test_simulate import TestObject
-from pysam import FastaFile
-from pysam import VariantFile
+from pysam import VariantFile, FastaFile
 import unittest
 import sys
 import os
@@ -30,6 +29,19 @@ class TestProcObject(TestObject):
                               'nth_sv': ln[10], 'order': ln[11]}
                 bed_records.append(bed_record)
         return bed_records
+
+    def extract_vcf_records(self):
+        vcf_records = []
+        vcf = VariantFile(self.vcf)
+        for rec in vcf.fetch():
+            ln = str(rec).split()
+            # separately parse info field of the form: 'END=45590417;SVTYPE=dDUP;SVLEN=539;TARGET=45581738'
+            info = {field.split('=')[0]: field.split('=')[1] for field in ln[7].split(';')}
+            vcf_record = {'CHROM': ln[0], 'POS': ln[1], 'ID': ln[2], 'REF': ln[3], 'ALT': ln[4], 'QUAL': ln[5],
+                          'FILTER': ln[6], 'INFO': info, 'FORMAT': ln[8], 'SAMPLE': ln[9]}
+            vcf_records.append(vcf_record)
+        return vcf_records
+
 
 
 class TestProcessing(unittest.TestCase):
@@ -168,8 +180,7 @@ class TestProcessing(unittest.TestCase):
                                                              self.hap1, self.hap2, self.bed, self.vcf)}
         self.test_objects_multievent = {'INVdup': TestProcObject([self.ref_file, {"chr19": "ACTGCTAATGCGTTC"}],
                                                                  [self.par,
-                                                                  {"sim_settings":
-                                                                       {"max_tries": 50, "prioritize_top": True},
+                                                                  {"sim_settings": {"max_tries": 50, "prioritize_top": True},
                                                                    "SVs": [{"type": "INVdup", "number": 3,
                                                                             "max_length": 4,
                                                                             "min_length": 2}]}],
@@ -183,16 +194,14 @@ class TestProcessing(unittest.TestCase):
         config.initialize_files()
         curr_sim = SV_Simulator(config.ref, config.par)
         curr_sim.apply_transformations(FastaFile(curr_sim.ref_file))
-        records = None
         if output_type == 'bed':
             if ins_fasta:
                 utils.remove_file(ins_fasta)
             self.formatter.export_to_bedpe(curr_sim.svs, self.bed, ins_fasta=ins_fasta)
             records = config.extract_bed_records()
         elif output_type == 'vcf':
-            pass
-            # self.formatter.export_to_vcf(curr_sim, curr_sim.stats, vcffile=self.vcf)
-            # TODO: write an extract_vcf_records() function
+            self.formatter.export_to_vcf(curr_sim.svs, curr_sim.stats, vcffile=self.vcf)
+            records = config.extract_vcf_records()
         else:
             raise ValueError('output_type must be \'bed\' or \'vcf\'')
         return records
@@ -219,6 +228,19 @@ class TestProcessing(unittest.TestCase):
             all([record['order'] == str(int(record['ev_type'] in constants.NONZERO_ORDER_OPERATIONS)) for record in
                  records]))
         self.assertTrue(set([record['zyg'] for record in records]) in [{'1/1'}, {'0/1'}])
+
+    def singleton_event_vcf_tests(self, record, sv_type, chrom, possible_intervals, possible_targets=None):
+        # possible_intervals/targets: list of (start, end) pairs target values the record could take on
+        self.assertTrue(record['CHROM'] == chrom)
+        self.assertTrue(record['ID'] == record['INFO']['SVTYPE'] == sv_type)
+        self.assertIn(record['SAMPLE'], ['1/1', '0/1'])
+        if sv_type != 'INS':
+            self.assertIn((record['POS'], record['INFO']['END']), possible_intervals)
+            self.assertTrue(int(record['INFO']['SVLEN']) == (int(record['INFO']['END']) - int(record['POS']) + 1))
+        else:
+            self.assertIn(record['POS'], [ivl[0] for ivl in possible_intervals])
+        if possible_targets:
+            self.assertIn(record['INFO']['TARGET'], possible_targets)
 
     def test_export_bedpe_simple_events(self):
         for sv_type in ['DEL', 'DUP', 'INV', 'INS']:
@@ -355,6 +377,49 @@ class TestProcessing(unittest.TestCase):
         records = self.initialize_test(self.test_objects_multievent, 'INVdup')
         for i in range(len(records)):
             self.assertTrue(records[i]['nth_sv'] == str(i + 1))
+
+    def test_export_vcf_simple_events(self):
+        for sv_type in ['DEL', 'DUP', 'INV', 'INS']:
+            record = self.initialize_test(self.test_objects_simple_events, sv_type, output_type='vcf')[0]
+            possible_intervals = [('1', '3')] if sv_type != 'INS' else [('1', None), ('2', None)]
+            self.singleton_event_vcf_tests(record, sv_type, 'chr19', possible_intervals)
+
+    def test_export_vcf_flanked_inversions(self):
+        for sv_type in ['dupINVdup', 'delINVdel', 'dupINVdel', 'delINVdup']:
+            record = self.initialize_test(self.test_objects_flanked_inversions, sv_type, output_type='vcf')[0]
+            self.singleton_event_vcf_tests(record, sv_type, 'chr19', [('1', '6')])
+
+    def test_export_vcf_dispersions(self):
+        for sv_type in ['dDUP', 'INV_dDUP', 'TRA']:
+            record = self.initialize_test(self.test_objects_dispersions, sv_type, output_type='vcf')[0]
+            self.singleton_event_vcf_tests(record, sv_type, 'chr19', [('4', '6'), ('1', '3')], ['0', '6'])
+
+    def test_export_vcf_del_inv(self):
+        for sv_type in ['delINV', 'INVdel']:
+            record = self.initialize_test(self.test_objects_del_inv, sv_type, output_type='vcf')[0]
+            self.singleton_event_vcf_tests(record, sv_type, 'chr19', [('1', '6')])
+
+    def test_export_vcf_idel(self):
+        for sv_type in ['dDUP_iDEL', 'INS_iDEL']:
+            record = self.initialize_test(self.test_objects_idel, sv_type, output_type='vcf')[0]
+            self.singleton_event_vcf_tests(record, sv_type, 'chr19', [('1', '3'), ('6', '8')], ['3', '5'])
+
+    def test_export_vcf_dup_inv(self):
+        for sv_type in ['dup_INV', 'INV_dup']:
+            record = self.initialize_test(self.test_objects_dup_inv, sv_type, output_type='vcf')[0]
+            self.singleton_event_vcf_tests(record, sv_type, 'chr19', [('1', '8')])
+
+    def test_export_vcf_INVdup(self):
+        record = self.initialize_test(self.test_objects_INVdup, 'INVdup', output_type='vcf')[0]
+        self.singleton_event_vcf_tests(record, 'INVdup', 'chr19', [('1', '4')])
+
+    def test_export_vcf_multievent(self):
+        records = self.initialize_test(self.test_objects_multievent, 'INVdup', output_type='vcf')
+        for record in records:
+            self.assertTrue(record['CHROM'] == 'chr19')
+            self.assertTrue(record['ID'] == record['INFO']['SVTYPE'] == 'INVdup')
+            self.assertIn(record['SAMPLE'], ['1/1', '0/1'])
+            self.assertIn(record['INFO']['SVLEN'], ['2', '3', '4'])
 
 
 if __name__ == "__main__":
