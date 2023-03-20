@@ -4,10 +4,10 @@
 SCRIPT=$(realpath "$0")
 SCRIPT_PATH=$(dirname "$SCRIPT")
 SOURCE_REF=$1
-CONFIG_R1=$2
-CONFIG_R2=$3
+CONFIG_R1=$2  #<-- config with parameters for SVs of type div_dDUP
+CONFIG_R2=$3  #<-- config with SVs entry giving the - vcf_path: {output_prefix}1.vcf
 OUTPUT_PREFIX=$4
-CONFIG_SIMPLE_EDIT=$5  #<-- (...and input divergent repeat intervals in SVs section input with - avoid_intervals: {vcf_path})
+CONFIG_SIMPLE_EDIT=$5  #<-- must input divergent repeat intervals in SVs section input with - avoid_intervals: {vcf_path}
 
 # generate R1 and R2
 python ${SCRIPT_PATH}/simulate.py ${SOURCE_REF} ${CONFIG_R1} ${OUTPUT_PREFIX}1

@@ -380,8 +380,8 @@ class SV_Simulator():
                         sv.end = sv.start + sv.req_space
                         block_start = sv.start
                     else:
-                        # to assign subevent "A" to a repeat interval in a flipped dispersion event, need to
-                        # anchor the sv the end of "A" and get the start position by subtracting off the total size
+                        # to assign event "A" to a repeat interval in a flipped dispersion event, need to
+                        # anchor the sv to the end of "A" and get the start position by subtracting off the total size
                         end_pos = int(sv.overlap_event[2])
                         start_pos = end_pos - sv.req_space
                         new_intervals = []
@@ -389,7 +389,6 @@ class SV_Simulator():
                         sv.end = end_pos
                         block_start = sv.start
 
-                    # start/end positions and reference source fragments defined for the subevents
                     for sv_event in sv.source_events:
                         # store start and end position and reference fragment
                         sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length

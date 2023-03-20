@@ -10,12 +10,12 @@ class Structural_Variant():
         Initializes SV's transformation and sets up its events, along with several other basic attributes like zygosity
 
         sv_type: Enum either specifying one of the prewritten classes or a Custom transformation, in which case source and target are required
-        mode: flag to indicate whether we're in fixed or randomized mode
+        mode: flag to indicate whether constructor called in fixed or randomized mode
         length_ranges: list containing tuple(s) (min_length, max_length) OR singleton int given if the SV is of known
             position/is being read in from a vcf of known/fixed variants
         source: tuple representing source sequence, optional
         target: tuple representing target sequence, optional
-        vcf_rec: (to be used in fixed mode) vcf record giving sv information that will instantiate the event
+        vcf_rec: (fixed mode) vcf record giving sv information that will instantiate the event
         ref_fasta: for extracting reference frag for vcf records in fixed mode initialization
         overlap_event: (chr, start, end) tuple representing the repeatmasker event that this SV is meant to overlap
         '''
@@ -147,7 +147,7 @@ class Structural_Variant():
         # initialize event classes
         for idx, symbol in enumerate(all_symbols):
             # empty event - no source fragment yet
-            # --> if we're trying to overlap a repeatmasker event, want to set this event's "A" subevent to
+            # --> if we're trying to overlap a repetitive event, want to set this event's "A" event to
             # that repetitive element's interval
             if symbol == 'A' and self.overlap_event is not None:
                 rm_event_len = int(self.overlap_event[2]) - int(self.overlap_event[1])
@@ -303,9 +303,8 @@ class Structural_Variant():
                     if i == len(block) - 1:
                         block_end = ev.end
                 changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
-            # general DEL logic: for all source events whose symbol doesn't appear (in any form) in the target symbols,
+            # DEL logic: for all source events whose symbol doesn't appear (in any form) in the target symbols,
             # create a deletion fragment over that interval
-            # # collect reference list of all source
             target_symbols = [ev.symbol[0].upper() for bl in self.target_symbol_blocks for ev in bl]
             for source_sym in self.events_dict.keys():
                 if not source_sym.startswith(Symbols.DIS_MARKING.value) and source_sym not in target_symbols:
