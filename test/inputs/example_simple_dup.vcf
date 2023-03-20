@@ -477,4 +477,4 @@
 ##INFO=<ID=SAN_FEMALE_CN_NONREF_COUNT,Number=1,Type=Integer,Description="Number of SAN FEMALE samples with non-reference copy states (multiallelic CNVs only).">
 ##INFO=<ID=SAN_FEMALE_CN_NONREF_FREQ,Number=1,Type=Float,Description="Frequency of SAN FEMALE samples with non-reference copy states (multiallelic CNVs only).">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	HG00096
-chr21	3	HGSV_240929	N	<DUP>	86	PASS	END=10;SVTYPE=DUP;CHR2=chr21;SVLEN=7	GT:GQ:RD_CN:RD_GQ:PE_GT:PE_GQ:SR_GT:SR_GQ:EV	1/1:133:2:133:.:.:.:.:RD
+chr21	3	HGSV_240929	N	<DUP>	86	PASS	END=9;SVTYPE=DUP;CHR2=chr21;SVLEN=7	GT:GQ:RD_CN:RD_GQ:PE_GT:PE_GQ:SR_GT:SR_GQ:EV	1/1:133:2:133:.:.:.:.:RD

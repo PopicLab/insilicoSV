@@ -170,11 +170,6 @@ class Structural_Variant():
         --> needs to fully populate events_dict with start/end (reflecting optional dispersion flip), lengths, and source frags
         --> (with those in place, Blocks() and assign_locations() should have everything they need to run before change_frags())
         """
-        # for insertions with an insertion sequence given in the vcf, storing the seq in sv attribute
-        if vcf_record.info['SVTYPE'] == 'INS':
-            if 'INSSEQ' in vcf_record.info:
-                self.insseq_from_rec = vcf_record.info['INSSEQ'][0]
-
         source_len = vcf_record.stop - vcf_record.start if 'SVLEN' not in vcf_record.info else vcf_record.info['SVLEN']
         for symbol in self.source_unique_char:
             if symbol == 'A':
@@ -194,9 +189,18 @@ class Structural_Variant():
                 disp_ev.source_chr = vcf_record.chrom
                 disp_ev.source_frag = ref_fasta.fetch(disp_ev.source_chr, disp_ev.start, disp_ev.end)
                 self.events_dict[symbol] = disp_ev
-        # need to have self.start/end defined for change_fragment()
-        self.start = self.events_dict['A'].start
-        self.end = self.events_dict['A'].end if '_1' not in self.events_dict.keys() else self.events_dict['_1'].end
+        # for insertions with an insertion sequence given in the vcf, storing the seq in sv attribute
+        if vcf_record.info['SVTYPE'] == 'INS':
+            if 'INSSEQ' in vcf_record.info:
+                self.insseq_from_rec = vcf_record.info['INSSEQ'][0]
+            source_ev = Event(self, source_len, (source_len, source_len), 'A')
+            self.events_dict['A'] = source_ev
+            self.start = vcf_record.start
+            self.end = self.start
+        else:
+            # need to have self.start/end defined for assign_locations()
+            self.start = self.events_dict['A'].start
+            self.end = self.events_dict['A'].end if '_1' not in self.events_dict.keys() else self.events_dict['_1'].end
         self.start_chr = vcf_record.chrom
 
         # handling for divergent repeat simulation logic

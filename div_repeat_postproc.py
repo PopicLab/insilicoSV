@@ -37,8 +37,8 @@ def correct_positions_div(input_vcf, label_entire_event=False, avoid_intervals=F
                     rec.stop = rec.info['TARGET'] + rec.info['SVLEN']
                     rec.info['TARGET'] = -1
                     rec.info['SVLEN'] = rec.stop - rec.start
-                # remove divergent repeat sequence for reporting
-                rec.info['DIV_REPEAT'] = '(removed)'
+                # # remove divergent repeat sequence for reporting
+                # rec.info['DIV_REPEAT'] = '(removed)'
                 out_vcf.write(rec)
             else:
                 # output separate records for each A and A* ("B") to serve as avoid intervals for further simulation
@@ -49,7 +49,7 @@ def correct_positions_div(input_vcf, label_entire_event=False, avoid_intervals=F
                     rec_A.alts = ('div_dDUP_A',)
                     rec_A.info['SVTYPE'] = 'div_dDUP_A'
                     rec_A.info['TARGET'] = -1
-                    rec_A.info['DIV_REPEAT'] = 'NA'
+                    # rec_A.info['DIV_REPEAT'] = 'NA'
                     # setting the above unsets rec.stop, so need to reset it to the original
                     rec_A.stop = rec.stop
                     # if the event is flipped, then need to shift the _A interval by one interval length
@@ -62,7 +62,7 @@ def correct_positions_div(input_vcf, label_entire_event=False, avoid_intervals=F
                     rec_B.stop = rec_B.info['TARGET'] + rec.info['SVLEN']
                     rec_B.info['SVTYPE'] = 'div_dDUP_B'
                     rec_B.info['TARGET'] = -1
-                    rec_B.info['DIV_REPEAT'] = 'NA'
+                    # rec_B.info['DIV_REPEAT'] = 'NA'
                     out_vcf.write(rec_A)
                     out_vcf.write(rec_B)
 

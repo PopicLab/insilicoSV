@@ -2,25 +2,15 @@ import unittest
 import sys
 import os
 
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from simulate import *
 from pysam import VariantFile
 from test_simulate import TestObject
 
 
-# -- Class attributes from TestObject --
-# self.ref = ref[0]
-# self.ref_content = ref[1]
-# self.par = par[0]
-# self.par_content = par[1]
-# self.hap1 = hap1
-# self.hap2 = hap2
-# self.bed = bed
 class TestKnownSVs(unittest.TestCase):
 
     def setUp(self):
-        # runs before every test
         test_vcf_simple_del = "test/inputs/example_simple_del.vcf"
         test_vcf_simple_dup = "test/inputs/example_simple_dup.vcf"
         test_vcf_simple_inv = "test/inputs/example_simple_inv.vcf"
@@ -64,61 +54,59 @@ class TestKnownSVs(unittest.TestCase):
         self.test_object_div_dDUP = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                   [par, {"SVs": [{"vcf_path": test_vcf_div_dDUP}]}], hap1, hap2, bed)
 
-    # TODO: add tests for different genotypes
-    def helper_test_simple_sv(self, sv_type, config_event_obj, input_frag, target_frag):
+    def helper_test_simple_sv(self, config_event_obj, target_frags=None):
         # template test method for simple SVs
         config = config_event_obj
         config.initialize_files()
         fixed_sim = SV_Simulator(config.ref, config.par)
-        self.assertEqual(fixed_sim.produce_variant_genome(fasta1_out=config.hap1, fasta2_out=config.hap2,
-                                                          ins_fasta=config.ref, bedfile=config.bed, verbose=False), True)
-        changed_frag_hap1 = config.get_actual_frag(return_haps='hap1')  # fetch fragment produced by simulator
-        changed_frag_hap2 = config.get_actual_frag(return_haps='hap2')
-        config.remove_test_files()  # remove any output files and .fai files
-        print(f'input frag from simple {sv_type} test = {input_frag}')
-        print(f'changed frag (hap1) from simple {sv_type} test = {changed_frag_hap1}')
-        print(f'changed frag (hap2) from simple {sv_type} test = {changed_frag_hap2}')
-        # self.assertEqual(changed_frag_hap1, target_frag)
-        self.assertTrue((changed_frag_hap1 == target_frag) or (changed_frag_hap2 == target_frag))
-        # print((changed_frag_hap1 == target_frag))
-        # print((changed_frag_hap2 == target_frag))
+        fixed_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
+        changed_frag_hap1, changed_frag_hap2 = config.get_actual_frag(return_haps='both')
+        config.remove_test_files()
+        # debug
+        print(f'frag1 = {changed_frag_hap1}, frag2 = {changed_frag_hap2}')
+        if target_frags is not None:
+            self.assertTrue(changed_frag_hap1 in target_frags or changed_frag_hap2 in target_frags)
 
+    def test_simple_del(self):
+        self.helper_test_simple_sv(self.test_object_simple_DEL, ['GCCTCCGT'])
 
-    # TODO: GENTOYPE ASSIGNMENT HAS BEEN MADE RANDOM IN FIXED MODE AND THAT MAKES THESE TESTS FAIL HALF THE TIME
-    #  NEED TO FIX!!
-    # def test_simple_del(self):
-    #     self.helper_test_simple_sv('DEL', self.test_object_simple_DEL, 'GCACTATCTCTCCGT', 'GCCTCCGT')
-    #
-    # def test_simple_dup(self):
-    #     self.helper_test_simple_sv('DUP', self.test_object_simple_DUP, 'GCACTATCTCTCCGT', 'GCACTATCTACTATCTCTCCGT')
-    #
-    # def test_simple_inv(self):
-    #     self.helper_test_simple_sv('INV', self.test_object_simple_INV, 'GCACTATCTCTCCGT', 'GCAGATAGTCTCCGT')
-    #
-    # def test_simple_ins(self):
-    #     self.helper_test_simple_sv('INS', self.test_object_simple_INS, 'GCACTATCTCTCCGT', 'GCGGGGGGGACTATCTCTCCGT')
-    #
-    # def test_multi_del(self):
-    #     self.helper_test_simple_sv('DEL, DEL', self.test_object_multiDEL, 'GCACTATCTCTCCGT', 'GCTATCTCCGT')
-    #
-    # def test_del_ins(self):
-    #     self.helper_test_simple_sv('INS, DEL', self.test_object_del_ins, 'GCACTATCTCTCCGT', 'GCGGGGGGGACTATCTCGT')
-    #
-    # def test_del_ins_del(self):
-    #     self.helper_test_simple_sv('DEL, INS, DEL', self.test_object_del_ins_del, 'GCACTATCTCTCCGT',
-    #                                'GCGGGGGGGTATCTCGT')
-    #
-    # def test_del_dup_del(self):
-    #     self.helper_test_simple_sv('DEL, DUP, DEL', self.test_object_del_dup_del, 'GCACTATCTCTCCGT', 'GCTATCTATCTCGT')
-    #
-    # def test_del_inv_del(self):
-    #     self.helper_test_simple_sv('DEL, INV, DEL', self.test_object_del_inv_del, 'GCACTATCTCTCCGT', 'GCATACTCGT')
-    #
-    # def test_dup_dup_inv(self):
-    #     self.helper_test_simple_sv('DUP, DUP, INS', self.test_object_dup_dup_ins, 'GCACTATCTCTCCGT',
-    #                                'GCACACGGGGGGGTATCTCTCCTCCGT')
+    def test_simple_dup(self):
+        self.helper_test_simple_sv(self.test_object_simple_DUP, ['GCACTATCTACTATCTCTCCGT'])
+
+    def test_simple_inv(self):
+        self.helper_test_simple_sv(self.test_object_simple_INV, ['GCAGATAGTCTCCGT'])
+
+    def test_simple_ins(self):
+        self.helper_test_simple_sv(self.test_object_simple_INS, ['GCGGGGGGGACTATCTCTCCGT'])
+
+    def test_multi_del(self):
+        # both DELs heterozygous
+        self.helper_test_simple_sv(self.test_object_multiDEL, ['GCTATCTCCGT'])
+
+    def test_del_ins(self):
+        # hom. DEL, het. INS
+        self.helper_test_simple_sv(self.test_object_del_ins, ['GCGGGGGGGACTATCTCGT', 'GCACTATCTCGT'])
+
+    def test_del_ins_del(self):
+        # het. DELs, hom. INS
+        self.helper_test_simple_sv(self.test_object_del_ins_del, ['GCGGGGGGGTATCTCGT', 'GCACGGGGGGGTATCTCGT',
+                                                                  'GCGGGGGGGTATCTCTCCGT', 'GCACGGGGGGGTATCTCTCCGT'])
+
+    def test_del_dup_del(self):
+        self.helper_test_simple_sv(self.test_object_del_dup_del, ['GCTATCTATCTCGT', 'GCACTATCTATCTCGT',
+                                                                  'GCTATCTCGT', 'GCACTATCTCGT'])
+
+    def test_del_inv_del(self):
+        self.helper_test_simple_sv(self.test_object_del_inv_del, ['GCATACTCGT'])
+
+    def test_dup_dup_inv(self):
+        # het., hom., het.
+        self.helper_test_simple_sv(self.test_object_dup_dup_ins,
+                                   ['GCACACGGGGGGGTATCTCTCCTCCGT', 'GCACACTATCTCTCCTCCGT', 'GCACGGGGGTATCTCTCCTCCGT'])
+
     def test_div_dDUP(self):
-        self.helper_test_simple_sv('div_dDUP', self.test_object_div_dDUP, 'GCACTATCTCTCCGT', 'GCACTATCTJJJJJCTCCGT')
+        self.helper_test_simple_sv(self.test_object_div_dDUP, ['GCACTATCTCACTATTCCGT'])
+
 
 if __name__ == '__main__':
     unittest.main()
