@@ -282,6 +282,53 @@ drawn from the second reference (after any additional events have also been adde
 `edit_ref.sh`, `divergent_repeat_augmentation.sh` requires dwgsim, samtools, and bwa in addition to the packages given in 
 `requirements.txt`.
 
+The bash script requires as input the path to the source reference, paths to the simulation config files to be used for
+the two edited references, the file prefix for the simulation's output files, and the config file describing any additional
+event that are to be simulated in addition to the divergent repeats. An example call is:
+```
+sh divergent_repeat_augmentation.sh {path_to}/ref.fa {path_to}/div_repeat_R1.yaml {path_to}/div_repeat_R2.yaml {output_prefix} {path_to}/events.yaml
+```
+To ensure that the output files of each stage of the process get fed to the next correctly, the three config files must
+include specific entries with the proper paths based on what output file prefix is given for the simulation. For example,
+a config used to generate the first reference (`div_repeat_R1.yaml` in the example above) should specify div_dDUP as the
+SV type:
+```yaml
+sim_settings:
+    max_tries: 200
+    prioritize_top: True
+SVs:
+    - type: "div_dDUP"
+      number: 3
+      min_length:
+        - 500
+        - 5000
+      max_length:
+        - 1000
+        - 10000
+```
+The config used to generate the second reference (`div_repeat_R2.yaml` in the example) then must read in the .vcf generated
+by the creation of the first reference in order to have knowledge of where the divergent repeats were placed:
+```yaml
+SVs:
+    - vcf_path: "{path_to_simulation_directory}/{output_prefix}1.vcf"
+```
+And the config of additional events to be added will be of the normal form but with an entry giving the path to a .vcf
+that will be created which specifies the intervals occupied by the divergent repeat events:
+```yaml
+sim_settings:
+    max_tries: 200
+    prioritize_top: True
+SVs:
+    - avoid_intervals: "{path_to_simulation_directory}/{output_prefix}1_decoy_divrepeat_intervals.vcf"
+    - type: "DEL"
+      number: 3
+      min_length: 1000
+      max_length: 10000
+    - type: "DUP"
+      number: 3
+    ...
+```
+
 ## How to Contribute
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate. If you'd like to contribute, please fork the repository and make changes as you'd like.
 
