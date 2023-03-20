@@ -81,13 +81,14 @@ def divergence(seq):
     p = random.uniform(0.5,1.0)
     return ''.join([b if random.random() > p else random.choice(list({"A", "C", "T", "G"} - {b})) for b in seq.upper()])
 
-def parse_bed_file(bed_fname, keep_type=False):
+def parse_bed_file(bed_fname, keep_type=False, allow_chroms=None):
     """
     reads bed file (intended use: processing repeatmasker elements to be considered for randomized
     event overlap) and returns list of (chr, start, end) tuples representing the intervals of each event in the file
     --> logic taken from bed_iter() and parse_bed_line() in cue (seq/io.py)
     - keep_type: optional flag to extract intervals with the fourth column string that in the case of a repeatmasker
                     bed file will give the repetitive element type
+    - allow_chroms: optional list of allowed chromosomes (filtering out all entries with chrom not in list)
     """
     intervals_list = []
     with open(bed_fname, 'r') as bed_file:
@@ -98,20 +99,24 @@ def parse_bed_file(bed_fname, keep_type=False):
             fields = line.strip().split()
             assert len(fields) >= 3, "Unexpected number of fields in BED: %s" % line
             chr_name, start, end = fields[:3]
+            if allow_chroms and chr_name not in allow_chroms:
+                continue
             if keep_type:
                 intervals_list.append((chr_name, start, end, fields[3]))
             else:
                 intervals_list.append((chr_name, start, end))
     return intervals_list
 
-def process_overlap_events(config):
+def process_overlap_events(config, chrom_list):
     if type(config.overlap_events['bed']) is list:
         overlap_events = []
         for bed_path in config.overlap_events['bed']:
             # need to extract bed record intervals with the element type given in column 4 (keep_type=True)
-            overlap_events.extend(parse_bed_file(bed_path, keep_type=True))
+            overlap_events.extend(parse_bed_file(bed_path, keep_type=True, allow_chroms=chrom_list))
     else:
-        overlap_events = parse_bed_file(config.overlap_events['bed'], keep_type=True)
+        overlap_events = parse_bed_file(config.overlap_events['bed'], keep_type=True, allow_chroms=chrom_list)
+    if len(overlap_events) == 0:
+        return overlap_events
     random.shuffle(overlap_events)
     # filter on allowed repetitive element types (if any are given)
     # --> if given, allow_types must be given as a list of strings

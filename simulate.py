@@ -162,7 +162,7 @@ class SV_Simulator():
                 self.extract_vcf_event_intervals(d["avoid_intervals"])
 
         self.overlap_events = None if "overlap_events" not in config.keys \
-            else utils.process_overlap_events(config)
+            else utils.process_overlap_events(config, self.order_ids)
 
         self.initialize_svs()
 

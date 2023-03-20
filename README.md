@@ -263,8 +263,24 @@ chr21   16630076        DIVERGENCE      N       DIVERGENCE      100     PASS    
 
 ### Automated pipeline bash scripts
 #### `edit_ref.sh`
+To automate the process of generating a synthetic reference and aligned BAM file, `edit_ref.sh` can be run with inputs
+giving the paths to the simulation config file, source reference fasta file, and output file prefix for the resulting files:
+```
+sh edit_ref.sh {path_to}/simulation_config.yaml {path_to}/ref.fa {output_prefix}
+```
+The bash script will execute `simulate.py` so will require the environment created with `requirements.txt`, as well as
+dwgsim, samtools, and bwa.
 
 #### `divergent_repeat_augmentation.sh`
+To generate a synthetic reference that includes divergent repeat events, `divergent_repeat_augmentation.sh` automates a
+multi-staged simulation procedure by which a source reference is used to generate two edited references, in
+which the first is augmented with events of the form "A_"->"A_A*", and the second is augmented with dispersed
+duplications ("A_"->"A_A") in the same locations. This has the effect of modeling the situation in which the source reference
+has repetitive sequences in which the instances of the repetition occur with scattered base flips, but the donor has the 
+same repeats but without any base flips. In order to capture the read signal that identifies this phenomenon, reads are
+drawn from the second reference (after any additional events have also been added) and aligned to the first. As with
+`edit_ref.sh`, `divergent_repeat_augmentation.sh` requires dwgsim, samtools, and bwa in addition to the packages given in 
+`requirements.txt`.
 
 ## How to Contribute
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate. If you'd like to contribute, please fork the repository and make changes as you'd like.

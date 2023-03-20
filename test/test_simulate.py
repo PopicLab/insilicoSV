@@ -284,6 +284,15 @@ class TestSVSimulator(unittest.TestCase):
                                                               "SVs": [{"type": "DEL", "number": 1,
                                                                        "min_length": 10, "max_length": 10,
                                                                        "num_overlap": 1}]}],
+                                                       hap1, hap2, bed),
+                                            # combine two input files, filter all by chromosome
+                                            TestObject([ref_file, {"chr19": "CTCCGTCGTACTAAGTCGTA"}],
+                                                       [par, {"sim_settings": {"prioritize_top": True},
+                                                              "overlap_events": {
+                                                                  "bed": [test_overlap_bed, test_overlap_bed_2]},
+                                                              "SVs": [{"type": "DEL", "number": 1,
+                                                                       "min_length": 10, "max_length": 10,
+                                                                       "num_overlap": 1}]}],
                                                        hap1, hap2, bed)
                                             ]
         self.test_objects_overlap_cplx = [TestObject([ref_file, {"chr21": "CTGAT"}],
@@ -398,6 +407,8 @@ class TestSVSimulator(unittest.TestCase):
                 self.assertTrue('AA' not in changed_frag_1 or 'AA' not in changed_frag_2)
             elif i == 3:
                 self.assertIsNone(curr_sim.svs[0].overlap_event)
+            elif i == 4:
+                self.assertEqual(len(curr_sim.overlap_events), 0)
         # complex events
         for i in range(len(self.test_objects_overlap_cplx)):
             if i == 0:

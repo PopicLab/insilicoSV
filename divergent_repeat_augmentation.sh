@@ -1,5 +1,5 @@
 # variation of divergent_repeat_simulation.sh to allow for adding divergent repeats onto a genome alongside
-# simple events and dispersed dups
+# other events
 
 SCRIPT=$(realpath "$0")
 SCRIPT_PATH=$(dirname "$SCRIPT")
