@@ -35,3 +35,5 @@ samtools sort -@ 20 ${OUTPUT_PREFIX}.bwamem.bam -o ${OUTPUT_PREFIX}.bwamem.sorte
 ## -- remove unsorted bam
 rm ${OUTPUT_PREFIX}.bwamem.bam
 samtools index -@ 20 ${OUTPUT_PREFIX}.bwamem.sorted.bam
+## -- remove unnecessary outputs from intermediate stages
+rm ${OUTPUT_PREFIX}2.* ${OUTPUT_PREFIX}1.hapB.fa ${OUTPUT_PREFIX}1.vcf ${OUTPUT_PREFIX}1.bed
