@@ -180,9 +180,9 @@ Chromosome21	124	135	Chromosome21	159	160	TRA	    10	0/1	AB_C_D>bb'_AEc'_EDC	1	1
 ### Example 3 - Editing reference with input SVs
 To edit an input reference file with a known set of SVs the user can provide a VCF file containing the SVs in the yaml 
 of format shown above. The events in the VCF must be non-overlapping. Supported variant types for this use case 
-currently include DEL, DUP, INV, and INS. For insertions, we assume that events will be specified with the insertion
-sequence given in an INFO field called `INSSEQ`. The commandline call to perform this reference edit is the same as the
-previous simulate.py call given above:
+currently include DEL, DUP, INV, INS, dDUP, INV_dDUP, and TRA. For insertions, events may be specified with the insertion
+sequence given in an INFO field called `INSSEQ` (provided a matching header line is included as well). The commandline 
+call to perform this reference edit is the same as the previous simulate.py call given above:
 ```yaml
 # YAML config file
 SVs:
@@ -240,26 +240,6 @@ The output .vcf file will label which events were placed at RepeatMasker interva
 chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVERLAP_EV=True  GT  0/1
 ```
 The current set of event types that are amenable to this feature are DEL, DUP, INV, dDUP, INV_dDUP, and TRA.
-
-### Example 5 - Nonvariant Events
-There is an additional class of event that can be simulated that are not structural variants but are common genome edits
-that might be common points of confusion for a variant caller or may otherwise be worth including in simulation. The only
-event of this class implemented so far is a divergent sequence, being the result of a transformation of the form "A" -> "A*"
-(for the symbol "*" representing a divergence operator that randomly changes each base in an interval with a fixed probability
-p). These events can be specified in the same way as SVs, e.g.:
-```yaml
-SVs:
-    - type: "DIVERGENCE"
-      number: 10
-      min_length:
-        - 5
-      max_length:
-        - 5
-```
-... and will result in .vcf records with a matching type label:
-```
-chr21   16630076        DIVERGENCE      N       DIVERGENCE      100     PASS    END=16630080;SVTYPE=DIVERGENCE;SVLEN=5  GT      0/1
-```
 
 ### Automated pipeline bash scripts
 #### `edit_ref.sh`
