@@ -245,6 +245,9 @@ class Structural_Variant():
                 ev.source_frag = self.insseq_from_rec
             else:
                 ev.source_frag = self.get_event_frag(source_event, ev.symbol)
+                # in fixed mode this will yield None, need to call generate_seq() to generate the ins. seq
+                if ev.source_frag is None:
+                    ev.source_frag = utils.generate_seq(ev.length)
         else:
             for i in range(len(target_events)):
                 ev = target_events[i]

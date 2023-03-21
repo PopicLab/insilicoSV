@@ -14,6 +14,7 @@ class TestKnownSVs(unittest.TestCase):
         test_vcf_simple_dup = "test/inputs/example_simple_dup.vcf"
         test_vcf_simple_inv = "test/inputs/example_simple_inv.vcf"
         test_vcf_simple_ins = "test/inputs/example_simple_ins.vcf"
+        test_vcf_simple_ins_no_insseq = "test/inputs/example_simple_ins_no_insseq.vcf"
 
         test_vcf_multidel = "test/inputs/example_multidel.vcf"
         test_vcf_del_ins = "test/inputs/example_del_ins.vcf"
@@ -44,7 +45,11 @@ class TestKnownSVs(unittest.TestCase):
                                                              hap2, bed),
                                            'INS': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                              [par, {"SVs": [{"vcf_path": test_vcf_simple_ins}]}], hap1,
-                                                             hap2, bed)}
+                                                             hap2, bed),
+                                           'INS_2': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                               [par, {"SVs": [{"vcf_path": test_vcf_simple_ins_no_insseq}]}],
+                                                               hap1, hap2, bed),
+                                           }
         self.test_objects_multievent = {'multiDEL': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                                [par, {"SVs": [{"vcf_path": test_vcf_multidel}]}], hap1,
                                                                hap2, bed),
@@ -90,12 +95,16 @@ class TestKnownSVs(unittest.TestCase):
         config.remove_test_files()
         if target_frags is not None:
             self.assertTrue(changed_frag_hap1 in target_frags or changed_frag_hap2 in target_frags)
+        return changed_frag_hap1, changed_frag_hap2
 
     def test_simple_events(self):
         self.helper_test_simple_sv(self.test_objects_simple_events['DEL'], ['GCCTCCGT'])
         self.helper_test_simple_sv(self.test_objects_simple_events['DUP'], ['GCACTATCTACTATCTCTCCGT'])
         self.helper_test_simple_sv(self.test_objects_simple_events['INV'], ['GCAGATAGTCTCCGT'])
         self.helper_test_simple_sv(self.test_objects_simple_events['INS'], ['GCGGGGGGGACTATCTCTCCGT'])
+        # insertion without specified INSSEQ (insertion sequence randomly generated)
+        frag1, frag2 = self.helper_test_simple_sv(self.test_objects_simple_events['INS_2'])
+        self.assertTrue(len(frag1) == 22 and len(frag2) == 22)
 
     def test_multiple_events(self):
         # both DELs heterozygous
@@ -103,14 +112,16 @@ class TestKnownSVs(unittest.TestCase):
         # hom. DEL, het. INS
         self.helper_test_simple_sv(self.test_objects_multievent['del_ins'], ['GCGGGGGGGACTATCTCGT', 'GCACTATCTCGT'])
         # het. DELs, hom. INS
-        self.helper_test_simple_sv(self.test_objects_multievent['del_ins_del'], ['GCGGGGGGGTATCTCGT', 'GCACGGGGGGGTATCTCGT',
-                                                                                 'GCGGGGGGGTATCTCTCCGT', 'GCACGGGGGGGTATCTCTCCGT'])
+        self.helper_test_simple_sv(self.test_objects_multievent['del_ins_del'],
+                                   ['GCGGGGGGGTATCTCGT', 'GCACGGGGGGGTATCTCGT',
+                                    'GCGGGGGGGTATCTCTCCGT', 'GCACGGGGGGGTATCTCTCCGT'])
         self.helper_test_simple_sv(self.test_objects_multievent['del_dup_del'], ['GCTATCTATCTCGT', 'GCACTATCTATCTCGT',
                                                                                  'GCTATCTCGT', 'GCACTATCTCGT'])
         self.helper_test_simple_sv(self.test_objects_multievent['del_inv_del'], ['GCATACTCGT'])
         # het., hom., het.
         self.helper_test_simple_sv(self.test_objects_multievent['dup_dup_ins'], ['GCACACGGGGGGGTATCTCTCCTCCGT',
-                                                                                 'GCACACTATCTCTCCTCCGT', 'GCACGGGGGTATCTCTCCTCCGT'])
+                                                                                 'GCACACTATCTCTCCTCCGT',
+                                                                                 'GCACGGGGGTATCTCTCCTCCGT'])
 
     def test_dispersion_events(self):
         self.helper_test_simple_sv(self.test_objects_dispersions['div_dDUP'], ['GCACTATCTCACTATTCCGT'])
