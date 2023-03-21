@@ -43,7 +43,6 @@ class TestProcObject(TestObject):
         return vcf_records
 
 
-
 class TestProcessing(unittest.TestCase):
     def setUp(self):
         # runs before every test

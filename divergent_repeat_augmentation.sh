@@ -30,6 +30,7 @@ bwa index ${OUTPUT_PREFIX}1.hapA.fa
 bwa mem -t20 -p ${OUTPUT_PREFIX}1.hapA.fa ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.fastq.gz | samtools view -Sb - > ${OUTPUT_PREFIX}.bwamem.bam
 ## -- remove fastq after bam is generated
 rm ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.12.fastq.gz
+rm ${OUTPUT_PREFIX}2_EDIT.dwgsim.hap.*.bwa.read*.fastq.gz
 samtools sort -@ 20 ${OUTPUT_PREFIX}.bwamem.bam -o ${OUTPUT_PREFIX}.bwamem.sorted.bam
 ## -- remove unsorted bam
 rm ${OUTPUT_PREFIX}.bwamem.bam

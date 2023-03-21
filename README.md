@@ -308,6 +308,10 @@ SVs:
       number: 3
     ...
 ```
+After the multi-staged simulation is complete, the alignments will be stored in `{output_prefix}.bwamem.sorted.bam`,
+the reference to which they were aligned will be `{output_prefix}1.hapA.fa`, the intervals occupied by divergent repeats
+will be stored in `{output_prefix}1_decoy_divrepeat_intervals.vcf`, and the simulated SV will be given in
+`{output_prefix}2_EDIT.{vcf/bed}`.
 
 ## How to Contribute
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate. If you'd like to contribute, please fork the repository and make changes as you'd like.

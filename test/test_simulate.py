@@ -417,8 +417,6 @@ class TestSVSimulator(unittest.TestCase):
                 # TRA [5,10) -> [10]; INV_dDUP [1,2) -> [0] or [3] - source ref: CTGATATGGAC
                 changed_frag_1, changed_frag_2 = self.helper_test_known_output_svs(self.test_objects_overlap_cplx[i])
                 # need to account for the events being placed on opposite haplotypes, so will check for each separately
-                # just forward TRA: CTGAT[->]C[ATGGA]; just backwards TRA: CTGA[ATGGA]T[<-]C
-                # just forward INV_dDUP: C[T->]G[A]ATATGGAC; just backwards INV_dDUP: [A]C[<-T]GATATGGAC
                 # --> check for INV_dDUP in first four characters of output refs
                 self.assertTrue(changed_frag_1[:4] in ['CTGA', 'ACTG'] or changed_frag_2[:4] in ['CTGA', 'ACTG'])
                 # --> check for TRA in second half of refs
@@ -450,8 +448,6 @@ class TestSVSimulator(unittest.TestCase):
             self.helper_test_known_output_svs(self.test_objects_no_dis[i + 9], [targets[list(targets.keys())[i]]])
 
     def test_inverted_duplication_events(self):
-        # inverted dup as simulated by SURVIVOR (A -> aa')
-        # reference CGT (min A length 3) --> desired output: ACGACG
         self.helper_test_known_output_svs(self.test_objects_no_dis[11], ['ACGACG'])
 
     def test_avoid_intervals(self):
