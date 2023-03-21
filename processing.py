@@ -242,7 +242,6 @@ class FormatterIO():
         vcf_file.header.info.add('SVLEN', number=1, type='Integer', description="Length of structural variant")
         vcf_file.header.info.add('SVMETHOD', number=1, type='String', description="SV detection method")
         vcf_file.header.info.add('TARGET', number=1, type='Integer', description="Target location for divergent repeat")
-        # vcf_file.header.info.add('DIV_REPEAT', number=1, type='String', description="Divergent repeat segment placed at target locus")
         vcf_file.header.info.add('OVERLAP_EV', number=1, type='String', description="Bool. indicator for the event being"
                                                                                     "placed at an overlap_events interval")
         vcf_file.header.formats.add('GT', number=1, type='String', description="Genotype")
