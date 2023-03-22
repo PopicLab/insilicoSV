@@ -78,7 +78,7 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
           Variant_Type.INVdel: [("A", "B"), ("a",)],
           Variant_Type.dDUP_iDEL: [("A", "_", "B"), ("A", "_", "A'")],
           Variant_Type.INS_iDEL: [("A", "_", "B"), ("_", "A'")],
-          # INVdup: an inverted dupication; dup_INV and INV_dup the complex events taken from gnomad_sv
+          # INVdup: an inverted dupication; dup_INV and INV_dup: duplication-flanked inversions
           Variant_Type.INVdup: [("A",), ("a", "a'")],
           Variant_Type.dup_INV: [("A", "B"), ("A", "b", "a'")],
           Variant_Type.INV_dup: [("A", "B"), ("b'", "a", "B")],
