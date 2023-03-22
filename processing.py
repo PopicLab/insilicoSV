@@ -187,16 +187,14 @@ class FormatterIO():
             utils.reset_file(bedfile)
             if ins_fasta:
                 utils.reset_file(ins_fasta)
-        nth_sv = 0
-        for sv in svs:
-            nth_sv += 1
+        for nth_sv, sv in enumerate(svs):
             # SVs with multiple source events will be split into multiple bed records (one for each)
             if len(sv.events_dict) == 1:
                 ev = list(sv.sv_blocks.target_events_dict.values())[0] if sv.type == Variant_Type.INS\
                         else list(sv.events_dict.values())[0]
                 op = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)[1]
                 record_info = {'source_s': ev.start, 'source_e': ev.end, 'target_s': ev.start, 'target_e': ev.end,
-                               'transform': op, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv,
+                               'transform': op, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv + 1,
                                # for simple events, order cant be > 1 and only depends on event type
                                'order': int(op in constants.NONZERO_ORDER_OPERATIONS)}
                 self.write_to_file(**record_info)
@@ -213,7 +211,7 @@ class FormatterIO():
                         continue
                     # --> target intvl and transform will be determined in each of the specific cases of how the
                     # --> source event is mapped into the target
-                    sv_record_info[ev.symbol] = {'source_s': ev.start, 'source_e': ev.end, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv}
+                    sv_record_info[ev.symbol] = {'source_s': ev.start, 'source_e': ev.end, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv + 1}
                     (target_s, target_e), operation = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)
                     sv_record_info[ev.symbol]['target_s'] = target_s
                     sv_record_info[ev.symbol]['target_e'] = target_e
