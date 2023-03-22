@@ -315,6 +315,11 @@ the reference to which they were aligned will be `{output_prefix}1.hapA.fa`, the
 will be stored in `{output_prefix}1_decoy_divrepeat_intervals.vcf`, and the simulated SV will be given in
 `{output_prefix}2_EDIT.{vcf/bed}`.
 
+### Example IGV visualizations
+Below are IGV visualizations of the alignment signal under each event in insilicoSV's current library of named SV types.
+
+![Alt text](imgs/simple_examples.svg)
+
 ## How to Contribute
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate. If you'd like to contribute, please fork the repository and make changes as you'd like.
 
