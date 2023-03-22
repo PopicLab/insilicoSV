@@ -319,6 +319,11 @@ will be stored in `{output_prefix}1_decoy_divrepeat_intervals.vcf`, and the simu
 Below are IGV visualizations of the alignment signal under each event in insilicoSV's current library of named SV types.
 
 ![Alt text](imgs/simple_examples.png)
+![Alt text](imgs/flanked_INV_examples.png)
+![Alt text](imgs/divergence_examples.png)
+![Alt text](imgs/dispersion_examples.png)
+![Alt text](imgs/INVdup_INVdel_examples.png)
+![Alt text](imgs/INV_dup_idel_examples.png)
 
 ## How to Contribute
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate. If you'd like to contribute, please fork the repository and make changes as you'd like.
