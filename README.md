@@ -194,9 +194,9 @@ python simulate.py <ref.fna> <par.yaml> <prefix>
 
 ### Example 4 - Placing events at known repetitive element intervals
 To augment a randomized simulation of events onto an input reference, the user can include in the simulation config
-file the path to a .bed file containing repetitive element intervals (e.g., RepeatMasker events). In addition to
-providing the path to the relevant .bed file(s), the user will also need to specify how many of each event type they
-wish to be placed at events from the .bed file. An example config with these inputs is:
+file the path to a .bed file containing known element intervals (e.g., known repetitive elements taken from RepeatMasker).
+In addition to providing the path to the relevant .bed file(s), the user will also need to specify how many of each 
+event type they wish to be placed at events from the .bed file. An example config with these inputs is:
 ```yaml
 sim_settings:
     max_tries: 200
@@ -234,19 +234,21 @@ that SV type. Events from the `overlap_events` .bed file(s) will be shuffled on 
 the first four columns of standard .bed records (chrom, chromStart, chromEnd, name), and only contain events from chromosomes
 included in the base reference used for the simulation.
 
-The output .vcf file will label which events were placed at RepeatMasker intervals with the additional INFO field
+The output .vcf file will label which events were placed at specified intervals with the additional INFO field
 `OVERLAP_EV=True', as in this example record:
 ```
 chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVERLAP_EV=True  GT  0/1
 ```
-The current set of event types that are amenable to this feature are DEL, DUP, INV, dDUP, INV_dDUP, and TRA.
+The current set of event types that are amenable to this feature are DEL, DUP, INV, dDUP, INV_dDUP, and TRA. For events
+involving dispersions (dDUP, INV_dDUP, TRA) the position is assigned such that the source event of the SV (the component
+getting duplicated or translocated) is placed at the selected element interval.
 
 ### Automated pipeline bash scripts
-#### `edit_ref.sh`
-To automate the process of generating a synthetic reference and aligned BAM file, `edit_ref.sh` can be run with inputs
+#### `generate_synthetic_genome.sh`
+To automate the process of generating a synthetic reference and aligned BAM file, `generate_synthetic_genome.sh` can be run with inputs
 giving the paths to the simulation config file, source reference fasta file, and output file prefix for the resulting files:
 ```
-sh edit_ref.sh {path_to}/simulation_config.yaml {path_to}/ref.fa {output_prefix}
+sh generate_synthetic_genome.sh {path_to}/simulation_config.yaml {path_to}/ref.fa {output_prefix}
 ```
 The bash script will execute `simulate.py` so will require the environment created with `requirements.txt`, as well as
 dwgsim, samtools, and bwa.
@@ -259,7 +261,7 @@ duplications ("A_"->"A_A") in the same locations. This has the effect of modelin
 has repetitive sequences in which the instances of the repetition occur with scattered base flips, but the donor has the 
 same repeats but without any base flips. In order to capture the read signal that identifies this phenomenon, reads are
 drawn from the second reference (after any additional events have also been added) and aligned to the first. As with
-`edit_ref.sh`, `divergent_repeat_augmentation.sh` requires dwgsim, samtools, and bwa in addition to the packages given in 
+`generate_synthetic_genome.sh`, `divergent_repeat_augmentation.sh` requires dwgsim, samtools, and bwa in addition to the packages given in 
 `requirements.txt`.
 
 The bash script requires as input the path to the source reference, paths to the simulation config files to be used for
