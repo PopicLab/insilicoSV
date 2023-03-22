@@ -317,8 +317,47 @@ will be stored in `{output_prefix}1_decoy_divrepeat_intervals.vcf`, and the simu
 
 ### Example IGV visualizations
 Below are IGV visualizations of the alignment signal under each event in insilicoSV's current library of named SV types.
+
 **DEL: "A" -> " "**
-![Alt text](imgs/DEL_39373784_39375651.png)
+![DEL](imgs/DEL_39373784_39375651.png)
+**DUP: "A" -> "AA'"**
+![DUP](imgs/DUP_19113463_19118988.png)
+**INV: "A" -> "a"**
+![INV](imgs/INV_40759267_40767611.png)
+**INS: " " -> "A"**
+![INS](imgs/INS_37651377.png)
+**dDUP: "A\_" -> "\_A'"**
+![dDUP](imgs/dDUP_39772358_39773214_39778332.png)
+**INV_dDUP: "A\_" -> "\_a'"**
+![INV_dDUP](imgs/INV_dDUP_13067243_13067756_13077502.png)
+**TRA: "A\_" -> "\_A"**
+![TRA](imgs/TRA_26365789_26366373_26356292.png)
+**dupINVdup: "ABC" -> "Ac'ba'C"**
+![dupINVdup](imgs/dupINVdup_39017470_39019883.png)
+**dupINVdel: "ABC" -> "Aba'"**
+![dupINVdel](imgs/dupINVdel_15375930_15378280.png)
+**delINVdup: "ABC" -> "c'bC'"**
+![delINVdup](imgs/delINVdup_42086110_42088387.png)
+**delINVdel: "ABC" -> "b"**
+![delINVdel](imgs/delINVdel_36691416_36693867.png)
+**dDUP_iDEL: "A\_B" -> "A\_A'"**
+![dDUP_iDEL](imgs/dDUP_iDEL_20291195_20301357.png)
+**INS_iDEL: "A\_B" -> "\_A'"**
+![INS_iDEL](imgs/INS_iDEL_39700749_39701724_39693224.png)
+**INVdup: "A" -> "aa'"**
+![INVdup](imgs/INVdup_17044647_17045589.png)
+**dup_INV: "AB" -> "Aba'"**
+![dup_INV](imgs/dup_INV_38928832_38930487.png)
+**INV_dup: "AB" -> "b'aB"**
+![INV_dup](imgs/INV_dup_21190415_21191709.png)
+**delINV: "AB" -> "b"**
+![delINV](imgs/delINV_44483168_44484875.png)
+**INVdel: "AB" -> "a"**
+![INVdel](imgs/INVdel_18169245_18170527.png)
+**divergence: "A" -> "A\*"**
+![divergence](imgs/DIVERGENCE_20798718_20799646.png)
+**divergent repeat**
+![divergent_repeat](imgs/div_repeat_19857334_19865475.png)
 
 ## How to Contribute
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate. If you'd like to contribute, please fork the repository and make changes as you'd like.
