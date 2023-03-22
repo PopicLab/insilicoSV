@@ -133,8 +133,9 @@ class SV_Simulator():
 
         # process config file for SVs
         self.formatter = FormatterIO(par_file)
-        config = self.formatter.yaml_to_var_list()
-        self.svs_config = config.SVs  # config for what SVs to simulate
+        self.formatter.yaml_to_var_list()
+        config = self.formatter.config
+        self.svs_config = config['SVs']  # config for what SVs to simulate
 
         # Based on the SVs config information, set a flag indicating which mode we're in
         self.mode = "randomized"
@@ -143,11 +144,11 @@ class SV_Simulator():
             self.mode = "fixed"
             self.vcf_path = self.svs_config[0]["vcf_path"]
 
-        self.sim_settings = config.sim_settings
+        self.sim_settings = config['sim_settings']
         if log_file and self.sim_settings["generate_log_file"]:
             logging.basicConfig(filename=log_file, filemode="w", level=logging.DEBUG,
                                 format='[%(name)s: %(levelname)s - %(asctime)s] %(message)s')
-            self.log_to_file("YAML Configuration: {}".format(config.__dict__))
+            self.log_to_file("YAML Configuration: {}".format(config))
 
         # create all SVs
         self.svs = []
@@ -161,7 +162,7 @@ class SV_Simulator():
                 # add intervals from vcf to event range
                 self.extract_vcf_event_intervals(d["avoid_intervals"])
 
-        self.overlap_events = None if "overlap_events" not in config.keys \
+        self.overlap_events = None if "overlap_events" not in config.keys() \
             else utils.process_overlap_events(config, self.order_ids)
 
         self.initialize_svs()
@@ -176,7 +177,7 @@ class SV_Simulator():
         # only logs to file if config setting indicates so
         log_func = [logging.debug, logging.warning]
         key_to_func = {"DEBUG": logging.debug, "WARNING": logging.warning}
-        if self.sim_settings["generate_log_file"]:
+        if "generate_log_file" in self.sim_settings and self.sim_settings["generate_log_file"]:
             key_to_func[key](info)
             # logging.debug(info)
 
@@ -187,7 +188,7 @@ class SV_Simulator():
         # -> returns random chromosome and its length
         valid_chrs = self.order_ids
         # if parameter setting on, only choose random chr from those that are big enough
-        if check_size != None and self.sim_settings["filter_small_chr"]:
+        if check_size != None and ("filter_small_chr" in self.sim_settings and self.sim_settings["filter_small_chr"]):
             # allow for chromosome size being equal to check size
             valid_chrs = [chr for chr, chr_size in self.len_dict.items() if chr_size >= check_size]
         if len(valid_chrs) == 0:

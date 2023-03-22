@@ -108,19 +108,19 @@ def parse_bed_file(bed_fname, keep_type=False, allow_chroms=None):
     return intervals_list
 
 def process_overlap_events(config, chrom_list):
-    if type(config.overlap_events['bed']) is list:
+    if type(config['overlap_events']['bed']) is list:
         overlap_events = []
-        for bed_path in config.overlap_events['bed']:
+        for bed_path in config['overlap_events']['bed']:
             # need to extract bed record intervals with the element type given in column 4 (keep_type=True)
             overlap_events.extend(parse_bed_file(bed_path, keep_type=True, allow_chroms=chrom_list))
     else:
-        overlap_events = parse_bed_file(config.overlap_events['bed'], keep_type=True, allow_chroms=chrom_list)
+        overlap_events = parse_bed_file(config['overlap_events']['bed'], keep_type=True, allow_chroms=chrom_list)
     if len(overlap_events) == 0:
         return overlap_events
     random.shuffle(overlap_events)
     # filter on allowed repetitive element types (if any are given)
     # --> if given, allow_types must be given as a list of strings
-    if 'allow_types' in config.overlap_events.keys():
+    if 'allow_types' in config['overlap_events'].keys():
         # remove the repetitive element type at the filtering step (we just care that it's an allowed type)
-        overlap_events = [ev[:-1] for ev in overlap_events if ev[-1] in config.overlap_events['allow_types']]
+        overlap_events = [ev[:-1] for ev in overlap_events if ev[-1] in config['overlap_events']['allow_types']]
     return overlap_events

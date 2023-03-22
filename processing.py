@@ -10,42 +10,20 @@ import os
 import time
 import utils
 
-class Config():
-    def __init__(self,**entries):
-        self.__dict__.update(DEFAULT_CONFIG)
-        self.__dict__.update({"SVs": entries["SVs"]})
-        if "sim_settings" in entries:   # if the user changed any of the default settings for the sim, they get updated here
-            self.__dict__["sim_settings"].update(entries["sim_settings"])
-        # optional config feature storing the path to a overlap_events bed file
-        if "overlap_events" in entries:
-            self.__dict__["overlap_events"] = entries["overlap_events"]
-        # artificial "keys" attribute to access the keys of config.__dict__
-        self.keys = self.__dict__.keys()
 
-        if "vcf_path" not in self.__dict__["SVs"][0]:
-            self.run_checks_randomized(entries)
-            for config_sv in self.SVs:
-                if "avoid_intervals" in config_sv:
-                    continue
-                # handles cases where user enters length range for all components within SV or specifies different ranges
-                if isinstance(config_sv["min_length"], int):
-                    config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
-                else:
-                    config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
-                # make sure max_length >= min_length >= 0
-                assert all(max_len >= min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
+class FormatterIO():
+    def __init__(self, par_file):
+        self.bedpe_counter = 1
+        self.par_file = par_file
+        self.config = None
 
-                config_sv["type"] = Variant_Type(config_sv["type"])
-                if config_sv["type"] != Variant_Type.Custom:
-                    config_sv["source"] = None
-                    config_sv["target"] = None
-
-    def run_checks_randomized(self, entries):
+    @staticmethod
+    def run_checks_randomized(config):
         '''
         check method for yaml given with SVs given for randomized placement on reference
         '''
         # entries: dict representing full config file parsed from yaml
-        config_svs = self.SVs
+        config_svs = config['SVs']
         for config_sv in config_svs:
             # "avoid_intervals" the optional argument for specifying a vcf whose event intervals
             # will be avoided during random placement of simulated events
@@ -64,28 +42,48 @@ class Config():
             # makes sure attributes are the correct datatype
             elif "type" in config_sv and not isinstance(config_sv["type"], str):
                 raise Exception("Invalid {} type for SV \'type\' attribute, str expected".format(type(config_sv["type"])))
-        valid_optional_par = ["fail_if_placement_issues", "max_tries", "generate_log_file", "filter_small_chr", "prioritize_top"] # valid arguments within sim_settings
-        for parameter in self.sim_settings:
+        valid_optional_par = ["fail_if_placement_issues", "max_tries", "generate_log_file", "filter_small_chr",
+                              "prioritize_top"]  # valid arguments within sim_settings
+        for parameter in config['sim_settings']:
             if parameter not in valid_optional_par:
                 raise Exception("\"{}\" is an invalid argument under sim_settings".format(parameter))
         valid_keys = ["sim_settings", "SVs", "overlap_events"]  # valid arguments at the top level
-        for key in entries:
+        for key in config:
             if key not in valid_keys:
                 raise Exception("Unknown argument \"{}\"".format(key))
 
-class FormatterIO():
-    def __init__(self, par_file):
-        self.bedpe_counter = 1
-        self.par_file = par_file
+    def postproc_config_dict(self):
+        if "vcf_path" not in self.config["SVs"][0]:
+            self.run_checks_randomized(self.config)
+        for config_sv in self.config['SVs']:
+            if "avoid_intervals" in config_sv or "vcf_path" in config_sv:
+                continue
+            # handles cases where user enters length range for all components within SV or specifies different ranges
+            if isinstance(config_sv["min_length"], int):
+                config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
+            else:
+                config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
+            # make sure max_length >= min_length >= 0
+            assert all(max_len >= min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
+
+            config_sv["type"] = Variant_Type(config_sv["type"])
+            if config_sv["type"] != Variant_Type.Custom:
+                config_sv["source"] = None
+                config_sv["target"] = None
+
+        # setting default values for sim_settings fields
+        if 'sim_settings' not in self.config.keys():
+            self.config['sim_settings'] = {"max_tries": 50, "prioritize_top": True}
+        elif 'max_tries' not in self.config['sim_settings']:
+            self.config['sim_settings']['max_tries'] = 50
 
     def yaml_to_var_list(self):
         try:
-            config_entries = yaml.full_load(open(self.par_file))
+            self.config = yaml.full_load(open(self.par_file))
         except:
             raise Exception("YAML File {} failed to be open".format(self.par_file))
+        self.postproc_config_dict()
 
-        config = Config(**config_entries)
-        return config
 
     def write_to_file(self, sv, bedfile, source_s, source_e, target_s, target_e, transform, event, nth_sv, order=0):
         assert (not event.symbol.startswith(Symbols.DIS_MARKING.value))
