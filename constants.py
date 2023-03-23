@@ -62,6 +62,7 @@ class Symbols(Enum):
     DIS = "_"  # dispersion event
     DUP = "'"  # attached to symbols that are not the original one from source sequence
     DIV = "*"  # divergent interval, attached to symbols that vary from the original by low-probability base error
+    REQUIRED_SOURCE = "A"  # event symbol of the required source/main event all SVs must have
 
 
 # for Structural Variant class

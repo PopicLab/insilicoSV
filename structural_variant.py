@@ -147,11 +147,11 @@ class Structural_Variant():
         # initialize event classes
         for idx, symbol in enumerate(all_symbols):
             # empty event - no source fragment yet
-            # --> if we're trying to overlap a repetitive event, want to set this event's "A" event to
+            # --> if we're trying to overlap a repetitive event, want to set the "A" event to
             # that repetitive element's interval
-            if symbol == 'A' and self.overlap_event is not None:
-                rm_event_len = int(self.overlap_event[2]) - int(self.overlap_event[1])
-                event = Event(self, rm_event_len, (rm_event_len, rm_event_len), symbol)
+            if symbol == Symbols.REQUIRED_SOURCE.value and self.overlap_event is not None:
+                ovlp_event_len = int(self.overlap_event[2]) - int(self.overlap_event[1])
+                event = Event(self, ovlp_event_len, (ovlp_event_len, ovlp_event_len), symbol)
             else:
                 event = Event(self, symbols_dict[symbol][0], symbols_dict[symbol][1], symbol)
             self.events_dict[symbol] = event
@@ -172,7 +172,7 @@ class Structural_Variant():
         """
         source_len = vcf_record.stop - vcf_record.start if 'SVLEN' not in vcf_record.info else vcf_record.info['SVLEN']
         for symbol in self.source_unique_char:
-            if symbol == 'A':
+            if symbol == Symbols.REQUIRED_SOURCE.value:
                 source_ev = Event(self, source_len, (source_len, source_len), symbol)
                 source_ev.start = vcf_record.start
                 source_ev.end = vcf_record.stop
@@ -193,14 +193,14 @@ class Structural_Variant():
         if vcf_record.info['SVTYPE'] == 'INS':
             if 'INSSEQ' in vcf_record.info:
                 self.insseq_from_rec = vcf_record.info['INSSEQ'][0]
-            source_ev = Event(self, source_len, (source_len, source_len), 'A')
-            self.events_dict['A'] = source_ev
+            source_ev = Event(self, source_len, (source_len, source_len), Symbols.REQUIRED_SOURCE.value)
+            self.events_dict[Symbols.REQUIRED_SOURCE.value] = source_ev
             self.start = vcf_record.start
             self.end = self.start
         else:
             # need to have self.start/end defined for assign_locations()
-            self.start = self.events_dict['A'].start
-            self.end = self.events_dict['A'].end if '_1' not in self.events_dict.keys() else self.events_dict['_1'].end
+            self.start = self.events_dict[Symbols.REQUIRED_SOURCE.value].start
+            self.end = self.events_dict[Symbols.REQUIRED_SOURCE.value].end if '_1' not in self.events_dict.keys() else self.events_dict['_1'].end
         self.start_chr = vcf_record.chrom
 
         # handling for divergent repeat simulation logic

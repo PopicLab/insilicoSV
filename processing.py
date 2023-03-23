@@ -249,7 +249,7 @@ class FormatterIO():
             dispersion_target = None
             if sv.type in DISPERSION_TYPES:
                 # --> going to read the source and target intervals off the start/end positions of the events dict
-                source_event = sv.events_dict['A']
+                source_event = sv.events_dict[Symbols.REQUIRED_SOURCE.value]
                 disp_event = sv.events_dict['_1']
                 rec_start = source_event.start
                 rec_end = source_event.end
@@ -269,7 +269,7 @@ class FormatterIO():
                     # special case of simple INS: sv length \neq (sv end - sv start)
                     # **pysam will delete END fields that are equal to POS, therefore INS records won't have an END
                     rec_end += 1
-                    info_field = {'SVTYPE': sv.type.value, 'SVLEN': sv.events_dict['A'].length}
+                    info_field = {'SVTYPE': sv.type.value, 'SVLEN': sv.events_dict[Symbols.REQUIRED_SOURCE.value].length}
                 else:
                     info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
             if sv.overlap_event is not None:
