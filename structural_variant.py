@@ -74,7 +74,7 @@ class Structural_Variant():
     def __repr__(self):
         return "<SV transformation \"{}\" -> \"{}\" taking up {} non-dispersion spaces>".format(
             ''.join(self.source), ''.join(self.target),
-            sum([event.length for event in self.source_events if not event.symbol.startswith(Symbols.DIS_MARKING.value)]))
+            sum([event.length for event in self.source_events if not event.symbol.startswith(Symbols.DIS.value)]))
 
     @staticmethod
     def reformat_seq(transformation):
@@ -85,12 +85,12 @@ class Structural_Variant():
         unique_transform = []
         unique_id = 1
         for component in transformation:
-            if component != Symbols.DIS_MARKING.value and component != Symbols.DUP_MARKING.value and component != Symbols.DIV_MARKING.value:
+            if component != Symbols.DIS.value and component != Symbols.DUP.value and component != Symbols.DIV.value:
                 unique_transform.append(component)
-            elif component == Symbols.DUP_MARKING.value:  # duplication event case, need to group together symbol and duplication marking
-                unique_transform[-1] += Symbols.DUP_MARKING.value
-            elif component == Symbols.DIV_MARKING.value: # divergence event case, want to keep track of interval needing modification
-                unique_transform[-1] += Symbols.DIV_MARKING.value
+            elif component == Symbols.DUP.value:  # duplication event case, need to group together symbol and duplication marking
+                unique_transform[-1] += Symbols.DUP.value
+            elif component == Symbols.DIV.value: # divergence event case, want to keep track of interval needing modification
+                unique_transform[-1] += Symbols.DIV.value
             else:  # dispersion event case, component = dispersion
                 unique_transform.append(component + str(unique_id))
                 unique_id += 1
@@ -107,7 +107,7 @@ class Structural_Variant():
                         "diverge": lambda string: utils.divergence(string)}
         if any(c.islower() for c in symbol):
             return decode_funcs["invert"](event.source_frag)
-        elif symbol[-1] == Symbols.DIV_MARKING.value:  # checks if the element ends in an *, representing a divergent duplicate
+        elif symbol[-1] == Symbols.DIV.value:  # checks if the element ends in an *, representing a divergent duplicate
             return decode_funcs["diverge"](event.source_frag)
         else:  # take original fragment, no changes
             return event.source_frag
@@ -124,7 +124,7 @@ class Structural_Variant():
         all_symbols = []
         for ele in self.source_unique_char + self.target_unique_char:
             # only append original symbols or dispersion events
-            if len(ele) > 0 and (len(ele) == 1 or ele.startswith(Symbols.DIS_MARKING.value)) and ele.upper() not in all_symbols:
+            if len(ele) > 0 and (len(ele) == 1 or ele.startswith(Symbols.DIS.value)) and ele.upper() not in all_symbols:
                 all_symbols.append(ele.upper())
         all_symbols.sort()  # user inputs symbol lengths in lexicographical order
 
@@ -179,7 +179,7 @@ class Structural_Variant():
                 source_ev.source_chr = vcf_record.chrom
                 source_ev.source_frag = ref_fasta.fetch(source_ev.source_chr, source_ev.start, source_ev.end)
                 self.events_dict[symbol] = source_ev
-            if symbol.startswith(Symbols.DIS_MARKING.value):
+            if symbol.startswith(Symbols.DIS.value):
                 self.dispersion_flip = vcf_record.info['TARGET'] < vcf_record.start
                 disp_len = vcf_record.info['TARGET'] - vcf_record.stop if not self.dispersion_flip else \
                     vcf_record.start - vcf_record.info['TARGET']
@@ -300,7 +300,7 @@ class Structural_Variant():
                         block_end = block_start + del_len
                     changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
                     continue
-                if block[0].symbol.startswith(Symbols.DIS_MARKING.value):
+                if block[0].symbol.startswith(Symbols.DIS.value):
                     continue
                 for i in range(len(block)):
                     ev = block[i]
@@ -314,7 +314,7 @@ class Structural_Variant():
             # create a deletion fragment over that interval
             target_symbols = [ev.symbol[0].upper() for bl in self.target_symbol_blocks for ev in bl]
             for source_sym in self.events_dict.keys():
-                if not source_sym.startswith(Symbols.DIS_MARKING.value) and source_sym not in target_symbols:
+                if not source_sym.startswith(Symbols.DIS.value) and source_sym not in target_symbols:
                     del_ev = self.events_dict[source_sym]
                     changed_fragments.append([del_ev.source_chr, del_ev.start, del_ev.end, ''])
 
@@ -373,7 +373,7 @@ class Blocks:
         # Ex. ("A","B","_","_") -> [[Event("A",...),Event("B",...)],[Event("_1")],[Event("_2")]]
         blocks = [[]]
         for symbol in transformation:
-            if symbol.startswith(Symbols.DIS_MARKING.value):
+            if symbol.startswith(Symbols.DIS.value):
                 # going to add singleton lists with the dispersions where they occur so we can keep track of the sizes
                 source_event = self.sv.events_dict[symbol]
                 disp_event = Event(sv_parent=self.sv, length=source_event.length, length_range=None, symbol=symbol)

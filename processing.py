@@ -86,7 +86,7 @@ class FormatterIO():
 
 
     def write_to_file(self, sv, bedfile, source_s, source_e, target_s, target_e, transform, event, nth_sv, order=0):
-        assert (not event.symbol.startswith(Symbols.DIS_MARKING.value))
+        assert (not event.symbol.startswith(Symbols.DIS.value))
         # consider insertions
         if transform == Operations.INS.value:
             transform_length = event.length
@@ -129,21 +129,21 @@ class FormatterIO():
         # helper function to return target_intvl and operation for multi-source events
         # need to enumerate the possible modifications to set the right operation
         # A -> A'
-        if ev + Symbols.DUP_MARKING.value in target_events_dict.keys():
-            trg_sym = ev + Symbols.DUP_MARKING.value
+        if ev + Symbols.DUP.value in target_events_dict.keys():
+            trg_sym = ev + Symbols.DUP.value
             return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), \
                    Operations.DUP.value if ev in target_events_dict.keys() else Operations.TRA.value
         # A -> a'
-        elif ev.lower() + Symbols.DUP_MARKING.value in target_events_dict.keys():
-            trg_sym = ev.lower() + Symbols.DUP_MARKING.value
+        elif ev.lower() + Symbols.DUP.value in target_events_dict.keys():
+            trg_sym = ev.lower() + Symbols.DUP.value
             return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.INVDUP.value
         # A -> a
         elif ev.lower() in target_events_dict.keys():
             trg_sym = ev.lower()
             return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.INV.value
         # A -> A* (in the case of a custom event in which an event is divergently duplicated)
-        elif ev + Symbols.DIV_MARKING.value in target_events_dict.keys():
-            trg_sym = ev + Symbols.DIV_MARKING.value
+        elif ev + Symbols.DIV.value in target_events_dict.keys():
+            trg_sym = ev + Symbols.DIV.value
             return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.DIV.value
         # A -> A (insertion if source A is undefined, identity otherwise)
         elif ev in target_events_dict.keys():
@@ -166,7 +166,7 @@ class FormatterIO():
         ins_pos = None
         for block in sv.target_symbol_blocks:
             for target_event in block:
-                if target_event.symbol.startswith(Symbols.DIS_MARKING.value) or \
+                if target_event.symbol.startswith(Symbols.DIS.value) or \
                         target_event.symbol in sv_record_info.keys():  # <- prevent collision with A' and A if both in target
                     continue
                 src_sym = target_event.symbol[0].upper()
@@ -207,7 +207,7 @@ class FormatterIO():
                 sv_record_info = {}
                 for ev in sv.events_dict.values():
                     # skip dispersion events
-                    if ev.symbol.startswith(Symbols.DIS_MARKING.value):
+                    if ev.symbol.startswith(Symbols.DIS.value):
                         continue
                     # --> target intvl and transform will be determined in each of the specific cases of how the
                     # --> source event is mapped into the target

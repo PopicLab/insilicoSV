@@ -46,9 +46,9 @@ class StatsCollection():
 
         self.total_svs = len(svs)
         self.min_event_len = min([event.length for sv in svs if sv.active for key, event in sv.events_dict.items() if
-                                  not event.symbol.startswith(Symbols.DIS_MARKING.value)])
+                                  not event.symbol.startswith(Symbols.DIS.value)])
         self.max_event_len = max([event.length for sv in svs if sv.active for key, event in sv.events_dict.items() if
-                                  not event.symbol.startswith(Symbols.DIS_MARKING.value)])
+                                  not event.symbol.startswith(Symbols.DIS.value)])
 
         for sv in svs:
             if sv.active:  # only collect information for SVs that were successfully simulated
@@ -72,7 +72,7 @@ class StatsCollection():
 
                 # count up average length of non-dispersion events
                 for symbol in sv.events_dict:
-                    if not symbol.startswith(Symbols.DIS_MARKING.value):
+                    if not symbol.startswith(Symbols.DIS.value):
                         event = sv.events_dict[symbol]
                         self.avg_len[0] += event.length
                         self.avg_len[1] += 1
@@ -400,7 +400,7 @@ class SV_Simulator():
                         start_pos += sv_event.length
 
                         # dispersion event should not impact whether position is valid or not, given that spacing is already guaranteed
-                        if sv_event.symbol.startswith(Symbols.DIS_MARKING.value):
+                        if sv_event.symbol.startswith(Symbols.DIS.value):
                             # check to see if chosen spot is a valid position
                             if utils.is_overlapping(chr_event_ranges, (
                                     block_start, sv_event.start)):  # sv_event.start is the end of the current block

@@ -59,9 +59,9 @@ class Zygosity(Enum):
 
 
 class Symbols(Enum):
-    DIS_MARKING = "_"  # dispersion event
-    DUP_MARKING = "'"  # attached to symbols that are not the original one from source sequence
-    DIV_MARKING = "*"  # divergent interval, attached to symbols that vary from the original by low-probability base error
+    DIS = "_"  # dispersion event
+    DUP = "'"  # attached to symbols that are not the original one from source sequence
+    DIV = "*"  # divergent interval, attached to symbols that vary from the original by low-probability base error
 
 
 # for Structural Variant class
