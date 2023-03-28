@@ -145,7 +145,7 @@ class SV_Simulator():
             self.vcf_path = self.svs_config[0]["vcf_path"]
 
         self.sim_settings = config['sim_settings']
-        if log_file and self.sim_settings["generate_log_file"]:
+        if log_file and "generate_log_file" in self.sim_settings.keys():
             logging.basicConfig(filename=log_file, filemode="w", level=logging.DEBUG,
                                 format='[%(name)s: %(levelname)s - %(asctime)s] %(message)s')
             self.log_to_file("YAML Configuration: {}".format(config))
