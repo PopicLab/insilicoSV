@@ -180,9 +180,9 @@ Chromosome21	124	135	Chromosome21	159	160	TRA	    10	0/1	AB_C_D>bb'_AEc'_EDC	1	1
 ### Example 3 - Editing reference with input SVs
 To edit an input reference file with a known set of SVs the user can provide a VCF file containing the SVs in the yaml 
 of format shown above. The events in the VCF must be non-overlapping. Supported variant types for this use case 
-currently include DEL, DUP, INV, and INS. For insertions, we assume that events will be specified with the insertion
-sequence given in an INFO field called `INSSEQ`. The commandline call to perform this reference edit is the same as the
-previous simulate.py call given above:
+currently include DEL, DUP, INV, INS, dDUP, INV_dDUP, and TRA. For insertions, events may be specified with the insertion
+sequence given in an INFO field called `INSSEQ` (provided a matching header line is included as well). The commandline 
+call to perform this reference edit is the same as the previous simulate.py call given above:
 ```yaml
 # YAML config file
 SVs:
@@ -191,6 +191,173 @@ SVs:
 ```
 python simulate.py <ref.fna> <par.yaml> <prefix>
 ```
+
+### Example 4 - Placing events at known repetitive element intervals
+To augment a randomized simulation of events onto an input reference, the user can include in the simulation config
+file the path to a .bed file containing known element intervals (e.g., known repetitive elements taken from RepeatMasker).
+In addition to providing the path to the relevant .bed file(s), the user will also need to specify how many of each 
+event type they wish to be placed at events from the .bed file. An example config with these inputs is:
+```yaml
+sim_settings:
+    max_tries: 200
+    prioritize_top: True
+overlap_events:
+    bed: '/{path_to}/{candidate_overlap_events}.bed'
+SVs:
+    - type: "DEL"
+      number: 10
+      min_length:
+        - 5
+      max_length:
+        - 5
+      num_overlap: 5
+    - type: "DUP"
+      number: 10
+      min_length:
+        - 5
+      max_length:
+        - 5
+      num_overlap: 2
+```
+Multiple .bed files can be given as input and their records will be combined and drawn from during event placement (in this
+case the user should provide a list of paths). Additionally, the user can provide a list of repetitive element types that
+will be allowed for event placement during simulation (.bed records of all other types being ignored). An example entry
+with multiple .bed files and specified allowed types is:
+```yaml
+overlap_events:
+    bed: ['/{path_to}/{candidate_overlap_events_1}.bed','/{path_to}/{candidate_overlap_events_2}.bed']
+    allow_types: ['L1HS', 'L1PA3']
+```
+While the simulator is placing each set of events, the first (`num_overlap`) events of that type will have their location
+given by an event from the .bed file given in the `overlap_events` field that falls within the specified size range for 
+that SV type. Events from the `overlap_events` .bed file(s) will be shuffled on input, and the file is required to have
+the first four columns of standard .bed records (chrom, chromStart, chromEnd, name), and only contain events from chromosomes
+included in the base reference used for the simulation.
+
+The output .vcf file will label which events were placed at specified intervals with the additional INFO field
+`OVERLAP_EV=True', as in this example record:
+```
+chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVERLAP_EV=True  GT  0/1
+```
+The current set of event types that are amenable to this feature are DEL, DUP, INV, dDUP, INV_dDUP, and TRA. For events
+involving dispersions (dDUP, INV_dDUP, TRA) the position is assigned such that the source event of the SV (the component
+getting duplicated or translocated) is placed at the selected element interval.
+
+### Automated pipeline bash scripts
+#### `generate_synthetic_genome.sh`
+To automate the process of generating a synthetic reference and aligned BAM file, `generate_synthetic_genome.sh` can be run with inputs
+giving the paths to the simulation config file, source reference fasta file, and output file prefix for the resulting files:
+```
+sh generate_synthetic_genome.sh {path_to}/simulation_config.yaml {path_to}/ref.fa {output_prefix}
+```
+The bash script will execute `simulate.py` so will require the environment created with `requirements.txt`, as well as
+dwgsim, samtools, and bwa.
+
+#### `divergent_repeat_augmentation.sh`
+To generate a synthetic reference that includes divergent repeat events, `divergent_repeat_augmentation.sh` automates a
+multi-staged simulation procedure by which a source reference is used to generate two edited references, in
+which the first is augmented with events of the form "A_"->"A_A*", and the second is augmented with dispersed
+duplications ("A_"->"A_A") in the same locations. This has the effect of modeling the situation in which the source reference
+has repetitive sequences in which the instances of the repetition occur with scattered base flips, but the donor has the 
+same repeats but without any base flips. In order to capture the read signal that identifies this phenomenon, reads are
+drawn from the second reference (after any additional events have also been added) and aligned to the first. As with
+`generate_synthetic_genome.sh`, `divergent_repeat_augmentation.sh` requires dwgsim, samtools, and bwa in addition to the packages given in 
+`requirements.txt`.
+
+The bash script requires as input the path to the source reference, paths to the simulation config files to be used for
+the two edited references, the file prefix for the simulation's output files, and the config file describing any additional
+event that are to be simulated in addition to the divergent repeats. An example call is:
+```
+sh divergent_repeat_augmentation.sh {path_to}/ref.fa {path_to}/div_repeat_R1.yaml {path_to}/div_repeat_R2.yaml {output_prefix} {path_to}/events.yaml
+```
+To ensure that the output files of each stage of the process get fed to the next correctly, the three config files must
+include specific entries with the proper paths based on what output file prefix is given for the simulation. For example,
+a config used to generate the first reference (`div_repeat_R1.yaml` in the example above) should specify div_dDUP as the
+SV type:
+```yaml
+sim_settings:
+    max_tries: 200
+    prioritize_top: True
+SVs:
+    - type: "div_dDUP"
+      number: 3
+      min_length:
+        - 500
+        - 5000
+      max_length:
+        - 1000
+        - 10000
+```
+The config used to generate the second reference (`div_repeat_R2.yaml` in the example) then must read in the .vcf generated
+by the creation of the first reference in order to have knowledge of where the divergent repeats were placed:
+```yaml
+SVs:
+    - vcf_path: "{path_to_simulation_directory}/{output_prefix}1.vcf"
+```
+And the config of additional events to be added will be of the normal form but with an entry giving the path to a .vcf
+that will be created which specifies the intervals occupied by the divergent repeat events:
+```yaml
+sim_settings:
+    max_tries: 200
+    prioritize_top: True
+SVs:
+    - avoid_intervals: "{path_to_simulation_directory}/{output_prefix}1_decoy_divrepeat_intervals.vcf"
+    - type: "DEL"
+      number: 3
+      min_length: 1000
+      max_length: 10000
+    - type: "DUP"
+      number: 3
+    ...
+```
+After the multi-staged simulation is complete, the alignments will be stored in `{output_prefix}.bwamem.sorted.bam`,
+the reference to which they were aligned will be `{output_prefix}1.hapA.fa`, the intervals occupied by divergent repeats
+will be stored in `{output_prefix}1_decoy_divrepeat_intervals.vcf`, and the simulated SV will be given in
+`{output_prefix}2_EDIT.{vcf/bed}`.
+
+### Example IGV visualizations
+Below are IGV visualizations of the alignment signal under each event in insilicoSV's current library of named SV types.
+
+**DEL: "A" -> " "**
+![DEL](imgs/DEL_39373784_39375651.png)
+**DUP: "A" -> "AA'"**
+![DUP](imgs/DUP_19113463_19118988.png)
+**INV: "A" -> "a"**
+![INV](imgs/INV_40759267_40767611.png)
+**INS: " " -> "A"**
+![INS](imgs/INS_37651377.png)
+**dDUP: "A\_" -> "\_A'"**
+![dDUP](imgs/dDUP_39772358_39773214_39778332.png)
+**INV_dDUP: "A\_" -> "\_a'"**
+![INV_dDUP](imgs/INV_dDUP_13067243_13067756_13077502.png)
+**TRA: "A\_" -> "\_A"**
+![TRA](imgs/TRA_26365789_26366373_26356292.png)
+**dupINVdup: "ABC" -> "Ac'ba'C"**
+![dupINVdup](imgs/dupINVdup_39017470_39019883.png)
+**dupINVdel: "ABC" -> "Aba'"**
+![dupINVdel](imgs/dupINVdel_15375930_15378280.png)
+**delINVdup: "ABC" -> "c'bC'"**
+![delINVdup](imgs/delINVdup_42086110_42088387.png)
+**delINVdel: "ABC" -> "b"**
+![delINVdel](imgs/delINVdel_36691416_36693867.png)
+**dDUP_iDEL: "A\_B" -> "A\_A'"**
+![dDUP_iDEL](imgs/dDUP_iDEL_20291195_20301357.png)
+**INS_iDEL: "A\_B" -> "\_A'"**
+![INS_iDEL](imgs/INS_iDEL_39700749_39701724_39693224.png)
+**INVdup: "A" -> "aa'"**
+![INVdup](imgs/INVdup_17044647_17045589.png)
+**dup_INV: "AB" -> "Aba'"**
+![dup_INV](imgs/dup_INV_38928832_38930487.png)
+**INV_dup: "AB" -> "b'aB"**
+![INV_dup](imgs/INV_dup_21190415_21191709.png)
+**delINV: "AB" -> "b"**
+![delINV](imgs/delINV_44483168_44484875.png)
+**INVdel: "AB" -> "a"**
+![INVdel](imgs/INVdel_18169245_18170527.png)
+**divergence: "A" -> "A\*"**
+![divergence](imgs/DIVERGENCE_20798718_20799646.png)
+**divergent repeat**
+![divergent_repeat](imgs/div_repeat_19857334_19865475.png)
 
 ## How to Contribute
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate. If you'd like to contribute, please fork the repository and make changes as you'd like.

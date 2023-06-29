@@ -4,19 +4,20 @@ import random
 
 
 class Structural_Variant():
-    def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None):
+    def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None, vcf_rec=None, ref_fasta=None,
+                 overlap_event=None):
         '''
         Initializes SV's transformation and sets up its events, along with several other basic attributes like zygosity
 
         sv_type: Enum either specifying one of the prewritten classes or a Custom transformation, in which case source and target are required
-        mode: flag to indicate whether we're in fixed or randomized mode
-            ---> is there a better way to do this (subclass this and create an alternate constructor for the fixed case
-                where a lot of this code isn't necessary)
-        Params given in randomized mode:
+        mode: flag to indicate whether constructor called in fixed or randomized mode
         length_ranges: list containing tuple(s) (min_length, max_length) OR singleton int given if the SV is of known
             position/is being read in from a vcf of known/fixed variants
         source: tuple representing source sequence, optional
         target: tuple representing target sequence, optional
+        vcf_rec: (fixed mode) vcf record giving sv information that will instantiate the event
+        ref_fasta: for extracting reference frag for vcf records in fixed mode initialization
+        overlap_event: (chr, start, end) tuple representing the repeatmasker event that this SV is meant to overlap
         '''
         self.type = sv_type
         if self.type != Variant_Type.Custom:
@@ -35,24 +36,40 @@ class Structural_Variant():
         # initialize event classes
         self.start = None  # defines the space in which SV operates
         self.end = None
+        self.start_chr = None
         self.req_space = None  # required space for SV, sum of event lengths
         self.source_events = []  # list of Event classes for every symbol in source sequence
         self.events_dict = dict()  # maps every unique symbol in source and target to an Event class
+        self.changed_fragments = []  # list recording new fragments to be placed in the output ref
+        self.dispersion_flip = False
+        self.insseq_from_rec = None  # space to store INSSEQ for fixed-mode INS event
+        self.overlap_event = overlap_event
+
+        if self.type in DISPERSION_TYPES:
+            if random.randint(0, 1):
+                self.dispersion_flip = True
         # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
             self.initialize_events(length_ranges)
-        self.source_symbol_blocks = []
-        self.target_symbol_blocks = []
+        else:
+            self.initialize_events_fixed(vcf_rec, ref_fasta)
 
-        # specifies if sv is unable to be simulated due to random placement issues
-        # will be turned on later
-        self.active = False
+        self.sv_blocks = Blocks(self)
+        self.target_symbol_blocks = self.sv_blocks.target_blocks
 
-        # 1 = homozygous, 0 = heterozygous
-        self.ishomozygous = Zygosity.UNDEFINED
+        if mode == 'randomized':
+            # specifies if sv is unable to be simulated due to random placement issues
+            # will be turned on later
+            self.active = False
 
-        # stores list of booleans specifying if SV will be applied to certain haplotype for assigned chromosome
-        self.hap = [False, False]
+            # 1 = homozygous, 0 = heterozygous
+            self.ishomozygous = Zygosity.UNDEFINED
+
+            # stores list of booleans specifying if SV will be applied to certain haplotype for assigned chromosome
+            self.hap = [False, False]
+        else:
+            # manual call to assign_locations in fixed mode
+            self.assign_locations(self.start)
 
     def __repr__(self):
         return "<SV transformation \"{}\" -> \"{}\" taking up {} non-dispersion spaces>".format(
@@ -68,14 +85,32 @@ class Structural_Variant():
         unique_transform = []
         unique_id = 1
         for component in transformation:
-            if component != Symbols.DIS.value and component != Symbols.DUP_MARKING.value:
+            if component != Symbols.DIS.value and component != Symbols.DUP.value and component != Symbols.DIV.value:
                 unique_transform.append(component)
-            elif component == Symbols.DUP_MARKING.value:  # duplication event case, need to group together symbol and duplication marking
-                unique_transform[-1] += Symbols.DUP_MARKING.value
+            elif component == Symbols.DUP.value:  # duplication event case, need to group together symbol and duplication marking
+                unique_transform[-1] += Symbols.DUP.value
+            elif component == Symbols.DIV.value: # divergence event case, want to keep track of interval needing modification
+                unique_transform[-1] += Symbols.DIV.value
             else:  # dispersion event case, component = dispersion
                 unique_transform.append(component + str(unique_id))
                 unique_id += 1
         return tuple(unique_transform)
+
+    @staticmethod
+    def get_event_frag(event, symbol):
+        # helper fn to get the ref frag for a given subevent
+        # event: source event from events_dict
+        # symbol: target symbol
+        decode_funcs = {"invert": lambda string: utils.complement(string[::-1]),
+                        "identity": lambda string: string,
+                        "complement": utils.complement,
+                        "diverge": lambda string: utils.divergence(string)}
+        if any(c.islower() for c in symbol):
+            return decode_funcs["invert"](event.source_frag)
+        elif symbol[-1] == Symbols.DIV.value:  # checks if the element ends in an *, representing a divergent duplicate
+            return decode_funcs["diverge"](event.source_frag)
+        else:  # take original fragment, no changes
+            return event.source_frag
 
     def initialize_events(self, lengths):
         '''
@@ -108,109 +143,183 @@ class Structural_Variant():
 
         else:
             raise Exception("Lengths parameter expects at least one tuple")
-        # symbols_dict[Symbols.PLACEHOLDER] = (0, (0,0))
 
         # initialize event classes
         for idx, symbol in enumerate(all_symbols):
             # empty event - no source fragment yet
-            event = Event(self, symbols_dict[symbol][0], symbols_dict[symbol][1], symbol)
+            # --> if we're trying to overlap a repetitive event, want to set the "A" event to
+            # that repetitive element's interval
+            if symbol == Symbols.REQUIRED_SOURCE.value and self.overlap_event is not None:
+                ovlp_event_len = int(self.overlap_event[2]) - int(self.overlap_event[1])
+                event = Event(self, ovlp_event_len, (ovlp_event_len, ovlp_event_len), symbol)
+            else:
+                event = Event(self, symbols_dict[symbol][0], symbols_dict[symbol][1], symbol)
             self.events_dict[symbol] = event
 
         for symbol in self.source_unique_char:
             self.source_events.append(self.events_dict[symbol])
 
+        if self.dispersion_flip:
+            self.source_events = self.source_events[::-1]
+
         self.req_space = sum([event.length for event in self.source_events])
-        # ** I don't think this return statement is used
-        # return self.source_events
 
-    def generate_blocks(self):
-        '''
-        Groups together source and target symbols between dispersion events (_)
-        Tracks which block index the original symbols are in
+    def initialize_events_fixed(self, vcf_record, ref_fasta):
+        """
+        initialization method for SV read in from vcf -- need to prepare objects needed for creation of target blocks
+        --> needs to fully populate events_dict with start/end (reflecting optional dispersion flip), lengths, and source frags
+        --> (with those in place, Blocks() and assign_locations() should have everything they need to run before change_frags())
+        """
+        source_len = vcf_record.stop - vcf_record.start if 'SVLEN' not in vcf_record.info else vcf_record.info['SVLEN']
+        for symbol in self.source_unique_char:
+            if symbol == Symbols.REQUIRED_SOURCE.value:
+                source_ev = Event(self, source_len, (source_len, source_len), symbol)
+                source_ev.start = vcf_record.start
+                source_ev.end = vcf_record.stop
+                source_ev.source_chr = vcf_record.chrom
+                source_ev.source_frag = ref_fasta.fetch(source_ev.source_chr, source_ev.start, source_ev.end)
+                self.events_dict[symbol] = source_ev
+            if symbol.startswith(Symbols.DIS.value):
+                self.dispersion_flip = vcf_record.info['TARGET'] < vcf_record.start
+                disp_len = vcf_record.info['TARGET'] - vcf_record.stop if not self.dispersion_flip else \
+                    vcf_record.start - vcf_record.info['TARGET']
+                disp_ev = Event(self, disp_len, (disp_len, disp_len), symbol)
+                disp_ev.start = vcf_record.stop if not self.dispersion_flip else vcf_record.info['TARGET']
+                disp_ev.end = vcf_record.info['TARGET'] if not self.dispersion_flip else vcf_record.start
+                disp_ev.source_chr = vcf_record.chrom
+                disp_ev.source_frag = ref_fasta.fetch(disp_ev.source_chr, disp_ev.start, disp_ev.end)
+                self.events_dict[symbol] = disp_ev
+        # for insertions with an insertion sequence given in the vcf, storing the seq in sv attribute
+        if vcf_record.info['SVTYPE'] == 'INS':
+            if 'INSSEQ' in vcf_record.info:
+                self.insseq_from_rec = vcf_record.info['INSSEQ'][0]
+            source_ev = Event(self, source_len, (source_len, source_len), Symbols.REQUIRED_SOURCE.value)
+            self.events_dict[Symbols.REQUIRED_SOURCE.value] = source_ev
+            self.start = vcf_record.start
+            self.end = self.start
+        else:
+            # need to have self.start/end defined for assign_locations()
+            self.start = self.events_dict[Symbols.REQUIRED_SOURCE.value].start
+            self.end = self.events_dict[Symbols.REQUIRED_SOURCE.value].end if '_1' not in self.events_dict.keys() else self.events_dict['_1'].end
+        self.start_chr = vcf_record.chrom
 
-        -> returns list of lists
-        '''
+        # handling for divergent repeat simulation logic
+        # (div_dDUPs placed into R1 need to correspond to dDUPs in R2)
+        if self.type == Variant_Type.div_dDUP:
+            self.target_unique_char = ("A", "_1", "A'")
 
-        def find_blocks(transformation):
-            # transformation: tuple of strings
-            # -> returns list of lists of strings
-            # Ex. ("A","B","_","C","D") -> [["A","B"], ["C","D"]]
-            # Ex. ("A","B","_","_") -> [["A","B"],[],[]]
-            blocks = [[]]
-            for symbol in transformation:
-                if not symbol.startswith(Symbols.DIS.value):
-                    blocks[-1].append(symbol)
-                else:
-                    blocks.append([])
-            return blocks
+        self.active = True
+        if vcf_record.samples[0]['GT'] == (1, 1):
+            self.ishomozygous = Zygosity.HOMOZYGOUS
+            self.hap = [True, True]
+        else:
+            self.ishomozygous = Zygosity.HETEROZYGOUS
+            self.hap = random.choice([[True, False], [False, True]])
 
-        def track_original_symbol(symbol_blocks):
-            # finds which region/block the original symbol is in
-            # if symbol is later found in another region, then translocation detected
-            # blocks: list of lists of symbols
-            for idx, block in enumerate(symbol_blocks):
-                for symbol in block:
-                    if len(symbol) == 1:  # means it's an original symbol
-                        self.events_dict[symbol].original_block_idx = idx
+    def assign_locations(self, start_pos):
+        """
+        assign events start and end positions (once target blocks are populated and in the right order)
+        """
+        for block in self.target_symbol_blocks:
+            for ev in block:
+                ev.source_chr = self.start_chr
+                # if the event is one also found in the source, place it at the location given in events_dict
+                # --> the events that stay the same will need to be in the same place in both input and output ref
+                if ev.symbol.upper() in self.events_dict.keys():
+                    source_ev = self.events_dict[ev.symbol.upper()]
+                    ev.start = source_ev.start
+                    ev.end = source_ev.end
+                    ev.source_frag = self.get_event_frag(source_ev, ev.symbol)
 
-        self.source_symbol_blocks = find_blocks(self.source_unique_char)
-        self.target_symbol_blocks = find_blocks(self.target_unique_char)
-        track_original_symbol(self.source_symbol_blocks)
+        # everything that wasn't assigned above will be modeled as insertion fragment placed at the nearest event boundary
+        target_events = [ev for bl in self.target_symbol_blocks for ev in bl]
+        # singleton event that's novel (i.e., INS)
+        if len(target_events) == 1 and target_events[0].start is None:
+            ev = target_events[0]
+            ev.start = start_pos
+            ev.end = start_pos
+            # position assigned, need to get source frag
+            source_event = self.events_dict[ev.symbol[0].upper()]
+            # if we're in fixed mode and the vcf record specified an INSSEQ, use that here
+            if self.insseq_from_rec is not None:
+                ev.source_frag = self.insseq_from_rec
+            else:
+                ev.source_frag = self.get_event_frag(source_event, ev.symbol)
+                # in fixed mode this will yield None, need to call generate_seq() to generate the ins. seq
+                if ev.source_frag is None:
+                    ev.source_frag = utils.generate_seq(ev.length)
+        else:
+            for i in range(len(target_events)):
+                ev = target_events[i]
+                if ev.start is None:
+                    if i == 0:
+                        # if the first event is novel, set start/end to the start of the nearest event
+                        j = i + 1
+                        while target_events[j].start is None:
+                            j += 1
+                        ev.start = target_events[j].start
+                        ev.end = target_events[j].start
+                    else:
+                        ev.start = target_events[i - 1].end
+                        ev.end = target_events[i - 1].end
+                    # position assigned, need to get source frag
+                    source_event = self.events_dict[ev.symbol[0].upper()]
+                    ev.source_frag = self.get_event_frag(source_event, ev.symbol)
 
-        return self.target_symbol_blocks
+        # populating target_events_dict for use in export functions
+        self.sv_blocks.generate_target_events_dict()
 
     def change_fragment(self):
         '''
         Takes the mapping of symbols to events and the target sequence to construct a replacement sequence for the reference fragment
         '''
-        decode_funcs = {"invert": lambda string: utils.complement(string[::-1]),
-                        "identity": lambda string: string,
-                        "complement": utils.complement}
-        encoding = self.events_dict  # maps symbol like A or B to base pairs on reference
-
-        # find all blocks of symbols between dispersion events
-        # we will apply edits based on a block's start and end pos
-        self.generate_blocks()  # blocks are the groupings of non-dispersion events
-
         changed_fragments = []
         assert (self.start is not None and self.end is not None), "Undefined SV start for {}".format(
             self)  # start & end should have been defined alongside event positions
-        block_start = self.start  # describes SV's start position - applies for the first "block"
-        curr_chr = self.start_chr
+        block_start = None
+        block_end = None
 
-        for idx, block in enumerate(self.target_symbol_blocks):
-            new_frag = ""
-            for x, ele in enumerate(block):
-                # used to find corresponding event from encoding, all keys in encoding are in uppercase
-                upper_str = ele[0].upper()
-                event = encoding[upper_str[0]]
-
-                if any(c.islower() for c in ele):  # checks if lowercase symbols exist in ele, represents an inversion
-                    new_frag += decode_funcs["invert"](event.source_frag)
-
-                elif upper_str[0] in encoding:  # take original fragment, no changes
-                    new_frag += event.source_frag
-
-                elif ele.startswith(Symbols.DIS.value):  # DIS = dispersion event ("_")
-                    raise Exception("Dispersion event detected within block: {}".format(self.target_symbol_blocks))
-                else:
-                    raise Exception("Symbol {} failed to fall in any cases".format(ele))
-
-            # find dispersion event right after block to find position of next block
-            assert curr_chr != None, "Unvalid chr detected for SV {} and events_dict {}".format(self, self.events_dict)
-            if idx < len(self.target_symbol_blocks) - 1:
-                dis_event = self.events_dict[Symbols.DIS.value + str(idx + 1)]  # find the nth dispersion event
-                changed_fragments.append(
-                    [curr_chr, block_start, dis_event.start, new_frag])  # record edits going by block
-                block_start = dis_event.end  # move on to next block
-                curr_chr = dis_event.source_chr
-            else:
-                changed_fragments.append([curr_chr, block_start, self.end, new_frag])
+        # special case: simple deletion -- len(target_symbol_blocks) == 0
+        if self.target_symbol_blocks == [[]]:
+            changed_fragments.append([self.start_chr, self.start, self.end, ''])
+        else:
+            for idx, block in enumerate(self.target_symbol_blocks):
+                new_frag = ''
+                if len(block) == 0:
+                    # this branch will be executed for TRAs:
+                    # --> want to delete the A-length interval on the opposite side of the dispersion as our A'
+                    if idx == 0:
+                        del_len = len(self.target_symbol_blocks[2][0].source_frag)
+                        disp_ev = self.target_symbol_blocks[1][0]
+                        block_start = disp_ev.start - del_len
+                        block_end = disp_ev.start
+                    else:
+                        del_len = len(self.target_symbol_blocks[idx - 2][0].source_frag)
+                        disp_ev = self.target_symbol_blocks[idx - 1][0]
+                        block_start = disp_ev.end
+                        block_end = block_start + del_len
+                    changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
+                    continue
+                if block[0].symbol.startswith(Symbols.DIS.value):
+                    continue
+                for i in range(len(block)):
+                    ev = block[i]
+                    new_frag += ev.source_frag
+                    if i == 0:
+                        block_start = ev.start
+                    if i == len(block) - 1:
+                        block_end = ev.end
+                changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
+            # DEL logic: for all source events whose symbol doesn't appear (in any form) in the target symbols,
+            # create a deletion fragment over that interval
+            target_symbols = [ev.symbol[0].upper() for bl in self.target_symbol_blocks for ev in bl]
+            for source_sym in self.events_dict.keys():
+                if not source_sym.startswith(Symbols.DIS.value) and source_sym not in target_symbols:
+                    del_ev = self.events_dict[source_sym]
+                    changed_fragments.append([del_ev.source_chr, del_ev.start, del_ev.end, ''])
 
         self.changed_fragments = changed_fragments
-        self.clean_event_storage()  # clean up unused storage - we do not need to store most source_frags anymore
-
-        return changed_fragments
+        self.clean_event_storage()
 
     def clean_event_storage(self):
         # remove source fragments from events to save space as they are no longer needed
@@ -222,7 +331,7 @@ class Structural_Variant():
 class Event():
     '''represents the symbols, also known as the "events," within a SV transformation'''
 
-    def __init__(self, sv_parent, length, length_range, symbol):
+    def __init__(self, sv_parent, length, length_range, symbol, source_frag=None, non_sv=False):
         '''
         sv_parent: Structural Variant, event is always part of larger SV
         '''
@@ -231,10 +340,63 @@ class Event():
         self.length_range = length_range
         self.symbol = symbol  # refers to symbol in SV's transformation
         self.source_chr = None
-        self.source_frag = None
+        self.source_frag = None if not source_frag else source_frag
         self.start = None
         self.end = None
 
     def __repr__(self):
         return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end,
-                                    "source_chr": self.source_chr, "source_frag": self.source_frag})
+                                    "source_chr": self.source_chr})
+
+
+class Blocks:
+    """
+    Groups together target symbols between dispersion events
+    """
+    def __init__(self, sv):
+        self.sv = sv
+        self.target_blocks = []
+        self.generate_blocks()
+        # optional dispersion flip should be done in init step
+        if self.sv.type in DISPERSION_TYPES \
+                and self.sv.dispersion_flip:
+            self.flip_blocks()
+        self.target_events_dict = None
+
+    def generate_blocks(self):
+        self.target_blocks = self.find_blocks(self.sv.target_unique_char)
+
+    def find_blocks(self, transformation):
+        # transformation: tuple of strings (source or target chars)
+        # -> returns list of lists of events
+        # Ex. ("A","B","_","C","D") -> [[Event("A",...),Event("B",...)], [Event("_1")], [Event("C",...),Event("D",...)]]
+        # Ex. ("A","B","_","_") -> [[Event("A",...),Event("B",...)],[Event("_1")],[Event("_2")]]
+        blocks = [[]]
+        for symbol in transformation:
+            if symbol.startswith(Symbols.DIS.value):
+                # going to add singleton lists with the dispersions where they occur so we can keep track of the sizes
+                source_event = self.sv.events_dict[symbol]
+                disp_event = Event(sv_parent=self.sv, length=source_event.length, length_range=None, symbol=symbol)
+                blocks.append([disp_event])
+                blocks.append([])
+            else:
+                # used to find corresponding event from encoding, all keys in encoding are in uppercase
+                source_event = self.sv.events_dict[symbol[0].upper()]
+                target_event = Event(sv_parent=self.sv, length=source_event.length, length_range=None, symbol=symbol)
+                # if symbol different from source symbol then being added to input ref
+                if symbol.upper() != source_event.symbol:
+                    target_event.length = 0
+                blocks[-1].append(target_event)
+        return blocks
+
+    def flip_blocks(self):
+        # perform the optional flip of the blocks list dictated by the flipped dispersion
+        self.target_blocks = self.target_blocks[::-1]
+
+    def generate_target_events_dict(self):
+        # setter for target_events_dict attribute (to be populated after location assignment of target events)
+        self.target_events_dict = {ev.symbol: ev for b in self.target_blocks for ev in b}
+
+    def __repr__(self):
+        return f"TARGET_BLOCKS: {self.target_blocks}"
+

@@ -2,109 +2,134 @@ import unittest
 import sys
 import os
 
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from simulate import *
-from pysam import VariantFile
-from unit_tests.test_simulate import TestObject
+from test_simulate import TestObject
 
 
-# -- Class attributes from TestObject --
-# self.ref = ref[0]
-# self.ref_content = ref[1]
-# self.par = par[0]
-# self.par_content = par[1]
-# self.hap1 = hap1
-# self.hap2 = hap2
-# self.bed = bed
 class TestKnownSVs(unittest.TestCase):
 
     def setUp(self):
-        # runs before every test
-        test_vcf_simple_del = "unit_tests/inputs/example_simple_del.vcf"
-        test_vcf_simple_dup = "unit_tests/inputs/example_simple_dup.vcf"
-        test_vcf_simple_inv = "unit_tests/inputs/example_simple_inv.vcf"
-        test_vcf_simple_ins = "unit_tests/inputs/example_simple_ins.vcf"
+        test_vcf_simple_del = "test/inputs/example_simple_del.vcf"
+        test_vcf_simple_dup = "test/inputs/example_simple_dup.vcf"
+        test_vcf_simple_inv = "test/inputs/example_simple_inv.vcf"
+        test_vcf_simple_ins = "test/inputs/example_simple_ins.vcf"
+        test_vcf_simple_ins_no_insseq = "test/inputs/example_simple_ins_no_insseq.vcf"
 
-        test_vcf_multidel = "unit_tests/inputs/example_multidel.vcf"
-        test_vcf_del_ins = "unit_tests/inputs/example_del_ins.vcf"
-        test_vcf_del_ins_del = "unit_tests/inputs/example_del_ins_del.vcf"
-        test_vcf_del_dup_del = "unit_tests/inputs/example_del_dup_del.vcf"
-        test_vcf_del_inv_del = "unit_tests/inputs/example_del_inv_del.vcf"
-        test_vcf_dup_dup_ins = "unit_tests/inputs/example_dup_dup_ins.vcf"
+        test_vcf_multidel = "test/inputs/example_multidel.vcf"
+        test_vcf_del_ins = "test/inputs/example_del_ins.vcf"
+        test_vcf_del_ins_del = "test/inputs/example_del_ins_del.vcf"
+        test_vcf_del_dup_del = "test/inputs/example_del_dup_del.vcf"
+        test_vcf_del_inv_del = "test/inputs/example_del_inv_del.vcf"
+        test_vcf_dup_dup_ins = "test/inputs/example_dup_dup_ins.vcf"
+        test_vcf_div_dDUP = "test/inputs/example_div_dDUP.vcf"
+        test_vcf_dDUP = "test/inputs/example_dDUP.vcf"
+        test_vcf_INV_dDUP = "test/inputs/example_INV_dDUP.vcf"
+        test_vcf_TRA = "test/inputs/example_TRA.vcf"
+        test_vcf_multi_dispersion = "test/inputs/example_multi_dispersion.vcf"
 
-        ref_file = "unit_tests/inputs/test.fna"
-        par = "unit_tests/inputs/par.yaml"
-        hap1 = "unit_tests/inputs/test1.fna"
-        hap2 = "unit_tests/inputs/test2.fna"
-        bed = "unit_tests/inputs/out.bed"
+        ref_file = "test/inputs/test.fna"
+        par = "test/inputs/par.yaml"
+        hap1 = "test/inputs/test1.fna"
+        hap2 = "test/inputs/test2.fna"
+        bed = "test/inputs/out.bed"
 
-        self.test_object_simple_DEL = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
-                                                 [par, {"SVs": [{"vcf_path": test_vcf_simple_del}]}], hap1, hap2, bed)
-        self.test_object_simple_DUP = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
-                                                 [par, {"SVs": [{"vcf_path": test_vcf_simple_dup}]}], hap1, hap2, bed)
-        self.test_object_simple_INV = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
-                                                 [par, {"SVs": [{"vcf_path": test_vcf_simple_inv}]}], hap1, hap2, bed)
-        self.test_object_simple_INS = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
-                                                 [par, {"SVs": [{"vcf_path": test_vcf_simple_ins}]}], hap1, hap2, bed)
-        self.test_object_multiDEL = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
-                                                 [par, {"SVs": [{"vcf_path": test_vcf_multidel}]}], hap1, hap2, bed)
-        self.test_object_del_ins = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
-                                               [par, {"SVs": [{"vcf_path": test_vcf_del_ins}]}], hap1, hap2, bed)
-        self.test_object_del_ins_del = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
-                                              [par, {"SVs": [{"vcf_path": test_vcf_del_ins_del}]}], hap1, hap2, bed)
-        self.test_object_del_dup_del = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
-                                                  [par, {"SVs": [{"vcf_path": test_vcf_del_dup_del}]}], hap1, hap2, bed)
-        self.test_object_del_inv_del = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
-                                                  [par, {"SVs": [{"vcf_path": test_vcf_del_inv_del}]}], hap1, hap2, bed)
-        self.test_object_dup_dup_ins = TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
-                                                  [par, {"SVs": [{"vcf_path": test_vcf_dup_dup_ins}]}], hap1, hap2, bed)
+        self.test_objects_simple_events = {'DEL': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                             [par, {"SVs": [{"vcf_path": test_vcf_simple_del}]}], hap1,
+                                                             hap2, bed),
+                                           'DUP': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                             [par, {"SVs": [{"vcf_path": test_vcf_simple_dup}]}], hap1,
+                                                             hap2, bed),
+                                           'INV': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                             [par, {"SVs": [{"vcf_path": test_vcf_simple_inv}]}], hap1,
+                                                             hap2, bed),
+                                           'INS': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                             [par, {"SVs": [{"vcf_path": test_vcf_simple_ins}]}], hap1,
+                                                             hap2, bed),
+                                           'INS_2': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                               [par, {"SVs": [{"vcf_path": test_vcf_simple_ins_no_insseq}]}],
+                                                               hap1, hap2, bed),
+                                           }
+        self.test_objects_multievent = {'multiDEL': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                               [par, {"SVs": [{"vcf_path": test_vcf_multidel}]}], hap1,
+                                                               hap2, bed),
+                                        'del_ins': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                              [par, {"SVs": [{"vcf_path": test_vcf_del_ins}]}], hap1,
+                                                              hap2, bed),
+                                        'del_ins_del': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                                  [par, {"SVs": [{"vcf_path": test_vcf_del_ins_del}]}],
+                                                                  hap1, hap2, bed),
+                                        'del_dup_del': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                                  [par, {"SVs": [{"vcf_path": test_vcf_del_dup_del}]}],
+                                                                  hap1, hap2, bed),
+                                        'del_inv_del': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                                  [par, {"SVs": [{"vcf_path": test_vcf_del_inv_del}]}],
+                                                                  hap1, hap2, bed),
+                                        'dup_dup_ins': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                                  [par, {"SVs": [{"vcf_path": test_vcf_dup_dup_ins}]}],
+                                                                  hap1, hap2, bed)}
+        self.test_objects_dispersions = {'div_dDUP': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                                [par, {"SVs": [{"vcf_path": test_vcf_div_dDUP}]}],
+                                                                hap1, hap2, bed),
+                                         'dDUP': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                            [par, {"SVs": [{"vcf_path": test_vcf_dDUP}]}],
+                                                            hap1, hap2, bed),
+                                         'INV_dDUP': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                                [par, {"SVs": [{"vcf_path": test_vcf_INV_dDUP}]}],
+                                                                hap1, hap2, bed),
+                                         'TRA': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                           [par, {"SVs": [{"vcf_path": test_vcf_TRA}]}],
+                                                           hap1, hap2, bed),
+                                         'multievent': TestObject([ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                                  [par,
+                                                                   {"SVs": [{"vcf_path": test_vcf_multi_dispersion}]}],
+                                                                  hap1, hap2, bed)}
 
-    # TODO: add tests for different genotypes
-    def helper_test_simple_sv(self, sv_type, config_event_obj, input_frag, target_frag):
+    def helper_test_simple_sv(self, config_event_obj, target_frags=None):
         # template test method for simple SVs
         config = config_event_obj
         config.initialize_files()
         fixed_sim = SV_Simulator(config.ref, config.par)
-        self.assertEqual(fixed_sim.produce_variant_genome(fasta1_out=config.hap1, fasta2_out=config.hap2,
-                                                          ins_fasta=config.ref, bedfile=config.bed, verbose=False), True)
-        changed_frag = config.get_actual_frag()  # fetch fragment produced by simulator
-        config.remove_test_files()  # remove any output files and .fai files
-        # print(f'input frag from simple {sv_type} test = {input_frag}')
-        # print(f'changed frag from simple {sv_type} test = {changed_frag}')
-        self.assertEqual(changed_frag, target_frag)
+        fixed_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
+        changed_frag_hap1, changed_frag_hap2 = config.get_actual_frag(return_haps='both')
+        config.remove_test_files()
+        if target_frags is not None:
+            self.assertTrue(changed_frag_hap1 in target_frags or changed_frag_hap2 in target_frags)
+        return changed_frag_hap1, changed_frag_hap2
 
-    def test_simple_del(self):
-        self.helper_test_simple_sv('DEL', self.test_object_simple_DEL, 'GCACTATCTCTCCGT', 'GCCTCCGT')
+    def test_simple_events(self):
+        self.helper_test_simple_sv(self.test_objects_simple_events['DEL'], ['GCCTCCGT'])
+        self.helper_test_simple_sv(self.test_objects_simple_events['DUP'], ['GCACTATCTACTATCTCTCCGT'])
+        self.helper_test_simple_sv(self.test_objects_simple_events['INV'], ['GCAGATAGTCTCCGT'])
+        self.helper_test_simple_sv(self.test_objects_simple_events['INS'], ['GCGGGGGGGACTATCTCTCCGT'])
+        # insertion without specified INSSEQ (insertion sequence randomly generated)
+        frag1, frag2 = self.helper_test_simple_sv(self.test_objects_simple_events['INS_2'])
+        self.assertTrue(len(frag1) == 22 and len(frag2) == 22)
 
-    def test_simple_dup(self):
-        self.helper_test_simple_sv('DUP', self.test_object_simple_DUP, 'GCACTATCTCTCCGT', 'GCACTATCTACTATCTCTCCGT')
+    def test_multiple_events(self):
+        # both DELs heterozygous
+        self.helper_test_simple_sv(self.test_objects_multievent['multiDEL'], ['GCTATCTCCGT'])
+        # hom. DEL, het. INS
+        self.helper_test_simple_sv(self.test_objects_multievent['del_ins'], ['GCGGGGGGGACTATCTCGT', 'GCACTATCTCGT'])
+        # het. DELs, hom. INS
+        self.helper_test_simple_sv(self.test_objects_multievent['del_ins_del'],
+                                   ['GCGGGGGGGTATCTCGT', 'GCACGGGGGGGTATCTCGT',
+                                    'GCGGGGGGGTATCTCTCCGT', 'GCACGGGGGGGTATCTCTCCGT'])
+        self.helper_test_simple_sv(self.test_objects_multievent['del_dup_del'], ['GCTATCTATCTCGT', 'GCACTATCTATCTCGT',
+                                                                                 'GCTATCTCGT', 'GCACTATCTCGT'])
+        self.helper_test_simple_sv(self.test_objects_multievent['del_inv_del'], ['GCATACTCGT'])
+        # het., hom., het.
+        self.helper_test_simple_sv(self.test_objects_multievent['dup_dup_ins'], ['GCACACGGGGGGGTATCTCTCCTCCGT',
+                                                                                 'GCACACTATCTCTCCTCCGT',
+                                                                                 'GCACGGGGGTATCTCTCCTCCGT'])
 
-    def test_simple_inv(self):
-        self.helper_test_simple_sv('INV', self.test_object_simple_INV, 'GCACTATCTCTCCGT', 'GCAGATAGTCTCCGT')
+    def test_dispersion_events(self):
+        self.helper_test_simple_sv(self.test_objects_dispersions['div_dDUP'], ['GCACTATCTCACTATTCCGT'])
+        self.helper_test_simple_sv(self.test_objects_dispersions['dDUP'], ['GCACTATCTCACTATTCCGT'])
+        self.helper_test_simple_sv(self.test_objects_dispersions['INV_dDUP'], ['GCACTATCTCATAGTTCCGT'])
+        self.helper_test_simple_sv(self.test_objects_dispersions['TRA'], ['GCCTCACTATTCCGT'])
+        self.helper_test_simple_sv(self.test_objects_dispersions['multievent'], ['GACGGCCTACTATCACTATTCCGT'])
 
-    def test_simple_ins(self):
-        self.helper_test_simple_sv('INS', self.test_object_simple_INS, 'GCACTATCTCTCCGT', 'GCGGGGGGGACTATCTCTCCGT')
-
-    def test_multi_del(self):
-        self.helper_test_simple_sv('DEL, DEL', self.test_object_multiDEL, 'GCACTATCTCTCCGT', 'GCTATCTCCGT')
-
-    def test_del_ins(self):
-        self.helper_test_simple_sv('INS, DEL', self.test_object_del_ins, 'GCACTATCTCTCCGT', 'GCGGGGGGGACTATCTCGT')
-
-    def test_del_ins_del(self):
-        self.helper_test_simple_sv('DEL, INS, DEL', self.test_object_del_ins_del, 'GCACTATCTCTCCGT',
-                                   'GCGGGGGGGTATCTCGT')
-
-    def test_del_dup_del(self):
-        self.helper_test_simple_sv('DEL, DUP, DEL', self.test_object_del_dup_del, 'GCACTATCTCTCCGT', 'GCTATCTATCTCGT')
-
-    def test_del_inv_del(self):
-        self.helper_test_simple_sv('DEL, INV, DEL', self.test_object_del_inv_del, 'GCACTATCTCTCCGT', 'GCATACTCGT')
-
-    def test_dup_dup_inv(self):
-        self.helper_test_simple_sv('DUP, DUP, INS', self.test_object_dup_dup_ins, 'GCACTATCTCTCCGT',
-                                   'GCACACGGGGGGGTATCTCTCCTCCGT')
 
 if __name__ == '__main__':
     unittest.main()

@@ -2,20 +2,16 @@ from constants import *
 import os
 import random
 
-def is_overlapping(event_ranges, addition):
+def is_overlapping(event_ranges, addition, called_from_helper=False):
     # addition: tuple (start, end)
     # event_ranges: list containing tuples
     # checks if addition overlaps with any of the events already stored
-
     for event in event_ranges:
-        if addition[1] == addition[0]: # addition is an insertion
-            if addition[0] >= event[0] and addition[1] <= event[1]: 
-                return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
-        if event[0] == event[1]:  # event is insertion
-            if event[0] >= addition[0] and event[0] <= addition[1]:
-                return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
         if event[1] > addition[0] and event[0] < addition[1]:
-            return True, "Overlap between {} and {}".format(event[0:2], addition[0:2])
+            if called_from_helper:
+                raise Exception("Overlap between {} and {}".format(event[0:2], addition[0:2]))
+            else:
+                return True
 
     return False
 
@@ -23,8 +19,7 @@ def fail_if_any_overlapping(arr):
     # will raise Exception if any overlap between intervals is found
     # arr: list of tuples
     for x, ele in enumerate(arr):
-        if is_overlapping(arr[:x], ele):
-            raise Exception(is_overlapping(arr[:x], ele)[1])
+        is_overlapping(arr[:x], ele, called_from_helper=True)
 
 def validate_symbols(source, target):
     '''
@@ -41,7 +36,7 @@ def validate_symbols(source, target):
         elif symbol != Symbols.DIS.value:   # exclude dispersion events because they will always appear the same for user inputs
             present[symbol] = True
 
-        if Symbols.DUP_MARKING.value in symbol:
+        if Symbols.DUP.value in symbol:
             raise Exception("Duplication marking (') not allowed in source sequence {}".format(source))
         if any(c.islower() for c in symbol):
             raise Exception("Only original symbols may appear in source sequence, and they must also be uppercase: {}".format(source))
@@ -58,18 +53,14 @@ def reset_file(filename):
     with open(filename, "w") as f_reset:
         f_reset.truncate()
 
-def generate_seq(length, random_gen=None):
+def generate_seq(length):
     # helper function for insertions
     # generates random sequence of bases of given length
     base_map = {1:"A", 2: "T", 3: "G", 4: "C"}
-    return ''.join([base_map[random_gen.randint(1, 4)] for _ in range(length)])
+    return ''.join([base_map[random.randint(1, 4)] for _ in range(length)])
 
 def percent_N(seq):
-    if len(seq) == 0:  # avoid ZeroDivisionError
-        return 0
-    else:
-        return seq.count('N') / len(seq)
-
+    return 0 if len(seq) == 0 else seq.count('N') / len(seq)
 
 def complement(seq):
     # seq: str
@@ -79,6 +70,57 @@ def complement(seq):
         if base in base_complements:
             output += base_complements[base]
         else:
-            raise ValueError("Unknown base \'{}\' detected in reference, complement of base not taken".format(base))
+            output += base
+            # raise ValueError("Unknown base \'{}\' detected in reference, complement of base not taken".format(base))
 
     return output
+
+def divergence(seq):
+    # function to create slightly mutated version of an input sequence
+    # --> p given as the probability of changing the base, chosen from U(0.5,1.0)
+    p = random.uniform(0.5,1.0)
+    return ''.join([b if random.random() > p else random.choice(list({"A", "C", "T", "G"} - {b})) for b in seq.upper()])
+
+def parse_bed_file(bed_fname, keep_type=False, allow_chroms=None):
+    """
+    reads bed file (intended use: processing repeatmasker elements to be considered for randomized
+    event overlap) and returns list of (chr, start, end) tuples representing the intervals of each event in the file
+    --> logic taken from bed_iter() and parse_bed_line() in cue (seq/io.py)
+    - keep_type: optional flag to extract intervals with the fourth column string that in the case of a repeatmasker
+                    bed file will give the repetitive element type
+    - allow_chroms: optional list of allowed chromosomes (filtering out all entries with chrom not in list)
+    """
+    intervals_list = []
+    with open(bed_fname, 'r') as bed_file:
+        for line in bed_file:
+            if line.startswith('#') or line.isspace():
+                continue
+            # parse line
+            fields = line.strip().split()
+            assert len(fields) >= 3, "Unexpected number of fields in BED: %s" % line
+            chr_name, start, end = fields[:3]
+            if allow_chroms and chr_name not in allow_chroms:
+                continue
+            if keep_type:
+                intervals_list.append((chr_name, start, end, fields[3]))
+            else:
+                intervals_list.append((chr_name, start, end))
+    return intervals_list
+
+def process_overlap_events(config, chrom_list):
+    if type(config['overlap_events']['bed']) is list:
+        overlap_events = []
+        for bed_path in config['overlap_events']['bed']:
+            # need to extract bed record intervals with the element type given in column 4 (keep_type=True)
+            overlap_events.extend(parse_bed_file(bed_path, keep_type=True, allow_chroms=chrom_list))
+    else:
+        overlap_events = parse_bed_file(config['overlap_events']['bed'], keep_type=True, allow_chroms=chrom_list)
+    if len(overlap_events) == 0:
+        return overlap_events
+    random.shuffle(overlap_events)
+    # filter on allowed repetitive element types (if any are given)
+    # --> if given, allow_types must be given as a list of strings
+    if 'allow_types' in config['overlap_events'].keys():
+        # remove the repetitive element type at the filtering step (we just care that it's an allowed type)
+        overlap_events = [ev[:-1] for ev in overlap_events if ev[-1] in config['overlap_events']['allow_types']]
+    return overlap_events

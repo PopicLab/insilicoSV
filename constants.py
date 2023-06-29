@@ -16,12 +16,22 @@ class Variant_Type(Enum):
     dupINVdel = "dupINVdel"
     delINV = "delINV"
     INVdel = "INVdel"
-    dDUP_iDEL = "dDUP-iDEL"
-    INS_iDEL = "INS-iDEL"
-    dupINV = "dupINV"
+    dDUP_iDEL = "dDUP_iDEL"
+    INS_iDEL = "INS_iDEL"
+    dup_INV = "dup_INV"
+    INV_dup = "INV_dup"
     INVdup = "INVdup"
     dDUP = "dDUP"
     Custom = "Custom"
+    INV_dDUP = "INV_dDUP"
+    div_dDUP = "div_dDUP"
+    DIVERGENCE = "DIVERGENCE"
+
+
+# list of dispersion-based events (listing explicitly to prevent having to parse from symbols)
+DISPERSION_TYPES = [Variant_Type.dDUP, Variant_Type.INV_dDUP,
+                    Variant_Type.TRA, Variant_Type.div_dDUP,
+                    Variant_Type.dDUP_iDEL, Variant_Type.INS_iDEL]
 
 
 class Operations(Enum):
@@ -34,6 +44,12 @@ class Operations(Enum):
     INVTRA = "INVTRA"
     IDENTITY = "IDENTITY"
     UNDEFINED = "UNDEFINED"
+    DIV = "DIV"
+
+
+# list of operations corresponding to events that should have bed record with order > 0
+NONZERO_ORDER_OPERATIONS = [Operations.TRA.value, Operations.INS.value, Operations.DUP.value, Operations.INVDUP.value,
+                            Operations.INVTRA.value, Operations.DIV.value]
 
 
 class Zygosity(Enum):
@@ -44,7 +60,9 @@ class Zygosity(Enum):
 
 class Symbols(Enum):
     DIS = "_"  # dispersion event
-    DUP_MARKING = "'"  # attached to symbols that are not the original one from source sequence
+    DUP = "'"  # attached to symbols that are not the original one from source sequence
+    DIV = "*"  # divergent interval, attached to symbols that vary from the original by low-probability base error
+    REQUIRED_SOURCE = "A"  # event symbol of the required source/main event all SVs must have
 
 
 # for Structural Variant class
@@ -52,7 +70,7 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
           Variant_Type.DEL: [("A",), ()],
           Variant_Type.INV: [("A",), ("a",)],
           Variant_Type.DUP: [("A",), ("A", "A'")],
-          Variant_Type.TRA: [("A", "_", "B"), ("B", "_", "A")],
+          Variant_Type.TRA: [("A", "_"), ("_", "A'")],
           Variant_Type.dupINVdup: [("A", "B", "C"), ("A", "c'", "b", "a'", "C")],
           Variant_Type.delINVdel: [("A", "B", "C"), ("b",)],
           Variant_Type.delINVdup: [("A", "B", "C"), ("c'", "b", "C")],
@@ -60,10 +78,17 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
           Variant_Type.delINV: [("A", "B"), ("b",)],
           Variant_Type.INVdel: [("A", "B"), ("a",)],
           Variant_Type.dDUP_iDEL: [("A", "_", "B"), ("A", "_", "A'")],
-          Variant_Type.INS_iDEL: [("A", "_", "B"), ("_", "A")],
-          Variant_Type.dupINV: [("A", "B"), ("A", "b", "a'")],
-          Variant_Type.INVdup: [("A", "B"), ("b'", "a", "B")],
-          Variant_Type.dDUP: [("A", "_"), ("A", "_", "A'")]}
+          Variant_Type.INS_iDEL: [("A", "_", "B"), ("_", "A'")],
+          # INVdup: an inverted duplication; dup_INV and INV_dup: duplication-flanked inversions
+          Variant_Type.INVdup: [("A",), ("a", "a'")],
+          Variant_Type.dup_INV: [("A", "B"), ("A", "b", "a'")],
+          Variant_Type.INV_dup: [("A", "B"), ("b'", "a", "B")],
+          Variant_Type.dDUP: [("A", "_"), ("A", "_", "A'")],
+          Variant_Type.INV_dDUP: [("A", "_"), ("A", "_", "a'")],
+          Variant_Type.div_dDUP: [("A", "_"), ("A", "_", "A*")],
+          # Event mimicking divergence of a source sequence -- not quite an SV but a common form of decoy event
+          # --> better to create a different class for non-SV decoy events?
+          Variant_Type.DIVERGENCE: [("A",), ("A*",)]}
 
 DEFAULT_CONFIG = {"sim_settings": {"max_tries": 100,
                                    "fail_if_placement_issues": False,
