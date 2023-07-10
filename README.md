@@ -370,4 +370,5 @@ Steps to contribute:
 5. Create a new Pull Request
 
 ## Authors
+Chris Rohlicek - crohlice@broadinstitute.org
 Nick Jiang - nickj@berkeley.edu
