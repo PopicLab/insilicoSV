@@ -1,5 +1,5 @@
 # insilicoSV
-insilicoSV is a software to design and simulate complex structural variants, both novel and known. 
+insilicoSV is a software to design and simulate simple and complex structural variants, both novel and known. 
 
 ## Requirements  (Prerequisites)
 * Python 3.6 and up - [Install](https://www.python.org/downloads/)
@@ -51,7 +51,7 @@ Source: Collins, R.L., Brand, H., Karczewski, K.J. *et al.* *Nature* (2020)
 | DEL | "A" -> "" |
 | INV | "A" -> "a" |
 | DUP | "A" -> "AA'" |
-| TRA | "A_B" -> "B_A" | 
+| TRA | "A_" -> "_A" | 
 | dupINVdup | "ABC" -> "Ac'ba'C" |
 | delINVdel | "ABC" -> "b" |
 | delINVdup | "ABC" -> "c'bC" |
@@ -60,9 +60,12 @@ Source: Collins, R.L., Brand, H., Karczewski, K.J. *et al.* *Nature* (2020)
 | INVdel | "AB" -> "a" |
 | dDUP-iDEL | "A_B" -> "A_A'" |
 | INS-iDEL | "A_B" -> "_A" |
-| dupINV | "AB" -> "Aba'" |
-| INVdup | "AB" -> "b'aB" |
+| dup_INV | "AB" -> "Aba'" |
+| INV_dup | "AB" -> "b'aB" |
+| INVdup | "A" -> "aa'" |
 | dDUP | "A_" -> "A_A'" |
+| INV_dDUP | "A_" -> "A_a'" |
+| div_dDUP | "A_" -> "A_A*" |
 
 A custom SV consists of a user-generated transformation with a source and target sequence of "symbols," most of which are alphabetical letters. Some examples of a source would be "ABC" and "A_B_C," while some examples of the target would be "a'AB" or "A_b'Bc'_C." 
 
@@ -137,9 +140,12 @@ Chromosome21	30	36	Chromosome21	30	31	DEL	5	    0/1	INVdel	    11	0
 Chromosome21	122	132	Chromosome21	122	132	INV	9	    1/1	INVdel	    12	0
 Chromosome21	131	142	Chromosome21	131	132	DEL	10	  1/1	INVdel	    12	0
 Chromosome19	93	106	Chromosome19	93	106	INV	12	  0/1	dupINVdel	  13	0
-Chromosome19	88	94	Chromosome19	105	106	dINVDUP	5	0/1	dupINVdel	  13	1
+Chromosome19	88	94	Chromosome19	105	106	INVDUP	5	0/1	dupINVdel	  13	1
 Chromosome19	105	113	Chromosome19	105	106	DEL	7	    0/1	dupINVdel	  13	0
 ```
+### *Example 1a* - Example config with entire insilicoSV vocabulary
+This [gist](https://gist.github.com/crohlicek/9d529e600508870b1424d1f41215acb8) contains an example config file specifying the subevent size ranges for each event.
+
 
 ### Example 2 - Custom SVs
 ```yaml
@@ -172,7 +178,7 @@ Chromosome21	100	110	Chromosome21	100	110	INV	    9	  0/1	AB_C_D>bb'_AEc'_EDC	1	
 Chromosome21	100	110	Chromosome21	109	110	INVDUP	9	  0/1	AB_C_D>bb'_AEc'_EDC	1	1
 Chromosome21	92	101	Chromosome21	124	125	TRA	    8	  0/1	AB_C_D>bb'_AEc'_EDC	1	1   # order important for insertion-like operations at the same position
 Chromosome21	124	125	Chromosome21	124	125	INS	    14	0/1	AB_C_D>bb'_AEc'_EDC	1	2
-Chromosome21	124	135	Chromosome21	124	125	dINVDUP	10	0/1	AB_C_D>bb'_AEc'_EDC	1	3
+Chromosome21	124	135	Chromosome21	124	125	INVDUP	10	0/1	AB_C_D>bb'_AEc'_EDC	1	3
 Chromosome21	150	151	Chromosome21	150	151	INS	    14	0/1	AB_C_D>bb'_AEc'_EDC	1	1
 Chromosome21	124	135	Chromosome21	159	160	TRA	    10	0/1	AB_C_D>bb'_AEc'_EDC	1	1
 ```
@@ -371,4 +377,5 @@ Steps to contribute:
 
 ## Authors
 Chris Rohlicek - crohlice@broadinstitute.org
+
 Nick Jiang - nickj@berkeley.edu
