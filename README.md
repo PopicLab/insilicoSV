@@ -332,9 +332,9 @@ Below are IGV visualizations of the alignment signal under each event in insilic
 ![INV](imgs/INV_40759267_40767611.png)
 **INS: " " -> "A"**
 ![INS](imgs/INS_37651377.png)
-**dDUP: "A\_" -> "\_A'"**
+**dDUP: "A\_" -> "A\_A'"**
 ![dDUP](imgs/dDUP_39772358_39773214_39778332.png)
-**INV_dDUP: "A\_" -> "\_a'"**
+**INV_dDUP: "A\_" -> "A\_a'"**
 ![INV_dDUP](imgs/INV_dDUP_13067243_13067756_13077502.png)
 **TRA: "A\_" -> "\_A"**
 ![TRA](imgs/TRA_26365789_26366373_26356292.png)
