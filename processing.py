@@ -104,7 +104,7 @@ class FormatterIO():
                        str(target_e),
                        transform,
                        str(transform_length),
-                       str(int(sv.ishomozygous.value)) + "/1",
+                       '%d/%d' % (int(sv.hap[0]), int(sv.hap[1])),
                        sv.name,
                        str(nth_sv),
                        str(order)]
@@ -245,7 +245,9 @@ class FormatterIO():
         vcf_out_file = pysam.VariantFile(vcffile, 'w', header=vcf_file.header)
 
         for sv in svs:
-            zyg = (1, 1) if sv.ishomozygous == Zygosity.HOMOZYGOUS else (0, 1)
+            # Reflecting specific active haplotypes in the zygosity (i.e., het calls reported as either 1/0 or 0/1 depending
+            # on haplotype of SV
+            zyg = (int(sv.hap[0]), int(sv.hap[1]))
             dispersion_target = None
             if sv.type in DISPERSION_TYPES:
                 # --> going to read the source and target intervals off the start/end positions of the events dict

@@ -13,6 +13,7 @@ insilicoSV is a software to design and simulate simple and complex structural va
 samtools faidx <ref.fna>   # if index file already produced, skip this line
 python simulate.py <ref.fna> <par.yaml> <prefix>
 ```
+**NB:** Before running will also need to set `PYTHONPATH` to point to the insilicoSV directory with `export PYTHONPATH={/path/to/insilicoSV}`
 
 ## Usage
 

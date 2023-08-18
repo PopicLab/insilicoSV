@@ -226,13 +226,13 @@ class TestProcessing(unittest.TestCase):
         self.assertTrue(
             all([record['order'] == str(int(record['ev_type'] in constants.NONZERO_ORDER_OPERATIONS)) for record in
                  records]))
-        self.assertTrue(set([record['zyg'] for record in records]) in [{'1/1'}, {'0/1'}])
+        self.assertTrue(set([record['zyg'] for record in records]) in [{'1/1'}, {'0/1'}, {'1/0'}])
 
     def singleton_event_vcf_tests(self, record, sv_type, chrom, possible_intervals, possible_targets=None):
         # possible_intervals/targets: list of (start, end) pairs target values the record could take on
         self.assertTrue(record['CHROM'] == chrom)
         self.assertTrue(record['ID'] == record['INFO']['SVTYPE'] == sv_type)
-        self.assertIn(record['SAMPLE'], ['1/1', '0/1'])
+        self.assertIn(record['SAMPLE'], ['1/1', '0/1', '1/0'])
         if sv_type != 'INS':
             self.assertIn((record['POS'], record['INFO']['END']), possible_intervals)
             self.assertTrue(int(record['INFO']['SVLEN']) == (int(record['INFO']['END']) - int(record['POS']) + 1))
@@ -417,7 +417,7 @@ class TestProcessing(unittest.TestCase):
         for record in records:
             self.assertTrue(record['CHROM'] == 'chr19')
             self.assertTrue(record['ID'] == record['INFO']['SVTYPE'] == 'INVdup')
-            self.assertIn(record['SAMPLE'], ['1/1', '0/1'])
+            self.assertIn(record['SAMPLE'], ['1/1', '0/1', '1/0'])
             self.assertIn(record['INFO']['SVLEN'], ['2', '3', '4'])
 
 
