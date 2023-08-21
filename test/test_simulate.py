@@ -401,14 +401,14 @@ class TestSVSimulator(unittest.TestCase):
             if i == 0:
                 self.assertTrue('CTGTCGTA' in [changed_frag_1, changed_frag_2])
             elif i == 1:
-                self.assertEqual(len(curr_sim.overlap_events), 1)
+                self.assertEqual(len(curr_sim.overlap_events.overlap_events_dict.values()), 1)
                 self.assertTrue('CCCC' in changed_frag_1 or 'CCCC' in changed_frag_2)
             elif i == 2:
                 self.assertTrue('AA' not in changed_frag_1 or 'AA' not in changed_frag_2)
             elif i == 3:
                 self.assertIsNone(curr_sim.svs[0].overlap_event)
             elif i == 4:
-                self.assertEqual(len(curr_sim.overlap_events), 0)
+                self.assertEqual(len(curr_sim.overlap_events.overlap_events_dict.values()), 0)
         # complex events
         for i in range(len(self.test_objects_overlap_cplx)):
             if i == 0:

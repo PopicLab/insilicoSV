@@ -163,7 +163,7 @@ class SV_Simulator():
                 self.extract_vcf_event_intervals(d["avoid_intervals"])
 
         self.overlap_events = None if "overlap_events" not in config.keys() \
-            else utils.process_overlap_events(config, self.order_ids)
+            else utils.OverlapEvents(config, allow_chroms=self.order_ids)
 
         self.initialize_svs()
 
@@ -238,6 +238,8 @@ class SV_Simulator():
         self.vcf_path: optional path that will be used if mode=="fixed"
         '''
         if self.mode == "randomized":
+            # debug
+            print(self.svs_config)
             for sv_config in self.svs_config:
                 if "avoid_intervals" in sv_config:
                     continue
@@ -245,15 +247,25 @@ class SV_Simulator():
                     # logic for placing events at intervals given in overlap bed file:
                     # for the first (sv_config["num_overlap"]) events, instantiate the SV at the next valid repeat elt interval
                     repeat_elt = None
-                    if "num_overlap" in sv_config.keys() and num < sv_config["num_overlap"] \
-                            and len(self.overlap_events) > 0:
-                        # filter by size: traverse the list until one is found with length within range for sv
-                        for i in range(len(self.overlap_events)):
-                            if sv_config["length_ranges"][0][0] <= \
-                                    (int(self.overlap_events[i][2]) - int(self.overlap_events[i][1])) \
-                                    <= sv_config["length_ranges"][0][1]:
-                                repeat_elt = self.overlap_events.pop(i)
-                                break
+                    # if there's an overlap_events object then we've created a dictionary giving the num_overlaps for each elt type by sv type
+                    if self.overlap_events is not None:
+                        # check if this type has an associated num_overlaps for any known elements
+                        if sv_config['type'] in self.overlap_events.svtype_overlap_counts.keys():
+                            elt_type = list(self.overlap_events.svtype_overlap_counts[sv_config['type']].keys())[0]
+                            # if num_overlaps was given as a single number rather than an element-specific list, draw a random element for overlap
+                            # debug
+                            print('minsize=%s' % sv_config['length_ranges'][0][0])
+                            print('maxsize=%s' % sv_config['length_ranges'][0][1])
+                            repeat_elt = self.overlap_events.__getitem__(minsize=sv_config['length_ranges'][0][0],
+                                                                         maxsize=sv_config['length_ranges'][0][1],
+                                                                         elt_type=(None if elt_type == 'ALL'else elt_type))
+                            if repeat_elt is not None:
+                                # decrement the self.svtype_overlap_counts dict such that initialize_svs() will only try to
+                                #  draw the right number of elements (i.e., no more than num_overlap)
+                                self.overlap_events.svtype_overlap_counts[sv_config['type']][elt_type] -= 1
+                                # ... and when the number reaches 0, remove from dict so line 253 will not be triggered
+                                if self.overlap_events.svtype_overlap_counts[sv_config['type']][elt_type] == 0:
+                                    del self.overlap_events.svtype_overlap_counts[sv_config['type']][elt_type]
                     sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                             length_ranges=sv_config["length_ranges"], source=sv_config["source"],
                                             target=sv_config["target"], overlap_event=repeat_elt)

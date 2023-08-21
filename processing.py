@@ -1,7 +1,7 @@
 import yaml
 import sys
 
-import constants
+# import constants
 from constants import *
 from pysam import FastaFile
 import pysam
@@ -170,7 +170,7 @@ class FormatterIO():
                         target_event.symbol in sv_record_info.keys():  # <- prevent collision with A' and A if both in target
                     continue
                 src_sym = target_event.symbol[0].upper()
-                if sv_record_info[src_sym]['transform'] in constants.NONZERO_ORDER_OPERATIONS:
+                if sv_record_info[src_sym]['transform'] in NONZERO_ORDER_OPERATIONS:
                     if ins_pos is None:
                         ins_pos = sv_record_info[src_sym]['target_s']
                         order += 1
@@ -196,7 +196,7 @@ class FormatterIO():
                 record_info = {'source_s': ev.start, 'source_e': ev.end, 'target_s': ev.start, 'target_e': ev.end,
                                'transform': op, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv + 1,
                                # for simple events, order cant be > 1 and only depends on event type
-                               'order': int(op in constants.NONZERO_ORDER_OPERATIONS)}
+                               'order': int(op in NONZERO_ORDER_OPERATIONS)}
                 self.write_to_file(**record_info)
                 # simple INS -> option to write novel inserted sequences to separate .fa at ins_fasta
                 if op == Operations.INS.value:
