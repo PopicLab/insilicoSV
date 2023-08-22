@@ -17,7 +17,7 @@ class Structural_Variant():
         target: tuple representing target sequence, optional
         vcf_rec: (fixed mode) vcf record giving sv information that will instantiate the event
         ref_fasta: for extracting reference frag for vcf records in fixed mode initialization
-        overlap_event: (chr, start, end) tuple representing the repeatmasker event that this SV is meant to overlap
+        overlap_event: (chr, start, end, elt_type) tuple representing the repeatmasker event that this SV is meant to overlap
         '''
         self.type = sv_type
         if self.type != Variant_Type.Custom:
@@ -43,7 +43,7 @@ class Structural_Variant():
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
         self.dispersion_flip = False
         self.insseq_from_rec = None  # space to store INSSEQ for fixed-mode INS event
-        self.overlap_event = overlap_event
+        self.overlap_event = overlap_event  # <- element tuple of form (chrom, start, end, type) or None
 
         if self.type in DISPERSION_TYPES:
             if random.randint(0, 1):

@@ -293,6 +293,26 @@ class TestSVSimulator(unittest.TestCase):
                                                               "SVs": [{"type": "DEL", "number": 1,
                                                                        "min_length": 10, "max_length": 10,
                                                                        "num_overlap": 1}]}],
+                                                       hap1, hap2, bed),
+                                            # type-specific num_overlap params
+                                            TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                       [par, {"sim_settings": {"prioritize_top": True},
+                                                              "overlap_events": {
+                                                                  "bed": [test_overlap_bed, test_overlap_bed_2],
+                                                                  "allow_types": ["L1HS", "ALR/Alpha"]},
+                                                              "SVs": [{"type": "DEL", "number": 4,
+                                                                       "min_length": 1, "max_length": 10,
+                                                                       "num_overlap": [2, 1]}]}],
+                                                       hap1, hap2, bed),
+                                            # type-specific num_overlap param > num available (ALR)
+                                            TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                       [par, {"sim_settings": {"prioritize_top": True},
+                                                              "overlap_events": {
+                                                                  "bed": [test_overlap_bed, test_overlap_bed_2],
+                                                                  "allow_types": ["L1HS", "ALR/Alpha"]},
+                                                              "SVs": [{"type": "DEL", "number": 5,
+                                                                       "min_length": 1, "max_length": 5,
+                                                                       "num_overlap": [2, 3]}]}],
                                                        hap1, hap2, bed)
                                             ]
         self.test_objects_overlap_cplx = [TestObject([ref_file, {"chr21": "CTGAT"}],
@@ -394,7 +414,10 @@ class TestSVSimulator(unittest.TestCase):
         # simple events
         for i in range(len(self.test_objects_overlap_simple)):
             config = self.test_objects_overlap_simple[i]
+            # debug
+            print(f'TEST_OVERLAP_PLACEMENT: i = {i}')
             config.initialize_files()
+            print(f'config content = {config.par_content}')
             curr_sim = SV_Simulator(config.ref, config.par)
             curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
             changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
@@ -409,6 +432,10 @@ class TestSVSimulator(unittest.TestCase):
                 self.assertIsNone(curr_sim.svs[0].overlap_event)
             elif i == 4:
                 self.assertEqual(len(curr_sim.overlap_events.overlap_events_dict.values()), 0)
+            elif i == 5:
+                self.assertEqual(len(curr_sim.overlap_events.overlap_events_dict.values()), 1)
+            elif i == 6:
+                self.assertEqual(len(curr_sim.overlap_events.overlap_events_dict.values()), 0)
         # complex events
         for i in range(len(self.test_objects_overlap_cplx)):
             if i == 0:
@@ -418,6 +445,9 @@ class TestSVSimulator(unittest.TestCase):
                 changed_frag_1, changed_frag_2 = self.helper_test_known_output_svs(self.test_objects_overlap_cplx[i])
                 # need to account for the events being placed on opposite haplotypes, so will check for each separately
                 # --> check for INV_dDUP in first four characters of output refs
+                # debug
+                print(f'changed_frag_1: {changed_frag_1}')
+                print(f'changed_frag_2: {changed_frag_2}')
                 self.assertTrue(changed_frag_1[:4] in ['CTGA', 'ACTG'] or changed_frag_2[:4] in ['CTGA', 'ACTG'])
                 # --> check for TRA in second half of refs
                 self.assertTrue(changed_frag_1[-7:] in ['TCATGGA', 'ATGGATC'] or changed_frag_2[-7:] in ['TCATGGA', 'ATGGATC'])

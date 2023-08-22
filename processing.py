@@ -73,9 +73,12 @@ class FormatterIO():
 
         # setting default values for sim_settings fields
         if 'sim_settings' not in self.config.keys():
-            self.config['sim_settings'] = {"max_tries": 50, "prioritize_top": True}
-        elif 'max_tries' not in self.config['sim_settings']:
-            self.config['sim_settings']['max_tries'] = 50
+            self.config['sim_settings'] = {'max_tries': 50, 'prioritize_top': True, 'fail_if_placement_issues': False}
+        else:
+            if 'max_tries' not in self.config['sim_settings']:
+                self.config['sim_settings']['max_tries'] = 50
+            if 'fail_if_placement_issues' not in self.config['sim_settings']:
+                self.config['sim_settings']['fail_if_placement_issues'] = False
 
     def yaml_to_var_list(self):
         try:
@@ -261,6 +264,11 @@ class FormatterIO():
                 else:
                     dispersion_target = disp_event.start
             else:
+                # debug
+                print('sv.changed_fragments:')
+                print(sv.changed_fragments)
+                print('sv.overlap_event:')
+                print(sv.overlap_event)
                 # start/end given by the min/max changed fragment interval positions
                 rec_start = min([frag[1] for frag in sv.changed_fragments])
                 rec_end = max(frag[2] for frag in sv.changed_fragments)
@@ -275,7 +283,8 @@ class FormatterIO():
                 else:
                     info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
             if sv.overlap_event is not None:
-                info_field['OVERLAP_EV'] = 'True'
+                # want to take the elt_type listed in the SV overlap_event attribute
+                info_field['OVERLAP_EV'] = sv.overlap_event[3]
 
             vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=rec_start, stop=rec_end,
                                                         alleles=['N', sv.type.value], id=sv.type.value,

@@ -238,8 +238,6 @@ class SV_Simulator():
         self.vcf_path: optional path that will be used if mode=="fixed"
         '''
         if self.mode == "randomized":
-            # debug
-            print(self.svs_config)
             for sv_config in self.svs_config:
                 if "avoid_intervals" in sv_config:
                     continue
@@ -250,12 +248,14 @@ class SV_Simulator():
                     # if there's an overlap_events object then we've created a dictionary giving the num_overlaps for each elt type by sv type
                     if self.overlap_events is not None:
                         # check if this type has an associated num_overlaps for any known elements
-                        if sv_config['type'] in self.overlap_events.svtype_overlap_counts.keys():
+                        if sv_config['type'] in self.overlap_events.svtype_overlap_counts.keys() and \
+                                len(self.overlap_events.overlap_events_dict.keys()) > 0:
                             elt_type = list(self.overlap_events.svtype_overlap_counts[sv_config['type']].keys())[0]
+                            # if this elt_type doesn't have any matching elements in the element dict, remove it and move on to the next elt type
+                            while elt_type != 'ALL' and elt_type not in self.overlap_events.overlap_events_dict.keys():
+                                del self.overlap_events.svtype_overlap_counts[sv_config['type']][elt_type]
+                                elt_type = list(self.overlap_events.svtype_overlap_counts[sv_config['type']].keys())[0]
                             # if num_overlaps was given as a single number rather than an element-specific list, draw a random element for overlap
-                            # debug
-                            print('minsize=%s' % sv_config['length_ranges'][0][0])
-                            print('maxsize=%s' % sv_config['length_ranges'][0][1])
                             repeat_elt = self.overlap_events.__getitem__(minsize=sv_config['length_ranges'][0][0],
                                                                          maxsize=sv_config['length_ranges'][0][1],
                                                                          elt_type=(None if elt_type == 'ALL'else elt_type))
@@ -266,9 +266,13 @@ class SV_Simulator():
                                 # ... and when the number reaches 0, remove from dict so line 253 will not be triggered
                                 if self.overlap_events.svtype_overlap_counts[sv_config['type']][elt_type] == 0:
                                     del self.overlap_events.svtype_overlap_counts[sv_config['type']][elt_type]
+                                    # ... and if the total counts for that svtype have been removed, remove the sv type dict entry
+                                    if len(self.overlap_events.svtype_overlap_counts[sv_config['type']].keys()) == 0:
+                                        del self.overlap_events.svtype_overlap_counts[sv_config['type']]
                     sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                             length_ranges=sv_config["length_ranges"], source=sv_config["source"],
-                                            target=sv_config["target"], overlap_event=repeat_elt)
+                                            target=sv_config["target"],
+                                            overlap_event=(repeat_elt + (elt_type,) if repeat_elt is not None else None))
 
                     # For divergent repeat simulation, need div_dDUP to be homozygous
                     if random.randint(0, 1) or sv.type == Variant_Type.div_dDUP:

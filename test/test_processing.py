@@ -2,6 +2,8 @@ from simulate import SV_Simulator
 from processing import FormatterIO
 from test_simulate import TestObject
 from pysam import VariantFile, FastaFile
+from collections import defaultdict, Counter
+from utils import NestedDict
 import unittest
 import sys
 import os
@@ -54,6 +56,8 @@ class TestProcessing(unittest.TestCase):
         self.bed = "test/inputs/out.bed"
         self.vcf = "test/inputs/out.vcf"
         self.ins_fasta = "test/inputs/ins_fasta.fa"
+        self.test_overlap_bed = "test/inputs/example_overlap_events.bed"
+        self.test_overlap_bed_2 = "test/inputs/example_overlap_events_2.bed"
 
         self.test_objects_simple_events = {'DEL': TestProcObject([self.ref_file, {"chr19": "CTG"}],
                                                                  [self.par, {"sim_settings": {"max_tries": 50, "prioritize_top": True},
@@ -184,6 +188,26 @@ class TestProcessing(unittest.TestCase):
                                                                             "max_length": 4,
                                                                             "min_length": 2}]}],
                                                                  self.hap1, self.hap2, self.bed, self.vcf)}
+        self.test_objects_overlap_simple = {'overlap1': TestProcObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                                       [self.par, {"sim_settings": {"prioritize_top": True,
+                                                                                                    "fail_if_placement_issues": True},
+                                                                                   "overlap_events": {
+                                                                                   "bed": [self.test_overlap_bed, self.test_overlap_bed_2],
+                                                                                   "allow_types": ["L1HS", "ALR/Alpha"]},
+                                                                                   "SVs": [{"type": "DEL", "number": 5,
+                                                                                            "min_length": 1, "max_length": 5,
+                                                                                            "num_overlap": [2, 1]}]}],
+                                                                       self.hap1, self.hap2, self.bed, self.vcf),
+                                            'overlap2': TestProcObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                                       [self.par, {"sim_settings": {"prioritize_top": True},
+                                                                                   "overlap_events": {
+                                                                                   "bed": [self.test_overlap_bed, self.test_overlap_bed_2],
+                                                                                   "allow_types": ["L1HS", "ALR/Alpha"]},
+                                                                                   "SVs": [{"type": "DEL", "number": 4,
+                                                                                            "min_length": 1, "max_length": 5,
+                                                                                            "num_overlap": [3, 1]}]}],
+                                                                       self.hap1, self.hap2, self.bed, self.vcf)
+                                            }
 
         self.formatter = FormatterIO(self.par)
 
@@ -419,6 +443,17 @@ class TestProcessing(unittest.TestCase):
             self.assertTrue(record['ID'] == record['INFO']['SVTYPE'] == 'INVdup')
             self.assertIn(record['SAMPLE'], ['1/1', '0/1', '1/0'])
             self.assertIn(record['INFO']['SVLEN'], ['2', '3', '4'])
+
+    def test_export_overlap(self):
+        elt_type_counts = defaultdict(NestedDict(int))
+        elt_type_counts['overlap1'] = {'L1HS': 2, 'ALR/Alpha': 1, 'NONE': 2}
+        elt_type_counts['overlap2'] = {'L1HS': 2, 'ALR/Alpha': 1, 'NONE': 1}
+        for test_case in ['overlap1', 'overlap2']:
+            records = self.initialize_test(self.test_objects_overlap_simple, test_case, output_type='vcf')
+            for record in records:
+                print(record)
+            ovlp_evs = [record['INFO']['OVERLAP_EV'] if 'OVERLAP_EV' in record['INFO'].keys() else 'NONE' for record in records]
+            self.assertEqual(dict(Counter(ovlp_evs)), elt_type_counts[test_case])
 
 
 if __name__ == "__main__":
