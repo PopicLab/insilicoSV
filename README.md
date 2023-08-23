@@ -37,7 +37,7 @@ The following optional parameters can be set under the "sim_settings" key to cha
 1. *max_tries=100 [optional]*: number of tries to find a valid position to simulate each SV
 2. *fail_if_placement_issues=False [optional]*: if set to True, insilicoSV will raise an Exception when a single SV fails to be placed and simulated
 3. *generate_log_file=False [optional]*: if set to True, insilicoSV will generate a log file for diagnostic purposes and debugging
-4. *filter_small_chr=True [optional]*: filter out chromosomes too small for a SV to be placed, speeds up the process for simulation
+4. *filter_small_chr={int} [optional]*: filter out chromosomes of length less than the given integer
 5. *prioritize_top=False [optional]*: if set to True, simulate the SVs listed first as the later ones may fail to be placed. Otherwise, give each SV an equal chance to be simulated
 
 Please see the table and picture for the list of predefined classes.

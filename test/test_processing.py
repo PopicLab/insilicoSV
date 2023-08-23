@@ -450,8 +450,6 @@ class TestProcessing(unittest.TestCase):
         elt_type_counts['overlap2'] = {'L1HS': 2, 'ALR/Alpha': 1, 'NONE': 1}
         for test_case in ['overlap1', 'overlap2']:
             records = self.initialize_test(self.test_objects_overlap_simple, test_case, output_type='vcf')
-            for record in records:
-                print(record)
             ovlp_evs = [record['INFO']['OVERLAP_EV'] if 'OVERLAP_EV' in record['INFO'].keys() else 'NONE' for record in records]
             self.assertEqual(dict(Counter(ovlp_evs)), elt_type_counts[test_case])
 
