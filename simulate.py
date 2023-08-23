@@ -121,21 +121,31 @@ class SV_Simulator():
         # utils.remove_file(self.ref_file + ".fai")    # if ref file was changed, then previously generated index file will not be updated
         self.ref_fasta = FastaFile(ref_file)  # FastaFile generates a new index file if one is not found
 
-        # get all chromosome ids
-        self.order_ids = self.ref_fasta.references
-        self.len_dict = dict()  # stores mapping with key = chromosome, value = chromosome length
-        for id in self.order_ids:
-            self.len_dict[id] = self.ref_fasta.get_reference_length(id)
-            print("Length of chromosome {}: {}".format(id, self.len_dict[id]))
-
-        # initialize stats file to be generated after all edits and exporting are finished
-        self.stats = StatsCollection(self.order_ids, self.len_dict)
-
         # process config file for SVs
         self.formatter = FormatterIO(par_file)
         self.formatter.yaml_to_var_list()
         config = self.formatter.config
         self.svs_config = config['SVs']  # config for what SVs to simulate
+
+        self.sim_settings = config['sim_settings']
+        if log_file and "generate_log_file" in self.sim_settings.keys():
+            logging.basicConfig(filename=log_file, filemode="w", level=logging.DEBUG,
+                                format='[%(name)s: %(levelname)s - %(asctime)s] %(message)s')
+            self.log_to_file("YAML Configuration: {}".format(config))
+
+        # get all chromosome ids
+        self.order_ids = self.ref_fasta.references
+        self.len_dict = dict()  # stores mapping with key = chromosome, value = chromosome length
+        for id in self.order_ids:
+            chrom_len = self.ref_fasta.get_reference_length(id)
+            if 'filter_small_chr' in self.sim_settings and chrom_len < self.sim_settings['filter_small_chr']:
+                print("Filtering chromosome {}: Length of {} below threshold of {}".format(id, chrom_len, self.sim_settings['filter_small_chr']))
+            else:
+                self.len_dict[id] = chrom_len
+                print("Length of chromosome {}: {}".format(id, self.len_dict[id]))
+
+        # initialize stats file to be generated after all edits and exporting are finished
+        self.stats = StatsCollection(self.order_ids, self.len_dict)
 
         # Based on the SVs config information, set a flag indicating which mode we're in
         self.mode = "randomized"
@@ -143,12 +153,6 @@ class SV_Simulator():
         if "vcf_path" in self.svs_config[0]:
             self.mode = "fixed"
             self.vcf_path = self.svs_config[0]["vcf_path"]
-
-        self.sim_settings = config['sim_settings']
-        if log_file and "generate_log_file" in self.sim_settings.keys():
-            logging.basicConfig(filename=log_file, filemode="w", level=logging.DEBUG,
-                                format='[%(name)s: %(levelname)s - %(asctime)s] %(message)s')
-            self.log_to_file("YAML Configuration: {}".format(config))
 
         # create all SVs
         self.svs = []
@@ -187,10 +191,9 @@ class SV_Simulator():
         # at known repetitive element locations)
         # -> returns random chromosome and its length
         valid_chrs = self.order_ids
-        # if parameter setting on, only choose random chr from those that are big enough
-        if check_size != None and ("filter_small_chr" in self.sim_settings and self.sim_settings["filter_small_chr"]):
+        if check_size is not None:
             # allow for chromosome size being equal to check size
-            valid_chrs = [chr for chr, chr_size in self.len_dict.items() if chr_size >= check_size]
+            valid_chrs = [chrom for chrom, chr_size in self.len_dict.items() if chr_size >= check_size]
         if len(valid_chrs) == 0:
             raise Exception("SVs are too big for the reference!")
 
@@ -382,57 +385,51 @@ class SV_Simulator():
                 rand_id, chr_len, chr_event_ranges = self.get_rand_chr(check_size=sv.req_space,
                                                                        fixed_chrom=(None if sv.overlap_event is None
                                                                                     else sv.overlap_event[0]))
-                # only set to invalid if required space exceeds chromosome length
-                if chr_len - sv.req_space < 0:  # SV is too big for current chromosome
-                    print('CHR_LEN - SV.REQ_SPACE < 0; SETTING SV TO INVALID')
+                if not (sv.dispersion_flip and sv.overlap_event is not None):
+                    start_pos = random.randint(0, chr_len - sv.req_space) if sv.overlap_event is None else int(sv.overlap_event[1])
+                    # define the space in which SV operates
+                    # we now also know where the target positions lie since we know the order and length of events
+                    new_intervals = []  # tracks new ranges of blocks
+                    sv.start, sv.start_chr = start_pos, rand_id
+                    sv.end = sv.start + sv.req_space
+                    block_start = sv.start
+                else:
+                    # to assign event "A" to a repeat interval in a flipped dispersion event, need to
+                    # anchor the sv to the end of "A" and get the start position by subtracting off the total size
+                    end_pos = int(sv.overlap_event[2])
+                    start_pos = end_pos - sv.req_space
+                    new_intervals = []
+                    sv.start, sv.start_chr = start_pos, rand_id
+                    sv.end = end_pos
+                    block_start = sv.start
+
+                for sv_event in sv.source_events:
+                    # store start and end position and reference fragment
+                    sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length
+                    sv_event.source_chr = rand_id
+                    frag = ref_fasta.fetch(rand_id, sv_event.start, sv_event.end)
+                    sv_event.source_frag = frag
+                    # prev_start -- store of previous start_pos in case we need to refer to it in the next event
+                    start_pos += sv_event.length
+
+                    # dispersion event should not impact whether position is valid or not, given that spacing is already guaranteed
+                    if sv_event.symbol.startswith(Symbols.DIS.value):
+                        # check to see if chosen spot is a valid position
+                        if utils.is_overlapping(chr_event_ranges, (
+                                block_start, sv_event.start)):  # sv_event.start is the end of the current block
+                            valid = False
+                            break  # if ANY of the non-dispersion events within SV are in an invalid position, then immediately fail the try
+                        new_intervals.append((block_start, sv_event.start))
+                        block_start = sv_event.end  # remember that the end is actually the position right after the sv_event
+                    elif utils.percent_N(frag) > 0.05:
+                        valid = False
+                        break
+                # catches the last (and perhaps only) block in sequence
+                if utils.is_overlapping(chr_event_ranges, (block_start, sv.end)):
                     valid = False
                     continue
                 else:
-                    if not (sv.dispersion_flip and sv.overlap_event is not None):
-                        start_pos = random.randint(0, chr_len - sv.req_space) if sv.overlap_event is None else int(sv.overlap_event[1])
-                        # define the space in which SV operates
-                        # we now also know where the target positions lie since we know the order and length of events
-                        new_intervals = []  # tracks new ranges of blocks
-                        sv.start, sv.start_chr = start_pos, rand_id
-                        sv.end = sv.start + sv.req_space
-                        block_start = sv.start
-                    else:
-                        # to assign event "A" to a repeat interval in a flipped dispersion event, need to
-                        # anchor the sv to the end of "A" and get the start position by subtracting off the total size
-                        end_pos = int(sv.overlap_event[2])
-                        start_pos = end_pos - sv.req_space
-                        new_intervals = []
-                        sv.start, sv.start_chr = start_pos, rand_id
-                        sv.end = end_pos
-                        block_start = sv.start
-
-                    for sv_event in sv.source_events:
-                        # store start and end position and reference fragment
-                        sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length
-                        sv_event.source_chr = rand_id
-                        frag = ref_fasta.fetch(rand_id, sv_event.start, sv_event.end)
-                        sv_event.source_frag = frag
-                        # prev_start -- store of previous start_pos in case we need to refer to it in the next event
-                        start_pos += sv_event.length
-
-                        # dispersion event should not impact whether position is valid or not, given that spacing is already guaranteed
-                        if sv_event.symbol.startswith(Symbols.DIS.value):
-                            # check to see if chosen spot is a valid position
-                            if utils.is_overlapping(chr_event_ranges, (
-                                    block_start, sv_event.start)):  # sv_event.start is the end of the current block
-                                valid = False
-                                break  # if ANY of the non-dispersion events within SV are in an invalid position, then immediately fail the try
-                            new_intervals.append((block_start, sv_event.start))
-                            block_start = sv_event.end  # remember that the end is actually the position right after the sv_event
-                        elif utils.percent_N(frag) > 0.05:
-                            valid = False
-                            break
-                    # catches the last (and perhaps only) block in sequence
-                    if utils.is_overlapping(chr_event_ranges, (block_start, sv.end)):
-                        valid = False
-                        continue
-                    else:
-                        new_intervals.append((block_start, sv.end))
+                    new_intervals.append((block_start, sv.end))
 
             # adds new SV to simulate only if chosen positions were valid
             if valid:
@@ -516,7 +513,6 @@ if __name__ == "__main__":
     # adding SVs from an input vcf
     sim.produce_variant_genome(args["hap1"], args["hap2"], args["ins_fasta"], args["bedpe"], args["stats"],
                                verbose=False)
-    # print(str(sim))
     print("Simulation completed in {} seconds".format(time.time() - sim_start))
 
     # current, peak = tracemalloc.get_traced_memory()
