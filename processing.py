@@ -347,7 +347,8 @@ def collect_args():
 
     args = parser.parse_args()
     args_dict = {"ref": args.ref, "config": args.config, "ins_fasta": args.prefix + ".insertions.fa", "hap1": args.prefix + ".hapA.fa",
-                "hap2": args.prefix + ".hapB.fa", "bedpe": args.prefix + ".bed", "stats": args.prefix + ".stats.txt", "log_file": args.prefix + ".log"}
+                 "hap2": args.prefix + ".hapB.fa", "bedpe": args.prefix + ".bed", "stats": args.prefix + ".stats.txt", "log_file": args.prefix + ".log",
+                 "random_seed": args.random_seed}
     if args.root_dir:
         for key, curr_path in args_dict.items():
             args_dict[key] = os.path.join(args.root_dir, curr_path)
