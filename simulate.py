@@ -492,9 +492,9 @@ if __name__ == "__main__":
     # tracemalloc.start()
 
     args = collect_args()
-    if args.random_seed:
-        random.seed(args.random_seed)
-        print(f"Random seed: ${args.random_seed}")
+    if args["random_seed"]:
+        random.seed(args["random_seed"])
+        print(f"Random seed: ${args['random_seed']}")
     fasta_in = args["ref"]
     yaml_in = args["config"]
     fasta1_out = args["hap1"]
