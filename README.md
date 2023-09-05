@@ -241,10 +241,13 @@ that SV type. Events from the `overlap_events` .bed file(s) will be shuffled on 
 the first four columns of standard .bed records (chrom, chromStart, chromEnd, name), and only contain events from chromosomes
 included in the base reference used for the simulation.
 
+The labels in the `allow_types` field can be given either as full element names or prefixes. For instance, if 'L1' is provided
+then all elements in the input .bed file(s) with 'L1' in the name will be considered for selection.
+
 The output .vcf file will label which events were placed at specified intervals with the additional INFO field
-`OVERLAP_EV=True', as in this example record:
+`OVERLAP_EV={evt. name}', as in this example record:
 ```
-chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVERLAP_EV=True  GT  0/1
+chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVERLAP_EV=L1HS  GT  0/1
 ```
 The current set of event types that are amenable to this feature are DEL, DUP, INV, dDUP, INV_dDUP, and TRA. For events
 involving dispersions (dDUP, INV_dDUP, TRA) the position is assigned such that the source event of the SV (the component

@@ -101,6 +101,9 @@ class OverlapEvents:
         self.allow_chroms = allow_chroms
         # --> allow_types will optionally be given in the config
         self.allow_types = None if 'allow_types' not in config['overlap_events'].keys() else config['overlap_events']['allow_types']
+        # if a single allow_type is given, wrap it in a list for agreement with downstream logic
+        if isinstance(self.allow_types, str):
+            self.allow_types = [self.allow_types]
         # dict containing the counts of overlap for each SV type and known element type
         self.svtype_overlap_counts = defaultdict(NestedDict(int))
         self.get_num_overlap_counts(config)
@@ -138,7 +141,8 @@ class OverlapEvents:
                 fields = line.strip().split()
                 assert len(fields) >= 3, "Unexpected number of fields in BED: %s" % line
                 chr_name, start, end, elt_type = fields[:4]
-                if (allow_chroms and chr_name not in allow_chroms) or (allow_types and elt_type not in allow_types):
+                # need to allow for allow_types to include prefixes of element names
+                if (allow_chroms and chr_name not in allow_chroms) or (allow_types and not any([elt_name in elt_type for elt_name in allow_types])):
                     continue
                 self.overlap_events_dict[elt_type].append((chr_name, start, end))
         # shuffle the lists of each element type for random selection
@@ -153,12 +157,22 @@ class OverlapEvents:
         if elt_type in self.overlap_events_dict.keys():  # <- elt_type given, and elements of matching type are in the dict
             # elt_type-specific branch: draw random element (recall: list is shuffled) of appropriate size
             rand_elt = next((elt for elt in self.overlap_events_dict[elt_type] if minsize <= self.get_intrvl_len(*elt) <= maxsize), None)
-        elif elt_type is None and len(self.overlap_events_dict.keys()) > 0:  # <- elt_type not given, and the element dict is non-empty
-            # elt_type-agnostic branch: draw random element from combined list of elements across all types
-            rand_elt = next((elt for elt in itertools.chain.from_iterable(self.overlap_events_dict.values()) if minsize <= self.get_intrvl_len(*elt) <= maxsize), None)
-            # to remove the chosen element from the right list in the dict we need a mapping from elt to elt_type
-            elt_type_mapping = {elt: elt_type for (elt_type, elt_list) in self.overlap_events_dict.items() for elt in elt_list}
-        else:  # <- elt_type is NOT given and there ARE elements in the dict
+        # elif elt_type is None and len(self.overlap_events_dict.keys()) > 0:  # <- elt_type not given, and the element dict is non-empty
+        elif len(self.overlap_events_dict.keys()) > 0:  # <- element dict is non-empty; elt_type not given, or is given as a prefix
+            if elt_type is None:
+                # elt_type-agnostic branch: draw random element from combined list of elements across all types
+                rand_elt = next((elt for elt in itertools.chain.from_iterable(self.overlap_events_dict.values()) if minsize <= self.get_intrvl_len(*elt) <= maxsize), None)
+                # to remove the chosen element from the right list in the dict we need a mapping from elt to elt_type
+                elt_type_mapping = {elt: elt_type for (elt_type, elt_list) in self.overlap_events_dict.items() for elt in elt_list}
+            else:
+                # elt_type prefix branch: choose an element whose name begins with elt_type
+                prefix_matches = [element_type for element_type in self.overlap_events_dict.keys() if elt_type in element_type]
+                if len(prefix_matches) > 0:
+                    elt_type = random.sample(prefix_matches, 1)[0]
+                    rand_elt = next((elt for elt in self.overlap_events_dict[elt_type] if minsize <= self.get_intrvl_len(*elt) <= maxsize), None)
+                else:
+                    rand_elt = None
+        else:  # <- elt_type is NOT given and there AREN'T elements in the dict
             # don't assign an element (this SV will not overlap something)
             rand_elt = None
         if rand_elt is not None:

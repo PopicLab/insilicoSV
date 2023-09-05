@@ -250,12 +250,15 @@ class SV_Simulator():
                     repeat_elt = None
                     # if there's an overlap_events object then we've created a dictionary giving the num_overlaps for each elt type by sv type
                     if self.overlap_events is not None:
-                        # check if this type has an associated num_overlaps for any known elements
+                        # check if this type has an associated num_overlaps for any known elements, and if there are
+                        # remaining elements that can be used for overlap
                         if sv_config['type'] in self.overlap_events.svtype_overlap_counts.keys() and \
                                 len(self.overlap_events.overlap_events_dict.keys()) > 0:
                             elt_type = list(self.overlap_events.svtype_overlap_counts[sv_config['type']].keys())[0]
-                            # if this elt_type doesn't have any matching elements in the element dict, remove it and move on to the next elt type
-                            while elt_type != 'ALL' and elt_type not in self.overlap_events.overlap_events_dict.keys():
+                            # if this elt_type doesn't have any matching elements in the element dict (for matching determined
+                            # either with elt_type giving the full element name or just a prefix – e.g., 'L1'), remove it
+                            # and move on to the next elt type
+                            while elt_type != 'ALL' and not any([elt_type in ovlp_type for ovlp_type in self.overlap_events.overlap_events_dict.keys()]):
                                 del self.overlap_events.svtype_overlap_counts[sv_config['type']][elt_type]
                                 elt_type = list(self.overlap_events.svtype_overlap_counts[sv_config['type']].keys())[0]
                             # if num_overlaps was given as a single number rather than an element-specific list, draw a random element for overlap
