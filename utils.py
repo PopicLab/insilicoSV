@@ -166,7 +166,7 @@ class OverlapEvents:
                 elt_type_mapping = {elt: elt_type for (elt_type, elt_list) in self.overlap_events_dict.items() for elt in elt_list}
             else:
                 # elt_type prefix branch: choose an element whose name begins with elt_type
-                prefix_matches = [element_type for element_type in self.overlap_events_dict.keys() if elt_type in element_type]
+                prefix_matches = [element_type for element_type in self.overlap_events_dict.keys() if element_type.startswith(elt_type)]
                 if len(prefix_matches) > 0:
                     elt_type = random.sample(prefix_matches, 1)[0]
                     rand_elt = next((elt for elt in self.overlap_events_dict[elt_type] if minsize <= self.get_intrvl_len(*elt) <= maxsize), None)
