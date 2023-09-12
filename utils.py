@@ -93,6 +93,15 @@ def divergence(seq):
     return ''.join([b if random.random() > p else random.choice(list({"A", "C", "T", "G"} - {b})) for b in seq.upper()])
 
 
+def get_sv_config_identifier(sv_config):
+    # helper function to yield a uniquely identifying string
+    # for a given SV config entry
+    # --> usage: needing to index into overlap events dicts to access info specific to a set of SVs simulated with a given set of params
+    min_str = str(sv_config['min_length']) if isinstance(sv_config['min_length'], int) else '_'.join(map(str, sv_config['min_length']))
+    max_str = str(sv_config['min_length']) if isinstance(sv_config['min_length'], int) else '_'.join(map(str, sv_config['min_length']))
+    return sv_config['type'].value + '_' + min_str + '_' + max_str
+
+
 # container object for the optionally-provided genome context elements that will be used in SV placement
 class OverlapEvents:
     def __init__(self, config, allow_chroms=None):
@@ -104,8 +113,9 @@ class OverlapEvents:
         # if a single allow_type is given, wrap it in a list for agreement with downstream logic
         if isinstance(self.allow_types, str):
             self.allow_types = [self.allow_types]
-        # dict containing the counts of overlap for each SV type and known element type
+        # dicts containing the counts of overlapping SVs and alu_mediated SVs for each SV type and known element type
         self.svtype_overlap_counts = defaultdict(NestedDict(int))
+        self.svtype_alu_mediated_counts = defaultdict(NestedDict(int))
         self.get_num_overlap_counts(config)
 
         # overlap_events can either be given as a single .bed file or multiple
@@ -115,20 +125,33 @@ class OverlapEvents:
         else:
             self.parse_bed_file(config['overlap_events']['bed'], allow_chroms=self.allow_chroms, allow_types=self.allow_types)
 
+        # optional list of Alu pairs to be used as flanking Alus for DELs/DUPs (to simulate Alu-mediated CNVs)
+        # --> dict of form {SV_identifier: [(chrom_1, a_1, b_1), ..., (chrom_n, a_n, b_n)]}
+        self.alu_pairs = self.populate_alu_pairs(config['SVs'])
+
     def get_num_overlap_counts(self, config):
         # populate nested dict of the form {sv type: {element type: num_overlap}}
         for sv in config['SVs']:
-            if isinstance(sv['num_overlap'], int):
-                self.svtype_overlap_counts[sv['type']]['ALL'] = sv['num_overlap']
-            else:
-                # set up correspondence with the element types as they were given in the config file
-                for num_ovlp in sv['num_overlap']:
-                    self.svtype_overlap_counts[sv['type']][self.allow_types[sv['num_overlap'].index(num_ovlp)]] = num_ovlp
+            sv_config_key = get_sv_config_identifier(sv)
+            if 'num_overlap' in sv.keys():
+                if isinstance(sv['num_overlap'], int):
+                    # if num_overlap given as a singleton integer, label type as 'ALL' if zero or multiple allow_types
+                    # are given, otherwise set type to the single allow_type provided
+                    if self.allow_types is not None and len(self.allow_types) == 1:
+                        self.svtype_overlap_counts[sv_config_key][self.allow_types[0]] = sv['num_overlap']
+                    else:
+                        self.svtype_overlap_counts[sv_config_key]['ALL'] = sv['num_overlap']
+                else:
+                    # set up correspondence with the element types as they were given in the config file
+                    for num_ovlp in sv['num_overlap']:
+                        self.svtype_overlap_counts[sv_config_key][self.allow_types[sv['num_overlap'].index(num_ovlp)]] = num_ovlp
+            if 'num_alu_mediated' in sv.keys():
+                self.svtype_alu_mediated_counts[sv_config_key] = sv['num_alu_mediated']
 
     def parse_bed_file(self, bed_fname, allow_chroms=None, allow_types=None):
         """
         reads bed file (intended use: processing repeatmasker elements to be considered for randomized
-        event overlap) and addes (chr, start, end) tuples representing the intervals to a dict keyed on elt type
+        event overlap) and adds (chr, start, end) tuples representing the intervals to a dict keyed on elt type
         --> logic taken from bed_iter() and parse_bed_line() in cue (seq/io.py)
         - allow_chroms: optional list of allowed chromosomes (filtering out all entries with chrom not in list)
         - allow_types: optional list of allowed types to be included in the simulation
@@ -149,15 +172,70 @@ class OverlapEvents:
         for k in self.overlap_events_dict.keys():
             random.shuffle(self.overlap_events_dict[k])
 
+    def populate_alu_pairs(self, svs_config):
+        # alu_pairs only to be populated if any SV config entries specify a value for 'num_alu_mediated'
+        if not any('num_alu_mediated' in d.keys() for d in svs_config):
+            return None
+        # construct dict of form {chrom: [(start, end)]} Alu interval tuples -- will look for Alus in the self.overlap_events_dict
+        alu_intervals = defaultdict(list)
+        for elt_type, elt_list in self.overlap_events_dict.items():
+            if 'Alu' in elt_type:
+                for chrom, start, end in elt_list:
+                    alu_intervals[chrom].append((int(start), int(end)))
+        # -------
+        alu_pairs_dict = {}
+        # construct the lists of viable flanking pairs for each SV config with a nonzero num_alu_mediated specified
+        for sv_config in svs_config:
+            sv_config_id = get_sv_config_identifier(sv_config)
+            if 'num_alu_mediated' in sv_config.keys():
+                alu_pairs = []
+                # recall: only DUPs and DELs may be made to be alu-mediated so length bounds will always be given as ints
+                sv_min, sv_max = sv_config['min_length'], sv_config['max_length']
+                # collecting twice as many Alu pairs as necessary to allow for collisions with previously-places SVs
+                for _ in range(self.svtype_alu_mediated_counts[sv_config_id] * 2):
+                    viable_matches = []
+                    while len(viable_matches) == 0:
+                        # choose a random starting (left) Alu (random across chromosome and position)
+                        rand_chrom = random.choice(list(alu_intervals.keys()))
+                        left_alu = random.choice(alu_intervals[rand_chrom])
+                        # collect all the alus on the same chromosome that are within an appropriate dist (and repeat
+                        # initial alu selection if there are no appropriate matches)
+                        viable_matches = [ivl for ivl in alu_intervals[rand_chrom] if sv_min <= ivl[0] - left_alu[1] <= sv_max]
+                    right_alu = random.choice(viable_matches)
+                    # need to also record chrom so we can yield that along with the interceding interval
+                    alu_pairs.append((rand_chrom, left_alu, right_alu))
+                random.shuffle(alu_pairs)
+                alu_pairs_dict[sv_config_id] = alu_pairs
+        return alu_pairs_dict
+
+    def get_alu_mediated_interval(self, sv_config_id):
+        # 1) draw alu-mediated interval for a given DEL/DUP of given size range (don't need to give the size bounds
+        # to this function because they were already used to assemble the list of viable alu pairs for this sv config)
+        # TODO: add a test case for addressing collisions between extracted Alu-mediated intervals and already-placed SVs
+        ivl_chrom, left_alu, right_alu = random.choice(self.alu_pairs[sv_config_id])
+        # 2) construct the interceding interval (extending halfway through both Alus)
+        ivl_start, ivl_end = (left_alu[1] + left_alu[0]) // 2, (right_alu[1] + right_alu[0]) // 2
+        # 3) decrement the svtype_alu_mediated_counts entry for this SV config
+        self.svtype_alu_mediated_counts[sv_config_id] -= 1
+        # 3a) ... removing the dict entry if decremented to 0
+        if self.svtype_alu_mediated_counts[sv_config_id] == 0:
+            del self.svtype_alu_mediated_counts[sv_config_id]
+        return ivl_chrom, ivl_start, ivl_end, 'ALU_MEDIATED'  # <- ALU_MEDIATED to be used as retrieved_type
+
     @staticmethod
     def get_intrvl_len(chr, st, end):
         return int(end) - int(st)
 
-    def __getitem__(self, minsize, maxsize, elt_type=None):
+    def __getitem__(self, sv_config_id, minsize, maxsize, elt_type=None):
+        # # debug
+        # print(f'getitem() called with elt_type = {elt_type}')
+        # print(f'svtype_overlap_counts = {self.svtype_overlap_counts}')
+        # --> need to store input_elt_type to decrement the right entries at the end (could instead decrement
+        # the count dict here but seems cleared to udpate both dicts together at the end)
+        input_elt_type = elt_type
         if elt_type in self.overlap_events_dict.keys():  # <- elt_type given, and elements of matching type are in the dict
             # elt_type-specific branch: draw random element (recall: list is shuffled) of appropriate size
             rand_elt = next((elt for elt in self.overlap_events_dict[elt_type] if minsize <= self.get_intrvl_len(*elt) <= maxsize), None)
-        # elif elt_type is None and len(self.overlap_events_dict.keys()) > 0:  # <- elt_type not given, and the element dict is non-empty
         elif len(self.overlap_events_dict.keys()) > 0:  # <- element dict is non-empty; elt_type not given, or is given as a prefix
             if elt_type is None:
                 # elt_type-agnostic branch: draw random element from combined list of elements across all types
@@ -182,5 +260,15 @@ class OverlapEvents:
             self.overlap_events_dict[elt_type].remove(rand_elt)
             if len(self.overlap_events_dict[elt_type]) == 0:
                 del self.overlap_events_dict[elt_type]
-        return rand_elt
+            # -------------
+            # decrement the self.svtype_overlap_counts dict
+            self.svtype_overlap_counts[sv_config_id][input_elt_type] -= 1
+            # ... and when the number reaches 0, remove from dict so line 253 will not be triggered
+            if self.svtype_overlap_counts[sv_config_id][input_elt_type] == 0:
+                del self.svtype_overlap_counts[sv_config_id][input_elt_type]
+                # ... and if the total counts for that svtype have been removed, remove the sv type dict entry
+                if len(self.svtype_overlap_counts[sv_config_id].keys()) == 0:
+                    del self.svtype_overlap_counts[sv_config_id]
+        # returning elt_type as well in order to have the retrieved type even when allow_types == 'ALL'
+        return rand_elt, elt_type
 

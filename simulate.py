@@ -250,35 +250,30 @@ class SV_Simulator():
                     repeat_elt = None
                     # if there's an overlap_events object then we've created a dictionary giving the num_overlaps for each elt type by sv type
                     if self.overlap_events is not None:
+                        sv_config_identifier = utils.get_sv_config_identifier(sv_config)
                         # check if this type has an associated num_overlaps for any known elements, and if there are
                         # remaining elements that can be used for overlap
-                        if sv_config['type'] in self.overlap_events.svtype_overlap_counts.keys() and \
+                        if sv_config_identifier in self.overlap_events.svtype_overlap_counts.keys() and \
                                 len(self.overlap_events.overlap_events_dict.keys()) > 0:
-                            elt_type = list(self.overlap_events.svtype_overlap_counts[sv_config['type']].keys())[0]
+                            elt_type = list(self.overlap_events.svtype_overlap_counts[sv_config_identifier].keys())[0]
                             # if this elt_type doesn't have any matching elements in the element dict (for matching determined
                             # either with elt_type giving the full element name or just a prefix – e.g., 'L1'), remove it
                             # and move on to the next elt type
                             while elt_type != 'ALL' and not any([elt_type in ovlp_type for ovlp_type in self.overlap_events.overlap_events_dict.keys()]):
-                                del self.overlap_events.svtype_overlap_counts[sv_config['type']][elt_type]
-                                elt_type = list(self.overlap_events.svtype_overlap_counts[sv_config['type']].keys())[0]
+                                del self.overlap_events.svtype_overlap_counts[sv_config_identifier][elt_type]
+                                elt_type = list(self.overlap_events.svtype_overlap_counts[sv_config_identifier].keys())[0]
                             # if num_overlaps was given as a single number rather than an element-specific list, draw a random element for overlap
-                            repeat_elt = self.overlap_events.__getitem__(minsize=sv_config['length_ranges'][0][0],
-                                                                         maxsize=sv_config['length_ranges'][0][1],
-                                                                         elt_type=(None if elt_type == 'ALL'else elt_type))
-                            if repeat_elt is not None:
-                                # decrement the self.svtype_overlap_counts dict such that initialize_svs() will only try to
-                                #  draw the right number of elements (i.e., no more than num_overlap)
-                                self.overlap_events.svtype_overlap_counts[sv_config['type']][elt_type] -= 1
-                                # ... and when the number reaches 0, remove from dict so line 253 will not be triggered
-                                if self.overlap_events.svtype_overlap_counts[sv_config['type']][elt_type] == 0:
-                                    del self.overlap_events.svtype_overlap_counts[sv_config['type']][elt_type]
-                                    # ... and if the total counts for that svtype have been removed, remove the sv type dict entry
-                                    if len(self.overlap_events.svtype_overlap_counts[sv_config['type']].keys()) == 0:
-                                        del self.overlap_events.svtype_overlap_counts[sv_config['type']]
+                            repeat_elt, retrieved_type = self.overlap_events.__getitem__(sv_config_id=sv_config_identifier,
+                                                                                         minsize=sv_config['length_ranges'][0][0],
+                                                                                         maxsize=sv_config['length_ranges'][0][1],
+                                                                                         elt_type=(None if elt_type == 'ALL'else elt_type))
+                        elif sv_config_identifier in self.overlap_events.svtype_alu_mediated_counts.keys():
+                            repeat_elt, retrieved_type = self.overlap_events.get_alu_mediated_interval(sv_config_identifier)
                     sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                             length_ranges=sv_config["length_ranges"], source=sv_config["source"],
                                             target=sv_config["target"],
-                                            overlap_event=(repeat_elt + (elt_type,) if repeat_elt is not None else None))
+                                            # --> **the singleton added here is used for the OVERLAP_EV info field**
+                                            overlap_event=(repeat_elt + (retrieved_type if elt_type == 'ALL' else elt_type,) if repeat_elt is not None else None))
 
                     # For divergent repeat simulation, need div_dDUP to be homozygous
                     if random.randint(0, 1) or sv.type == Variant_Type.div_dDUP:
@@ -385,6 +380,7 @@ class SV_Simulator():
                     valid = False
                     break
 
+                # this is where chromosome-match is enforced for SVs assigned to overlap a known element
                 rand_id, chr_len, chr_event_ranges = self.get_rand_chr(check_size=sv.req_space,
                                                                        fixed_chrom=(None if sv.overlap_event is None
                                                                                     else sv.overlap_event[0]))

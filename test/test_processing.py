@@ -58,6 +58,8 @@ class TestProcessing(unittest.TestCase):
         self.ins_fasta = "test/inputs/ins_fasta.fa"
         self.test_overlap_bed = "test/inputs/example_overlap_events.bed"
         self.test_overlap_bed_2 = "test/inputs/example_overlap_events_2.bed"
+        # test_overlap_bed_3: events with differing chromosome
+        self.test_overlap_bed_3 = "test/inputs/example_overlap_events_3.bed"
 
         self.test_objects_simple_events = {'DEL': TestProcObject([self.ref_file, {"chr19": "CTG"}],
                                                                  [self.par, {"sim_settings": {"max_tries": 50, "prioritize_top": True},
@@ -223,6 +225,16 @@ class TestProcessing(unittest.TestCase):
                                                                                    "overlap_events": {
                                                                                        "bed": [self.test_overlap_bed, self.test_overlap_bed_2],
                                                                                        "allow_types": "L1"},
+                                                                                   "SVs": [{"type": "DEL", "number": 5,
+                                                                                            "min_length": 1, "max_length": 5,
+                                                                                            "num_overlap": 2}]}],
+                                                                       self.hap1, self.hap2, self.bed, self.vcf),
+                                            'overlap5': TestProcObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                                       [self.par, {"sim_settings": {"prioritize_top": True,
+                                                                                                    "fail_if_placement_issues": True},
+                                                                                   "overlap_events": {
+                                                                                        "bed": self.test_overlap_bed_3,
+                                                                                        "allow_types": "ALR"},
                                                                                    "SVs": [{"type": "DEL", "number": 5,
                                                                                             "min_length": 1, "max_length": 5,
                                                                                             "num_overlap": 2}]}],
@@ -470,8 +482,10 @@ class TestProcessing(unittest.TestCase):
         elt_type_counts['overlap2'] = {'L1HS': 2, 'ALR/Alpha': 1, 'NONE': 1}
         # *the vcf INFO overlap event field will reflect the label given in the config (i.e., whether just a prefix or full elt name)
         elt_type_counts['overlap3'] = {'L1': 3, 'ALR': 2}
-        elt_type_counts['overlap4'] = {'ALL': 2, 'NONE': 3}
-        for test_case in ['overlap1', 'overlap2', 'overlap3', 'overlap4']:
+        elt_type_counts['overlap4'] = {'L1': 2, 'NONE': 3}
+        # --> overlap5: case in which allow_types not specified; reported type will take full repName provided in bed file
+        elt_type_counts['overlap5'] = {'ALR': 1, 'NONE': 4}
+        for test_case in ['overlap1', 'overlap2', 'overlap3', 'overlap4', 'overlap5']:
             records = self.initialize_test(self.test_objects_overlap_simple, test_case, output_type='vcf')
             ovlp_evs = [record['INFO']['OVERLAP_EV'] if 'OVERLAP_EV' in record['INFO'].keys() else 'NONE' for record in records]
             self.assertEqual(dict(Counter(ovlp_evs)), elt_type_counts[test_case])
