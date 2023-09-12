@@ -253,6 +253,22 @@ The current set of event types that are amenable to this feature are DEL, DUP, I
 involving dispersions (dDUP, INV_dDUP, TRA) the position is assigned such that the source event of the SV (the component
 getting duplicated or translocated) is placed at the selected element interval.
 
+### Example 4a - Placing DUPs or DELs at Alu-mediated intervals
+An additional use case for the above known-element placement is to place deletion or tandem duplication events in between Alu elements in the genome (Alu-mediated CNVs being a well-studied case of SV/repetitive element relation – e.g., [Gu et al., 2015](https://academic.oup.com/hmg/article/24/14/4061/2385874)). Alu-mediated DELs or DUPs can be specified in the same way as the above cases of specifying overlap, but instead by specifying the desired number of Alu-mediated SVs with the config field `num_alu_mediated`. An example config file is given below:
+```yaml
+sim_settings:
+    max_tries: 200
+    prioritize_top: True
+overlap_events:
+    bed: '/{path_to}/{candidate_overlap_events}.bed'
+SVs:
+    - type: "DEL"
+      number: 10
+      min_length: 500
+      max_length: 1000
+      num_alu_mediated: 5
+```
+
 ### Automated pipeline bash scripts
 #### `generate_synthetic_genome.sh`
 To automate the process of generating a synthetic reference and aligned BAM file, `generate_synthetic_genome.sh` can be run with inputs
