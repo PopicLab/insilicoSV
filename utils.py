@@ -1,6 +1,7 @@
 import os
 import random
 import itertools
+import numpy as np
 from constants import *
 from collections import defaultdict
 
@@ -124,6 +125,10 @@ class OverlapEvents:
                 self.parse_bed_file(bed_path, allow_chroms=self.allow_chroms, allow_types=self.allow_types)
         else:
             self.parse_bed_file(config['overlap_events']['bed'], allow_chroms=self.allow_chroms, allow_types=self.allow_types)
+        # debug
+        print(f'svtype_overlap_counts populated: {self.svtype_overlap_counts}')
+        print(f'svtype_alu_mediated_counts populated: {self.svtype_alu_mediated_counts}')
+        print(f'overlap_events_dict populated: {self.overlap_events_dict}')
 
         # optional list of Alu pairs to be used as flanking Alus for DELs/DUPs (to simulate Alu-mediated CNVs)
         # --> dict of form {SV_identifier: [(chrom_1, a_1, b_1), ..., (chrom_n, a_n, b_n)]}
@@ -182,30 +187,65 @@ class OverlapEvents:
             if 'Alu' in elt_type:
                 for chrom, start, end in elt_list:
                     alu_intervals[chrom].append((int(start), int(end)))
+        for chrom in alu_intervals.keys():
+            random.shuffle(alu_intervals[chrom])
+        # debug
+        print(f'alu_intervals constructed : {alu_intervals}')
         # -------
         alu_pairs_dict = {}
         # construct the lists of viable flanking pairs for each SV config with a nonzero num_alu_mediated specified
+        # debug
+        print('ALU PAIR SELECTION PROCESS')
         for sv_config in svs_config:
             sv_config_id = get_sv_config_identifier(sv_config)
             if 'num_alu_mediated' in sv_config.keys():
+                print(f'num_alu_mediated found in sv_config:\n{sv_config}')
                 alu_pairs = []
                 # recall: only DUPs and DELs may be made to be alu-mediated so length bounds will always be given as ints
                 sv_min, sv_max = sv_config['min_length'], sv_config['max_length']
                 # collecting twice as many Alu pairs as necessary to allow for collisions with previously-places SVs
+                # --> terminate if we run out of viable matches (we're picking the left_alu without replacement, so stop when there
+                # --> are no choices left)
                 for _ in range(self.svtype_alu_mediated_counts[sv_config_id] * 2):
                     viable_matches = []
                     while len(viable_matches) == 0:
+                        print(f'\nSTART OF WHILE LOOP – alu_intervals = {alu_intervals}')
+                        if len(alu_intervals.keys()) == 0:
+                            print('EMPTY ALU_INTERVALS DICT')
+                            break
                         # choose a random starting (left) Alu (random across chromosome and position)
                         rand_chrom = random.choice(list(alu_intervals.keys()))
-                        left_alu = random.choice(alu_intervals[rand_chrom])
+                        alu1 = alu_intervals[rand_chrom].pop()
+                        print(f'rand_chrom = {rand_chrom}')
+                        print(f'alu1 = {alu1}')
+                        # -- update alu_intervals --
+                        if len(alu_intervals[rand_chrom]) == 0:
+                            del alu_intervals[rand_chrom]
+                            break
+                        # --------------------------
                         # collect all the alus on the same chromosome that are within an appropriate dist (and repeat
                         # initial alu selection if there are no appropriate matches)
-                        viable_matches = [ivl for ivl in alu_intervals[rand_chrom] if sv_min <= ivl[0] - left_alu[1] <= sv_max]
-                    right_alu = random.choice(viable_matches)
-                    # need to also record chrom so we can yield that along with the interceding interval
-                    alu_pairs.append((rand_chrom, left_alu, right_alu))
-                random.shuffle(alu_pairs)
-                alu_pairs_dict[sv_config_id] = alu_pairs
+                        viable_matches = [ivl for ivl in alu_intervals[rand_chrom] if sv_min <= np.abs(self.midpoint(*ivl) - self.midpoint(*alu1)) <= sv_max]
+                        print(f'viable_matches = {viable_matches}')
+                        print(f'END OF WHILE LOOP – alu_intervals = {alu_intervals}')
+                    if len(viable_matches) == 0:
+                        pass  # do something
+                    else:
+                        # need to pick this without replacement as well, right?
+                        alu2 = random.choice(viable_matches)
+                        print(f'alu2 = {alu2}')
+                        alu_intervals[rand_chrom].remove(alu2)
+                        # -- update alu_intervals --
+                        if len(alu_intervals[rand_chrom]) == 0:
+                            del alu_intervals[rand_chrom]
+                        # --------------------------
+                        # need to also record chrom so we can yield that along with the interceding interval
+                        alu_pairs.append((rand_chrom, alu1, alu2) if alu1[0] < alu2[0] else (rand_chrom, alu2, alu1))
+                        print(f'adding to alu_pairs: {(rand_chrom, alu1, alu2)}')
+                if len(alu_pairs) > 0:
+                    random.shuffle(alu_pairs)
+                    alu_pairs_dict[sv_config_id] = alu_pairs
+                print(f'END OF ALU PAIR SELECTION PROCESS\nalu_pair_dict = {alu_pairs_dict}')
         return alu_pairs_dict
 
     def get_alu_mediated_interval(self, sv_config_id):
@@ -220,7 +260,11 @@ class OverlapEvents:
         # 3a) ... removing the dict entry if decremented to 0
         if self.svtype_alu_mediated_counts[sv_config_id] == 0:
             del self.svtype_alu_mediated_counts[sv_config_id]
-        return ivl_chrom, ivl_start, ivl_end, 'ALU_MEDIATED'  # <- ALU_MEDIATED to be used as retrieved_type
+        return (ivl_chrom, ivl_start, ivl_end), 'ALU_MEDIATED'  # <- ALU_MEDIATED to be used as retrieved_type
+
+    @staticmethod
+    def midpoint(start, end):
+        return (start + end) // 2
 
     @staticmethod
     def get_intrvl_len(chr, st, end):

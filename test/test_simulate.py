@@ -78,6 +78,9 @@ class TestSVSimulator(unittest.TestCase):
 
         test_overlap_bed = "test/inputs/example_overlap_events.bed"
         test_overlap_bed_2 = "test/inputs/example_overlap_events_2.bed"
+        test_overlap_bed_3 = "test/inputs/example_overlap_events_3.bed"
+        test_overlap_bed_4 = "test/inputs/example_overlap_events_4.bed"
+        test_overlap_bed_5 = "test/inputs/example_overlap_events_5.bed"
 
         self.test_objects_no_dis = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
                                                [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
@@ -340,6 +343,23 @@ class TestSVSimulator(unittest.TestCase):
                                                                     ]}],
                                                      hap1, hap2, bed)
                                           ]
+        self.test_objects_alu_mediated = [TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                     [par, {"sim_settings": {"prioritize_top": True,
+                                                                             "fail_if_placement_issues": True},
+                                                            "overlap_events": {"bed": test_overlap_bed_4},
+                                                            "SVs": [{"type": "DEL", "number": 1,
+                                                                     "min_length": 13, "max_length": 15,
+                                                                     "num_alu_mediated": 1}]}],
+                                                     hap1, hap2, bed),
+                                          TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                     [par, {"sim_settings": {"prioritize_top": True,
+                                                                             "fail_if_placement_issues": True},
+                                                            "overlap_events": {"bed": [test_overlap_bed_4,
+                                                                                       test_overlap_bed_5]},
+                                                            "SVs": [{"type": "DEL", "number": 1,
+                                                                     "min_length": 5, "max_length": 15,
+                                                                     "num_alu_mediated": 9}]}],
+                                                     hap1, hap2, bed)]
 
         # ---------- test objects for divergence event ------------
         self.test_objects_divergence_event = [TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
@@ -469,6 +489,28 @@ class TestSVSimulator(unittest.TestCase):
                 self.assertTrue(changed_frag_1[:4] in ['CTGA', 'ACTG'] or changed_frag_2[:4] in ['CTGA', 'ACTG'])
                 # --> check for TRA in second half of refs
                 self.assertTrue(changed_frag_1[-7:] in ['TCATGGA', 'ATGGATC'] or changed_frag_2[-7:] in ['TCATGGA', 'ATGGATC'])
+
+    def test_alu_mediated_placement(self):
+        for i in range(len(self.test_objects_alu_mediated)):
+            if i == 1:
+                continue
+            config = self.test_objects_alu_mediated[i]
+            config.initialize_files()
+            curr_sim = SV_Simulator(config.ref, config.par)
+            curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
+            changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+            if i == 0:
+                # pass
+                # debug
+                print(f'changed_frag_1 = {changed_frag_1}')
+                print(f'changed_frag_2 = {changed_frag_2}')
+                self.assertTrue('CTCCGTCTCCGTCGTACTAAGTCGTA' in [changed_frag_1, changed_frag_2])
+            if i == 1:
+                # debug
+                print(f'changed_frag_1 = {changed_frag_1}')
+                print(f'changed_frag_2 = {changed_frag_2}')
+                # self.assertTrue('CTCCGTCTCCGTCGTACTAAGTCGTA' in [changed_frag_1, changed_frag_2])
+
 
     def test_divergence_events(self):
         # the divergence operator will mutate each base in an event interval with probability p

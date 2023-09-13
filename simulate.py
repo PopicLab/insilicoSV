@@ -248,6 +248,7 @@ class SV_Simulator():
                     # logic for placing events at intervals given in overlap bed file:
                     # for the first (sv_config["num_overlap"]) events, instantiate the SV at the next valid repeat elt interval
                     repeat_elt = None
+                    elt_type = None
                     # if there's an overlap_events object then we've created a dictionary giving the num_overlaps for each elt type by sv type
                     if self.overlap_events is not None:
                         sv_config_identifier = utils.get_sv_config_identifier(sv_config)
@@ -273,7 +274,7 @@ class SV_Simulator():
                                             length_ranges=sv_config["length_ranges"], source=sv_config["source"],
                                             target=sv_config["target"],
                                             # --> **the singleton added here is used for the OVERLAP_EV info field**
-                                            overlap_event=(repeat_elt + (retrieved_type if elt_type == 'ALL' else elt_type,) if repeat_elt is not None else None))
+                                            overlap_event=(repeat_elt + (retrieved_type if elt_type in ['ALL', None] else elt_type,) if repeat_elt is not None else None))
 
                     # For divergent repeat simulation, need div_dDUP to be homozygous
                     if random.randint(0, 1) or sv.type == Variant_Type.div_dDUP:
