@@ -262,6 +262,9 @@ class SV_Simulator():
                             # and move on to the next elt type
                             while elt_type != 'ALL' and not any([elt_type in ovlp_type for ovlp_type in self.overlap_events.overlap_events_dict.keys()]):
                                 del self.overlap_events.svtype_overlap_counts[sv_config_identifier][elt_type]
+                                if len(self.overlap_events.svtype_overlap_counts[sv_config_identifier]) == 0:
+                                    del self.overlap_events.svtype_overlap_counts[sv_config_identifier]
+                                    break
                                 elt_type = list(self.overlap_events.svtype_overlap_counts[sv_config_identifier].keys())[0]
                             # if num_overlaps was given as a single number rather than an element-specific list, draw a random element for overlap
                             repeat_elt, retrieved_type = self.overlap_events.__getitem__(sv_config_id=sv_config_identifier,
@@ -270,10 +273,12 @@ class SV_Simulator():
                                                                                          elt_type=(None if elt_type == 'ALL'else elt_type))
                         elif sv_config_identifier in self.overlap_events.svtype_alu_mediated_counts.keys():
                             repeat_elt, retrieved_type = self.overlap_events.get_alu_mediated_interval(sv_config_identifier)
+                    # print(f'==== calling SV constructor ====\nrepeat_elt = {repeat_elt}\nelt_type = {elt_type}\nretrieved_type = {retrieved_type}\n')
                     sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                             length_ranges=sv_config["length_ranges"], source=sv_config["source"],
                                             target=sv_config["target"],
                                             # --> **the singleton added here is used for the OVERLAP_EV info field**
+                                            # --> overlap_event <- None if repeat_elt is None, o/w relevant 4-tuple of info
                                             overlap_event=(repeat_elt + (retrieved_type if elt_type in ['ALL', None] else elt_type,) if repeat_elt is not None else None))
 
                     # For divergent repeat simulation, need div_dDUP to be homozygous

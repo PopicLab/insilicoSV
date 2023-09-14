@@ -1,6 +1,7 @@
 import os
 import random
 import itertools
+import copy  # <- utils for making copies of python objects
 import numpy as np
 from constants import *
 from collections import defaultdict
@@ -170,9 +171,10 @@ class OverlapEvents:
                 assert len(fields) >= 3, "Unexpected number of fields in BED: %s" % line
                 chr_name, start, end, elt_type = fields[:4]
                 # need to allow for allow_types to include prefixes of element names
-                if (allow_chroms and chr_name not in allow_chroms) or (allow_types and not any([elt_name in elt_type for elt_name in allow_types])):
+                # --> also need to always include Alu as an allowed prefix in case any of the SVs will need to be placed at Alu-mediated intervals
+                if (allow_chroms and chr_name not in allow_chroms) or (allow_types and not any([elt_name in elt_type for elt_name in allow_types + ['Alu']])):
                     continue
-                self.overlap_events_dict[elt_type].append((chr_name, start, end))
+                self.overlap_events_dict[elt_type].append((chr_name, int(start), int(end)))
         # shuffle the lists of each element type for random selection
         for k in self.overlap_events_dict.keys():
             random.shuffle(self.overlap_events_dict[k])
@@ -200,48 +202,52 @@ class OverlapEvents:
             sv_config_id = get_sv_config_identifier(sv_config)
             if 'num_alu_mediated' in sv_config.keys():
                 print(f'num_alu_mediated found in sv_config:\n{sv_config}')
+                # want a copy of the alu_intervals specific to this SV config so we can edit without changing the state of alu_intervals
+                alu_intervals_copy = copy.deepcopy(alu_intervals)
                 alu_pairs = []
                 # recall: only DUPs and DELs may be made to be alu-mediated so length bounds will always be given as ints
                 sv_min, sv_max = sv_config['min_length'], sv_config['max_length']
                 # collecting twice as many Alu pairs as necessary to allow for collisions with previously-places SVs
                 # --> terminate if we run out of viable matches (we're picking the left_alu without replacement, so stop when there
                 # --> are no choices left)
-                for _ in range(self.svtype_alu_mediated_counts[sv_config_id] * 2):
+                for _ in range(self.svtype_alu_mediated_counts[sv_config_id]):  # * 2): <-- just going to generate the exact number requested, see if it becomes an issue with collisions with previously-placed SVs
                     viable_matches = []
                     while len(viable_matches) == 0:
-                        print(f'\nSTART OF WHILE LOOP – alu_intervals = {alu_intervals}')
-                        if len(alu_intervals.keys()) == 0:
-                            print('EMPTY ALU_INTERVALS DICT')
+                        print(f'\nSTART OF WHILE LOOP – sv_min, sv_max = {sv_min, sv_max} – alu_intervals_copy = {alu_intervals_copy}')
+                        if len(alu_intervals_copy.keys()) == 0 or not any(len(v) > 1 for v in alu_intervals_copy.values()):
+                            print(f'INSUFFICIENT ALU_INTERVALS DICT: {alu_intervals_copy}')
+                            # break if there are no alus remaining to choose from
                             break
                         # choose a random starting (left) Alu (random across chromosome and position)
-                        rand_chrom = random.choice(list(alu_intervals.keys()))
-                        alu1 = alu_intervals[rand_chrom].pop()
+                        # --> only need to choose from chroms with at least 2 alus
+                        rand_chrom = random.choice([chrom for chrom, alus in alu_intervals_copy.items() if len(alus) > 1])
+                        alu1 = alu_intervals_copy[rand_chrom].pop()
                         print(f'rand_chrom = {rand_chrom}')
                         print(f'alu1 = {alu1}')
-                        # -- update alu_intervals --
-                        if len(alu_intervals[rand_chrom]) == 0:
-                            del alu_intervals[rand_chrom]
-                            break
-                        # --------------------------
                         # collect all the alus on the same chromosome that are within an appropriate dist (and repeat
                         # initial alu selection if there are no appropriate matches)
-                        viable_matches = [ivl for ivl in alu_intervals[rand_chrom] if sv_min <= np.abs(self.midpoint(*ivl) - self.midpoint(*alu1)) <= sv_max]
+                        viable_matches = [ivl for ivl in alu_intervals_copy[rand_chrom] if sv_min <= np.abs(self.midpoint(*ivl) - self.midpoint(*alu1)) <= sv_max]
                         print(f'viable_matches = {viable_matches}')
-                        print(f'END OF WHILE LOOP – alu_intervals = {alu_intervals}')
-                    if len(viable_matches) == 0:
-                        pass  # do something
-                    else:
+                        print(f'END OF WHILE LOOP – alu_intervals_copy = {alu_intervals_copy}')
+                    if len(viable_matches) > 0:
                         # need to pick this without replacement as well, right?
                         alu2 = random.choice(viable_matches)
                         print(f'alu2 = {alu2}')
-                        alu_intervals[rand_chrom].remove(alu2)
+                        alu_intervals_copy[rand_chrom].remove(alu2)
                         # -- update alu_intervals --
-                        if len(alu_intervals[rand_chrom]) == 0:
-                            del alu_intervals[rand_chrom]
+                        if len(alu_intervals_copy[rand_chrom]) == 0:
+                            del alu_intervals_copy[rand_chrom]
                         # --------------------------
                         # need to also record chrom so we can yield that along with the interceding interval
                         alu_pairs.append((rand_chrom, alu1, alu2) if alu1[0] < alu2[0] else (rand_chrom, alu2, alu1))
                         print(f'adding to alu_pairs: {(rand_chrom, alu1, alu2)}')
+                        # and only want to delete from the true alu_intervals dict the Alus that are actually used
+                        # (not just the ones that didn't yield matches, because those might have matches under a different SV config's params)
+                        # --> also need to remove from the general overlap_events_dict because these now cant be used for full overlap placement either
+                        for alu in [alu1, alu2]:
+                            alu_intervals[rand_chrom].remove(alu)
+                            self.remove_alu_from_overlap_dict(rand_chrom, *alu)
+                        print(f'removed alu1,alu2 from alu_intervals: {alu_intervals}')
                 if len(alu_pairs) > 0:
                     random.shuffle(alu_pairs)
                     alu_pairs_dict[sv_config_id] = alu_pairs
@@ -249,10 +255,16 @@ class OverlapEvents:
         return alu_pairs_dict
 
     def get_alu_mediated_interval(self, sv_config_id):
+        print(f'GET_ALU_MED_INTERVAL CALLED WITH svtype_alu_mediated_counts = {self.svtype_alu_mediated_counts}')
+        # 0) if there are no remaining alu pairs to choose for this sv config, return None and zero out the remaining
+        # counts in the svtype_alu...counts dict (so we don't keep looking in subsequent iterations)
+        if len(self.alu_pairs[sv_config_id]) == 0:
+            print(f'No valid alu pairs remaining for {sv_config_id} – alu_pairs = {self.alu_pairs}')
+            del self.svtype_alu_mediated_counts[sv_config_id]
+            return None, None
         # 1) draw alu-mediated interval for a given DEL/DUP of given size range (don't need to give the size bounds
         # to this function because they were already used to assemble the list of viable alu pairs for this sv config)
-        # TODO: add a test case for addressing collisions between extracted Alu-mediated intervals and already-placed SVs
-        ivl_chrom, left_alu, right_alu = random.choice(self.alu_pairs[sv_config_id])
+        ivl_chrom, left_alu, right_alu = self.alu_pairs[sv_config_id].pop()
         # 2) construct the interceding interval (extending halfway through both Alus)
         ivl_start, ivl_end = (left_alu[1] + left_alu[0]) // 2, (right_alu[1] + right_alu[0]) // 2
         # 3) decrement the svtype_alu_mediated_counts entry for this SV config
@@ -261,6 +273,16 @@ class OverlapEvents:
         if self.svtype_alu_mediated_counts[sv_config_id] == 0:
             del self.svtype_alu_mediated_counts[sv_config_id]
         return (ivl_chrom, ivl_start, ivl_end), 'ALU_MEDIATED'  # <- ALU_MEDIATED to be used as retrieved_type
+
+    def remove_alu_from_overlap_dict(self, chrom, start, end):
+        print(f'\nRemoving {(chrom, start, end)} from overlap_events_dict')
+        print(f'overlap_events_dict before: {self.overlap_events_dict}')
+        # helper method to remove an Alu element from the overlap_events_dict if it's been chosen for an alu-mediated interval
+        for k, v in self.overlap_events_dict.items():
+            if k.startswith('Alu') and (chrom, start, end) in v:
+                self.overlap_events_dict[k].remove((chrom, start, end))
+        self.overlap_events_dict = {k: v for k, v in self.overlap_events_dict.items() if len(v) > 0}
+        print(f'overlap_events_dict after: {self.overlap_events_dict}\n')
 
     @staticmethod
     def midpoint(start, end):
@@ -301,6 +323,7 @@ class OverlapEvents:
             # if we drew a non-None element, want to remove it from its list and decrement the count dictionary
             if elt_type is None:
                 elt_type = elt_type_mapping[rand_elt]
+            # TODO: need to also make sure the event is removed from the available Alu intervals so we don't choose the same one and cause a collision
             self.overlap_events_dict[elt_type].remove(rand_elt)
             if len(self.overlap_events_dict[elt_type]) == 0:
                 del self.overlap_events_dict[elt_type]
