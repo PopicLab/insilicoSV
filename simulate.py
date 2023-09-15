@@ -254,23 +254,12 @@ class SV_Simulator():
                         sv_config_identifier = utils.get_sv_config_identifier(sv_config)
                         # check if this type has an associated num_overlaps for any known elements, and if there are
                         # remaining elements that can be used for overlap
-                        if sv_config_identifier in self.overlap_events.svtype_overlap_counts.keys() and \
-                                len(self.overlap_events.overlap_events_dict.keys()) > 0:
-                            elt_type = list(self.overlap_events.svtype_overlap_counts[sv_config_identifier].keys())[0]
-                            # if this elt_type doesn't have any matching elements in the element dict (for matching determined
-                            # either with elt_type giving the full element name or just a prefix – e.g., 'L1'), remove it
-                            # and move on to the next elt type
-                            while elt_type != 'ALL' and not any([elt_type in ovlp_type for ovlp_type in self.overlap_events.overlap_events_dict.keys()]):
-                                del self.overlap_events.svtype_overlap_counts[sv_config_identifier][elt_type]
-                                if len(self.overlap_events.svtype_overlap_counts[sv_config_identifier]) == 0:
-                                    del self.overlap_events.svtype_overlap_counts[sv_config_identifier]
-                                    break
-                                elt_type = list(self.overlap_events.svtype_overlap_counts[sv_config_identifier].keys())[0]
-                            # if num_overlaps was given as a single number rather than an element-specific list, draw a random element for overlap
-                            repeat_elt, retrieved_type = self.overlap_events.__getitem__(sv_config_id=sv_config_identifier,
-                                                                                         minsize=sv_config['length_ranges'][0][0],
-                                                                                         maxsize=sv_config['length_ranges'][0][1],
-                                                                                         elt_type=(None if elt_type == 'ALL'else elt_type))
+                        if sv_config_identifier in self.overlap_events.svtype_overlap_counts.keys():
+                            repeat_elt, retrieved_type, elt_type = self.overlap_events.get_single_element_interval(
+                                sv_config_identifier, sv_config, partial_overlap=False)
+                        elif sv_config_identifier in self.overlap_events.svtype_partial_overlap_counts.keys():
+                            repeat_elt, retrieved_type, elt_type = self.overlap_events.get_single_element_interval(
+                                sv_config_identifier, sv_config, partial_overlap=True)
                         elif sv_config_identifier in self.overlap_events.svtype_alu_mediated_counts.keys():
                             repeat_elt, retrieved_type = self.overlap_events.get_alu_mediated_interval(sv_config_identifier)
                     # print(f'==== calling SV constructor ====\nrepeat_elt = {repeat_elt}\nelt_type = {elt_type}\nretrieved_type = {retrieved_type}\n')

@@ -400,8 +400,29 @@ class TestSVSimulator(unittest.TestCase):
                                                                       "min_length": [2, 1],
                                                                       "max_length": [2, 1],
                                                                       "num_overlap": 1}]}],
+                                                      hap1, hap2, bed),
+                                           TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                      [par, {"sim_settings": {"prioritize_top": True,
+                                                                              "fail_if_placement_issues": False},
+                                                             "overlap_events": {"bed": test_overlap_bed_4,
+                                                                                "allow_types": "Alu"},
+                                                             "SVs": [{"type": "DEL", "number": 1,
+                                                                      "min_length": 4, "max_length": 4,
+                                                                      "num_overlap": 1},
+                                                                     {"type": "DEL", "number": 1,
+                                                                      "min_length": 13, "max_length": 15,
+                                                                      "num_alu_mediated": 1}
+                                                                     ]}],
                                                       hap1, hap2, bed)
                                            ]
+        self.test_objects_partial_overlap = [TestObject([ref_file, {"chr21": "CTCCGTAGTA"}],
+                                                        [par, {"sim_settings": {"prioritize_top": True,
+                                                                                "fail_if_placement_issues": True},
+                                                               "overlap_events": {"bed": test_overlap_bed},
+                                                               "SVs": [{"type": "DEL", "number": 1,
+                                                                        "min_length": 2, "max_length": 2,
+                                                                        "num_partial_overlap": 1}]}],
+                                                        hap1, hap2, bed)]
 
         # ---------- test objects for divergence event ------------
         self.test_objects_divergence_event = [TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
@@ -499,8 +520,6 @@ class TestSVSimulator(unittest.TestCase):
     def test_overlap_placement(self):
         # simple events
         for i in range(len(self.test_objects_overlap_simple)):
-            if i != 6:
-                continue
             config = self.test_objects_overlap_simple[i]
             config.initialize_files()
             curr_sim = SV_Simulator(config.ref, config.par)
@@ -534,6 +553,17 @@ class TestSVSimulator(unittest.TestCase):
                 # --> check for TRA in second half of refs
                 self.assertTrue(changed_frag_1[-7:] in ['TCATGGA', 'ATGGATC'] or changed_frag_2[-7:] in ['TCATGGA', 'ATGGATC'])
 
+    def test_partial_overlap_placement(self):
+        for i in range(len(self.test_objects_partial_overlap)):
+            config = self.test_objects_partial_overlap[i]
+            config.initialize_files()
+            curr_sim = SV_Simulator(config.ref, config.par)
+            curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
+            changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+            # source: CTCCGTAGTA -> four possible valid del intervals, checking each
+            self.assertTrue(any(possible_del not in changed_frag_1 for possible_del in ['CT', 'CC', 'CG', 'GT']) or
+                            any(possible_del not in changed_frag_2 for possible_del in ['CT', 'CC', 'CG', 'GT']))
+
     def test_alu_mediated_placement(self):
         for i in range(len(self.test_objects_alu_mediated)):
             config = self.test_objects_alu_mediated[i]
@@ -556,6 +586,8 @@ class TestSVSimulator(unittest.TestCase):
     def test_mixed_known_element_placement(self):
         # handling for interacting with alu-mediated placement and overlap placement with other known elements
         for i in range(len(self.test_objects_known_elt_mix)):
+            if i == 2:
+                continue
             config = self.test_objects_known_elt_mix[i]
             config.initialize_files()
             curr_sim = SV_Simulator(config.ref, config.par)
@@ -570,12 +602,14 @@ class TestSVSimulator(unittest.TestCase):
                                 any('CCTCC' in frag for frag in [changed_frag_1, changed_frag_2]))
             if i == 1:
                 # --> del: same as above; dDUP: source either at (2,4) or (25,27)
-                print(f'changed_frag_1 = {changed_frag_1}')
-                print(f'changed_frag_2 = {changed_frag_2}')
                 self.assertFalse(all('GTACTAAGTCGTAC' in frag for frag in [changed_frag_1, changed_frag_2]))
                 self.assertTrue(any('CCGCC' in frag for frag in [changed_frag_1, changed_frag_2]) or
                                 any('CCTCC' in frag for frag in [changed_frag_1, changed_frag_2]) or
                                 any('TCGTC' in frag for frag in [changed_frag_1, changed_frag_2]))
+            if i == 2:
+                # TODO: Better test for what happens when an Alu is occupied by a previous event?
+                print(f'changed_frag_1 = {changed_frag_1}')
+                print(f'changed_frag_2 = {changed_frag_2}')
 
 
     def test_divergence_events(self):
