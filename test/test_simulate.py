@@ -82,6 +82,8 @@ class TestSVSimulator(unittest.TestCase):
         test_overlap_bed_4 = "test/inputs/example_overlap_events_4.bed"
         test_overlap_bed_5 = "test/inputs/example_overlap_events_5.bed"
         test_overlap_bed_6 = "test/inputs/example_overlap_events_6.bed"
+        test_overlap_bed_7 = "test/inputs/example_overlap_events_7.bed"
+        test_overlap_bed_8 = "test/inputs/example_overlap_events_8.bed"
 
         self.test_objects_no_dis = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
                                                [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
@@ -422,7 +424,36 @@ class TestSVSimulator(unittest.TestCase):
                                                                "SVs": [{"type": "DEL", "number": 1,
                                                                         "min_length": 2, "max_length": 2,
                                                                         "num_partial_overlap": 1}]}],
-                                                        hap1, hap2, bed)]
+                                                        hap1, hap2, bed),
+                                             TestObject([ref_file, {"chr21": "CTCCGTAGTAAGTCAGGTGAGGCAG"}],
+                                                        [par, {"sim_settings": {"prioritize_top": True,
+                                                                                "fail_if_placement_issues": True},
+                                                               "overlap_events": {"bed": test_overlap_bed_7},
+                                                               "SVs": [{"type": "DEL", "number": 2,
+                                                                        "min_length": 2, "max_length": 6,
+                                                                        "num_partial_overlap": 1,
+                                                                        "num_overlap": 1}]}],
+                                                        hap1, hap2, bed),
+                                             TestObject([ref_file, {"chr21": "CTCCGTAGTAAGTCAGGTGAGGCAGGTCTAGC"}],
+                                                        [par, {"sim_settings": {"prioritize_top": True,
+                                                                                "fail_if_placement_issues": True},
+                                                               "overlap_events": {"bed": test_overlap_bed_8},
+                                                               "SVs": [{"type": "DEL", "number": 3,
+                                                                        "min_length": 2, "max_length": 6,
+                                                                        "num_partial_overlap": 1,
+                                                                        "num_overlap": 1,
+                                                                        "num_alu_mediated": 1}]}],
+                                                        hap1, hap2, bed),
+                                             TestObject([ref_file, {"chr21": "CTCCGTAGTAAGTCAGGTGAGGCAGGTCTAGC"}],
+                                                        [par, {"sim_settings": {"prioritize_top": True,
+                                                                                "fail_if_placement_issues": True},
+                                                               "overlap_events": {"bed": test_overlap_bed_8},
+                                                               "SVs": [{"type": "DEL", "number": 2,
+                                                                        "min_length": 2, "max_length": 6,
+                                                                        "num_partial_overlap": 1,
+                                                                        "num_alu_mediated": 1}]}],
+                                                        hap1, hap2, bed)
+                                             ]
 
         # ---------- test objects for divergence event ------------
         self.test_objects_divergence_event = [TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
@@ -559,10 +590,29 @@ class TestSVSimulator(unittest.TestCase):
             config.initialize_files()
             curr_sim = SV_Simulator(config.ref, config.par)
             curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
+            # to simplify checking the diffnt possible outcomes of each test: sorting SVs by start position
+            curr_sim.svs.sort(key=lambda x: x.start)
             changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-            # source: CTCCGTAGTA -> four possible valid del intervals, checking each
-            self.assertTrue(any(possible_del not in changed_frag_1 for possible_del in ['CT', 'CC', 'CG', 'GT']) or
-                            any(possible_del not in changed_frag_2 for possible_del in ['CT', 'CC', 'CG', 'GT']))
+            if i == 0:
+                # source: CTCCGTAGTA -> four possible valid del intervals, checking each
+                self.assertTrue(any(possible_del not in changed_frag_1 for possible_del in ['CT', 'CC', 'CG', 'GT']) or
+                                any(possible_del not in changed_frag_2 for possible_del in ['CT', 'CC', 'CG', 'GT']))
+            if i == 1:
+                # check that between the two SVs one is a perfect match and is other overlaps
+                case_a = (curr_sim.svs[0].start, curr_sim.svs[0].end) == (2, 4) and utils.is_overlapping([(15, 20)], (curr_sim.svs[1].start, curr_sim.svs[1].end))
+                case_b = (curr_sim.svs[1].start, curr_sim.svs[1].end) == (15, 20) and utils.is_overlapping([(2, 4)], (curr_sim.svs[0].start, curr_sim.svs[0].end))
+                self.assertTrue(case_a or case_b)
+            if i == 2:
+                case_a = (curr_sim.svs[0].start, curr_sim.svs[0].end) == (2, 4) and utils.is_overlapping([(22, 25)], (curr_sim.svs[2].start, curr_sim.svs[2].end))
+                case_b = (curr_sim.svs[2].start, curr_sim.svs[2].end) == (22, 25) and utils.is_overlapping([(2, 4)], (curr_sim.svs[0].start, curr_sim.svs[0].end))
+                self.assertTrue(case_a or case_b)
+                self.assertTrue((curr_sim.svs[1].start, curr_sim.svs[1].end) == (11, 15))
+            if i == 3:
+                sv_intervals = [(sv.start, sv.end) for sv in curr_sim.svs]
+                self.assertTrue((11, 15) in sv_intervals)
+                partial_ovl_sv = curr_sim.svs[(sv_intervals.index((11, 15)) + 1) % 2]
+                self.assertTrue(utils.is_overlapping([(2, 4)], (partial_ovl_sv.start, partial_ovl_sv.end)) or
+                                utils.is_overlapping([(22, 25)], (partial_ovl_sv.start, partial_ovl_sv.end)))
 
     def test_alu_mediated_placement(self):
         for i in range(len(self.test_objects_alu_mediated)):
@@ -586,8 +636,6 @@ class TestSVSimulator(unittest.TestCase):
     def test_mixed_known_element_placement(self):
         # handling for interacting with alu-mediated placement and overlap placement with other known elements
         for i in range(len(self.test_objects_known_elt_mix)):
-            if i == 2:
-                continue
             config = self.test_objects_known_elt_mix[i]
             config.initialize_files()
             curr_sim = SV_Simulator(config.ref, config.par)
@@ -607,9 +655,12 @@ class TestSVSimulator(unittest.TestCase):
                                 any('CCTCC' in frag for frag in [changed_frag_1, changed_frag_2]) or
                                 any('TCGTC' in frag for frag in [changed_frag_1, changed_frag_2]))
             if i == 2:
-                # TODO: Better test for what happens when an Alu is occupied by a previous event?
-                print(f'changed_frag_1 = {changed_frag_1}')
-                print(f'changed_frag_2 = {changed_frag_2}')
+                # test case for valid alu-pair selection taking precedence over single element overlap selection
+                # --> the single overlap element should fail to find the (18,22) Alu because it should be claimed by
+                # --> the alu-mediated DEL that will need that for the right breapoint
+                sv_intervals = [(sv.start, sv.end) for sv in curr_sim.svs]
+                self.assertIn((6, 20), sv_intervals)
+                self.assertNotIn((18, 22), sv_intervals)
 
 
     def test_divergence_events(self):

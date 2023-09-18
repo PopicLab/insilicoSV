@@ -120,10 +120,6 @@ class OverlapEvents:
         self.svtype_partial_overlap_counts = defaultdict(NestedDict(int))
         self.svtype_alu_mediated_counts = defaultdict(NestedDict(int))
         self.get_num_overlap_counts(config)
-        # debug
-        print(f'AFTER METHOD: svtype_partial_overlap_counts populated: {self.svtype_partial_overlap_counts}')
-        print(f'AFTER METHOD: svtype_overlap_counts populated: {self.svtype_overlap_counts}')
-        print(f'AFTER METHOD: svtype_alu_mediated_counts populated: {self.svtype_alu_mediated_counts}')
 
         # overlap_events can either be given as a single .bed file or multiple
         if type(config['overlap_events']['bed']) is list:
@@ -154,33 +150,8 @@ class OverlapEvents:
                         # set up correspondence with the element types as they were given in the config file
                         for num_ovlp in sv[overlap_count]:
                             count_dict[sv_config_key][self.allow_types[sv[overlap_count].index(num_ovlp)]] = num_ovlp
-            # --------
-            # if 'num_partial_overlap' in sv.keys():
-            #     # debug
-            #     print(f'TEST -- svtype_partial_overlap_counts = {self.svtype_partial_overlap_counts}')
-            #     if isinstance(sv['num_partial_overlap'], int):
-            #         if self.allow_types is not None and len(self.allow_types) == 1:
-            #             self.svtype_partial_overlap_counts[sv_config_key][self.allow_types[0]] = sv['num_partial_overlap']
-            #         else:
-            #             self.svtype_partial_overlap_counts[sv_config_key]['ALL'] = sv['num_partial_overlap']
-            #     else:
-            #         for num_ovlp in sv['num_partial_overlap']:
-            #             self.svtype_partial_overlap_counts[sv_config_key][self.allow_types[sv['num_partial_overlap'].index(num_ovlp)]] = num_ovlp
-            # if 'num_overlap' in sv.keys():
-            #     if isinstance(sv['num_overlap'], int):
-            #         if self.allow_types is not None and len(self.allow_types) == 1:
-            #             self.svtype_overlap_counts[sv_config_key][self.allow_types[0]] = sv['num_overlap']
-            #         else:
-            #             self.svtype_overlap_counts[sv_config_key]['ALL'] = sv['num_overlap']
-            #     else:
-            #         for num_ovlp in sv['num_overlap']:
-            #             self.svtype_overlap_counts[sv_config_key][self.allow_types[sv['num_overlap'].index(num_ovlp)]] = num_ovlp
             if 'num_alu_mediated' in sv.keys():
                 self.svtype_alu_mediated_counts[sv_config_key] = sv['num_alu_mediated']
-
-        print(f'END OF METHOD -- svtype_partial_overlap_counts = {self.svtype_partial_overlap_counts}')
-        print(f'END OF METHOD -- svtype_overlap_counts = {self.svtype_overlap_counts}')
-        print(f'END OF METHOD -- svtype_alu_mediated_counts = {self.svtype_alu_mediated_counts}')
 
     def parse_bed_file(self, bed_fname, allow_chroms=None, allow_types=None):
         """
@@ -242,17 +213,12 @@ class OverlapEvents:
                     alu_intervals[chrom].append((int(start), int(end)))
         for chrom in alu_intervals.keys():
             random.shuffle(alu_intervals[chrom])
-        # debug
-        print(f'alu_intervals constructed : {alu_intervals}')
         # -------
         alu_pairs_dict = {}
         # construct the lists of viable flanking pairs for each SV config with a nonzero num_alu_mediated specified
-        # debug
-        print('ALU PAIR SELECTION PROCESS')
         for sv_config in svs_config:
             sv_config_id = get_sv_config_identifier(sv_config)
             if 'num_alu_mediated' in sv_config.keys():
-                print(f'num_alu_mediated found in sv_config:\n{sv_config}')
                 # want a copy of the alu_intervals specific to this SV config so we can edit without changing the state of alu_intervals
                 alu_intervals_copy = copy.deepcopy(alu_intervals)
                 alu_pairs = []
@@ -264,26 +230,19 @@ class OverlapEvents:
                 for _ in range(self.svtype_alu_mediated_counts[sv_config_id]):  # * 2): <-- just going to generate the exact number requested, see if it becomes an issue with collisions with previously-placed SVs
                     viable_matches = []
                     while len(viable_matches) == 0:
-                        print(f'\nSTART OF WHILE LOOP – sv_min, sv_max = {sv_min, sv_max} – alu_intervals_copy = {alu_intervals_copy}')
                         if len(alu_intervals_copy.keys()) == 0 or not any(len(v) > 1 for v in alu_intervals_copy.values()):
-                            print(f'INSUFFICIENT ALU_INTERVALS DICT: {alu_intervals_copy}')
                             # break if there are no alus remaining to choose from
                             break
                         # choose a random starting (left) Alu (random across chromosome and position)
                         # --> only need to choose from chroms with at least 2 alus
                         rand_chrom = random.choice([chrom for chrom, alus in alu_intervals_copy.items() if len(alus) > 1])
                         alu1 = alu_intervals_copy[rand_chrom].pop()
-                        print(f'rand_chrom = {rand_chrom}')
-                        print(f'alu1 = {alu1}')
                         # collect all the alus on the same chromosome that are within an appropriate dist (and repeat
                         # initial alu selection if there are no appropriate matches)
                         viable_matches = [ivl for ivl in alu_intervals_copy[rand_chrom] if sv_min <= np.abs(self.midpoint(*ivl) - self.midpoint(*alu1)) <= sv_max]
-                        print(f'viable_matches = {viable_matches}')
-                        print(f'END OF WHILE LOOP – alu_intervals_copy = {alu_intervals_copy}')
                     if len(viable_matches) > 0:
                         # need to pick this without replacement as well, right?
                         alu2 = random.choice(viable_matches)
-                        print(f'alu2 = {alu2}')
                         alu_intervals_copy[rand_chrom].remove(alu2)
                         # -- update alu_intervals --
                         if len(alu_intervals_copy[rand_chrom]) == 0:
@@ -291,26 +250,21 @@ class OverlapEvents:
                         # --------------------------
                         # need to also record chrom so we can yield that along with the interceding interval
                         alu_pairs.append((rand_chrom, alu1, alu2) if alu1[0] < alu2[0] else (rand_chrom, alu2, alu1))
-                        print(f'adding to alu_pairs: {(rand_chrom, alu1, alu2)}')
                         # and only want to delete from the true alu_intervals dict the Alus that are actually used
                         # (not just the ones that didn't yield matches, because those might have matches under a different SV config's params)
                         # --> also need to remove from the general overlap_events_dict because these now cant be used for full overlap placement either
                         for alu in [alu1, alu2]:
                             alu_intervals[rand_chrom].remove(alu)
                             self.remove_alu_from_overlap_dict(rand_chrom, *alu)
-                        print(f'removed alu1,alu2 from alu_intervals: {alu_intervals}')
                 if len(alu_pairs) > 0:
                     random.shuffle(alu_pairs)
                     alu_pairs_dict[sv_config_id] = alu_pairs
-                print(f'END OF ALU PAIR SELECTION PROCESS\nalu_pair_dict = {alu_pairs_dict}')
         return alu_pairs_dict
 
     def get_alu_mediated_interval(self, sv_config_id):
-        print(f'GET_ALU_MED_INTERVAL CALLED WITH svtype_alu_mediated_counts = {self.svtype_alu_mediated_counts}')
         # 0) if there are no remaining alu pairs to choose for this sv config, return None and zero out the remaining
         # counts in the svtype_alu...counts dict (so we don't keep looking in subsequent iterations)
         if len(self.alu_pairs[sv_config_id]) == 0:
-            print(f'No valid alu pairs remaining for {sv_config_id} – alu_pairs = {self.alu_pairs}')
             del self.svtype_alu_mediated_counts[sv_config_id]
             return None, None
         # 1) draw alu-mediated interval for a given DEL/DUP of given size range (don't need to give the size bounds
@@ -326,14 +280,11 @@ class OverlapEvents:
         return (ivl_chrom, ivl_start, ivl_end), 'ALU_MEDIATED'  # <- ALU_MEDIATED to be used as retrieved_type
 
     def remove_alu_from_overlap_dict(self, chrom, start, end):
-        print(f'\nRemoving {(chrom, start, end)} from overlap_events_dict')
-        print(f'overlap_events_dict before: {self.overlap_events_dict}')
         # helper method to remove an Alu element from the overlap_events_dict if it's been chosen for an alu-mediated interval
         for k, v in self.overlap_events_dict.items():
             if k.startswith('Alu') and (chrom, start, end) in v:
                 self.overlap_events_dict[k].remove((chrom, start, end))
         self.overlap_events_dict = {k: v for k, v in self.overlap_events_dict.items() if len(v) > 0}
-        print(f'overlap_events_dict after: {self.overlap_events_dict}\n')
 
     @staticmethod
     def midpoint(start, end):
@@ -350,17 +301,18 @@ class OverlapEvents:
     @staticmethod
     def get_partially_overlapping_interval(elt_chrom, elt_start, elt_stop, sv_min, sv_max):
         # debug
-        print(f'CREATING PARTIALLY OVERLAPPING INTERVAL\ninput: {(elt_chrom, elt_start, elt_stop), sv_min, sv_max}\n')
         # choose sv size, draw a random position in element interval, randomly set that to the start or end of SV
         def draw_from_unif(a,b):
             return a if a == b else np.random.randint(a, b)
-        sv_size, anchor_point = draw_from_unif(sv_min, sv_max), draw_from_unif(elt_start, elt_stop)
-        return (elt_chrom, anchor_point, anchor_point + sv_size) if random.randint(0, 1) else (elt_chrom, anchor_point - sv_size, anchor_point)
+        sv_size = draw_from_unif(sv_min, sv_max)
+        interval_left = draw_from_unif(max(elt_start - sv_size + 1, 0), max(elt_stop - sv_size, 0)) if random.randint(0, 1)\
+            else draw_from_unif(elt_start, max(elt_stop - sv_size - 1, elt_start))  # <- two possible distributions for the left bound of the SV
+        return elt_chrom, interval_left, interval_left + sv_size
 
     def __getitem__(self, sv_config_id, minsize, maxsize, elt_type=None, partial_overlap=False):
         # --> need to store input_elt_type to decrement the right entries at the end (could instead decrement
-        # the count dict here but seems cleared to udpate both dicts together at the end)
-        input_elt_type = elt_type
+        # the count dict here but seems clearer to update both dicts together at the end)
+        input_elt_type = 'ALL' if elt_type is None else elt_type
         if elt_type in self.overlap_events_dict.keys():  # <- elt_type given, and elements of matching type are in the dict
             # elt_type-specific branch: draw random element (recall: list is shuffled) of appropriate size
             rand_elt = next((elt for elt in self.overlap_events_dict[elt_type] if minsize <= self.get_intrvl_len(*elt) <= maxsize), None)
@@ -395,18 +347,18 @@ class OverlapEvents:
             if len(self.overlap_events_dict[elt_type]) == 0:
                 del self.overlap_events_dict[elt_type]
             # -------------
-            # decrement the self.svtype_overlap_counts dict
-            self.svtype_overlap_counts[sv_config_id][input_elt_type] -= 1
+            # decrement the relevant counts dict
+            counts_dict = self.svtype_partial_overlap_counts if partial_overlap else self.svtype_overlap_counts
+            counts_dict[sv_config_id][input_elt_type] -= 1
             # ... and when the number reaches 0, remove from dict so line 253 will not be triggered
-            if self.svtype_overlap_counts[sv_config_id][input_elt_type] == 0:
-                del self.svtype_overlap_counts[sv_config_id][input_elt_type]
+            if counts_dict[sv_config_id][input_elt_type] == 0:
+                del counts_dict[sv_config_id][input_elt_type]
                 # ... and if the total counts for that svtype have been removed, remove the sv type dict entry
-                if len(self.svtype_overlap_counts[sv_config_id].keys()) == 0:
-                    del self.svtype_overlap_counts[sv_config_id]
+                if len(counts_dict[sv_config_id].keys()) == 0:
+                    del counts_dict[sv_config_id]
         # check if we want to return a partially overlapping interval; if yes, compute one based on the elt chosen
         if partial_overlap:
             rand_elt = self.get_partially_overlapping_interval(*rand_elt, minsize, maxsize)
-            print(f'output: {rand_elt}')
         # returning elt_type as well in order to have the retrieved type even when allow_types == 'ALL'
         return rand_elt, elt_type
 

@@ -262,7 +262,6 @@ class SV_Simulator():
                                 sv_config_identifier, sv_config, partial_overlap=True)
                         elif sv_config_identifier in self.overlap_events.svtype_alu_mediated_counts.keys():
                             repeat_elt, retrieved_type = self.overlap_events.get_alu_mediated_interval(sv_config_identifier)
-                    # print(f'==== calling SV constructor ====\nrepeat_elt = {repeat_elt}\nelt_type = {elt_type}\nretrieved_type = {retrieved_type}\n')
                     sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                             length_ranges=sv_config["length_ranges"], source=sv_config["source"],
                                             target=sv_config["target"],
