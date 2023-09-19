@@ -269,6 +269,37 @@ SVs:
       num_alu_mediated: 5
 ```
 
+### Example 4b - Specifying different overlap counts for different element types
+In situations where a list of different `allow_types` are given alongside the input .bed file of known elements, different counts can be given for the different element types listed in the `allow_types` field. For example, the augmented version of the above example shows how one might specify that a different number of DELs should be places at L1HS intervals than should be placed at L1PA3 intervals:
+```yaml
+overlap_events:
+    bed: ['/{path_to}/{candidate_overlap_events_1}.bed','/{path_to}/{candidate_overlap_events_2}.bed']
+    allow_types: ['L1HS', 'L1PA3']
+SVs:
+    - type: "DEL"
+      number: 10
+      min_length: 500
+      max_length: 1000
+      num_overlap: [3, 5]
+```
+By providing a list in the `num_overlap` field, each number given in the list will be interpreted as the desired overlap count for the corresponding entry in the `allow_types` list. As a result, any list given in the `num_overlap` field must be of the same length as the `allow_types` list. `0` is a valid entry in the `num_overlap` list, as would be required if one wished to only specify overlap counts for a subset of the element types given in `allow_types`.
+
+### Example 4c - Partial Overlap
+In the same way that SVs can be made to completely overlap known element intervals in the various ways described above, they can also be made to *partially* overlap known element intervals. This can be done using SV config field `num_partial_overlap` which operated in the same way as `num_overlap`. An analogous version of the above example with partial overlap is given below:
+```yaml
+overlap_events:
+    bed: ['/{path_to}/{candidate_overlap_events_1}.bed','/{path_to}/{candidate_overlap_events_2}.bed']
+    allow_types: ['L1HS', 'L1PA3']
+SVs:
+    - type: "DEL"
+      number: 10
+      min_length: 500
+      max_length: 1000
+      num_partial_overlap: [3, 5]
+```
+
+**The various types of known element placement are not mutually exclusive and can be used concurrently (when appropriate with respect to the types of SVs being simulated)**
+
 ### Automated pipeline bash scripts
 #### `generate_synthetic_genome.sh`
 To automate the process of generating a synthetic reference and aligned BAM file, `generate_synthetic_genome.sh` can be run with inputs
