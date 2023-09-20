@@ -382,7 +382,20 @@ class SV_Simulator():
                                                                        fixed_chrom=(None if sv.overlap_event is None
                                                                                     else sv.overlap_event[0]))
                 if not (sv.dispersion_flip and sv.overlap_event is not None):
-                    start_pos = random.randint(0, chr_len - sv.req_space) if sv.overlap_event is None else int(sv.overlap_event[1])
+                    # if an overlap event is given, need to find the SV start position based on which fragment has been
+                    # set to the overlap event interval
+                    if sv.overlap_event is not None:
+                        start_pos = 0
+                        # walk along the frag list backwards, set start_pos to the start of the overlap fragment and
+                        # then subtract off the lengths of the preceeding fragments to get the true SV start position
+                        for frag in sv.source_events[::-1]:
+                            if frag.start is not None:
+                                start_pos = frag.start
+                            else:
+                                start_pos -= frag.length
+                    else:
+                        start_pos = random.randint(0, chr_len - sv.req_space)
+                    # start_pos = random.randint(0, chr_len - sv.req_space) if sv.overlap_event is None else int(sv.overlap_event[1])
                     # define the space in which SV operates
                     # we now also know where the target positions lie since we know the order and length of events
                     new_intervals = []  # tracks new ranges of blocks

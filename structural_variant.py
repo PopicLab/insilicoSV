@@ -145,13 +145,18 @@ class Structural_Variant():
             raise Exception("Lengths parameter expects at least one tuple")
 
         # initialize event classes
+        # --> if overlap_event given, randomly choosing a (non-dispersion) source frag to overlap (only a nontrivial
+        # --> choice for SVs with multiple, e.g., delINVdel)
+        ovlp_frag = random.choice([frag for frag in self.source_unique_char if frag[0] != '_']) if self.overlap_event is not None else None
         for idx, symbol in enumerate(all_symbols):
             # empty event - no source fragment yet
             # --> if we're trying to overlap a repetitive event, want to set the "A" event to
             # that repetitive element's interval
-            if symbol == Symbols.REQUIRED_SOURCE.value and self.overlap_event is not None:
+            # if symbol == Symbols.REQUIRED_SOURCE.value and self.overlap_event is not None:
+            if self.overlap_event is not None and symbol == ovlp_frag:
                 ovlp_event_len = int(self.overlap_event[2]) - int(self.overlap_event[1])
-                event = Event(self, ovlp_event_len, (ovlp_event_len, ovlp_event_len), symbol)
+                event = Event(self, ovlp_event_len, (ovlp_event_len, ovlp_event_len), symbol,
+                              start=int(self.overlap_event[1]), end=int(self.overlap_event[2]))
             else:
                 event = Event(self, symbols_dict[symbol][0], symbols_dict[symbol][1], symbol)
             self.events_dict[symbol] = event
@@ -331,7 +336,7 @@ class Structural_Variant():
 class Event():
     '''represents the symbols, also known as the "events," within a SV transformation'''
 
-    def __init__(self, sv_parent, length, length_range, symbol, source_frag=None, non_sv=False):
+    def __init__(self, sv_parent, length, length_range, symbol, source_frag=None, start=None, end=None):
         '''
         sv_parent: Structural Variant, event is always part of larger SV
         '''
@@ -341,8 +346,8 @@ class Event():
         self.symbol = symbol  # refers to symbol in SV's transformation
         self.source_chr = None
         self.source_frag = None if not source_frag else source_frag
-        self.start = None
-        self.end = None
+        self.start = start
+        self.end = end
 
     def __repr__(self):
         return "<Event {}>".format({"length": self.length, "symbol": self.symbol, "start": self.start, "end": self.end,

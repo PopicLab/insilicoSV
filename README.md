@@ -249,9 +249,10 @@ The output .vcf file will label which events were placed at specified intervals 
 ```
 chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVERLAP_EV=L1HS  GT  0/1
 ```
-The current set of event types that are amenable to this feature are DEL, DUP, INV, dDUP, INV_dDUP, and TRA. For events
-involving dispersions (dDUP, INV_dDUP, TRA) the position is assigned such that the source event of the SV (the component
-getting duplicated or translocated) is placed at the selected element interval.
+For events involving dispersions (dDUP, INV_dDUP, TRA) the position is assigned such that the source event of the SV (the component
+getting duplicated or translocated) is placed at the selected element interval. For complex events with multiple non-dispersion
+source fragments (e.g., delINVdel), one of the non-dispersion source fragments is chosen at random to be the overlapping
+component with the selected known element.
 
 ### Example 4a - Placing DUPs or DELs at Alu-mediated intervals
 An additional use case for the above known-element placement is to place deletion or tandem duplication events in between Alu elements in the genome (Alu-mediated CNVs being a well-studied case of SV/repetitive element relation – e.g., [Gu et al., 2015](https://academic.oup.com/hmg/article/24/14/4061/2385874)). Alu-mediated DELs or DUPs can be specified in the same way as the above cases of specifying overlap, but instead by specifying the desired number of Alu-mediated SVs with the config field `num_alu_mediated`. An example config file is given below:
