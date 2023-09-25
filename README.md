@@ -39,6 +39,7 @@ The following optional parameters can be set under the "sim_settings" key to cha
 3. *generate_log_file=False [optional]*: if set to True, insilicoSV will generate a log file for diagnostic purposes and debugging
 4. *filter_small_chr={int} [optional]*: filter out chromosomes of length less than the given integer
 5. *prioritize_top=False [optional]*: if set to True, simulate the SVs listed first as the later ones may fail to be placed. Otherwise, give each SV an equal chance to be simulated
+6. *homozygous_only=False [optional]*: if set to True, make all simulated variants homozygous
 
 Please see the table and picture for the list of predefined classes.
 
