@@ -273,7 +273,7 @@ class SV_Simulator():
                                             overlap_event=(repeat_elt + (retrieved_type if elt_type in ['ALL', None] else elt_type,) if repeat_elt is not None else None))
 
                     # For divergent repeat simulation, need div_dDUP to be homozygous
-                    if random.randint(0, 1) or sv.type == Variant_Type.div_dDUP:
+                    if self.sim_settings.get("homozygous_only", False) or random.randint(0, 1) or sv.type == Variant_Type.div_dDUP:
                         sv.ishomozygous = Zygosity.HOMOZYGOUS
                         sv.hap = [True, True]
                     else:
