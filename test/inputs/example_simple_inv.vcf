@@ -11,4 +11,4 @@
 ##INFO=<ID=INSSEQ,Number=.,Type=String,Description="Sequences of insertion.">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
-chr21	3	HGSV_240929	N	<INV>	86	PASS	END=9;SVTYPE=INV;SVLEN=7	GT	1/1
+chr21	3	INV	N	<INV>	86	PASS	END=9;SVTYPE=INV;SVLEN=7	GT	1/1

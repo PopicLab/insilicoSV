@@ -2,9 +2,11 @@ import os
 import random
 import itertools
 import copy  # <- utils for making copies of python objects
+import argparse
 import numpy as np
 from constants import *
 from collections import defaultdict
+from pysam import VariantFile
 
 
 # NestedDict helper class
@@ -13,6 +15,43 @@ class NestedDict(defaultdict):
 
     def __call__(self):
         return NestedDict(self.default_factory)
+
+
+def get_original_base_pos(genome_vcf, query_loc, query_chrom):
+    # calculates the input reference position of the base that corresponds
+    # to the one at position query_loc in the output reference (i.e., adjusts the
+    # input ref position by the cumulative change in ref length caused by
+    # the variants from [0, query_loc)
+    # **for now: just admits DEL, DUP, INV
+    vcf = VariantFile(genome_vcf)
+    # need to make sure vcf recs sorted by position and separated by chrom
+    vcf_recs = defaultdict(list)
+    for rec in vcf.fetch():
+        vcf_recs[rec.chrom].append((rec.id, rec.start, rec.stop))
+    for chrom in vcf_recs.keys():
+        vcf_recs[chrom].sort(key=lambda x: x[1])
+    # total the cumulative change in ref length from all the SVs *ending* before p
+    p = query_loc
+    i = 0
+    # print(f'\ninput query locus: p = {p}')
+    while i < len(vcf_recs[query_chrom]) and vcf_recs[query_chrom][i][1] <= p:
+        rec_id, rec_start, rec_stop = vcf_recs[query_chrom][i]
+        rec_len = rec_stop - rec_start
+        if rec_id == 'DEL' and rec_start <= p:
+            p += rec_len
+            # print(f'DEL found, adding {rec_len}; p = {p}')
+        if rec_id == 'DUP' and rec_stop <= p:
+            p -= rec_len
+            # print(f'DUP found, subtracting {rec_len}; p = {p}')
+        i += 1
+    # print(f'accounted for prior SVs:\tp = {p}')
+    # ... then check if p is internal to an INV; edge case not covered by the above loop
+    surrounding_inv = next((rec for rec in vcf_recs[query_chrom] if rec[1] <= p < rec[2] and rec[0] == 'INV'), None)
+    if surrounding_inv is not None:
+        sv_id, sv_start, sv_end = surrounding_inv
+        p += (sv_end - sv_start) - ((p - sv_start) * 2 + 1)
+    # print(f'input: {query_loc}\toutput: {p}')
+    return p
 
 
 def is_overlapping(event_ranges, addition, called_from_helper=False, strictly_partial=False):
@@ -70,7 +109,7 @@ def reset_file(filename):
 def generate_seq(length):
     # helper function for insertions
     # generates random sequence of bases of given length
-    base_map = {1:"A", 2: "T", 3: "G", 4: "C"}
+    base_map = {1: "A", 2: "T", 3: "G", 4: "C"}
     return ''.join([base_map[random.randint(1, 4)] for _ in range(length)])
 
 def percent_N(seq):
@@ -384,4 +423,15 @@ class OverlapEvents:
             rand_elt = self.get_partially_overlapping_interval(*rand_elt, minsize, maxsize)
         # returning elt_type as well in order to have the retrieved type even when allow_types == 'ALL'
         return rand_elt, elt_type
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Special use case for utils.py: Commandline access to get_original_base_pos()')
+    parser.add_argument('--genome_vcf', type=str, help='Path to vcf describing simulated SVs populating the synthetic genome')
+    parser.add_argument('--query_loc', type=int, help='Query genome locus (given with respect to synthetic reference)')
+    parser.add_argument('--query_chrom', type=int, help='Corresponding chromosome of the query locus')
+    args = parser.parse_args()
+
+    print('Input reference position corresponding to mutated reference position (%s) %d: %d' %
+          (args.query_chrom, args.query_loc, get_original_base_pos(args.genome_vcf, args.query_loc, args.query_chrom)))
 
