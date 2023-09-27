@@ -1,6 +1,6 @@
 from simulate import SV_Simulator
 from processing import FormatterIO
-from test_simulate import TestObject
+from .test_simulate import TestObject
 from pysam import VariantFile, FastaFile
 from collections import defaultdict, Counter
 from utils import NestedDict
@@ -251,6 +251,12 @@ class TestProcessing(unittest.TestCase):
                                                                      self.hap1, self.hap2, self.bed, self.vcf)}
 
         self.formatter = FormatterIO(self.par)
+
+    def tearDown(self):
+        utils.remove_file(self.ins_fasta)
+        utils.remove_file(self.bed)
+        utils.remove_file(self.vcf)
+        utils.remove_file(self.par)
 
     def initialize_test(self, test_objects_dict, sv_type, output_type='bed', ins_fasta=None):
         # function to execute the shared logic for simulating SVs from test objects and generating bed/vcf output
