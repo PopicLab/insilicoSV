@@ -1,6 +1,6 @@
 from simulate import SV_Simulator
 from processing import FormatterIO
-from .test_simulate import TestObject
+from test_simulate import TestObject
 from pysam import VariantFile, FastaFile
 from collections import defaultdict, Counter
 from utils import NestedDict
