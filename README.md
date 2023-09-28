@@ -8,6 +8,12 @@ insilicoSV is a software to design and simulate simple and complex structural va
 
 `$ pip install -r requirements.txt`
 
+Alternately, if you prefer to use conda environments, in the repository root run
+```
+conda env create -f envs/insilicosv-002-env.yml
+conda activate insilicosv-002-env
+```
+
 ## To Run
 ```
 samtools faidx <ref.fna>   # if index file already produced, skip this line
@@ -437,6 +443,13 @@ Steps to contribute:
 3. Commit your changes (git commit -am 'Add some feature')
 4. Push to the branch (git push origin feature/insilicoSV)
 5. Create a new Pull Request
+
+## Running tests
+
+To run all tests, in the repository root run 
+```
+./run_tests.sh
+```
 
 ## Authors
 Chris Rohlicek - crohlice@broadinstitute.org

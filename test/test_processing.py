@@ -252,6 +252,12 @@ class TestProcessing(unittest.TestCase):
 
         self.formatter = FormatterIO(self.par)
 
+    def tearDown(self):
+        utils.remove_file(self.ins_fasta)
+        utils.remove_file(self.bed)
+        utils.remove_file(self.vcf)
+        utils.remove_file(self.par)
+
     def initialize_test(self, test_objects_dict, sv_type, output_type='bed', ins_fasta=None):
         # function to execute the shared logic for simulating SVs from test objects and generating bed/vcf output
         config = test_objects_dict[sv_type]

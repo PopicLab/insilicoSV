@@ -43,7 +43,7 @@ class FormatterIO():
             elif "type" in config_sv and not isinstance(config_sv["type"], str):
                 raise Exception("Invalid {} type for SV \'type\' attribute, str expected".format(type(config_sv["type"])))
         valid_optional_par = ["fail_if_placement_issues", "max_tries", "generate_log_file", "filter_small_chr",
-                              "prioritize_top"]  # valid arguments within sim_settings
+                              "prioritize_top", "homozygous_only"]  # valid arguments within sim_settings
         for parameter in config['sim_settings']:
             if parameter not in valid_optional_par:
                 raise Exception("\"{}\" is an invalid argument under sim_settings".format(parameter))
