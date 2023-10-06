@@ -160,10 +160,10 @@ class OverlapEvents:
         self.svtype_partial_overlap_counts = defaultdict(NestedDict(int))
         self.svtype_alu_mediated_counts = defaultdict(NestedDict(int))
         self.get_num_overlap_counts(config)
-        # # ---- debug ----
-        # print(f'overlap_counts: {self.svtype_overlap_counts}')
-        # print(f'partial overlap_counts: {self.svtype_partial_overlap_counts}')
-        # print(f'alu_mediated_counts: {self.svtype_alu_mediated_counts}')
+        # ---- debug ----
+        print(f'overlap_counts: {self.svtype_overlap_counts}')
+        print(f'partial overlap_counts: {self.svtype_partial_overlap_counts}')
+        print(f'alu_mediated_counts: {self.svtype_alu_mediated_counts}')
         # # ---------------
 
         # overlap_events can either be given as a single .bed file or multiple
@@ -187,6 +187,10 @@ class OverlapEvents:
             # building separate counts dictionaries for complete overlaps, partial overlaps, and alu-mediated intervals
             for overlap_count, count_dict in [('num_overlap', self.svtype_overlap_counts), ('num_partial_overlap', self.svtype_partial_overlap_counts)]:
                 if overlap_count in sv.keys():
+                    # debug
+                    print(f'{overlap_count} in sv.keys()')
+                    print(f'count_dict: {count_dict}')
+                    # -----
                     if isinstance(sv[overlap_count], int) and sv[overlap_count] > 0:
                         # if num_overlap given as a singleton integer, label type as 'ALL' if zero or multiple allow_types
                         # are given, otherwise set type to the single allow_type provided
@@ -367,6 +371,17 @@ class OverlapEvents:
             else draw_from_unif(elt_start, max(elt_stop - sv_size - 1, elt_start))  # <- two possible distributions for the left bound of the SV
         return elt_chrom, interval_left, interval_left + sv_size
 
+    def decrement_counts(self, sv_config_id, input_elt_type, partial_overlap):
+        # decrement the relevant counts dict based on element extracted in __getitem__()
+        counts_dict = self.svtype_partial_overlap_counts if partial_overlap else self.svtype_overlap_counts
+        counts_dict[sv_config_id][input_elt_type] -= 1
+        # ... and when the number reaches 0, remove from dict so line 253 will not be triggered
+        if counts_dict[sv_config_id][input_elt_type] == 0:
+            del counts_dict[sv_config_id][input_elt_type]
+            # ... and if the total counts for that svtype have been removed, remove the sv type dict entry
+            if len(counts_dict[sv_config_id].keys()) == 0:
+                del counts_dict[sv_config_id]
+
     def __getitem__(self, sv_config_id, minsize, maxsize, elt_type=None, partial_overlap=False):
         # --> need to store input_elt_type to decrement the right entries at the end (could instead decrement
         # the count dict here but seems clearer to update both dicts together at the end)
@@ -403,21 +418,13 @@ class OverlapEvents:
             # if we drew a non-None element, want to remove it from its list and decrement the count dictionary
             if elt_type is None:
                 elt_type = elt_type_mapping[rand_elt]
-            # TODO?: need to also make sure the event is removed from the available Alu intervals so we don't choose the same one and cause a collision
-            #  --> not necessary if we always prioritize Alu-pair selection; is that necessarily bad? Seems potentially useful
             self.overlap_events_dict[elt_type].remove(rand_elt)
             if len(self.overlap_events_dict[elt_type]) == 0:
                 del self.overlap_events_dict[elt_type]
-            # -------------
-            # decrement the relevant counts dict
-            counts_dict = self.svtype_partial_overlap_counts if partial_overlap else self.svtype_overlap_counts
-            counts_dict[sv_config_id][input_elt_type] -= 1
-            # ... and when the number reaches 0, remove from dict so line 253 will not be triggered
-            if counts_dict[sv_config_id][input_elt_type] == 0:
-                del counts_dict[sv_config_id][input_elt_type]
-                # ... and if the total counts for that svtype have been removed, remove the sv type dict entry
-                if len(counts_dict[sv_config_id].keys()) == 0:
-                    del counts_dict[sv_config_id]
+            self.decrement_counts(sv_config_id, input_elt_type, partial_overlap)
+        elif elt_type in self.overlap_events_dict.keys():  # <- case in which elements of valid type but not size were available
+            # need to decrement the count for elt_type because this case occurs in which there is not a valid choice due to size
+            self.decrement_counts(sv_config_id, input_elt_type, partial_overlap)
         # check if we want to return a partially overlapping interval; if yes, compute one based on the elt chosen
         if partial_overlap:
             rand_elt = self.get_partially_overlapping_interval(*rand_elt, minsize, maxsize)

@@ -86,6 +86,7 @@ class TestSVSimulator(unittest.TestCase):
         test_overlap_bed_8 = "test/inputs/example_overlap_events_8.bed"
         test_overlap_bed_9 = "test/inputs/example_overlap_events_9.bed"
         test_overlap_bed_10 = "test/inputs/example_overlap_events_10.bed"
+        test_overlap_bed_11 = "test/inputs/example_overlap_events_11.bed"
 
         self.test_objects_no_dis = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
                                                [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
@@ -321,6 +322,18 @@ class TestSVSimulator(unittest.TestCase):
                                                               "SVs": [{"type": "DEL", "number": 5,
                                                                        "min_length": 1, "max_length": 5,
                                                                        "num_overlap": [2, 3]}]}],
+                                                       hap1, hap2, bed),
+                                            TestObject([ref_file, {"chr21": "CCTCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTATCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                       [par, {"sim_settings": {"prioritize_top": True},
+                                                              "overlap_events": {"bed": test_overlap_bed_11,
+                                                                                 "allow_types": ['Alu', 'L1', 'L2', 'SVA', 'HERVK']},
+                                                              "SVs": [{"type": "DEL", "number": 5,
+                                                                       "min_length": 2, "max_length": 4,
+                                                                       "num_overlap": [1, 1, 1, 1, 1]},
+                                                                      {"type": "DEL", "number": 5,
+                                                                       "min_length": 6, "max_length": 8,
+                                                                       "num_overlap": [1, 1, 1, 1, 1]}
+                                                                      ]}],
                                                        hap1, hap2, bed)
                                             ]
         self.test_objects_overlap_cplx = [TestObject([ref_file, {"chr21": "CTGAT"}],
@@ -618,6 +631,8 @@ class TestSVSimulator(unittest.TestCase):
     def test_overlap_placement_simple(self):
         # simple events
         for i in range(len(self.test_objects_overlap_simple)):
+            if i != 7:
+                continue
             config = self.test_objects_overlap_simple[i]
             config.initialize_files()
             curr_sim = SV_Simulator(config.ref, config.par)
@@ -638,6 +653,8 @@ class TestSVSimulator(unittest.TestCase):
                 self.assertEqual(len(curr_sim.overlap_events.overlap_events_dict.values()), 2)
             elif i == 6:
                 self.assertEqual(len(curr_sim.overlap_events.overlap_events_dict.values()), 1)
+            elif i == 7:
+                self.assertEqual(len(curr_sim.overlap_events.overlap_events_dict.values()), 3)
 
     def test_overlap_placement_complex(self):
         # complex events

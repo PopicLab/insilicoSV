@@ -242,6 +242,9 @@ class SV_Simulator():
         '''
         if self.mode == "randomized":
             for sv_config in self.svs_config:
+                # --- debug ---
+                print(f'Initializing SVs from new config\n{sv_config}')
+                # -------------
                 if "avoid_intervals" in sv_config:
                     continue
                 for num in range(sv_config["number"]):
