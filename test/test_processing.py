@@ -242,7 +242,8 @@ class TestProcessing(unittest.TestCase):
                                                                                             "num_overlap": 2}]}],
                                                                        self.hap1, self.hap2, self.bed, self.vcf),
                                             'overlap6': TestProcObject([self.ref_file, {"chr21": "CCTCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTATCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                                       [self.par, {"sim_settings": {"prioritize_top": True},
+                                                                       [self.par, {"sim_settings": {"prioritize_top": True,
+                                                                                                    "fail_if_placement_issues": True},
                                                                                    "overlap_events": {"bed": self.test_overlap_bed_11,
                                                                                                       "allow_types": ['Alu', 'L1', 'L2', 'SVA', 'HERVK']},
                                                                                    "SVs": [{"type": "DEL", "number": 5,
@@ -251,6 +252,18 @@ class TestProcessing(unittest.TestCase):
                                                                                            {"type": "DEL", "number": 5,
                                                                                             "min_length": 6, "max_length": 8,
                                                                                             "num_overlap": [1, 1, 1, 1, 1]}]}],
+                                                                       self.hap1, self.hap2, self.bed, self.vcf),
+                                            'overlap7': TestProcObject([self.ref_file, {"chr21": "CCTCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTATCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                                       [self.par, {"sim_settings": {"prioritize_top": True,
+                                                                                                    "fail_if_placement_issues": True},
+                                                                        "overlap_events": {"bed": self.test_overlap_bed_11,
+                                                                                           "allow_types": ['Alu', 'L1', 'L2', 'SVA', 'HERVK']},
+                                                                                   "SVs": [{"type": "DEL", "number": 5,
+                                                                                            "min_length": 1, "max_length": 1,
+                                                                                            "num_partial_overlap": [1, 1, 1, 1, 1]},
+                                                                                           {"type": "DEL", "number": 5,
+                                                                                            "min_length": 2, "max_length": 2,
+                                                                                            "num_partial_overlap": [1, 1, 1, 1, 1]}]}],
                                                                        self.hap1, self.hap2, self.bed, self.vcf)
                                             }
         self.test_objects_alu_mediated = {'alu_med1': TestProcObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
@@ -512,13 +525,32 @@ class TestProcessing(unittest.TestCase):
         elt_type_counts['overlap4'] = {'L1': 2, 'NONE': 3}
         # --> overlap5: case in which allow_types not specified; reported type will take full repName provided in bed file
         elt_type_counts['overlap5'] = {'ALR': 1, 'NONE': 4}
-        # TODO, formulate version of test overlap6 that doesn't fail with possible placements for random events
         elt_type_counts['overlap6'] = {'Alu': 1, 'L1': 2, 'L2': 1, 'SVA': 1, 'HERVK': 2, 'NONE': 3}
+        elt_type_counts['overlap7'] = {'Alu': 2, 'L1': 2, 'L2': 2, 'SVA': 2, 'HERVK': 2}
         elt_type_counts['alu_med1'] = {'ALU_MEDIATED': 1}
         for test_case in ['overlap1', 'overlap2', 'overlap3', 'overlap4', 'overlap5']:
             records = self.initialize_test(self.test_objects_overlap_simple, test_case, output_type='vcf')
             ovlp_evs = [record['INFO']['OVERLAP_EV'] if 'OVERLAP_EV' in record['INFO'].keys() else 'NONE' for record in records]
             self.assertEqual(dict(Counter(ovlp_evs)), elt_type_counts[test_case])
+        # Special case tests: low probability failure case when events are failed to be placed (want to repeat until all
+        # are placed – we're testing the reporting of the records when all events appear)
+
+        def repeat_until_successful_placement():
+            try:
+                return self.initialize_test(self.test_objects_overlap_simple, test_case, output_type='vcf')
+            except:
+                return None
+
+        for test_case in ['overlap6', 'overlap7']:
+            while True:
+                records = repeat_until_successful_placement()
+                if records is not None:
+                    break
+                else:
+                    continue
+            ovlp_evs = [record['INFO']['OVERLAP_EV'] if 'OVERLAP_EV' in record['INFO'].keys() else 'NONE' for record in records]
+            self.assertEqual(dict(Counter(ovlp_evs)), elt_type_counts[test_case])
+
         for test_case in ['alu_med1']:
             records = self.initialize_test(self.test_objects_alu_mediated, test_case, output_type='vcf')
             ovlp_evs = [record['INFO']['OVERLAP_EV'] if 'OVERLAP_EV' in record['INFO'].keys() else 'NONE' for record in records]

@@ -87,6 +87,8 @@ class TestSVSimulator(unittest.TestCase):
         test_overlap_bed_9 = "test/inputs/example_overlap_events_9.bed"
         test_overlap_bed_10 = "test/inputs/example_overlap_events_10.bed"
         test_overlap_bed_11 = "test/inputs/example_overlap_events_11.bed"
+        test_overlap_bed_12 = "test/inputs/example_overlap_events_12.bed"
+        test_overlap_bed_13 = "test/inputs/example_overlap_events_13.bed"
 
         self.test_objects_no_dis = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
                                                [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
@@ -383,7 +385,7 @@ class TestSVSimulator(unittest.TestCase):
                                                      hap1, hap2, bed),
                                           TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
                                                      [par, {"sim_settings": {"prioritize_top": True},
-                                                            "overlap_events": {"bed": test_overlap_bed_2},
+                                                            "overlap_events": {"bed": test_overlap_bed_13},
                                                             "SVs": [{"type": "delINVdel", "number": 1,
                                                                      "min_length": [3, 3, 3],
                                                                      "max_length": [3, 3, 3],
@@ -500,7 +502,7 @@ class TestSVSimulator(unittest.TestCase):
         self.test_objects_partial_overlap = [TestObject([ref_file, {"chr21": "CTCCGTAGTA"}],
                                                         [par, {"sim_settings": {"prioritize_top": True,
                                                                                 "fail_if_placement_issues": True},
-                                                               "overlap_events": {"bed": test_overlap_bed},
+                                                               "overlap_events": {"bed": test_overlap_bed_12},
                                                                "SVs": [{"type": "DEL", "number": 1,
                                                                         "min_length": 2, "max_length": 2,
                                                                         "num_partial_overlap": 1}]}],
