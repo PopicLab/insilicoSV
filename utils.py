@@ -164,7 +164,7 @@ class OverlapEvents:
         # print(f'overlap_counts: {self.svtype_overlap_counts}')
         # print(f'partial overlap_counts: {self.svtype_partial_overlap_counts}')
         # print(f'alu_mediated_counts: {self.svtype_alu_mediated_counts}')
-        # # # ---------------
+        # # ---------------
 
         # overlap_events can either be given as a single .bed file or multiple
         if type(config['overlap_events']['bed']) is list:
@@ -420,7 +420,7 @@ class OverlapEvents:
             # need to decrement the count for elt_type because this case occurs in which there is not a valid choice due to size
             self.decrement_counts(sv_config_id, input_elt_type, partial_overlap)
         # check if we want to return a partially overlapping interval; if yes, compute one based on the elt chosen
-        if partial_overlap:
+        if partial_overlap and rand_elt is not None:
             rand_elt = self.get_partially_overlapping_interval(*rand_elt, minsize, maxsize)
         # returning elt_type as well in order to have the retrieved type even when allow_types == 'ALL'
         return rand_elt, elt_type
