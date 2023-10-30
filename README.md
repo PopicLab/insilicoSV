@@ -8,12 +8,6 @@ insilicoSV is a software to design and simulate simple and complex structural va
 
 `$ pip install -r requirements.txt`
 
-Alternately, if you prefer to use conda environments, in the repository root run
-```
-conda env create -f envs/insilicosv-002-env.yml
-conda activate insilicosv-002-env
-```
-
 ## To Run
 ```
 samtools faidx <ref.fna>   # if index file already produced, skip this line
@@ -53,27 +47,30 @@ Please see the table and picture for the list of predefined classes.
 
 Source: Collins, R.L., Brand, H., Karczewski, K.J. *et al.* *Nature* (2020)
 
-| SV Type | Transformation |
-|---------|----------------|
-| INS | "" -> "A" | 
-| DEL | "A" -> "" |
-| INV | "A" -> "a" |
-| DUP | "A" -> "AA'" |
-| TRA | "A_" -> "_A" | 
+| SV Type   | Transformation |
+|-----------|--------------|
+| INS       | "" -> "A" | 
+| DEL       | "A" -> "" |
+| INV       | "A" -> "a" |
+| DUP       | "A" -> "AA'" |
+| TRA       | "A_" -> "_A" | 
 | dupINVdup | "ABC" -> "Ac'ba'C" |
 | delINVdel | "ABC" -> "b" |
 | delINVdup | "ABC" -> "c'bC" |
 | dupINVdel | "ABC" -> "Aba'" |
-| delINV | "AB" -> "b" |
-| INVdel | "AB" -> "a" |
+| delINV    | "AB" -> "b" |
+| INVdel    | "AB" -> "a" |
 | dDUP-iDEL | "A_B" -> "A_A'" |
-| INS-iDEL | "A_B" -> "_A" |
-| dup_INV | "AB" -> "Aba'" |
-| INV_dup | "AB" -> "b'aB" |
-| INVdup | "A" -> "aa'" |
-| dDUP | "A_" -> "A_A'" |
-| INV_dDUP | "A_" -> "A_a'" |
-| div_dDUP | "A_" -> "A_A*" |
+| INS-iDEL  | "A_B" -> "_A" |
+| dup_INV   | "AB" -> "Aba'" |
+| INV_dup   | "AB" -> "b'aB" |
+| INVdup    | "A" -> "aa'" |
+| dDUP      | "A_" -> "A_A'" |
+| INV_dDUP  | "A_" -> "A_a'" |
+| div_dDUP  | "A_" -> "A_A*" |
+| SNP       | "A" -> "A*" |
+
+Although SNPs are not considered to be a type of structural variant, we include them here as another valid event type for simulation (more information below about how use them).
 
 A custom SV consists of a user-generated transformation with a source and target sequence of "symbols," most of which are alphabetical letters. Some examples of a source would be "ABC" and "A_B_C," while some examples of the target would be "a'AB" or "A_b'Bc'_C." 
 
@@ -154,6 +151,15 @@ Chromosome19	105	113	Chromosome19	105	106	DEL	7	    0/1	dupINVdel	  13	0
 ### *Example 1a* - Example config with entire insilicoSV vocabulary
 This [gist](https://gist.github.com/crohlicek/9d529e600508870b1424d1f41215acb8) contains an example config file specifying the subevent size ranges for each event.
 
+### Example 1b - Example SNP specification
+We include SNPs as an available event type for simulation and admit them to the input config files with a modified form of the default SV config info used for other events.
+Because SNPs are only a single base in length, they only need to be specified with `number` as in the example below:
+```yaml
+SVs:
+  - type: "SNP"
+    number: 10
+```
+Usage of this event type is otherwise the same.
 
 ### Example 2 - Custom SVs
 ```yaml
