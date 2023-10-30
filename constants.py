@@ -9,6 +9,7 @@ class Variant_Type(Enum):
     DEL = "DEL"
     INV = "INV"
     DUP = "DUP"
+    SNP = "SNP"
     TRA = "TRA"
     dupINVdup = "dupINVdup"
     delINVdel = "delINVdel"
@@ -67,6 +68,8 @@ class Symbols(Enum):
 
 # for Structural Variant class
 SV_KEY = {Variant_Type.INS: [(), ("A")],
+          # SNP: same signature as DIVERGENCE but enforced to have len=1 and base flip probability=1
+          Variant_Type.SNP: [("A",), ("A*",)],
           Variant_Type.DEL: [("A",), ()],
           Variant_Type.INV: [("A",), ("a",)],
           Variant_Type.DUP: [("A",), ("A", "A'")],

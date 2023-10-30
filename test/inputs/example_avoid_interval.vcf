@@ -10,4 +10,4 @@
 ##INFO=<ID=TARGET,Number=1,Type=Integer,Description="Target location for divergent repeat">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
-chr19	16	HGSV_240929	N	<DEL>	86	PASS	END=83;SVTYPE=DEL;SVLEN=68	GT	1/1
+chr19	16	EMPTY	N	<EMPTY>	86	PASS	END=83;SVTYPE=EMPTY;SVLEN=68	GT	1/1

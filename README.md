@@ -206,6 +206,25 @@ SVs:
 python simulate.py <ref.fna> <par.yaml> <prefix>
 ```
 
+### Example 4 - Marking banned intervals of the genome
+When initializing a new simulation the user can include a list of banned genome intervals (i.e., intervals in which no SVs will be simulated) via a VCF given in the `avoid_intervals` entry of the `SVs` section of the config file:
+```yaml
+sim_settings:
+    max_tries: 200
+    prioritize_top: True
+SVs:
+    - avoid_intervals: "{path}/{to}/{banned_intervals}.vcf"
+    - type: "DEL"
+      number: 3
+      min_length: 1000
+      max_length: 10000
+    - type: "DUP"
+      number: 3
+    ...
+```
+The entries of the VCF will only have the interval information extracted under this feature, so an arbitrary record ID and SVTYPE can be provided (e.g., 'EMPTY')
+
+
 ### Example 4 - Placing events at known repetitive element intervals
 To augment a randomized simulation of events onto an input reference, the user can include in the simulation config
 file the path to a .bed file containing known element intervals (e.g., known repetitive elements taken from RepeatMasker).

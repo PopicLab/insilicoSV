@@ -268,12 +268,17 @@ class SV_Simulator():
                     # # ---- debug ----
                     # print(f'===== calling SV constructor with =====\n--> retrieved type = {retrieved_type}\n--> repeat_elt = {repeat_elt}')
                     # # ---------------
-                    sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
-                                            length_ranges=sv_config["length_ranges"], source=sv_config["source"],
-                                            target=sv_config["target"],
-                                            # --> **the singleton added here is used for the OVERLAP_EV info field**
-                                            # --> overlap_event <- None if repeat_elt is None, o/w relevant 4-tuple of info
-                                            overlap_event=(repeat_elt + (retrieved_type if elt_type in ['ALL', None] else elt_type,) if repeat_elt is not None else None))
+                    # TODO: adding SNP event type; will want a separate SV() call where length_ranges is given as 1 and the other fields
+                    #  are left blank (want the user to just specify count for SNPs)
+                    if sv_config['type'] == Variant_Type.SNP:
+                        sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode, length_ranges=[(1, 1)])
+                    else:
+                        sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
+                                                length_ranges=sv_config["length_ranges"], source=sv_config["source"],
+                                                target=sv_config["target"],
+                                                # --> **the singleton added here is used for the OVERLAP_EV info field**
+                                                # --> overlap_event <- None if repeat_elt is None, o/w relevant 4-tuple of info
+                                                overlap_event=(repeat_elt + (retrieved_type if elt_type in ['ALL', None] else elt_type,) if repeat_elt is not None else None))
 
                     # For divergent repeat simulation, need div_dDUP to be homozygous
                     if self.sim_settings.get("homozygous_only", False) or random.randint(0, 1) or sv.type == Variant_Type.div_dDUP:

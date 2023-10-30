@@ -121,7 +121,7 @@ class TestKnownSVs(unittest.TestCase):
                                     'GCGGGGGGGTATCTCTCCGT', 'GCACGGGGGGGTATCTCTCCGT'])
         self.helper_test_simple_sv(self.test_objects_multievent['del_dup_del'], ['GCTATCTATCTCGT', 'GCACTATCTATCTCGT',
                                                                                  'GCTATCTCGT', 'GCACTATCTCGT'])
-        self.helper_test_simple_sv(self.test_objects_multievent['del_inv_del'], ['GCGATATCGT'])#['GCATACTCGT'])
+        self.helper_test_simple_sv(self.test_objects_multievent['del_inv_del'], ['GCGATATCGT'])
         # het., hom., het.
         self.helper_test_simple_sv(self.test_objects_multievent['dup_dup_ins'], ['GCACACGGGGGGGTATCTCTCCTCCGT',
                                                                                  'GCACACTATCTCTCCTCCGT',

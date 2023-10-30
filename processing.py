@@ -29,14 +29,20 @@ class FormatterIO():
             # will be avoided during random placement of simulated events
             if "avoid_intervals" in config_sv:
                 continue
+            elif "type" not in config_sv:
+                raise Exception("\"Type\" attribute must be specified! For custom transformations, enter in \"Custom\"")
+            # SNP events are only specified by count (size is deterministic)
+            elif config_sv["type"] == "SNP":
+                if "number" in config_sv:
+                    continue
+                else:
+                    raise Exception("Number is a required parameter for all SVs")
             # makes sure required attributes are written into parameter file
             if "min_length" not in config_sv:
                 raise Exception("Min length must be specified on all SVs!")
-            elif "max_length" not in config_sv:
+            if "max_length" not in config_sv:
                 raise Exception("Max length must be specified on all SVs!")
-            elif "type" not in config_sv:
-                raise Exception("\"Type\" attribute must be specified! For custom transformations, enter in \"Custom\"")
-            elif "number" not in config_sv:
+            if "number" not in config_sv:
                 raise Exception("Number is a required parameter for all SVs")
 
             # makes sure attributes are the correct datatype
@@ -58,13 +64,15 @@ class FormatterIO():
         for config_sv in self.config['SVs']:
             if "avoid_intervals" in config_sv or "vcf_path" in config_sv:
                 continue
-            # handles cases where user enters length range for all components within SV or specifies different ranges
-            if isinstance(config_sv["min_length"], int):
-                config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
-            else:
-                config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
-            # make sure max_length >= min_length >= 0
-            assert all(max_len >= min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
+            # SV event length specification - not applicable for SNPs
+            if config_sv["type"] != "SNP":
+                # handles cases where user enters length range for all components within SV or specifies different ranges
+                if isinstance(config_sv["min_length"], int):
+                    config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
+                else:
+                    config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
+                # make sure max_length >= min_length >= 0
+                assert all(max_len >= min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
 
             config_sv["type"] = Variant_Type(config_sv["type"])
             if config_sv["type"] != Variant_Type.Custom:

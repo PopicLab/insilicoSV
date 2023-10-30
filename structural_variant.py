@@ -96,18 +96,18 @@ class Structural_Variant():
                 unique_id += 1
         return tuple(unique_transform)
 
-    @staticmethod
-    def get_event_frag(event, symbol):
+    def get_event_frag(self, event, symbol):
         # helper fn to get the ref frag for a given subevent
         # event: source event from events_dict
         # symbol: target symbol
+        # is_snp: bool flag to identify SNPs (and distinguish them from large DIV events)
         decode_funcs = {"invert": lambda string: utils.complement(string[::-1]),
                         "identity": lambda string: string,
                         "complement": utils.complement,
-                        "diverge": lambda string: utils.divergence(string)}
+                        "diverge": lambda string: utils.divergence(string, snp=(self.type == Variant_Type.SNP))}
         if any(c.islower() for c in symbol):
             return decode_funcs["invert"](event.source_frag)
-        elif symbol[-1] == Symbols.DIV.value:  # checks if the element ends in an *, representing a divergent duplicate
+        elif symbol[-1] == Symbols.DIV.value:  # checks if the element ends in an *, representing a divergence
             return decode_funcs["diverge"](event.source_frag)
         else:  # take original fragment, no changes
             return event.source_frag
@@ -149,10 +149,6 @@ class Structural_Variant():
         # --> choice for SVs with multiple, e.g., delINVdel)
         ovlp_frag = random.choice([frag for frag in self.source_unique_char if frag[0] != '_']) if self.overlap_event is not None else None
         for idx, symbol in enumerate(all_symbols):
-            # empty event - no source fragment yet
-            # --> if we're trying to overlap a repetitive event, want to set the "A" event to
-            # that repetitive element's interval
-            # if symbol == Symbols.REQUIRED_SOURCE.value and self.overlap_event is not None:
             if self.overlap_event is not None and symbol == ovlp_frag:
                 ovlp_event_len = int(self.overlap_event[2]) - int(self.overlap_event[1])
                 event = Event(self, ovlp_event_len, (ovlp_event_len, ovlp_event_len), symbol,
@@ -225,13 +221,15 @@ class Structural_Variant():
         """
         assign events start and end positions (once target blocks are populated and in the right order)
         """
+        # debug
+        print(f'assign_locations called with self.target_symbol_blocks = {self.target_symbol_blocks}\nself.events_dict = {self.events_dict}')
         for block in self.target_symbol_blocks:
             for ev in block:
                 ev.source_chr = self.start_chr
                 # if the event is one also found in the source, place it at the location given in events_dict
                 # --> the events that stay the same will need to be in the same place in both input and output ref
-                if ev.symbol.upper() in self.events_dict.keys():
-                    source_ev = self.events_dict[ev.symbol.upper()]
+                if ev.symbol.upper() in self.events_dict.keys() or ev.symbol[-1] == Symbols.DIV.value:
+                    source_ev = self.events_dict[ev.symbol.upper() if ev.symbol.upper() in self.events_dict.keys() else ev.symbol[0]]
                     ev.start = source_ev.start
                     ev.end = source_ev.end
                     ev.source_frag = self.get_event_frag(source_ev, ev.symbol)
@@ -254,8 +252,11 @@ class Structural_Variant():
                 if ev.source_frag is None:
                     ev.source_frag = utils.generate_seq(ev.length)
         else:
+            # debug
+            print('ASSIGN LOCATIONS - BRANCH 3')
             for i in range(len(target_events)):
                 ev = target_events[i]
+                print(f'---> ev = {ev}')
                 if ev.start is None:
                     if i == 0:
                         # if the first event is novel, set start/end to the start of the nearest event

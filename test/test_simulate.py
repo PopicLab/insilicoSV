@@ -567,6 +567,16 @@ class TestSVSimulator(unittest.TestCase):
                                                                   "max_length": 9,
                                                                   "min_length": 9}]}],
                                                   hap1, hap2, bed)]
+        # ----------- test objects for SNPs -----------
+        self.test_objects_SNPs = [TestObject([ref_file, {"chr21": "C"}],
+                                             [par, {"sim_settings": {"prioritize_top": True},
+                                                    "SVs": [{"type": "SNP", "number": 1}]}],
+                                             hap1, hap2, bed),
+                                  TestObject([ref_file, {"chr21": "CTGTTGACCG"}],
+                                             [par, {"sim_settings": {"prioritize_top": True},
+                                                    "SVs": [{"type": "SNP", "number": 4}]}],
+                                             hap1, hap2, bed)
+                                  ]
 
     def test_is_overlapping(self):
         # non-insertion cases
@@ -594,6 +604,13 @@ class TestSVSimulator(unittest.TestCase):
         if target_frags is not None:
             self.assertTrue(changed_frag_1 in target_frags or changed_frag_2 in target_frags)
         return changed_frag_1, changed_frag_2
+
+    def test_snps(self):
+        self.helper_test_known_output_svs(self.test_objects_SNPs[0], ['A', 'G', 'T'])
+        changed_frag_1, changed_frag_2 = self.helper_test_known_output_svs(self.test_objects_SNPs[1])
+        self.assertTrue(changed_frag_1 not in self.test_objects_SNPs[1].ref or
+                        changed_frag_2 not in self.test_objects_SNPs[1].ref)
+        self.assertTrue(len(changed_frag_1) == len(changed_frag_2) == 10)
 
     def test_simple_deletions(self):
         self.helper_test_known_output_svs(self.test_objects_simple_dels[0], ['CA', 'CT', 'AT'])
@@ -809,6 +826,7 @@ class TestSVSimulator(unittest.TestCase):
         changed_frag_1, changed_frag_2 = self.helper_test_known_output_svs(self.test_objects_divergence_event[0])
         self.assertTrue(changed_frag_1 not in self.test_objects_divergence_event[0].ref or
                         changed_frag_2 not in self.test_objects_divergence_event[0].ref)
+        self.assertTrue(len(changed_frag_1) == len(changed_frag_2) == 10)
 
     def test_flanked_inversions(self):
         # tests for dupINVdup, delINVdel, etc.
