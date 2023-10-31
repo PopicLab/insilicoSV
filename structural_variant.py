@@ -221,8 +221,6 @@ class Structural_Variant():
         """
         assign events start and end positions (once target blocks are populated and in the right order)
         """
-        # debug
-        print(f'assign_locations called with self.target_symbol_blocks = {self.target_symbol_blocks}\nself.events_dict = {self.events_dict}')
         for block in self.target_symbol_blocks:
             for ev in block:
                 ev.source_chr = self.start_chr
@@ -252,11 +250,8 @@ class Structural_Variant():
                 if ev.source_frag is None:
                     ev.source_frag = utils.generate_seq(ev.length)
         else:
-            # debug
-            print('ASSIGN LOCATIONS - BRANCH 3')
             for i in range(len(target_events)):
                 ev = target_events[i]
-                print(f'---> ev = {ev}')
                 if ev.start is None:
                     if i == 0:
                         # if the first event is novel, set start/end to the start of the nearest event
