@@ -178,7 +178,8 @@ class Structural_Variant():
                 source_ev.start = vcf_record.start
                 source_ev.end = vcf_record.stop
                 source_ev.source_chr = vcf_record.chrom
-                source_ev.source_frag = ref_fasta.fetch(source_ev.source_chr, source_ev.start, source_ev.end)
+                source_ev.source_frag = ref_fasta.fetch(source_ev.source_chr, source_ev.start, source_ev.end) if \
+                    vcf_record.id != Variant_Type.SNP.value else vcf_record.ref
                 self.events_dict[symbol] = source_ev
             if symbol.startswith(Symbols.DIS.value):
                 self.dispersion_flip = vcf_record.info['TARGET'] < vcf_record.start
@@ -191,6 +192,10 @@ class Structural_Variant():
                 disp_ev.source_frag = ref_fasta.fetch(disp_ev.source_chr, disp_ev.start, disp_ev.end)
                 self.events_dict[symbol] = disp_ev
         # for insertions with an insertion sequence given in the vcf, storing the seq in sv attribute
+        # (also for SNPs, going to store the ALT base value in insseq)
+        if vcf_record.info['SVTYPE'] == 'SNP':
+            # NB: only supporting SNP records with a single allele ALT reported
+            self.insseq_from_rec = vcf_record.alts[0]
         if vcf_record.info['SVTYPE'] == 'INS':
             if 'INSSEQ' in vcf_record.info:
                 self.insseq_from_rec = vcf_record.info['INSSEQ'][0]
@@ -230,7 +235,8 @@ class Structural_Variant():
                     source_ev = self.events_dict[ev.symbol.upper() if ev.symbol.upper() in self.events_dict.keys() else ev.symbol[0]]
                     ev.start = source_ev.start
                     ev.end = source_ev.end
-                    ev.source_frag = self.get_event_frag(source_ev, ev.symbol)
+                    # if self.insseq_from_rec is not None, we are in fixed mode and have an ALT base from a SNP record
+                    ev.source_frag = self.get_event_frag(source_ev, ev.symbol) if self.insseq_from_rec is None else self.insseq_from_rec
 
         # everything that wasn't assigned above will be modeled as insertion fragment placed at the nearest event boundary
         target_events = [ev for bl in self.target_symbol_blocks for ev in bl]
