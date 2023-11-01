@@ -199,10 +199,10 @@ Chromosome21	124	135	Chromosome21	159	160	TRA	    10	0/1	AB_C_D>bb'_AEc'_EDC	1	1
 
 ### Example 3 - Editing reference with input SVs
 To edit an input reference file with a known set of SVs the user can provide a VCF file containing the SVs in the yaml 
-of format shown above. The events in the VCF must be non-overlapping. Supported variant types for this use case 
-currently include DEL, DUP, INV, INS, dDUP, INV_dDUP, and TRA. For insertions, events may be specified with the insertion
-sequence given in an INFO field called `INSSEQ` (provided a matching header line is included as well). The commandline 
-call to perform this reference edit is the same as the previous simulate.py call given above:
+of format shown above. The events in the VCF must be non-overlapping. All predefined variant types are supported for this use case
+(e.g., including DEL, DUP, INV, INS, dDUP, INV_dDUP, TRA, and SNP). For insertions, events may be specified with the insertion
+sequence given in an INFO field called `INSSEQ` (provided a matching header line is included as well). All VCF records are
+expected to include an info field `SVTYPE` to record event type. The commandline call to perform this reference edit is the same as the previous simulate.py call given above:
 ```yaml
 # YAML config file
 SVs:
