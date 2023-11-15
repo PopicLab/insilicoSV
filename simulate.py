@@ -222,11 +222,11 @@ class SV_Simulator():
 
         vcf = VariantFile(vcf_path)
         for rec in vcf.fetch():
-            type = Variant_Type(rec.info['SVTYPE'])
+            svtype = Variant_Type(rec.info['SVTYPE']) if 'SVTYPE' in rec.info else Variant_Type(rec.id)
             # add the SV interval to the event_ranges dict keyed on chromosome
             self.event_ranges[rec.chrom].append((rec.start, rec.stop))
 
-            sv = Structural_Variant(sv_type=type, mode='fixed', vcf_rec=rec, ref_fasta=self.ref_fasta)
+            sv = Structural_Variant(sv_type=svtype, mode='fixed', vcf_rec=rec, ref_fasta=self.ref_fasta)
             self.svs.append(sv)
             active_svs_total += 1
             self.log_to_file("Intervals {} added to Chromosome \"{}\"".format(self.event_ranges[rec.chrom], rec.chrom))

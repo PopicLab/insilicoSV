@@ -17,6 +17,7 @@ class TestKnownSVs(unittest.TestCase):
         self.test_vcf_simple_inv = "test/inputs/example_simple_inv.vcf"
         self.test_vcf_simple_ins = "test/inputs/example_simple_ins.vcf"
         self.test_vcf_simple_ins_no_insseq = "test/inputs/example_simple_ins_no_insseq.vcf"
+        self.test_vcf_snp = "test/inputs/example_SNP.vcf"
 
         self.test_vcf_multidel = "test/inputs/example_multidel.vcf"
         self.test_vcf_del_ins = "test/inputs/example_del_ins.vcf"
@@ -26,6 +27,7 @@ class TestKnownSVs(unittest.TestCase):
         self.test_vcf_del_dup_2 = "test/inputs/example_del_dup_2.vcf"
         self.test_vcf_del_inv_del = "test/inputs/example_del_inv_del.vcf"
         self.test_vcf_dup_dup_ins = "test/inputs/example_dup_dup_ins.vcf"
+        self.test_vcf_multidel_multisnp = "test/inputs/example_multiDEL_multiSNP.vcf"
         self.test_vcf_div_dDUP = "test/inputs/example_div_dDUP.vcf"
         self.test_vcf_dDUP = "test/inputs/example_dDUP.vcf"
         self.test_vcf_INV_dDUP = "test/inputs/example_INV_dDUP.vcf"
@@ -53,6 +55,9 @@ class TestKnownSVs(unittest.TestCase):
                                            'INS_2': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                                [self.par, {"SVs": [{"vcf_path": self.test_vcf_simple_ins_no_insseq}]}],
                                                                self.hap1, self.hap2, self.bed),
+                                           'SNP': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                             [self.par, {"SVs": [{"vcf_path": self.test_vcf_snp}]}],
+                                                             self.hap1, self.hap2, self.bed),
                                            }
         self.test_objects_multievent = {'multiDEL': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                                [self.par, {"SVs": [{"vcf_path": self.test_vcf_multidel}]}],
@@ -71,7 +76,11 @@ class TestKnownSVs(unittest.TestCase):
                                                                   self.hap1, self.hap2, self.bed),
                                         'dup_dup_ins': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                                   [self.par, {"SVs": [{"vcf_path": self.test_vcf_dup_dup_ins}]}],
-                                                                  self.hap1, self.hap2, self.bed)}
+                                                                  self.hap1, self.hap2, self.bed),
+                                        'multiDEL_multiSNP': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                                        [self.par, {"SVs": [{"vcf_path": self.test_vcf_multidel_multisnp}]}],
+                                                                        self.hap1, self.hap2, self.bed),
+                                        }
         self.test_objects_dispersions = {'div_dDUP': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                                 [self.par, {"SVs": [{"vcf_path": self.test_vcf_div_dDUP}]}],
                                                                 self.hap1, self.hap2, self.bed),
@@ -109,10 +118,12 @@ class TestKnownSVs(unittest.TestCase):
         # insertion without specified INSSEQ (insertion sequence randomly generated)
         frag1, frag2 = self.helper_test_simple_sv(self.test_objects_simple_events['INS_2'])
         self.assertTrue(len(frag1) == 22 and len(frag2) == 22)
+        self.helper_test_simple_sv(self.test_objects_simple_events['SNP'], ['GCGCTATCTCTCCGT'])
 
     def test_multiple_events(self):
         # both DELs heterozygous
         self.helper_test_simple_sv(self.test_objects_multievent['multiDEL'], ['GCTATCTCCGT'])
+        self.helper_test_simple_sv(self.test_objects_multievent['multiDEL_multiSNP'], ['AATATCTCCGT'])
         # hom. DEL, het. INS
         self.helper_test_simple_sv(self.test_objects_multievent['del_ins'], ['GCGGGGGGGACTATCTCGT', 'GCACTATCTCGT'])
         # het. DELs, hom. INS
