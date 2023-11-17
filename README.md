@@ -96,7 +96,7 @@ Each line/entry will have the following parameters:
 6. *target_end*: End position on the target chr [EXCLUDE at pos], one-based indexing
 7. *event_type*: Describes the transformation made by the event, either an INS, DEL, INV, TRA, DUP, INVDUP, or INVTRA. Dispersed duplications--those that do not occur immediately after the original--have an attached "d" at the front.
 8. *event_size*: Size of the reference fragment impacted by the event
-9. *zygosity*: 0/1 = heterozygous, 1/1 = homozygous. insilicoSV gives each SV a 2/3 chance of being heterozygous and 1/3 chance of being homozygous. 
+9. *zygosity*: {0/1, 1/0} = heterozygous, 1/1 = homozygous. insilicoSV gives each SV a 50% chance of being heterozygous or homozygous, and if the SV is heterozygous it is given a 50% chance of being placed on haplotype A or B. 
 10. *parent_sv*: Describes the parent SV the event is a component of, for instance "dupINVdup." If a custom SV was provided, the name becomes "source>target"
 11. *nth_sv*: int, index to count up each SV (note: not the events). All events of a SV belong in the same index.
 12. *order*: int, for insertion-like operations such as TRA, INS, or DUP, the "order" index describes in which order events that target the same position were compiled. Events with INV and DEL operations have an order of 0.
@@ -199,8 +199,8 @@ Chromosome21	124	135	Chromosome21	159	160	TRA	    10	0/1	AB_C_D>bb'_AEc'_EDC	1	1
 
 ### Example 3 - Editing reference with input SVs
 To edit an input reference file with a known set of SVs the user can provide a VCF file containing the SVs in the yaml 
-of format shown above. The events in the VCF must be non-overlapping. All predefined variant types are supported for this use case
-(e.g., including DEL, DUP, INV, INS, dDUP, INV_dDUP, TRA, and SNP). For insertions, events may be specified with the insertion
+of format shown above. The events in the VCF must be non-overlapping. All single-interval and dispersion-based predefined variant types are supported for this use case
+(i.e., DEL, DUP, INV, INS, dDUP, INV_dDUP, TRA, INVdup, and SNP). For insertions, events may be specified with the insertion
 sequence given in an INFO field called `INSSEQ` (provided a matching header line is included as well). All VCF records are
 expected to include an info field `SVTYPE` to record event type. The commandline call to perform this reference edit is the same as the previous simulate.py call given above:
 ```yaml

@@ -18,6 +18,7 @@ class TestKnownSVs(unittest.TestCase):
         self.test_vcf_simple_ins = "test/inputs/example_simple_ins.vcf"
         self.test_vcf_simple_ins_no_insseq = "test/inputs/example_simple_ins_no_insseq.vcf"
         self.test_vcf_snp = "test/inputs/example_SNP.vcf"
+        self.test_vcf_invdup = "test/inputs/example_invdup.vcf"
 
         self.test_vcf_multidel = "test/inputs/example_multidel.vcf"
         self.test_vcf_del_ins = "test/inputs/example_del_ins.vcf"
@@ -58,6 +59,9 @@ class TestKnownSVs(unittest.TestCase):
                                            'SNP': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                              [self.par, {"SVs": [{"vcf_path": self.test_vcf_snp}]}],
                                                              self.hap1, self.hap2, self.bed),
+                                           'INVdup': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+                                                                [self.par, {"SVs": [{"vcf_path": self.test_vcf_invdup}]}],
+                                                                self.hap1, self.hap2, self.bed),
                                            }
         self.test_objects_multievent = {'multiDEL': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                                [self.par, {"SVs": [{"vcf_path": self.test_vcf_multidel}]}],
@@ -119,6 +123,7 @@ class TestKnownSVs(unittest.TestCase):
         frag1, frag2 = self.helper_test_simple_sv(self.test_objects_simple_events['INS_2'])
         self.assertTrue(len(frag1) == 22 and len(frag2) == 22)
         self.helper_test_simple_sv(self.test_objects_simple_events['SNP'], ['GCGCTATCTCTCCGT'])
+        self.helper_test_simple_sv(self.test_objects_simple_events['INVdup'], ['GCAGATAGTAGATAGTCTCCGT'])
 
     def test_multiple_events(self):
         # both DELs heterozygous
