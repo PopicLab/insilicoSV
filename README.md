@@ -333,6 +333,23 @@ SVs:
 
 **The various types of known element placement are not mutually exclusive and can be used concurrently (when appropriate with respect to the types of SVs being simulated)**
 
+### Example 5 - Divergent intervals
+In addition to the various SV types included in the predefined library, insilicoSV also allows for the simulation of divergent
+intervals in which a random proportion of the bases in a given interval will be corrupted with some probability `p`. Divergent
+intervals can be included in the same way as any of the SVs provided, accessible through the type name `'DIVERGENCE'`. The
+probability parameter by which each base will be randomly changed can be optionally provided by the user as shown in the example
+below (and if it is not provided it will be drawn uniformly from (0.5, 1.0)):
+```yaml
+SVs:
+    - type: "DIVERGENCE"
+      number: 3
+      divergence_prob: 0.2
+      min_length:
+        - 500
+      max_length:
+        - 1000
+```
+
 ### Automated pipeline bash scripts
 #### `generate_synthetic_genome.sh`
 To automate the process of generating a synthetic reference and aligned BAM file, `generate_synthetic_genome.sh` can be run with inputs

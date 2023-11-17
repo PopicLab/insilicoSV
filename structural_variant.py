@@ -5,7 +5,7 @@ import random
 
 class Structural_Variant():
     def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None, vcf_rec=None, ref_fasta=None,
-                 overlap_event=None):
+                 overlap_event=None, div_prob=None):
         '''
         Initializes SV's transformation and sets up its events, along with several other basic attributes like zygosity
 
@@ -44,6 +44,7 @@ class Structural_Variant():
         self.dispersion_flip = False
         self.insseq_from_rec = None  # space to store INSSEQ for fixed-mode INS event
         self.overlap_event = overlap_event  # <- element tuple of form (chrom, start, end, type) or None
+        self.div_prob = div_prob  # <- divergence probability param (optionally given for type == DIVERGENCE)
 
         if self.type in DISPERSION_TYPES:
             if random.randint(0, 1):
@@ -104,7 +105,10 @@ class Structural_Variant():
         decode_funcs = {"invert": lambda string: utils.complement(string[::-1]),
                         "identity": lambda string: string,
                         "complement": utils.complement,
-                        "diverge": lambda string: utils.divergence(string, snp=(self.type == Variant_Type.SNP))}
+                        # divergence probability set to 1 if type==SNP, otherwise set to optionally provided value from config
+                        "diverge": lambda string: utils.divergence(string,
+                                                                   divergence_prob=(1 if self.type == Variant_Type.SNP
+                                                                                    else self.div_prob))}
         if any(c.islower() for c in symbol):
             return decode_funcs["invert"](event.source_frag)
         elif symbol[-1] == Symbols.DIV.value:  # checks if the element ends in an *, representing a divergence

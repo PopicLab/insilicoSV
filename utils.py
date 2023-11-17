@@ -124,15 +124,13 @@ def complement(seq):
             output += base_complements[base]
         else:
             output += base
-            # raise ValueError("Unknown base \'{}\' detected in reference, complement of base not taken".format(base))
 
     return output
 
-def divergence(seq, snp=False):
+def divergence(seq, divergence_prob=None):
     # function to create slightly mutated version of an input sequence
-    # --> p given as the probability of changing the base, chosen from U(0.5,1.0)
-    # ... unless the divergence is being executed for a SNP, in which case we always flip the base
-    p = random.uniform(0.5, 1.0) if not snp else 1.0
+    # --> p given as the probability of changing the base, chosen from U(0.5,1.0) or given from user
+    p = random.uniform(0.5, 1.0) if divergence_prob is None else float(divergence_prob)
     return ''.join([b if random.random() > p else random.choice(list({"A", "C", "T", "G"} - {b})) for b in seq.upper()])
 
 

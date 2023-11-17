@@ -542,7 +542,23 @@ class TestSVSimulator(unittest.TestCase):
                                                          [par, {"sim_settings": {"prioritize_top": True},
                                                                 "SVs": [{"type": "DIVERGENCE", "number": 1,
                                                                          "min_length": 5, "max_length": 5}]}],
-                                                         hap1, hap2, bed)]
+                                                         hap1, hap2, bed),
+                                              TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
+                                                         [par, {"sim_settings": {"prioritize_top": True},
+                                                                "SVs": [{"type": "DIVERGENCE", "number": 1, 'divergence_prob': 0,
+                                                                         "min_length": 10, "max_length": 10}]}],
+                                                         hap1, hap2, bed),
+                                              TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
+                                                         [par, {"sim_settings": {"prioritize_top": True},
+                                                                "SVs": [{"type": "DIVERGENCE", "number": 1, 'divergence_prob': 1,
+                                                                         "min_length": 10, "max_length": 10}]}],
+                                                         hap1, hap2, bed),
+                                              TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
+                                                         [par, {"sim_settings": {"prioritize_top": True},
+                                                                "SVs": [{"type": "DIVERGENCE", "number": 1, 'divergence_prob': 0.2,
+                                                                         "min_length": 10, "max_length": 10}]}],
+                                                         hap1, hap2, bed)
+                                              ]
 
         self.test_objects_filter_chroms = [TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA",
                                                                   "chr20": "CTCCGT"}],
@@ -823,10 +839,16 @@ class TestSVSimulator(unittest.TestCase):
         # the divergence operator will mutate each base in an event interval with probability p
         # --> going to check for randomized placement of a divergence by checking that the output sequence
         # --> is not contained in the unedited reference (for event of length 5 and dummy reference: CTCCGTCGTA)
-        changed_frag_1, changed_frag_2 = self.helper_test_known_output_svs(self.test_objects_divergence_event[0])
-        self.assertTrue(changed_frag_1 not in self.test_objects_divergence_event[0].ref or
-                        changed_frag_2 not in self.test_objects_divergence_event[0].ref)
-        self.assertTrue(len(changed_frag_1) == len(changed_frag_2) == 10)
+        # obj. 1, divergence probability = 0; obj. 2, divergence probability = 1; obj. 3, divergence probability = 0.2
+        for i in range(len(self.test_objects_divergence_event)):
+            changed_frag_1, changed_frag_2 = self.helper_test_known_output_svs(self.test_objects_divergence_event[i])
+            if i != 1:
+                self.assertTrue(changed_frag_1 not in self.test_objects_divergence_event[i].ref or
+                                changed_frag_2 not in self.test_objects_divergence_event[i].ref)
+            else:
+                self.assertTrue(changed_frag_1 == changed_frag_2 == 'CTCCGTCGTA')
+            self.assertTrue(len(changed_frag_1) == len(changed_frag_2) == 10)
+
 
     def test_flanked_inversions(self):
         # tests for dupINVdup, delINVdel, etc.
