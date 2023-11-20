@@ -18,7 +18,7 @@ python simulate.py <ref.fna> <par.yaml> <prefix>
 ## Documentation
 For documentation outlining the different features of insilicoSV along with usage examples and data resources, please refer to the wiki:
 <!-- toc -->
-- [Input guidelines]([https://github.com/PopicLab/insilicoSV/wiki#usage](https://github.com/PopicLab/insilicoSV/wiki#input-guidelines))
+- [Input guidelines](https://github.com/PopicLab/insilicoSV/wiki#input-guidelines)
 - [Example Use Cases](https://github.com/PopicLab/insilicoSV/wiki#example-use-cases)
 - [SV Grammar](https://github.com/PopicLab/insilicoSV/wiki/SV-Grammar)
 - [Benchmark Genomes](https://github.com/PopicLab/insilicoSV/wiki/Benchmark-Genomes)
