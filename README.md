@@ -15,6 +15,16 @@ python simulate.py <ref.fna> <par.yaml> <prefix>
 ```
 **NB:** Before running will also need to set `PYTHONPATH` to point to the insilicoSV directory with `export PYTHONPATH={/path/to/insilicoSV}`
 
+## Documentation
+For documentation outlining the different features of insilicoSV along with usage examples and data resources, please refer to the wiki:
+<!-- toc -->
+- [Input guidelines]([https://github.com/PopicLab/insilicoSV/wiki#usage](https://github.com/PopicLab/insilicoSV/wiki#input-guidelines))
+- [Example Use Cases](https://github.com/PopicLab/insilicoSV/wiki#example-use-cases)
+- [SV Grammar](https://github.com/PopicLab/insilicoSV/wiki/SV-Grammar)
+- [Benchmark Genomes](https://github.com/PopicLab/insilicoSV/wiki/Benchmark-Genomes)
+- [Automated Pipelines and Additional Utilities](https://github.com/PopicLab/insilicoSV/wiki/Automated-pipelines-and-additional-utilities)
+- [Example SV Visualizations](https://github.com/PopicLab/insilicoSV/wiki/Example-SV-visualizations)
+
 ## Usage
 
 insilicoSV takes in two input files: the reference genome and a yaml configuration file. Following the simulation, it outputs two haplotype files, a BEDPE file, and a simple stats file using the prefix given. 
