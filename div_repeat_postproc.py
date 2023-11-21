@@ -1,5 +1,5 @@
-from pysam import VariantFile
 import argparse
+from pysam import VariantFile
 from collections import defaultdict
 
 

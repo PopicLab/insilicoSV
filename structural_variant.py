@@ -1,24 +1,21 @@
-from constants import *
 import utils
 import random
+from constants import *
 
 
-class Structural_Variant():
+class Structural_Variant:
     def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None, vcf_rec=None, ref_fasta=None,
                  overlap_event=None, div_prob=None):
-        '''
-        Initializes SV's transformation and sets up its events, along with several other basic attributes like zygosity
-
-        sv_type: Enum either specifying one of the prewritten classes or a Custom transformation, in which case source and target are required
+        """
+        sv_type: Enum either specifying one of the prewritten classes or a Custom transformation
         mode: flag to indicate whether constructor called in fixed or randomized mode
-        length_ranges: list containing tuple(s) (min_length, max_length) OR singleton int given if the SV is of known
-            position/is being read in from a vcf of known/fixed variants
+        length_ranges: list containing tuple(s) (min_length, max_length) or singleton int
         source: tuple representing source sequence, optional
         target: tuple representing target sequence, optional
         vcf_rec: (fixed mode) vcf record giving sv information that will instantiate the event
         ref_fasta: for extracting reference frag for vcf records in fixed mode initialization
-        overlap_event: (chr, start, end, elt_type) tuple representing the repeatmasker event that this SV is meant to overlap
-        '''
+        overlap_event: (chr, start, end, elt_type) tuple representing the genome element that this SV is meant to overlap, optional
+        """
         self.type = sv_type
         if self.type != Variant_Type.Custom:
             self.source, self.target = SV_KEY[self.type]
@@ -27,29 +24,25 @@ class Structural_Variant():
             self.source, self.target = tuple(source), tuple(target)
             self.name = str("".join(self.source)) + ">" + str("".join(self.target))
 
-        # events like dispersions will appear as the same symbol, so it's important to add unique tags to differentiate them
-        # user-generated source/target will also not group together duplication markings and their corresponding symbols together as it is inputted as string
         utils.validate_symbols(self.source, self.target)
         self.source_unique_char, self.target_unique_char = Structural_Variant.reformat_seq(
             self.source), Structural_Variant.reformat_seq(self.target)
 
-        # initialize event classes
-        self.start = None  # defines the space in which SV operates
+        self.start = None
         self.end = None
         self.start_chr = None
         self.req_space = None  # required space for SV, sum of event lengths
         self.source_events = []  # list of Event classes for every symbol in source sequence
         self.events_dict = dict()  # maps every unique symbol in source and target to an Event class
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
-        self.dispersion_flip = False
+        self.dispersion_flip = False  # orientation of dispersion event
         self.insseq_from_rec = None  # space to store INSSEQ for fixed-mode INS event
-        self.overlap_event = overlap_event  # <- element tuple of form (chrom, start, end, type) or None
+        self.overlap_event = overlap_event  # <- element tuple of form (chrom, start, end, type) (optional)
         self.div_prob = div_prob  # <- divergence probability param (optionally given for type == DIVERGENCE)
 
         if self.type in DISPERSION_TYPES:
             if random.randint(0, 1):
                 self.dispersion_flip = True
-        # initialize_events sets the values of events_dict, source_dict, and req_space
         if mode == 'randomized':
             self.initialize_events(length_ranges)
         else:
@@ -59,14 +52,8 @@ class Structural_Variant():
         self.target_symbol_blocks = self.sv_blocks.target_blocks
 
         if mode == 'randomized':
-            # specifies if sv is unable to be simulated due to random placement issues
-            # will be turned on later
             self.active = False
-
-            # 1 = homozygous, 0 = heterozygous
             self.ishomozygous = Zygosity.UNDEFINED
-
-            # stores list of booleans specifying if SV will be applied to certain haplotype for assigned chromosome
             self.hap = [False, False]
         else:
             # manual call to assign_locations in fixed mode
@@ -79,10 +66,8 @@ class Structural_Variant():
 
     @staticmethod
     def reformat_seq(transformation):
-        # if dispersion events exist in transformation, tag on unique ids to make them distinct as they all are "_"
-        # unique ids necessary to map symbol to event with one-to-one correspondence
-        # groups together a duplication marking and its corresponding symbol
         # transformation: tuple, user inputted source and target
+        # if dispersion events exist in transformation, tag on unique ids to make them distinct as they all are "_"
         unique_transform = []
         unique_id = 1
         for component in transformation:
@@ -90,7 +75,7 @@ class Structural_Variant():
                 unique_transform.append(component)
             elif component == Symbols.DUP.value:  # duplication event case, need to group together symbol and duplication marking
                 unique_transform[-1] += Symbols.DUP.value
-            elif component == Symbols.DIV.value: # divergence event case, want to keep track of interval needing modification
+            elif component == Symbols.DIV.value:  # divergence event case, want to keep track of interval needing modification
                 unique_transform[-1] += Symbols.DIV.value
             else:  # dispersion event case, component = dispersion
                 unique_transform.append(component + str(unique_id))
@@ -98,59 +83,47 @@ class Structural_Variant():
         return tuple(unique_transform)
 
     def get_event_frag(self, event, symbol):
-        # helper fn to get the ref frag for a given subevent
         # event: source event from events_dict
         # symbol: target symbol
-        # is_snp: bool flag to identify SNPs (and distinguish them from large DIV events)
         decode_funcs = {"invert": lambda string: utils.complement(string[::-1]),
                         "identity": lambda string: string,
                         "complement": utils.complement,
-                        # divergence probability set to 1 if type==SNP, otherwise set to optionally provided value from config
                         "diverge": lambda string: utils.divergence(string,
                                                                    divergence_prob=(1 if self.type == Variant_Type.SNP
                                                                                     else self.div_prob))}
         if any(c.islower() for c in symbol):
             return decode_funcs["invert"](event.source_frag)
-        elif symbol[-1] == Symbols.DIV.value:  # checks if the element ends in an *, representing a divergence
+        elif symbol[-1] == Symbols.DIV.value:
             return decode_funcs["diverge"](event.source_frag)
-        else:  # take original fragment, no changes
+        else:
             return event.source_frag
 
     def initialize_events(self, lengths):
-        '''
+        """
         Initializes event classes and creates a mapping of symbol to event
 
         lengths: list of tuples specifying min and max length for events within SV
         -> returns list of events in source sequence
-        '''
-        # collect all unique symbols present in both source and target sequences - include target as there may be insertions
-        # note that the symbols represent events
+        """
         all_symbols = []
         for ele in self.source_unique_char + self.target_unique_char:
-            # only append original symbols or dispersion events
             if len(ele) > 0 and (len(ele) == 1 or ele.startswith(Symbols.DIS.value)) and ele.upper() not in all_symbols:
                 all_symbols.append(ele.upper())
-        all_symbols.sort()  # user inputs symbol lengths in lexicographical order
+        all_symbols.sort()
 
         # symbols_dict: (key = symbol, value = (chosen length, length range))
-        # determine length of events/symbols
         symbols_dict = dict()
         if len(lengths) > 1:  # values given by user represents custom ranges for each event symbol of variant in lexicographical order
             assert (len(lengths) == len(all_symbols)), \
                 "Number of lengths entered does not match the number of symbols (remember foreign insertions and dispersions) present!"
             for idx, symbol in enumerate(all_symbols):
                 symbols_dict[symbol] = (random.randint(lengths[idx][0], lengths[idx][1]), lengths[idx])
-
         elif len(lengths) == 1:  # value given by user represents length (same range) of each event within variant in lexicographical order
             for symbol in all_symbols:
                 symbols_dict[symbol] = (random.randint(lengths[0][0], lengths[0][1]), lengths[0])
-
         else:
             raise Exception("Lengths parameter expects at least one tuple")
 
-        # initialize event classes
-        # --> if overlap_event given, randomly choosing a (non-dispersion) source frag to overlap (only a nontrivial
-        # --> choice for SVs with multiple, e.g., delINVdel)
         ovlp_frag = random.choice([frag for frag in self.source_unique_char if frag[0] != '_']) if self.overlap_event is not None else None
         for idx, symbol in enumerate(all_symbols):
             if self.overlap_event is not None and symbol == ovlp_frag:
@@ -170,11 +143,7 @@ class Structural_Variant():
         self.req_space = sum([event.length for event in self.source_events])
 
     def initialize_events_fixed(self, vcf_record, ref_fasta):
-        """
-        initialization method for SV read in from vcf -- need to prepare objects needed for creation of target blocks
-        --> needs to fully populate events_dict with start/end (reflecting optional dispersion flip), lengths, and source frags
-        --> (with those in place, Blocks() and assign_locations() should have everything they need to run before change_frags())
-        """
+        # initialization method for SV read in from vcf
         source_len = vcf_record.stop - vcf_record.start if 'SVLEN' not in vcf_record.info else vcf_record.info['SVLEN']
         for symbol in self.source_unique_char:
             if symbol == Symbols.REQUIRED_SOURCE.value:
@@ -195,8 +164,7 @@ class Structural_Variant():
                 disp_ev.source_chr = vcf_record.chrom
                 disp_ev.source_frag = ref_fasta.fetch(disp_ev.source_chr, disp_ev.start, disp_ev.end)
                 self.events_dict[symbol] = disp_ev
-        # for insertions with an insertion sequence given in the vcf, storing the seq in sv attribute
-        # (also for SNPs, going to store the ALT base value in insseq)
+        # storing the insertion seq for INSs/SNPs with an insertion sequence / alt allele given in the vcf
         if vcf_record.info['SVTYPE'] == 'SNP':
             # NB: only supporting SNP records with a single allele ALT reported
             self.insseq_from_rec = vcf_record.alts[0]
@@ -208,13 +176,11 @@ class Structural_Variant():
             self.start = vcf_record.start
             self.end = self.start
         else:
-            # need to have self.start/end defined for assign_locations()
             self.start = self.events_dict[Symbols.REQUIRED_SOURCE.value].start
             self.end = self.events_dict[Symbols.REQUIRED_SOURCE.value].end if '_1' not in self.events_dict.keys() else self.events_dict['_1'].end
         self.start_chr = vcf_record.chrom
 
-        # handling for divergent repeat simulation logic
-        # (div_dDUPs placed into R1 need to correspond to dDUPs in R2)
+        # handling for divergent repeat simulation logic (div_dDUPs placed into R1 need to correspond to dDUPs in R2)
         if self.type == Variant_Type.div_dDUP:
             self.target_unique_char = ("A", "_1", "A'")
 
@@ -234,12 +200,10 @@ class Structural_Variant():
             for ev in block:
                 ev.source_chr = self.start_chr
                 # if the event is one also found in the source, place it at the location given in events_dict
-                # --> the events that stay the same will need to be in the same place in both input and output ref
                 if ev.symbol.upper() in self.events_dict.keys() or ev.symbol[-1] == Symbols.DIV.value:
                     source_ev = self.events_dict[ev.symbol.upper() if ev.symbol.upper() in self.events_dict.keys() else ev.symbol[0]]
                     ev.start = source_ev.start
                     ev.end = source_ev.end
-                    # if self.insseq_from_rec is not None, we are in fixed mode and have an ALT base from a SNP record
                     ev.source_frag = self.get_event_frag(source_ev, ev.symbol) if self.insseq_from_rec is None else self.insseq_from_rec
 
         # everything that wasn't assigned above will be modeled as insertion fragment placed at the nearest event boundary
@@ -249,14 +213,11 @@ class Structural_Variant():
             ev = target_events[0]
             ev.start = start_pos
             ev.end = start_pos
-            # position assigned, need to get source frag
             source_event = self.events_dict[ev.symbol[0].upper()]
-            # if we're in fixed mode and the vcf record specified an INSSEQ, use that here
             if self.insseq_from_rec is not None:
                 ev.source_frag = self.insseq_from_rec
             else:
                 ev.source_frag = self.get_event_frag(source_event, ev.symbol)
-                # in fixed mode this will yield None, need to call generate_seq() to generate the ins. seq
                 if ev.source_frag is None:
                     ev.source_frag = utils.generate_seq(ev.length)
         else:
@@ -273,32 +234,28 @@ class Structural_Variant():
                     else:
                         ev.start = target_events[i - 1].end
                         ev.end = target_events[i - 1].end
-                    # position assigned, need to get source frag
                     source_event = self.events_dict[ev.symbol[0].upper()]
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
 
-        # populating target_events_dict for use in export functions
         self.sv_blocks.generate_target_events_dict()
 
     def change_fragment(self):
-        '''
+        """
         Takes the mapping of symbols to events and the target sequence to construct a replacement sequence for the reference fragment
-        '''
+        """
         changed_fragments = []
         assert (self.start is not None and self.end is not None), "Undefined SV start for {}".format(
-            self)  # start & end should have been defined alongside event positions
+            self)
         block_start = None
         block_end = None
 
-        # special case: simple deletion -- len(target_symbol_blocks) == 0
-        if self.target_symbol_blocks == [[]]:
+        if self.target_symbol_blocks == [[]]:  # special case: simple deletion -- len(target_symbol_blocks) == 0
             changed_fragments.append([self.start_chr, self.start, self.end, ''])
         else:
             for idx, block in enumerate(self.target_symbol_blocks):
                 new_frag = ''
                 if len(block) == 0:
-                    # this branch will be executed for TRAs:
-                    # --> want to delete the A-length interval on the opposite side of the dispersion as our A'
+                    # TRA branch: delete the A-length interval on the opposite side of the dispersion as our A'
                     if idx == 0:
                         del_len = len(self.target_symbol_blocks[2][0].source_frag)
                         disp_ev = self.target_symbol_blocks[1][0]
@@ -339,14 +296,13 @@ class Structural_Variant():
                 event.source_frag = "Removed"
 
 
-class Event():
-    '''represents the symbols, also known as the "events," within a SV transformation'''
+class Event:
+    """
+    represents the symbols, also known as the "events," within a SV transformation
+    """
 
     def __init__(self, sv_parent, length, length_range, symbol, source_frag=None, start=None, end=None):
-        '''
-        sv_parent: Structural Variant, event is always part of larger SV
-        '''
-        self.sv_parent = sv_parent
+        self.sv_parent = sv_parent  # sv_parent: Structural_Variant, event is always part of larger SV
         self.length = length
         self.length_range = length_range
         self.symbol = symbol  # refers to symbol in SV's transformation
@@ -368,9 +324,7 @@ class Blocks:
         self.sv = sv
         self.target_blocks = []
         self.generate_blocks()
-        # optional dispersion flip should be done in init step
-        if self.sv.type in DISPERSION_TYPES \
-                and self.sv.dispersion_flip:
+        if self.sv.type in DISPERSION_TYPES and self.sv.dispersion_flip:
             self.flip_blocks()
         self.target_events_dict = None
 
@@ -385,7 +339,6 @@ class Blocks:
         blocks = [[]]
         for symbol in transformation:
             if symbol.startswith(Symbols.DIS.value):
-                # going to add singleton lists with the dispersions where they occur so we can keep track of the sizes
                 source_event = self.sv.events_dict[symbol]
                 disp_event = Event(sv_parent=self.sv, length=source_event.length, length_range=None, symbol=symbol)
                 blocks.append([disp_event])

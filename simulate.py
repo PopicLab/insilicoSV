@@ -1,25 +1,21 @@
-from os import write
 import random
-from pysam import FastaFile
-from pysam import VariantFile
-
 import constants
-from processing import FormatterIO, collect_args
 import utils
-from constants import *
-from structural_variant import Structural_Variant, Event
-import tracemalloc  # only for testing
-import sys
 import logging
 import time
+from os import write
+from processing import FormatterIO, collect_args
+from pysam import FastaFile
+from pysam import VariantFile
+from constants import *
+from structural_variant import Structural_Variant, Event
 from collections import defaultdict
 
 time_start = time.time()
 
 
-class StatsCollection():
-    '''collection of information for stats file, if requested'''
-
+class StatsCollection:
+    """collection of information for stats file, if requested"""
     def __init__(self, chr_ids, chr_lens):
         self.num_heterozygous = 0
         self.num_homozygous = 0
@@ -37,13 +33,12 @@ class StatsCollection():
             self.active_events_chr[id] = 0
 
     def get_info(self, svs):
-        '''
+        """
         collects all information for stats file after all edits are completed
 
         svs: list of Structural_Variant objects
         -> return None
-        '''
-
+        """
         self.total_svs = len(svs)
         self.min_event_len = min([event.length for sv in svs if sv.active for key, event in sv.events_dict.items() if
                                   not event.symbol.startswith(Symbols.DIS.value)])
@@ -67,8 +62,7 @@ class StatsCollection():
 
                 # add up the lengths of impacted regions on the reference
                 for frag in sv.changed_fragments:
-                    self.len_frags_chr[frag[0]] += frag[2] - frag[
-                        1]  # frag[0] = chromosome id, frag[1] = start position, frag[2] = end position of edit
+                    self.len_frags_chr[frag[0]] += frag[2] - frag[1]
 
                 # count up average length of non-dispersion events
                 for symbol in sv.events_dict:
@@ -76,17 +70,13 @@ class StatsCollection():
                         event = sv.events_dict[symbol]
                         self.avg_len[0] += event.length
                         self.avg_len[1] += 1
-        if self.avg_len[1] != 0:  # avoid ZeroDivisionError
-            self.avg_len = self.avg_len[0] // self.avg_len[1]
-        else:
-            self.avg_len = 0
+        self.avg_len = self.avg_len[0] // self.avg_len[1] if self.avg_len[1] != 0 else 0
 
     def export_data(self, fileout):
-        '''
+        """
         Exports all collected data to entered file
         fileout: Location to export stats file
-        '''
-
+        """
         def write_item(fout, name, item, prefix=""):
             fout.write("{}{}: {}\n".format(prefix, str(name), str(item)))
 
@@ -106,22 +96,18 @@ class StatsCollection():
                 write_item(fout, "Total impacted length of reference chromosome", self.len_frags_chr[id])
 
 
-class SV_Simulator():
+class SV_Simulator:
     def __init__(self, ref_file, par_file, log_file=None):
-        '''
+        """
         ref_file: file location to reference genome (.fasta or .fna or .fa)
         par_file: file location to configuration file (.yaml)
         log_file: location to store log file with diagnostic information if config parameters indicate so
-        '''
+        """
         global time_start
         print("Setting up Simulator...")
 
-        # create FastaFile with access to the reference file
         self.ref_file = ref_file
-        # utils.remove_file(self.ref_file + ".fai")    # if ref file was changed, then previously generated index file will not be updated
         self.ref_fasta = FastaFile(ref_file)  # FastaFile generates a new index file if one is not found
-
-        # process config file for SVs
         self.formatter = FormatterIO(par_file)
         self.formatter.yaml_to_var_list()
         config = self.formatter.config
@@ -147,23 +133,18 @@ class SV_Simulator():
         # initialize stats file to be generated after all edits and exporting are finished
         self.stats = StatsCollection(self.order_ids, self.len_dict)
 
-        # Based on the SVs config information, set a flag indicating which mode we're in
         self.mode = "randomized"
         self.vcf_path = None
         if "vcf_path" in self.svs_config[0]:
             self.mode = "fixed"
             self.vcf_path = self.svs_config[0]["vcf_path"]
 
-        # create all SVs
         self.svs = []
-        # Going to populate event_ranges while we traverse the vcf (in process_vcf, called by initialize_svs)
         self.event_ranges = defaultdict(list)
 
-        # if the config contains a path to a vcf of event intervals to avoid, place those intervals in event_ranges
         for d in self.svs_config:
             if "avoid_intervals" in d:
-                # extract {chrom: [(start, end)]} intervals from vcf
-                # add intervals from vcf to event range
+                # extract {chrom: [(start, end)]} intervals from vcf, add intervals from vcf to event range
                 self.extract_vcf_event_intervals(d["avoid_intervals"])
 
         self.overlap_events = None if "overlap_events" not in config.keys() \
@@ -186,46 +167,32 @@ class SV_Simulator():
             # logging.debug(info)
 
     def get_rand_chr(self, check_size=None, fixed_chrom=None):
-        # random assignment of SV to a chromosome (unless we have a predetermined
-        # chromosome for this event, e.g., in the case of placing events
-        # at known repetitive element locations)
+        # random assignment of SV to a chromosome (unless we have a predetermined chromosome for this event)
         # -> returns random chromosome and its length
         valid_chrs = self.order_ids
         if check_size is not None:
-            # allow for chromosome size being equal to check size
             valid_chrs = [chrom for chrom, chr_size in self.len_dict.items() if chr_size >= check_size]
         if len(valid_chrs) == 0:
             raise Exception("SVs are too big for the reference!")
-
         rand_id = valid_chrs[random.randint(0, len(valid_chrs) - 1)] if fixed_chrom is None else fixed_chrom
         chr_len = self.len_dict[rand_id]
         chr_event_ranges = self.event_ranges[rand_id]
-        assert rand_id != None
-
+        assert rand_id is not None
         return rand_id, chr_len, chr_event_ranges
 
     def extract_vcf_event_intervals(self, vcf_path):
-        '''
-        When in randomized mode and given vcf of events already placed on a reference, extract those intervals
-        and add to the event_ranges dict of the simulator object
-        '''
         vcf = VariantFile(vcf_path)
         for rec in vcf.fetch():
             self.event_ranges[rec.chrom].append((rec.start, rec.stop))
 
     def process_vcf(self, vcf_path):
-        '''
-        Method to process vcf containing SVs to be added (deterministically) to reference
-        '''
+        # process vcf containing SVs to be added (deterministically) to reference
         active_svs_total = 0
         time_start_local = 0
-
         vcf = VariantFile(vcf_path)
         for rec in vcf.fetch():
             svtype = Variant_Type(rec.info['SVTYPE']) if 'SVTYPE' in rec.info else Variant_Type(rec.id)
-            # add the SV interval to the event_ranges dict keyed on chromosome
             self.event_ranges[rec.chrom].append((rec.start, rec.stop))
-
             sv = Structural_Variant(sv_type=svtype, mode='fixed', vcf_rec=rec, ref_fasta=self.ref_fasta)
             self.svs.append(sv)
             active_svs_total += 1
@@ -235,16 +202,13 @@ class SV_Simulator():
             time_start_local = time.time()
 
     def initialize_svs(self):
-        '''
+        """
         Creates Structural_Variant objects for every SV to simulate and decides zygosity
         self.mode: flag indicating whether SVs are to be randomly generated or read in from VCF
         self.vcf_path: optional path that will be used if mode=="fixed"
-        '''
+        """
         if self.mode == "randomized":
             for sv_config in self.svs_config:
-                # # --- debug ---
-                # print(f'Initializing SVs from new config\n{sv_config}')
-                # # -------------
                 if "avoid_intervals" in sv_config:
                     continue
                 for num in range(sv_config["number"]):
@@ -252,11 +216,8 @@ class SV_Simulator():
                     # for the first (sv_config["num_overlap"]) events, instantiate the SV at the next valid repeat elt interval
                     repeat_elt = None
                     elt_type = None
-                    # if there's an overlap_events object then we've created a dictionary giving the num_overlaps for each elt type by sv type
                     if self.overlap_events is not None:
                         sv_config_identifier = utils.get_sv_config_identifier(sv_config)
-                        # check if this type has an associated num_overlaps for any known elements, and if there are
-                        # remaining elements that can be used for overlap
                         if sv_config_identifier in self.overlap_events.svtype_overlap_counts.keys():
                             repeat_elt, retrieved_type, elt_type = self.overlap_events.get_single_element_interval(
                                 sv_config_identifier, sv_config, partial_overlap=False)
@@ -265,17 +226,12 @@ class SV_Simulator():
                                 sv_config_identifier, sv_config, partial_overlap=True)
                         elif sv_config_identifier in self.overlap_events.svtype_alu_mediated_counts.keys():
                             repeat_elt, retrieved_type = self.overlap_events.get_alu_mediated_interval(sv_config_identifier)
-                    # # ---- debug ----
-                    # print(f'===== calling SV constructor with =====\n--> retrieved type = {retrieved_type}\n--> repeat_elt = {repeat_elt}')
-                    # # ---------------
                     if sv_config['type'] == Variant_Type.SNP:
                         sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode, length_ranges=[(1, 1)])
                     else:
                         sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
                                                 length_ranges=sv_config["length_ranges"], source=sv_config["source"],
                                                 target=sv_config["target"],
-                                                # --> **the singleton added here is used for the OVERLAP_EV info field**
-                                                # --> overlap_event <- None if repeat_elt is None, o/w relevant 4-tuple of info
                                                 overlap_event=(repeat_elt + (retrieved_type if elt_type in ['ALL', None] else elt_type,) if repeat_elt is not None else None),
                                                 div_prob=(None if 'divergence_prob' not in sv_config.keys() else sv_config['divergence_prob']))
 
@@ -288,82 +244,64 @@ class SV_Simulator():
                         sv.hap = random.choice([[True, False], [False, True]])
 
                     self.svs.append(sv)
-            # shuffle svs if we are not prioritizing the simulation of the SVs inputted first
             if not self.sim_settings["prioritize_top"]:
                 random.shuffle(self.svs)
-        else:
-            # branch for mode == "fixed"
+        else:  # <-- branch for mode == "fixed"
             self.process_vcf(self.vcf_path)
 
     def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta, bedfile, stats_file=None, initial_reset=True,
                                verbose=False, export_to_file=True):
-        '''
+        """
         initial_reset: boolean to indicate if output file should be overwritten (True) or appended to (False)
         stats_file: whether a stats file summarizing SVs simulated will be generated in same directory the reference genome is located in
-        '''
+        """
         global time_start
         if initial_reset:
             utils.reset_file(fasta1_out)
             utils.reset_file(fasta2_out)
-        # edit chromosome
         ref_fasta = self.ref_fasta
         self.apply_transformations(ref_fasta)
         print("Finished SV placements and transformations in {} seconds".format(time.time() - time_start))
         time_start = time.time()
-
-        # organize edits and export
         active_svs = [sv for sv in self.svs if sv.active]
-
         print("Starting Export Process...")
         for x in range(2):
             edits_dict = dict()
             for id in self.order_ids:
                 edits_dict[id] = []
-
             if x == 0:
-                fasta_out = fasta1_out  # where to write new genome to
+                fasta_out = fasta1_out
             elif x == 1:
                 fasta_out = fasta2_out
             for sv in active_svs:
                 if sv.hap[x]:
                     for frag in sv.changed_fragments:
                         edits_dict[frag[0]].append(frag[1:])
-
-            # only for debugging
             for id in edits_dict:
                 edits_dict[id].sort()
                 self.event_ranges[id].sort()
             self.log_to_file("Event Ranges: {}".format(self.event_ranges))
             self.log_to_file("Intervals for hap {}: {}".format(x, edits_dict))
-
             for id in self.order_ids:
-                # account for homozygous and heterogeneous variants
                 edits_x = edits_dict[id]
                 utils.fail_if_any_overlapping(edits_x)
-
-                # export edited chromosomes to FASTA files
                 self.formatter.export_variants_to_fasta(id, edits_x, fasta_out, ref_fasta, verbose=verbose)
-
                 print("ID {} exported to fasta file {} in {} seconds".format(id, fasta_out, time.time() - time_start))
                 time_start = time.time()
-
-        # export variant data to BED/VCF file
         if export_to_file:
             self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta=ins_fasta, reset_file=initial_reset)
             self.formatter.export_to_vcf(active_svs, self.stats, vcffile=bedfile[:-4]+'.vcf')
-
-        # create and export stats file
         if stats_file:
             self.stats.get_info(self.svs)
             self.stats.export_data(stats_file)
 
     def choose_rand_pos(self, svs, ref_fasta, verbose=False):
-        '''
+        """
         randomly positions SVs and stores reference fragments in SV events
 
         svs: list of Structural Variant objects
         ref_fasta: FastaFile with access to reference file
-        '''
+        """
         active_svs_total = 0
         inactive_svs_total = 0
         time_start_local = 0
@@ -373,18 +311,14 @@ class SV_Simulator():
             while not valid:
                 tries += 1
                 valid = True
-
                 if tries > self.sim_settings["max_tries"]:
-                    if self.sim_settings["fail_if_placement_issues"]:  # user can set a setting to fail if a single
-                        # SV was not able to be positioned
+                    if self.sim_settings["fail_if_placement_issues"]:
                         raise Exception(
                             "Failed to simulate {}, {} / {} SVs successfully simulated (set fail_if_placement_issues "
                             "to False to override placement failures)".format(
                                 sv, active_svs_total, len(svs)))
                     valid = False
                     break
-
-                # this is where chromosome-match is enforced for SVs assigned to overlap a known element
                 rand_id, chr_len, chr_event_ranges = self.get_rand_chr(check_size=sv.req_space,
                                                                        fixed_chrom=(None if sv.overlap_event is None
                                                                                     else sv.overlap_event[0]))
@@ -393,8 +327,6 @@ class SV_Simulator():
                     # set to the overlap event interval
                     if sv.overlap_event is not None:
                         start_pos = 0
-                        # walk along the frag list backwards, set start_pos to the start of the overlap fragment and
-                        # then subtract off the lengths of the preceeding fragments to get the true SV start position
                         for frag in sv.source_events[::-1]:
                             if frag.start is not None:
                                 start_pos = frag.start
@@ -402,9 +334,7 @@ class SV_Simulator():
                                 start_pos -= frag.length
                     else:
                         start_pos = random.randint(0, chr_len - sv.req_space)
-                    # start_pos = random.randint(0, chr_len - sv.req_space) if sv.overlap_event is None else int(sv.overlap_event[1])
                     # define the space in which SV operates
-                    # we now also know where the target positions lie since we know the order and length of events
                     new_intervals = []  # tracks new ranges of blocks
                     sv.start, sv.start_chr = start_pos, rand_id
                     sv.end = sv.start + sv.req_space
@@ -420,23 +350,18 @@ class SV_Simulator():
                     block_start = sv.start
 
                 for sv_event in sv.source_events:
-                    # store start and end position and reference fragment
                     sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length
                     sv_event.source_chr = rand_id
                     frag = ref_fasta.fetch(rand_id, sv_event.start, sv_event.end)
                     sv_event.source_frag = frag
-                    # prev_start -- store of previous start_pos in case we need to refer to it in the next event
                     start_pos += sv_event.length
 
-                    # dispersion event should not impact whether position is valid or not, given that spacing is already guaranteed
                     if sv_event.symbol.startswith(Symbols.DIS.value):
-                        # check to see if chosen spot is a valid position
-                        if utils.is_overlapping(chr_event_ranges, (
-                                block_start, sv_event.start)):  # sv_event.start is the end of the current block
+                        if utils.is_overlapping(chr_event_ranges, (block_start, sv_event.start)):
                             valid = False
-                            break  # if ANY of the non-dispersion events within SV are in an invalid position, then immediately fail the try
+                            break
                         new_intervals.append((block_start, sv_event.start))
-                        block_start = sv_event.end  # remember that the end is actually the position right after the sv_event
+                        block_start = sv_event.end
                     elif utils.percent_N(frag) > 0.05:
                         valid = False
                         break
@@ -453,13 +378,10 @@ class SV_Simulator():
                 sv.active = True
                 self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(new_intervals, rand_id, sv))
                 chr_event_ranges.extend(new_intervals)
-
                 # populates insertions with random sequence - these event symbols only show up in target transformation
                 for event in sv.events_dict.values():
-                    if event.source_frag == None and event.length > 0:
+                    if event.source_frag is None and event.length > 0:
                         event.source_frag = utils.generate_seq(event.length)
-
-                # Need to call assign_locations() here because need novel INS sequences to be populated
                 sv.assign_locations(sv.start)
             else:
                 inactive_svs_total += 1
@@ -474,25 +396,23 @@ class SV_Simulator():
             time_start_local = time.time()
 
     def apply_transformations(self, ref_fasta):
-        '''
+        """
         Randomly chooses positions for all SVs and carries out all edits
         Populates event classes within SVs with reference fragments and start & end positions
         Stores list of changes, which each have an interval and a sequence to substitute the reference frag with, in SV
-        
+
         ref_fasta: FastaFile with access to reference
         mode: flag indicating whether we're adding SVs to the reference in a randomized or deterministic way
-        '''
+        """
         if self.mode == "randomized":
             # select random positions for SVs
             self.choose_rand_pos(self.svs, ref_fasta)
-        # in fixed mode self.event_ranges() is populated in process_vcf()
 
         print("Starting edit process...")
         active_svs_total = sum([1 for sv in self.svs if sv.active])
         total = 0
         for sv in self.svs:
             if sv.active:
-                # make edits and store in sv object
                 sv.change_fragment()
                 total += 1
                 print("{} / {} SVs successfully edited".format(total, active_svs_total), end="\r")
@@ -504,8 +424,6 @@ class SV_Simulator():
 
 if __name__ == "__main__":
     sim_start = time.time()
-
-    # tracemalloc.start()
 
     args = collect_args()
     if args["random_seed"]:
@@ -528,12 +446,7 @@ if __name__ == "__main__":
     stats_file = "debugging/inputs/stats.txt"'''
 
     sim = SV_Simulator(args["ref"], args["config"], log_file=args["log_file"])
-    # sim object has mode variable that indicates whether we're randomly adding SVs to reference, or deterministically
-    # adding SVs from an input vcf
     sim.produce_variant_genome(args["hap1"], args["hap2"], args["ins_fasta"], args["bedpe"], args["stats"],
                                verbose=False)
     print("Simulation completed in {} seconds".format(time.time() - sim_start))
 
-    # current, peak = tracemalloc.get_traced_memory()
-    # print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
-    # tracemalloc.stop()

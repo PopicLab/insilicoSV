@@ -1,6 +1,5 @@
 from enum import Enum
 
-# TODO: is this an appropriate value for this and should it be set here?
 MAX_BUFFER_SIZE: int = 1000000  # max number of bases that can be read at one time to export to fasta file
 
 
@@ -66,9 +65,7 @@ class Symbols(Enum):
     REQUIRED_SOURCE = "A"  # event symbol of the required source/main event all SVs must have
 
 
-# for Structural Variant class
 SV_KEY = {Variant_Type.INS: [(), ("A")],
-          # SNP: same signature as DIVERGENCE but enforced to have len=1 and base flip probability=1
           Variant_Type.SNP: [("A",), ("A*",)],
           Variant_Type.DEL: [("A",), ()],
           Variant_Type.INV: [("A",), ("a",)],
@@ -82,15 +79,12 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
           Variant_Type.INVdel: [("A", "B"), ("a",)],
           Variant_Type.dDUP_iDEL: [("A", "_", "B"), ("A", "_", "A'")],
           Variant_Type.INS_iDEL: [("A", "_", "B"), ("_", "A'")],
-          # INVdup: an inverted duplication; dup_INV and INV_dup: duplication-flanked inversions
           Variant_Type.INVdup: [("A",), ("a", "a'")],
           Variant_Type.dup_INV: [("A", "B"), ("A", "b", "a'")],
           Variant_Type.INV_dup: [("A", "B"), ("b'", "a", "B")],
           Variant_Type.dDUP: [("A", "_"), ("A", "_", "A'")],
           Variant_Type.INV_dDUP: [("A", "_"), ("A", "_", "a'")],
           Variant_Type.div_dDUP: [("A", "_"), ("A", "_", "A*")],
-          # Event mimicking divergence of a source sequence -- not quite an SV but a common form of decoy event
-          # --> better to create a different class for non-SV decoy events?
           Variant_Type.DIVERGENCE: [("A",), ("A*",)]}
 
 DEFAULT_CONFIG = {"sim_settings": {"max_tries": 100,

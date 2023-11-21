@@ -1,17 +1,15 @@
 import yaml
 import sys
-
-# import constants
-from constants import *
-from pysam import FastaFile
 import pysam
 import argparse
 import os
 import time
 import utils
+from constants import *
+from pysam import FastaFile
 
 
-class FormatterIO():
+class FormatterIO:
     def __init__(self, par_file):
         self.bedpe_counter = 1
         self.par_file = par_file
@@ -19,20 +17,16 @@ class FormatterIO():
 
     @staticmethod
     def run_checks_randomized(config):
-        '''
+        """
         check method for yaml given with SVs given for randomized placement on reference
-        '''
-        # entries: dict representing full config file parsed from yaml
+        """
         config_svs = config['SVs']
         for config_sv in config_svs:
-            # "avoid_intervals" the optional argument for specifying a vcf whose event intervals
-            # will be avoided during random placement of simulated events
             if "avoid_intervals" in config_sv:
                 continue
             elif "type" not in config_sv:
                 raise Exception("\"Type\" attribute must be specified! For custom transformations, enter in \"Custom\"")
-            # SNP events are only specified by count (size is deterministic)
-            elif config_sv["type"] == "SNP":
+            elif config_sv["type"] == "SNP":  # SNP events are only specified by count (size is deterministic)
                 if "number" in config_sv:
                     continue
                 else:
@@ -66,7 +60,6 @@ class FormatterIO():
                 continue
             # SV event length specification - not applicable for SNPs
             if config_sv["type"] != "SNP":
-                # handles cases where user enters length range for all components within SV or specifies different ranges
                 if isinstance(config_sv["min_length"], int):
                     config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
                 else:
@@ -95,16 +88,12 @@ class FormatterIO():
             raise Exception("YAML File {} failed to be open".format(self.par_file))
         self.postproc_config_dict()
 
-
     def write_to_file(self, sv, bedfile, source_s, source_e, target_s, target_e, transform, event, nth_sv, order=0):
         assert (not event.symbol.startswith(Symbols.DIS.value))
-        # consider insertions
         if transform == Operations.INS.value:
             transform_length = event.length
         else:
             transform_length = source_e - source_s
-
-        # do not write events of size 0
         if event.length > 0:
             with open(bedfile, "a") as fout:
                 row = [str(event.source_chr),
@@ -119,7 +108,6 @@ class FormatterIO():
                        sv.name,
                        str(nth_sv),
                        str(order)]
-
                 fout.write("\t".join(row) + "\n")
 
     @staticmethod
@@ -128,22 +116,23 @@ class FormatterIO():
 
     @staticmethod
     def export_insertions(chr, start_pos, seq, ins_fasta):
-        '''
+        """
         Exports foreign insertion sequences to separate fasta file, append only
-        '''
+        """
         with open(ins_fasta, "a") as fout_ins:
             fout_ins.write(">{}_{}\n".format(chr, start_pos))
             fout_ins.write("{}\n".format(seq))
 
     @staticmethod
     def get_event_target_operation(ev, target_events_dict, source_events_dict):
-        # helper function to return target_intvl and operation for multi-source events
-        # need to enumerate the possible modifications to set the right operation
+        """
+        determines target interval and operation for multi-source events
+        """
         # A -> A'
         if ev + Symbols.DUP.value in target_events_dict.keys():
             trg_sym = ev + Symbols.DUP.value
             return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), \
-                   Operations.DUP.value if ev in target_events_dict.keys() else Operations.TRA.value
+                Operations.DUP.value if ev in target_events_dict.keys() else Operations.TRA.value
         # A -> a'
         elif ev.lower() + Symbols.DUP.value in target_events_dict.keys():
             trg_sym = ev.lower() + Symbols.DUP.value
@@ -169,10 +158,12 @@ class FormatterIO():
 
     @staticmethod
     def postprocess_record_params(sv, sv_record_info):
-        # arrange the bed_record parameter dictionaries in order of ascending source interval start position
-        # and assign order values to the relevant entries
-        # --> for TRA/INS/DUP events with the same target position, 'order' describes the order in which they
-        # --> are compiled (i.e., the order in which they appear in the target sequence)
+        """
+        arrange the bed_record parameter dictionaries in order of ascending source interval start position
+        and assign order values to the relevant entries
+        """
+        # for TRA/INS/DUP events with the same target position, 'order' describes the order in which they
+        # are compiled (i.e., the order in which they appear in the target sequence)
         order = 0
         ins_pos = None
         for block in sv.target_symbol_blocks:
@@ -206,10 +197,8 @@ class FormatterIO():
                 op = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)[1]
                 record_info = {'source_s': ev.start, 'source_e': ev.end, 'target_s': ev.start, 'target_e': ev.end,
                                'transform': op, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv + 1,
-                               # for simple events, order cant be > 1 and only depends on event type
                                'order': int(op in NONZERO_ORDER_OPERATIONS)}
                 self.write_to_file(**record_info)
-                # simple INS -> option to write novel inserted sequences to separate .fa at ins_fasta
                 if op == Operations.INS.value:
                     self.export_insertions(sv.start_chr, ev.start, ev.source_frag, ins_fasta)
             else:
@@ -220,8 +209,6 @@ class FormatterIO():
                     # skip dispersion events
                     if ev.symbol.startswith(Symbols.DIS.value):
                         continue
-                    # --> target intvl and transform will be determined in each of the specific cases of how the
-                    # --> source event is mapped into the target
                     sv_record_info[ev.symbol] = {'source_s': ev.start, 'source_e': ev.end, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv + 1}
                     (target_s, target_e), operation = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)
                     sv_record_info[ev.symbol]['target_s'] = target_s
@@ -256,23 +243,18 @@ class FormatterIO():
         vcf_out_file = pysam.VariantFile(vcffile, 'w', header=vcf_file.header)
 
         for sv in svs:
-            # Reflecting specific active haplotypes in the zygosity (i.e., het calls reported as either 1/0 or 0/1 depending
-            # on haplotype of SV
             zyg = (int(sv.hap[0]), int(sv.hap[1]))
             dispersion_target = None
             if sv.type in DISPERSION_TYPES:
-                # --> going to read the source and target intervals off the start/end positions of the events dict
                 source_event = sv.events_dict[Symbols.REQUIRED_SOURCE.value]
                 disp_event = sv.events_dict['_1']
                 rec_start = source_event.start
                 rec_end = source_event.end
-                # setting TARGET to the correct end of the dispersion
                 if disp_event.start == source_event.end:
                     dispersion_target = disp_event.end
                 else:
                     dispersion_target = disp_event.start
             else:
-                # start/end given by the min/max changed fragment interval positions
                 rec_start = min([frag[1] for frag in sv.changed_fragments])
                 rec_end = max(frag[2] for frag in sv.changed_fragments)
             if dispersion_target is not None:
@@ -286,7 +268,6 @@ class FormatterIO():
                 else:
                     info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
             if sv.overlap_event is not None:
-                # want to take the elt_type listed in the SV overlap_event attribute
                 info_field['OVERLAP_EV'] = sv.overlap_event[3]
 
             vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=rec_start, stop=rec_end,
@@ -298,52 +279,41 @@ class FormatterIO():
 
         vcf_out_file.close()
 
-
-    def export_variants_to_fasta(self, id, edits, fasta_out, fasta_file, verbose = False):
-        '''
+    def export_variants_to_fasta(self, id, edits, fasta_out, fasta_file, verbose=False):
+        """
         Exports list of changes from simulator to fasta file
 
         id: chr_id to apply edits to
-        edits: list with interval and new_frag, replace reference at the interval with new_frag
+        edits: list with elements of the form (start, end, new_frag)
         fasta_out: Fasta file to export changes to
         fasta_file: FastaFile with access to reference
-        '''
-        with open(fasta_out,"a") as fout_export:
+        """
+        with open(fasta_out, "a") as fout_export:
             if id not in fasta_file.references:
                 raise KeyError("ID {} not found in inputted fasta file".format(id))
-
             if verbose:
                 print("New ID: ", id)
-
-            # Write in chr_id
             fout_export.write(">" + str(id) + "\n")
-            chr_variants = list(edits)   # given as (start, end, new_frag)
+            chr_variants = list(edits)
             chr_variants.sort()
-            # *** I think this is colliding with the case of a deletion of the entire input ref sequence
-            chr_variants.append([fasta_file.get_reference_length(id), fasta_file.get_reference_length(id), ""]) # to ensure that all bases after last variant are included
-
-            # apply changes by traversing reference from start to end - this is possible since chr_variants is sorted
+            chr_variants.append([fasta_file.get_reference_length(id), fasta_file.get_reference_length(id), ""])
             pos = 0
             for variant in chr_variants:
                 var_start, var_end = variant[0], variant[1]
-                # write all reference bases up until interval, which indicates that a change will occur
                 while pos < var_start:
                     appropriate_buffer = MAX_BUFFER_SIZE if var_start - pos > MAX_BUFFER_SIZE else var_start - pos
                     c = fasta_file.fetch(id, pos, pos + appropriate_buffer)
                     fout_export.write(c)
                     pos += appropriate_buffer
-
-                # add in replacement fragment
                 assert (pos == var_start), "Replacement fragment about to be inserted at position {} instead of var_start {}".format(pos, var_start)
                 fout_export.write(variant[2])
-
                 pos = var_end
             fout_export.write("\n")
 
     def close(self):
-        # close all file handlers
         self.fin_export1.close()
         self.fin_export2.close()
+
 
 def collect_args():
     parser = argparse.ArgumentParser(description='insilicoSV is a software to design and simulate complex structural variants, both novel and known.')
