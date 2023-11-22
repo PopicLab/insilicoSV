@@ -304,7 +304,7 @@ class SV_Simulator:
         """
         active_svs_total = 0
         inactive_svs_total = 0
-        time_start_local = 0
+        time_start_local = time.time()
         for sv in svs:
             tries = 0  # number of attempts to place sv randomly
             valid = False
@@ -407,15 +407,13 @@ class SV_Simulator:
         if self.mode == "randomized":
             # select random positions for SVs
             self.choose_rand_pos(self.svs, ref_fasta)
+            print()
 
-        print("Starting edit process...")
-        active_svs_total = sum([1 for sv in self.svs if sv.active])
         total = 0
         for sv in self.svs:
             if sv.active:
                 sv.change_fragment()
                 total += 1
-                print("{} / {} SVs successfully edited".format(total, active_svs_total), end="\r")
                 self.log_to_file("Events Dict after all edits: {} ".format(sv.events_dict))
 
     def close(self):

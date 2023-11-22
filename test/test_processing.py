@@ -185,9 +185,9 @@ class TestProcessing(unittest.TestCase):
                                                                         "max_length": 4,
                                                                         "min_length": 4}]}],
                                                              self.hap1, self.hap2, self.bed, self.vcf)}
-        self.test_objects_multievent = {'INVdup': TestProcObject([self.ref_file, {"chr19": "ACTGCTAATGCGTTC"}],
+        self.test_objects_multievent = {'INVdup': TestProcObject([self.ref_file, {"chr19": "ACTGCTAATGCGTTCACTGCTAATGCGTTC"}],
                                                                  [self.par,
-                                                                  {"sim_settings": {"max_tries": 50, "prioritize_top": True},
+                                                                  {"sim_settings": {"max_tries": 200, "prioritize_top": True},
                                                                    "SVs": [{"type": "INVdup", "number": 3,
                                                                             "max_length": 4,
                                                                             "min_length": 2}]}],
