@@ -1,14 +1,13 @@
 import random
-import constants
-import utils
+from insilicosv import utils
 import logging
 import time
 from os import write
-from processing import FormatterIO, collect_args
+from insilicosv.processing import FormatterIO, collect_args
 from pysam import FastaFile
 from pysam import VariantFile
-from constants import *
-from structural_variant import Structural_Variant, Event
+from insilicosv.constants import *
+from insilicosv.structural_variant import Structural_Variant, Event
 from collections import defaultdict
 
 time_start = time.time()
@@ -419,8 +418,7 @@ class SV_Simulator:
     def close(self):
         self.ref_fasta.close()
 
-
-if __name__ == "__main__":
+def run_insilicosv():
     sim_start = time.time()
 
     args = collect_args()
@@ -448,3 +446,5 @@ if __name__ == "__main__":
                                verbose=False)
     print("Simulation completed in {} seconds".format(time.time() - sim_start))
 
+if __name__ == "__main__":
+    run_insilicosv()

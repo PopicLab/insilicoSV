@@ -1,16 +1,14 @@
-from simulate import SV_Simulator
-from processing import FormatterIO
+from insilicosv.simulate import SV_Simulator
+from insilicosv.processing import FormatterIO
 from test_simulate import TestObject
 from pysam import VariantFile, FastaFile
 from collections import defaultdict, Counter
-from utils import NestedDict
+from insilicosv.utils import NestedDict
 import unittest
 import sys
 import os
-import utils
-import constants
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from insilicosv import utils
+from insilicosv import constants
 
 
 class TestProcObject(TestObject):

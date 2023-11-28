@@ -2,7 +2,6 @@
 ######################
 .DS_Store
 .DS_Store?
-__pycache__/
 .venv/
 .vscode/
 debugging/
@@ -11,3 +10,13 @@ reference/
 # Emacs backup files
 *~
 \#*#
+
+# Python-related
+__pycache__/
+build/
+insilicosv.egg-info/
+dist/
+
+# Files sometimes left after tests
+test/inputs/test.fa
+test/inputs/test.fa.fai
