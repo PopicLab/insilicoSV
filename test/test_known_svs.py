@@ -2,10 +2,9 @@ import unittest
 import sys
 import os
 
-import utils
+from insilicosv import utils
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from simulate import *
+from insilicosv.simulate import *
 from test_simulate import TestObject
 
 

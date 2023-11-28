@@ -1,11 +1,11 @@
 import unittest
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from simulate import SV_Simulator
+
+from insilicosv.simulate import SV_Simulator
 from pysam import FastaFile
 import yaml
-import utils
+from insilicosv import utils
 import numpy as np
 
 

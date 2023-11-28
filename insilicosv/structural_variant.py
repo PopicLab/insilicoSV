@@ -1,6 +1,6 @@
-import utils
+from insilicosv import utils
 import random
-from constants import *
+from insilicosv.constants import *
 
 
 class Structural_Variant:

@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "insilicosv"
+version = "0.0.1"
+authors = [
+  { name="Chris Rohlicek", email="crohlice@broadinstitute.org" },
+  { name="Nick Jiang", email="nickj@berkeley.edu" },
+  { name="Ilya Shlyakhter", email="ilya@broadinstitute.org" },
+  { name="Victoria Popic", email="vpopic@broadinstitute.org" },
+]
+description = "Simulator of complex structural variants in genomes"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+        'cycler',
+        'kiwisolver',
+        'matplotlib',
+        'numpy',
+        'Pillow',
+        'pyparsing',
+        'pysam',
+        'python-dateutil',
+        'PyYAML',
+        'six'
+             
+]
+
+[project.urls]
+Homepage = "https://github.com/PopicLab/insilicoSV"
+Issues = "https://github.com/PopicLab/insilicoSV/issues"
+
+[project.scripts]
+insilicosv = "insilicosv.simulate:run_insilicosv"
+

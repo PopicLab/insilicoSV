@@ -4,7 +4,7 @@ import itertools
 import copy  # <- utils for making copies of python objects
 import argparse
 import numpy as np
-from constants import *
+from insilicosv.constants import *
 from collections import defaultdict
 from pysam import VariantFile
 

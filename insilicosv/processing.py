@@ -4,8 +4,8 @@ import pysam
 import argparse
 import os
 import time
-import utils
-from constants import *
+from insilicosv import utils
+from insilicosv.constants import *
 from pysam import FastaFile
 
 
@@ -83,7 +83,8 @@ class FormatterIO:
 
     def yaml_to_var_list(self):
         try:
-            self.config = yaml.full_load(open(self.par_file))
+            with open(self.par_file) as yaml_file:
+                self.config = yaml.full_load(yaml_file)
         except:
             raise Exception("YAML File {} failed to be open".format(self.par_file))
         self.postproc_config_dict()
