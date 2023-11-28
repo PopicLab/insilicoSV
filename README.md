@@ -25,22 +25,6 @@ For documentation outlining the different features of insilicoSV along with usag
 - [Automated Pipelines and Additional Utilities](https://github.com/PopicLab/insilicoSV/wiki/Automated-pipelines-and-additional-utilities)
 - [Example SV Visualizations](https://github.com/PopicLab/insilicoSV/wiki/Example-SV-visualizations)
 
-## How to Contribute
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate. If you'd like to contribute, please fork the repository and make changes as you'd like.
-
-Steps to contribute:
-1. Fork this repository (link to your repository)
-2. Create your feature branch (git checkout -b feature/insilicoSV)
-3. Commit your changes (git commit -am 'Add some feature')
-4. Push to the branch (git push origin feature/insilicoSV)
-5. Create a new Pull Request
-
-## Running tests
-
-To run all tests, in the repository root run 
-```
-./run_tests.sh
-```
 
 ## Authors
 Chris Rohlicek - crohlice@broadinstitute.org
