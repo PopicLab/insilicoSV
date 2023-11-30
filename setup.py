@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name = "insilicosv",
-    version = "0.0.1",
+    version = "0.0.4",
     description = ("Simulator of complex structural variants in the genome "),
     #license = "BSD",
     #keywords = "DNA simulation structural variant",
