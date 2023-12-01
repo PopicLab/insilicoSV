@@ -45,15 +45,13 @@ class StatsCollection:
                                   not event.symbol.startswith(Symbols.DIS.value)])
 
         for sv in svs:
-            if sv.active:  # only collect information for SVs that were successfully simulated
+            if sv.active:
                 self.active_svs += 1
-                # count up SVs of each type
                 if sv.name in self.sv_types:
                     self.sv_types[sv.name] += 1
                 else:
                     self.sv_types[sv.name] = 1
 
-                # count up zygosity
                 if sv.hap[0] and sv.hap[1]:  # homozygous SV
                     self.num_homozygous += 1
                 else:  # heterozygous SV
@@ -96,21 +94,20 @@ class StatsCollection:
 
 
 class SV_Simulator:
-    def __init__(self, ref_file, par_file, log_file=None):
+    def __init__(self, par_file, log_file=None):
         """
-        ref_file: file location to reference genome (.fasta or .fna or .fa)
         par_file: file location to configuration file (.yaml)
         log_file: location to store log file with diagnostic information if config parameters indicate so
         """
         global time_start
         print("Setting up Simulator...")
 
-        self.ref_file = ref_file
-        self.ref_fasta = FastaFile(ref_file)  # FastaFile generates a new index file if one is not found
         self.formatter = FormatterIO(par_file)
         self.formatter.yaml_to_var_list()
         config = self.formatter.config
-        self.svs_config = config['SVs']  # config for what SVs to simulate
+        self.ref_file = config['sim_settings']['reference']
+        self.ref_fasta = FastaFile(self.ref_file)
+        self.svs_config = config['SVs']
 
         self.sim_settings = config['sim_settings']
         if log_file and "generate_log_file" in self.sim_settings.keys():
@@ -159,15 +156,12 @@ class SV_Simulator:
 
     def log_to_file(self, info, key="DEBUG"):
         # only logs to file if config setting indicates so
-        log_func = [logging.debug, logging.warning]
         key_to_func = {"DEBUG": logging.debug, "WARNING": logging.warning}
         if "generate_log_file" in self.sim_settings and self.sim_settings["generate_log_file"]:
             key_to_func[key](info)
-            # logging.debug(info)
 
     def get_rand_chr(self, check_size=None, fixed_chrom=None):
         # random assignment of SV to a chromosome (unless we have a predetermined chromosome for this event)
-        # -> returns random chromosome and its length
         valid_chrs = self.order_ids
         if check_size is not None:
             valid_chrs = [chrom for chrom, chr_size in self.len_dict.items() if chr_size >= check_size]
@@ -245,7 +239,7 @@ class SV_Simulator:
                     self.svs.append(sv)
             if not self.sim_settings["prioritize_top"]:
                 random.shuffle(self.svs)
-        else:  # <-- branch for mode == "fixed"
+        else:  # mode == "fixed"
             self.process_vcf(self.vcf_path)
 
     def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta, bedfile, stats_file=None, initial_reset=True,
@@ -305,7 +299,7 @@ class SV_Simulator:
         inactive_svs_total = 0
         time_start_local = time.time()
         for sv in svs:
-            tries = 0  # number of attempts to place sv randomly
+            tries = 0
             valid = False
             while not valid:
                 tries += 1
@@ -425,7 +419,6 @@ def run_insilicosv():
     if args["random_seed"]:
         random.seed(args["random_seed"])
         print(f"Random seed: {args['random_seed']}")
-    fasta_in = args["ref"]
     yaml_in = args["config"]
     fasta1_out = args["hap1"]
     fasta2_out = args["hap2"]
@@ -434,14 +427,7 @@ def run_insilicosv():
     stats_file = args["stats"]
     log_file = args["log_file"]
 
-    '''fasta_in = "debugging/inputs/test.fna"
-    yaml_in = "debugging/inputs/par.yaml"
-    fasta1_out = "debugging/inputs/test1_out.fna"
-    fasta2_out = "debugging/inputs/test2_out.fna"
-    bed_out = "debugging/inputs/out.bed"
-    stats_file = "debugging/inputs/stats.txt"'''
-
-    sim = SV_Simulator(args["ref"], args["config"], log_file=args["log_file"])
+    sim = SV_Simulator(args["config"], log_file=args["log_file"])
     sim.produce_variant_genome(args["hap1"], args["hap2"], args["ins_fasta"], args["bedpe"], args["stats"],
                                verbose=False)
     print("Simulation completed in {} seconds".format(time.time() - sim_start))

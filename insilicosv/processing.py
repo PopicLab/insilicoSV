@@ -27,11 +27,10 @@ class FormatterIO:
             elif "type" not in config_sv:
                 raise Exception("\"Type\" attribute must be specified! For custom transformations, enter in \"Custom\"")
             elif config_sv["type"] == "SNP":  # SNP events are only specified by count (size is deterministic)
-                if "number" in config_sv:
+                if "number" in config_sv and isinstance(config_sv["number"], int) and config_sv["number"] > 0:
                     continue
                 else:
-                    raise Exception("Number is a required parameter for all SVs")
-            # makes sure required attributes are written into parameter file
+                    raise Exception("Number (of type int > 0) is a required parameter for all SVs")
             if "min_length" not in config_sv:
                 raise Exception("Min length must be specified on all SVs!")
             if "max_length" not in config_sv:
@@ -39,11 +38,10 @@ class FormatterIO:
             if "number" not in config_sv:
                 raise Exception("Number is a required parameter for all SVs")
 
-            # makes sure attributes are the correct datatype
             elif "type" in config_sv and not isinstance(config_sv["type"], str):
                 raise Exception("Invalid {} type for SV \'type\' attribute, str expected".format(type(config_sv["type"])))
         valid_optional_par = ["fail_if_placement_issues", "max_tries", "generate_log_file", "filter_small_chr",
-                              "prioritize_top", "homozygous_only"]  # valid arguments within sim_settings
+                              "prioritize_top", "homozygous_only", "reference"]  # valid arguments within sim_settings
         for parameter in config['sim_settings']:
             if parameter not in valid_optional_par:
                 raise Exception("\"{}\" is an invalid argument under sim_settings".format(parameter))
@@ -53,6 +51,12 @@ class FormatterIO:
                 raise Exception("Unknown argument \"{}\"".format(key))
 
     def postproc_config_dict(self):
+        if 'sim_settings' not in self.config.keys():
+            raise Exception("Must include \'sim_settings\' sections specifying at least \'reference\' path")
+        if "reference" not in self.config["sim_settings"]:
+            raise Exception("Must include reference FASTA file in \'reference\' field of \'sim_settings\'")
+        elif self.config["sim_settings"]["reference"].split(".")[-1] not in ["fa", "fna", "fasta"]:
+            raise Exception("Input reference must be of type .fa, .fna, or .fasta")
         if "vcf_path" not in self.config["SVs"][0]:
             self.run_checks_randomized(self.config)
         for config_sv in self.config['SVs']:
@@ -64,8 +68,14 @@ class FormatterIO:
                     config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
                 else:
                     config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
-                # make sure max_length >= min_length >= 0
                 assert all(max_len >= min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
+            if "divergence_prob" in config_sv:
+                if config_sv["type"] != "DIVERGENCE":
+                    raise Exception("divergence_prob can only be given for event type DIVERGENCE")
+                else:
+                    assert isinstance(config_sv["divergence_prob"], int) or isinstance(config_sv["divergence_prob"], float), \
+                        "Must give \'divergence_prob\'"
+                    assert 1 >= config_sv["divergence_prob"] > 0, "divergence_prob must be in (0,1]"
 
             config_sv["type"] = Variant_Type(config_sv["type"])
             if config_sv["type"] != Variant_Type.Custom:
@@ -73,13 +83,10 @@ class FormatterIO:
                 config_sv["target"] = None
 
         # setting default values for sim_settings fields
-        if 'sim_settings' not in self.config.keys():
-            self.config['sim_settings'] = {'max_tries': 50, 'prioritize_top': True, 'fail_if_placement_issues': False}
-        else:
-            if 'max_tries' not in self.config['sim_settings']:
-                self.config['sim_settings']['max_tries'] = 50
-            if 'fail_if_placement_issues' not in self.config['sim_settings']:
-                self.config['sim_settings']['fail_if_placement_issues'] = False
+        if 'max_tries' not in self.config['sim_settings']:
+            self.config['sim_settings']['max_tries'] = 50
+        if 'fail_if_placement_issues' not in self.config['sim_settings']:
+            self.config['sim_settings']['fail_if_placement_issues'] = False
 
     def yaml_to_var_list(self):
         try:
@@ -207,7 +214,6 @@ class FormatterIO:
                 # and target intervals taken from corresponding target events (if no match, then deletion)
                 sv_record_info = {}
                 for ev in sv.events_dict.values():
-                    # skip dispersion events
                     if ev.symbol.startswith(Symbols.DIS.value):
                         continue
                     sv_record_info[ev.symbol] = {'source_s': ev.start, 'source_e': ev.end, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv + 1}
@@ -318,17 +324,17 @@ class FormatterIO:
 
 def collect_args():
     parser = argparse.ArgumentParser(description='insilicoSV is a software to design and simulate complex structural variants, both novel and known.')
-    parser.add_argument("ref", help="FASTA reference file")
     parser.add_argument("config", help="YAML config file")
-    parser.add_argument("prefix", help="Used for naming all output files (haplotype, bed, and stats)")
     parser.add_argument("-r", "--root", action="store", metavar="DIR", dest="root_dir", help="root directory for all files given")
     parser.add_argument("--random_seed", type=int,
                         help="if non-zero, random seed for random number generation")
 
     args = parser.parse_args()
-    args_dict = {"ref": args.ref, "config": args.config, "ins_fasta": args.prefix + ".insertions.fa", "hap1": args.prefix + ".hapA.fa",
-                 "hap2": args.prefix + ".hapB.fa", "bedpe": args.prefix + ".bed", "stats": args.prefix + ".stats.txt", "log_file": args.prefix + ".log",
-                 "random_seed": args.random_seed}
+    output_dir = os.path.dirname(args.config)
+    args_dict = {"config": args.config, "ins_fasta": os.path.join(output_dir, "sim.insertions.fa"),
+                 "hap1": os.path.join(output_dir, "sim.hapA.fa"), "hap2": os.path.join(output_dir, "sim.hapB.fa"),
+                 "bedpe": os.path.join(output_dir, "sim.bed"), "stats": os.path.join(output_dir, "sim.stats.txt"),
+                 "log_file": os.path.join(output_dir, "sim.log"), "random_seed": args.random_seed}
     if args.root_dir:
         for key, curr_path in args_dict.items():
             args_dict[key] = os.path.join(args.root_dir, curr_path)
