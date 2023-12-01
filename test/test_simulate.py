@@ -70,264 +70,264 @@ class TestSVSimulator(unittest.TestCase):
     def setUp(self):
 
         # runs before every test
-        ref_file = "test/inputs/test.fna"
-        par = "test/inputs/par.yaml"
+        self.ref_file = "test/inputs/test.fna"
+        self.par = "test/inputs/par.yaml"
 
-        hap1 = "test/inputs/test1.fna"
-        hap2 = "test/inputs/test2.fna"
-        bed = "test/inputs/out.bed"
+        self.hap1 = "test/inputs/test1.fna"
+        self.hap2 = "test/inputs/test2.fna"
+        self.bed = "test/inputs/out.bed"
 
-        test_overlap_bed = "test/inputs/example_overlap_events.bed"
-        test_overlap_bed_2 = "test/inputs/example_overlap_events_2.bed"
-        test_overlap_bed_4 = "test/inputs/example_overlap_events_4.bed"
-        test_overlap_bed_5 = "test/inputs/example_overlap_events_5.bed"
-        test_overlap_bed_6 = "test/inputs/example_overlap_events_6.bed"
-        test_overlap_bed_7 = "test/inputs/example_overlap_events_7.bed"
-        test_overlap_bed_8 = "test/inputs/example_overlap_events_8.bed"
-        test_overlap_bed_9 = "test/inputs/example_overlap_events_9.bed"
-        test_overlap_bed_10 = "test/inputs/example_overlap_events_10.bed"
-        test_overlap_bed_11 = "test/inputs/example_overlap_events_11.bed"
-        test_overlap_bed_12 = "test/inputs/example_overlap_events_12.bed"
-        test_overlap_bed_13 = "test/inputs/example_overlap_events_13.bed"
+        self.test_overlap_bed = "test/inputs/example_overlap_events.bed"
+        self.test_overlap_bed_2 = "test/inputs/example_overlap_events_2.bed"
+        self.test_overlap_bed_4 = "test/inputs/example_overlap_events_4.bed"
+        self.test_overlap_bed_5 = "test/inputs/example_overlap_events_5.bed"
+        self.test_overlap_bed_6 = "test/inputs/example_overlap_events_6.bed"
+        self.test_overlap_bed_7 = "test/inputs/example_overlap_events_7.bed"
+        self.test_overlap_bed_8 = "test/inputs/example_overlap_events_8.bed"
+        self.test_overlap_bed_9 = "test/inputs/example_overlap_events_9.bed"
+        self.test_overlap_bed_10 = "test/inputs/example_overlap_events_10.bed"
+        self.test_overlap_bed_11 = "test/inputs/example_overlap_events_11.bed"
+        self.test_overlap_bed_12 = "test/inputs/example_overlap_events_12.bed"
+        self.test_overlap_bed_13 = "test/inputs/example_overlap_events_13.bed"
 
-        self.test_objects_no_dis = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
-                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+        self.test_objects_no_dis = [TestObject([self.ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
+                                               [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                    {"type": "delINVdup", "number": 1, "max_length": 5,
                                                     "min_length": 5}]}],
-                                               hap1, hap2, bed),
-                                    TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
-                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                               self.hap1, self.hap2, self.bed),
+                                    TestObject([self.ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
+                                               [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                    {"type": "delINVdup", "number": 1, "max_length": 5, "min_length": 5},
                                                    {"type": "delINVdel", "number": 1, "min_length": 5, "max_length": 5},
                                                    {"type": "dupINVdup", "number": 1, "min_length": 5, "max_length": 5}
                                                    ]}],
-                                               hap1, hap2, bed),
-                                    TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGAGTCAGGGAGCAAAAAAGTGTGACACTAGTCCACAGGTGAGAAACACAAATATTCAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
-                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                               self.hap1, self.hap2, self.bed),
+                                    TestObject([self.ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGAGTCAGGGAGCAAAAAAGTGTGACACTAGTCCACAGGTGAGAAACACAAATATTCAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
+                                               [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                    {"type": "dupINVdel", "number": 1, "max_length": 5, "min_length": 5},
                                                    {"type": "delINV", "number": 1, "min_length": 5, "max_length": 5},
                                                    {"type": "INVdel", "number": 1, "min_length": 5, "max_length": 5}
                                                    ]}],
-                                               hap1, hap2, bed),
-                                    TestObject([ref_file, {"Chromosome19": "ACACTAGTCCACAGGTGAGAATCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
-                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                               self.hap1, self.hap2, self.bed),
+                                    TestObject([self.ref_file, {"Chromosome19": "ACACTAGTCCACAGGTGAGAATCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
+                                               [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                    {"type": "dup_INV", "number": 1, "max_length": 5, "min_length": 5},
                                                    {"type": "INV_dup", "number": 1, "min_length": 5, "max_length": 5}
                                                    ]}],
-                                               hap1, hap2, bed),
-                                    TestObject([ref_file, {"chr19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
-                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                               self.hap1, self.hap2, self.bed),
+                                    TestObject([self.ref_file, {"chr19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
+                                               [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                    {"type": "delINVdup", "number": 1, "max_length": 5, "min_length": 5},
                                                    {"avoid_intervals": "test/inputs/example_avoid_interval.vcf"}]}],
-                                               hap1, hap2, bed),
+                                               self.hap1, self.hap2, self.bed),
                                     # small ref for testing three-part events
-                                    TestObject([ref_file, {"Chromosome19": "CTCCGT"}],
-                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                    TestObject([self.ref_file, {"Chromosome19": "CTCCGT"}],
+                                               [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                    {"type": "dupINVdup",
                                                     "number": 1,
                                                     "min_length": {2, 2, 2},
                                                     "max_length": {2, 2, 2}}]}],
-                                               hap1, hap2, bed),
-                                    TestObject([ref_file, {"Chromosome19": "CTCCGT"}],
-                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                               self.hap1, self.hap2, self.bed),
+                                    TestObject([self.ref_file, {"Chromosome19": "CTCCGT"}],
+                                               [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                    {"type": "delINVdel",
                                                     "number": 1,
                                                     "min_length": {2, 2, 2},
                                                     "max_length": {2, 2, 2}}]}],
-                                               hap1, hap2, bed),
-                                    TestObject([ref_file, {"Chromosome19": "CTCCGT"}],
-                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                               self.hap1, self.hap2, self.bed),
+                                    TestObject([self.ref_file, {"Chromosome19": "CTCCGT"}],
+                                               [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                    {"type": "delINVdup",
                                                     "number": 1,
                                                     "min_length": {2, 2, 2},
                                                     "max_length": {2, 2, 2}}]}],
-                                               hap1, hap2, bed),
-                                    TestObject([ref_file, {"Chromosome19": "CTCCGT"}],
-                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                               self.hap1, self.hap2, self.bed),
+                                    TestObject([self.ref_file, {"Chromosome19": "CTCCGT"}],
+                                               [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                    {"type": "dupINVdel",
                                                     "number": 1,
                                                     "min_length": {2, 2, 2},
                                                     "max_length": {2, 2, 2}}]}],
-                                               hap1, hap2, bed),
+                                               self.hap1, self.hap2, self.bed),
                                     # objects for delINV and INVdel
-                                    TestObject([ref_file, {"Chromosome19": "CTCCGT"}],
-                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                    TestObject([self.ref_file, {"Chromosome19": "CTCCGT"}],
+                                               [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                    {"type": "delINV",
                                                     "number": 1,
                                                     "min_length": {3, 3},
                                                     "max_length": {3, 3}}]}],
-                                               hap1, hap2, bed),
-                                    TestObject([ref_file, {"Chromosome19": "CTCCGT"}],
-                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                               self.hap1, self.hap2, self.bed),
+                                    TestObject([self.ref_file, {"Chromosome19": "CTCCGT"}],
+                                               [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                    {"type": "INVdel",
                                                     "number": 1,
                                                     "min_length": {3, 3},
                                                     "max_length": {3, 3}}]}],
-                                               hap1, hap2, bed),
+                                               self.hap1, self.hap2, self.bed),
                                     # object for inverted duplication
-                                    TestObject([ref_file, {"Chromosome19": "CGT"}],
-                                               [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                    TestObject([self.ref_file, {"Chromosome19": "CGT"}],
+                                               [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                    {"type": "INVdup",
                                                     "number": 1,
                                                     "min_length": 3,
                                                     "max_length": 3}]}],
-                                               hap1, hap2, bed)
+                                               self.hap1, self.hap2, self.bed)
                                     ]
         # test objects for bidirectional tests
-        self.test_dispersion_objects = [TestObject([ref_file, {"Chromosome19": "CT"}],
-                                                   [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+        self.test_dispersion_objects = [TestObject([self.ref_file, {"Chromosome19": "CT"}],
+                                                   [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                        {"type": "TRA",
                                                         "number": 1,
                                                         "min_length": [1, 1],
                                                         "max_length": [1, 1]}]}],
-                                                   hap1, hap2, bed),
-                                        TestObject([ref_file, {"Chromosome19": "CT"}],
-                                                   [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                                   self.hap1, self.hap2, self.bed),
+                                        TestObject([self.ref_file, {"Chromosome19": "CT"}],
+                                                   [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                        {"type": "dDUP",
                                                         "number": 1,
                                                         "min_length": [1, 1],
                                                         "max_length": [1, 1]}]}],
-                                                   hap1, hap2, bed),
-                                        TestObject([ref_file, {"Chromosome19": "CT"}],
-                                                   [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                                   self.hap1, self.hap2, self.bed),
+                                        TestObject([self.ref_file, {"Chromosome19": "CT"}],
+                                                   [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                        {"type": "INV_dDUP",
                                                         "number": 1,
                                                         "min_length": [1, 1],
                                                         "max_length": [1, 1]}]}],
-                                                   hap1, hap2, bed),
-                                        TestObject([ref_file, {"Chromosome19": "CTG"}],
-                                                   [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                                   self.hap1, self.hap2, self.bed),
+                                        TestObject([self.ref_file, {"Chromosome19": "CTG"}],
+                                                   [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                        {"type": "dDUP_iDEL",
                                                         "number": 1,
                                                         "min_length": [1, 1, 1],
                                                         "max_length": [1, 1, 1]}]}],
-                                                   hap1, hap2, bed),
-                                        TestObject([ref_file, {"Chromosome19": "CTG"}],
-                                                   [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+                                                   self.hap1, self.hap2, self.bed),
+                                        TestObject([self.ref_file, {"Chromosome19": "CTG"}],
+                                                   [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                        {"type": "INS_iDEL",
                                                         "number": 1,
                                                         "min_length": [1, 1, 1],
                                                         "max_length": [1, 1, 1]}]}],
-                                                   hap1, hap2, bed)
+                                                   self.hap1, self.hap2, self.bed)
                                         ]
-        self.test_objects_ins = [TestObject([ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
-                                            [par, {"sim_settings": {"prioritize_top": True}, "SVs": [
+        self.test_objects_ins = [TestObject([self.ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
+                                            [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "SVs": [
                                                 {"type": "INS", "number": 1, "min_length": 5, "max_length": 5},
                                                 {"type": "delINV", "number": 1, "min_length": 5, "max_length": 5},
                                                 {"type": "INS", "number": 1, "min_length": 5, "max_length": 5}]}],
-                                            hap1, hap2, bed)]
+                                            self.hap1, self.hap2, self.bed)]
 
         # --------- simple event test objects -----------
-        self.test_objects_simple_dels = [TestObject([ref_file, {"Chromosome19": "CACTATCTCTCCGAT"}],
-                                                    [par, {"sim_settings": {"prioritize_top": True},
+        self.test_objects_simple_dels = [TestObject([self.ref_file, {"Chromosome19": "CACTATCTCTCCGAT"}],
+                                                    [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                            "SVs": [{"type": "DEL", "number": 1,
                                                                     "min_length": 13, "max_length": 13}]}],
-                                                    hap1, hap2, bed),
-                                         TestObject([ref_file, {"Chromosome19": "CACTATCTCTCCGAT"}],
-                                                    [par, {"sim_settings": {"prioritize_top": True},
+                                                    self.hap1, self.hap2, self.bed),
+                                         TestObject([self.ref_file, {"Chromosome19": "CACTATCTCTCCGAT"}],
+                                                    [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                            "SVs": [{"type": "DEL", "number": 1,
                                                                     "min_length": 14, "max_length": 14}]}],
-                                                    hap1, hap2, bed)]
+                                                    self.hap1, self.hap2, self.bed)]
 
-        self.test_objects_simple_dups = [TestObject([ref_file, {"Chromosome19": "CA"}],
-                                                    [par, {"sim_settings": {"prioritize_top": True},
+        self.test_objects_simple_dups = [TestObject([self.ref_file, {"Chromosome19": "CA"}],
+                                                    [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                            "SVs": [{"type": "DUP", "number": 1,
                                                                     "min_length": 2, "max_length": 2}]}],
-                                                    hap1, hap2, bed),
-                                         TestObject([ref_file, {"Chromosome19": "CAT"}],
-                                                    [par, {"sim_settings": {"prioritize_top": True},
+                                                    self.hap1, self.hap2, self.bed),
+                                         TestObject([self.ref_file, {"Chromosome19": "CAT"}],
+                                                    [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                            "SVs": [{"type": "DUP", "number": 1,
                                                                     "min_length": 2, "max_length": 2}]}],
-                                                    hap1, hap2, bed),
-                                         TestObject([ref_file, {"Chromosome19": "C"}],
-                                                    [par, {"sim_settings": {"prioritize_top": True},
+                                                    self.hap1, self.hap2, self.bed),
+                                         TestObject([self.ref_file, {"Chromosome19": "C"}],
+                                                    [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                            "SVs": [{"type": "DUP", "number": 1,
                                                                     "min_length": 1, "max_length": 1}]}],
-                                                    hap1, hap2, bed)]
+                                                    self.hap1, self.hap2, self.bed)]
 
-        self.test_objects_simple_inss = [TestObject([ref_file, {"Chromosome19": "CA"}],
-                                                    [par, {"sim_settings": {"prioritize_top": True},
+        self.test_objects_simple_inss = [TestObject([self.ref_file, {"Chromosome19": "CA"}],
+                                                    [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                            "SVs": [{"type": "INS", "number": 1,
                                                                     "min_length": 5, "max_length": 5}]}],
-                                                    hap1, hap2, bed)]
+                                                    self.hap1, self.hap2, self.bed)]
 
-        self.test_objects_simple_invs = [TestObject([ref_file, {"Chromosome19": "CA"}],
-                                                    [par, {"sim_settings": {"prioritize_top": True},
+        self.test_objects_simple_invs = [TestObject([self.ref_file, {"Chromosome19": "CA"}],
+                                                    [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                            "SVs": [{"type": "INV", "number": 1,
                                                                     "min_length": 2, "max_length": 2}]}],
-                                                    hap1, hap2, bed),
-                                         TestObject([ref_file, {"Chromosome19": "C"}],
-                                                    [par, {"sim_settings": {"prioritize_top": True},
+                                                    self.hap1, self.hap2, self.bed),
+                                         TestObject([self.ref_file, {"Chromosome19": "C"}],
+                                                    [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                            "SVs": [{"type": "INV", "number": 1,
                                                                     "min_length": 1, "max_length": 1}]}],
-                                                    hap1, hap2, bed)]
+                                                    self.hap1, self.hap2, self.bed)]
         # ---------- test objects for overlap-aware event placement ------------
-        self.test_objects_overlap_simple = [TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
-                                                       [par, {"sim_settings": {"prioritize_top": True},
-                                                              "overlap_events": {"bed": test_overlap_bed},
+        self.test_objects_overlap_simple = [TestObject([self.ref_file, {"chr21": "CTCCGTCGTA"}],
+                                                       [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
+                                                              "overlap_events": {"bed": self.test_overlap_bed},
                                                               "SVs": [{"type": "DEL", "number": 1,
                                                                        "min_length": 2, "max_length": 2,
                                                                        "num_overlap": 1}]}],
-                                                       hap1, hap2, bed),
-                                            TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
-                                                       [par, {"sim_settings": {"prioritize_top": True},
-                                                              "overlap_events": {"bed": test_overlap_bed},
+                                                       self.hap1, self.hap2, self.bed),
+                                            TestObject([self.ref_file, {"chr21": "CTCCGTCGTA"}],
+                                                       [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
+                                                              "overlap_events": {"bed": self.test_overlap_bed},
                                                               "SVs": [{"type": "DUP", "number": 1,
                                                                        "min_length": 2, "max_length": 2,
                                                                        "num_overlap": 1},
                                                                       {"type": "INV", "number": 1,
                                                                        "min_length": 2, "max_length": 2,
                                                                        "num_overlap": 1}]}],
-                                                       hap1, hap2, bed),
+                                                       self.hap1, self.hap2, self.bed),
                                             # combine two input files, filter all but one event by type
-                                            TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTA"}],
-                                                       [par, {"sim_settings": {"prioritize_top": True},
-                                                              "overlap_events": {"bed": [test_overlap_bed, test_overlap_bed_2],
+                                            TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTA"}],
+                                                       [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
+                                                              "overlap_events": {"bed": [self.test_overlap_bed, self.test_overlap_bed_2],
                                                                                  "allow_types": ["L1PA15"]},
                                                               "SVs": [{"type": "DEL", "number": 1,
                                                                        "min_length": 2, "max_length": 5,
                                                                        "num_overlap": 1}]}],
-                                                       hap1, hap2, bed),
+                                                       self.hap1, self.hap2, self.bed),
                                             # combine two input files, filter all by length
-                                            TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTA"}],
-                                                       [par, {"sim_settings": {"prioritize_top": True},
-                                                              "overlap_events": {"bed": [test_overlap_bed, test_overlap_bed_2]},
+                                            TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTA"}],
+                                                       [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
+                                                              "overlap_events": {"bed": [self.test_overlap_bed, self.test_overlap_bed_2]},
                                                               "SVs": [{"type": "DEL", "number": 1,
                                                                        "min_length": 10, "max_length": 10,
                                                                        "num_overlap": 1}]}],
-                                                       hap1, hap2, bed),
+                                                       self.hap1, self.hap2, self.bed),
                                             # combine two input files, filter all by chromosome
-                                            TestObject([ref_file, {"chr19": "CTCCGTCGTACTAAGTCGTA"}],
-                                                       [par, {"sim_settings": {"prioritize_top": True},
+                                            TestObject([self.ref_file, {"chr19": "CTCCGTCGTACTAAGTCGTA"}],
+                                                       [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                               "overlap_events": {
-                                                                  "bed": [test_overlap_bed, test_overlap_bed_2]},
+                                                                  "bed": [self.test_overlap_bed, self.test_overlap_bed_2]},
                                                               "SVs": [{"type": "DEL", "number": 1,
                                                                        "min_length": 10, "max_length": 10,
                                                                        "num_overlap": 1}]}],
-                                                       hap1, hap2, bed),
+                                                       self.hap1, self.hap2, self.bed),
                                             # type-specific num_overlap params
-                                            TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                       [par, {"sim_settings": {"prioritize_top": True},
+                                            TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                       [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                               "overlap_events": {
-                                                                  "bed": [test_overlap_bed, test_overlap_bed_2],
+                                                                  "bed": [self.test_overlap_bed, self.test_overlap_bed_2],
                                                                   "allow_types": ["L1HS", "ALR/Alpha"]},
                                                               "SVs": [{"type": "DEL", "number": 4,
                                                                        "min_length": 1, "max_length": 10,
                                                                        "num_overlap": [2, 1]}]}],
-                                                       hap1, hap2, bed),
+                                                       self.hap1, self.hap2, self.bed),
                                             # type-specific num_overlap param > num available (ALR)
-                                            TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                       [par, {"sim_settings": {"prioritize_top": True},
+                                            TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                       [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                               "overlap_events": {
-                                                                  "bed": [test_overlap_bed, test_overlap_bed_2],
+                                                                  "bed": [self.test_overlap_bed, self.test_overlap_bed_2],
                                                                   "allow_types": ["L1HS", "ALR/Alpha"]},
                                                               "SVs": [{"type": "DEL", "number": 5,
                                                                        "min_length": 1, "max_length": 5,
                                                                        "num_overlap": [2, 3]}]}],
-                                                       hap1, hap2, bed),
-                                            TestObject([ref_file, {"chr21": "CCTCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTATCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                       [par, {"sim_settings": {"prioritize_top": True},
-                                                              "overlap_events": {"bed": test_overlap_bed_11,
+                                                       self.hap1, self.hap2, self.bed),
+                                            TestObject([self.ref_file, {"chr21": "CCTCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTATCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                       [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
+                                                              "overlap_events": {"bed": self.test_overlap_bed_11,
                                                                                  "allow_types": ['Alu', 'L1', 'L2', 'SVA', 'HERVK']},
                                                               "SVs": [{"type": "DEL", "number": 5,
                                                                        "min_length": 2, "max_length": 4,
@@ -336,21 +336,21 @@ class TestSVSimulator(unittest.TestCase):
                                                                        "min_length": 6, "max_length": 8,
                                                                        "num_overlap": [1, 1, 1, 1, 1]}
                                                                       ]}],
-                                                       hap1, hap2, bed)
+                                                       self.hap1, self.hap2, self.bed)
                                             ]
-        self.test_objects_overlap_cplx = [TestObject([ref_file, {"chr21": "CTGAT"}],
-                                                     [par, {"sim_settings": {"prioritize_top": True},
-                                                            "overlap_events": {"bed": [test_overlap_bed, test_overlap_bed_2],
+        self.test_objects_overlap_cplx = [TestObject([self.ref_file, {"chr21": "CTGAT"}],
+                                                     [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
+                                                            "overlap_events": {"bed": [self.test_overlap_bed, self.test_overlap_bed_2],
                                                                                "allow_types": ["L1HS"]},
                                                             "SVs": [{"type": "dDUP", "number": 1,
                                                                      "min_length": [2, 1],
                                                                      "max_length": [2, 1],
                                                                      "num_overlap": 1}]}],
-                                                     hap1, hap2, bed),
-                                          TestObject([ref_file, {"chr21": "CTGATATGGAC"}],
-                                                     [par, {"sim_settings": {"prioritize_top": True},
+                                                     self.hap1, self.hap2, self.bed),
+                                          TestObject([self.ref_file, {"chr21": "CTGATATGGAC"}],
+                                                     [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                             "overlap_events": {
-                                                                "bed": [test_overlap_bed, test_overlap_bed_2],
+                                                                "bed": [self.test_overlap_bed, self.test_overlap_bed_2],
                                                                 "allow_types": ["L1HS", "AluSz6"]},
                                                             "SVs": [{"type": "TRA", "number": 1,
                                                                      "min_length": [4, 1],
@@ -361,18 +361,18 @@ class TestSVSimulator(unittest.TestCase):
                                                                      "max_length": [1, 1],
                                                                      "num_overlap": 1}
                                                                     ]}],
-                                                     hap1, hap2, bed),
-                                          TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                     [par, {"sim_settings": {"prioritize_top": True},
-                                                            "overlap_events": {"bed": test_overlap_bed_2},
+                                                     self.hap1, self.hap2, self.bed),
+                                          TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                     [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
+                                                            "overlap_events": {"bed": self.test_overlap_bed_2},
                                                             "SVs": [{"type": "delINVdel", "number": 1,
                                                                      "min_length": [3, 3, 3],
                                                                      "max_length": [3, 3, 3],
                                                                      "num_overlap": 1}]}],
-                                                     hap1, hap2, bed),
-                                          TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                     [par, {"sim_settings": {"prioritize_top": True},
-                                                            "overlap_events": {"bed": test_overlap_bed_10},
+                                                     self.hap1, self.hap2, self.bed),
+                                          TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                     [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
+                                                            "overlap_events": {"bed": self.test_overlap_bed_10},
                                                             "SVs": [{"type": "delINV", "number": 1,
                                                                      "min_length": [3, 3],
                                                                      "max_length": [3, 3],
@@ -382,29 +382,29 @@ class TestSVSimulator(unittest.TestCase):
                                                                      "max_length": [2, 2],
                                                                      "num_overlap": 1}
                                                                     ]}],
-                                                     hap1, hap2, bed),
-                                          TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                     [par, {"sim_settings": {"prioritize_top": True},
-                                                            "overlap_events": {"bed": test_overlap_bed_13},
+                                                     self.hap1, self.hap2, self.bed),
+                                          TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                     [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
+                                                            "overlap_events": {"bed": self.test_overlap_bed_13},
                                                             "SVs": [{"type": "delINVdel", "number": 1,
                                                                      "min_length": [3, 3, 3],
                                                                      "max_length": [3, 3, 3],
                                                                      "num_partial_overlap": 1}]}],
-                                                     hap1, hap2, bed)
+                                                     self.hap1, self.hap2, self.bed)
                                           ]
-        self.test_objects_alu_mediated = [TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                     [par, {"sim_settings": {"prioritize_top": True,
+        self.test_objects_alu_mediated = [TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                     [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                              "fail_if_placement_issues": True},
-                                                            "overlap_events": {"bed": test_overlap_bed_4},
+                                                            "overlap_events": {"bed": self.test_overlap_bed_4},
                                                             "SVs": [{"type": "DEL", "number": 1,
                                                                      "min_length": 13, "max_length": 15,
                                                                      "num_alu_mediated": 1}]}],
-                                                     hap1, hap2, bed),
-                                          TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTCCTAAGTCGTA"}],
-                                                     [par, {"sim_settings": {"prioritize_top": True,
+                                                     self.hap1, self.hap2, self.bed),
+                                          TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTCCTAAGTCGTA"}],
+                                                     [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                              "fail_if_placement_issues": True},
-                                                            "overlap_events": {"bed": [test_overlap_bed_4,
-                                                                                       test_overlap_bed_5]},
+                                                            "overlap_events": {"bed": [self.test_overlap_bed_4,
+                                                                                       self.test_overlap_bed_5]},
                                                             "SVs": [{"type": "DEL", "number": 1,
                                                                      "min_length": 14, "max_length": 14,
                                                                      "num_alu_mediated": 1},
@@ -412,21 +412,21 @@ class TestSVSimulator(unittest.TestCase):
                                                                      "min_length": 5, "max_length": 7,
                                                                      "num_alu_mediated": 1}
                                                                     ]}],
-                                                     hap1, hap2, bed),
-                                          TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                     [par, {"sim_settings": {"prioritize_top": True,
+                                                     self.hap1, self.hap2, self.bed),
+                                          TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                     [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                              "fail_if_placement_issues": True},
-                                                            "overlap_events": {"bed": [test_overlap_bed_4,
-                                                                                       test_overlap_bed_5]},
+                                                            "overlap_events": {"bed": [self.test_overlap_bed_4,
+                                                                                       self.test_overlap_bed_5]},
                                                             "SVs": [{"type": "DEL", "number": 5,
                                                                      "min_length": 2, "max_length": 2,
                                                                      "num_alu_mediated": 5}]}],
-                                                     hap1, hap2, bed)
+                                                     self.hap1, self.hap2, self.bed)
                                           ]
-        self.test_objects_known_elt_mix = [TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                      [par, {"sim_settings": {"prioritize_top": True,
+        self.test_objects_known_elt_mix = [TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                      [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                               "fail_if_placement_issues": True},
-                                                             "overlap_events": {"bed": [test_overlap_bed, test_overlap_bed_4],
+                                                             "overlap_events": {"bed": [self.test_overlap_bed, self.test_overlap_bed_4],
                                                                                 "allow_types": "L1HS"},
                                                              "SVs": [{"type": "DEL", "number": 1,
                                                                       "min_length": 13, "max_length": 15,
@@ -435,12 +435,12 @@ class TestSVSimulator(unittest.TestCase):
                                                                       "min_length": [2, 1],
                                                                       "max_length": [2, 1],
                                                                       "num_overlap": 1}]}],
-                                                      hap1, hap2, bed),
-                                           TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                      [par, {"sim_settings": {"prioritize_top": True,
+                                                      self.hap1, self.hap2, self.bed),
+                                           TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                      [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                               "fail_if_placement_issues": True},
                                                              "overlap_events": {
-                                                                 "bed": [test_overlap_bed_6, test_overlap_bed_4]},
+                                                                 "bed": [self.test_overlap_bed_6, self.test_overlap_bed_4]},
                                                              "SVs": [{"type": "DEL", "number": 1,
                                                                       "min_length": 13, "max_length": 15,
                                                                       "num_alu_mediated": 1},
@@ -448,11 +448,11 @@ class TestSVSimulator(unittest.TestCase):
                                                                       "min_length": [2, 1],
                                                                       "max_length": [2, 1],
                                                                       "num_overlap": 1}]}],
-                                                      hap1, hap2, bed),
-                                           TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                      [par, {"sim_settings": {"prioritize_top": True,
+                                                      self.hap1, self.hap2, self.bed),
+                                           TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                      [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                               "fail_if_placement_issues": False},
-                                                             "overlap_events": {"bed": test_overlap_bed_4,
+                                                             "overlap_events": {"bed": self.test_overlap_bed_4,
                                                                                 "allow_types": "Alu"},
                                                              "SVs": [{"type": "DEL", "number": 1,
                                                                       "min_length": 4, "max_length": 4,
@@ -461,35 +461,35 @@ class TestSVSimulator(unittest.TestCase):
                                                                       "min_length": 13, "max_length": 15,
                                                                       "num_alu_mediated": 1}
                                                                      ]}],
-                                                      hap1, hap2, bed),
-                                           TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                      [par, {"sim_settings": {"prioritize_top": True,
+                                                      self.hap1, self.hap2, self.bed),
+                                           TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                      [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                               "fail_if_placement_issues": False},
-                                                             "overlap_events": {"bed": [test_overlap_bed_4,
-                                                                                        test_overlap_bed_5],
+                                                             "overlap_events": {"bed": [self.test_overlap_bed_4,
+                                                                                        self.test_overlap_bed_5],
                                                                                 "allow_types": ["Alu", "L1", "MLT", "(GT)"]},
                                                              "SVs": [{"type": "DEL", "number": 3,
                                                                       "min_length": 2, "max_length": 8,
                                                                       "num_overlap": [0, 2, 1, 0]}
                                                                      ]}],
-                                                      hap1, hap2, bed),
-                                           TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                      [par, {"sim_settings": {"prioritize_top": True,
+                                                      self.hap1, self.hap2, self.bed),
+                                           TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                      [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                               "fail_if_placement_issues": False},
-                                                             "overlap_events": {"bed": [test_overlap_bed_2,
-                                                                                        test_overlap_bed_4,
-                                                                                        test_overlap_bed_5],
+                                                             "overlap_events": {"bed": [self.test_overlap_bed_2,
+                                                                                        self.test_overlap_bed_4,
+                                                                                        self.test_overlap_bed_5],
                                                                                 "allow_types": ["Alu", "ALR", "L1", "MLT", "(GT)"]},
                                                              "SVs": [{"type": "DEL", "number": 5,
                                                                       "min_length": 2, "max_length": 8,
                                                                       "num_overlap": [0, 1, 2, 0, 0],
                                                                       "num_partial_overlap": [0, 1, 1, 0, 0]}
                                                                      ]}],
-                                                      hap1, hap2, bed),
-                                           TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                      [par, {"sim_settings": {"prioritize_top": True,
+                                                      self.hap1, self.hap2, self.bed),
+                                           TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                                      [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                               "fail_if_placement_issues": False},
-                                                             "overlap_events": {"bed": test_overlap_bed_9,
+                                                             "overlap_events": {"bed": self.test_overlap_bed_9,
                                                                                 "allow_types": ["Alu", "ALR", "L1", "MLT", "(GT)"]},
                                                              "SVs": [{"type": "DEL", "number": 6,
                                                                       "min_length": 2, "max_length": 4,
@@ -497,101 +497,96 @@ class TestSVSimulator(unittest.TestCase):
                                                                       "num_partial_overlap": [0, 1, 0, 0, 0],
                                                                       "num_alu_mediated": 1}
                                                                      ]}],
-                                                      hap1, hap2, bed)
+                                                      self.hap1, self.hap2, self.bed)
                                            ]
-        self.test_objects_partial_overlap = [TestObject([ref_file, {"chr21": "CTCCGTAGTA"}],
-                                                        [par, {"sim_settings": {"prioritize_top": True,
+        self.test_objects_partial_overlap = [TestObject([self.ref_file, {"chr21": "CTCCGTAGTA"}],
+                                                        [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                                 "fail_if_placement_issues": True},
-                                                               "overlap_events": {"bed": test_overlap_bed_12},
+                                                               "overlap_events": {"bed": self.test_overlap_bed_12},
                                                                "SVs": [{"type": "DEL", "number": 1,
                                                                         "min_length": 2, "max_length": 2,
                                                                         "num_partial_overlap": 1}]}],
-                                                        hap1, hap2, bed),
-                                             TestObject([ref_file, {"chr21": "CTCCGTAGTAAGTCAGGTGAGGCAG"}],
-                                                        [par, {"sim_settings": {"prioritize_top": True,
+                                                        self.hap1, self.hap2, self.bed),
+                                             TestObject([self.ref_file, {"chr21": "CTCCGTAGTAAGTCAGGTGAGGCAG"}],
+                                                        [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                                 "fail_if_placement_issues": True},
-                                                               "overlap_events": {"bed": test_overlap_bed_7},
+                                                               "overlap_events": {"bed": self.test_overlap_bed_7},
                                                                "SVs": [{"type": "DEL", "number": 2,
                                                                         "min_length": 2, "max_length": 6,
                                                                         "num_partial_overlap": 1,
                                                                         "num_overlap": 1}]}],
-                                                        hap1, hap2, bed),
-                                             TestObject([ref_file, {"chr21": "CTCCGTAGTAAGTCAGGTGAGGCAGGTCTAGC"}],
-                                                        [par, {"sim_settings": {"prioritize_top": True,
+                                                        self.hap1, self.hap2, self.bed),
+                                             TestObject([self.ref_file, {"chr21": "CTCCGTAGTAAGTCAGGTGAGGCAGGTCTAGC"}],
+                                                        [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                                 "fail_if_placement_issues": True},
-                                                               "overlap_events": {"bed": test_overlap_bed_8},
+                                                               "overlap_events": {"bed": self.test_overlap_bed_8},
                                                                "SVs": [{"type": "DEL", "number": 3,
                                                                         "min_length": 2, "max_length": 6,
                                                                         "num_partial_overlap": 1,
                                                                         "num_overlap": 1,
                                                                         "num_alu_mediated": 1}]}],
-                                                        hap1, hap2, bed),
-                                             TestObject([ref_file, {"chr21": "CTCCGTAGTAAGTCAGGTGAGGCAGGTCTAGC"}],
-                                                        [par, {"sim_settings": {"prioritize_top": True,
+                                                        self.hap1, self.hap2, self.bed),
+                                             TestObject([self.ref_file, {"chr21": "CTCCGTAGTAAGTCAGGTGAGGCAGGTCTAGC"}],
+                                                        [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                                 "fail_if_placement_issues": True},
-                                                               "overlap_events": {"bed": test_overlap_bed_8},
+                                                               "overlap_events": {"bed": self.test_overlap_bed_8},
                                                                "SVs": [{"type": "DEL", "number": 2,
                                                                         "min_length": 2, "max_length": 6,
                                                                         "num_partial_overlap": 1,
                                                                         "num_alu_mediated": 1}]}],
-                                                        hap1, hap2, bed)
+                                                        self.hap1, self.hap2, self.bed)
                                              ]
 
         # ---------- test objects for divergence event ------------
-        self.test_objects_divergence_event = [TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
-                                                         [par, {"sim_settings": {"prioritize_top": True},
+        self.test_objects_divergence_event = [TestObject([self.ref_file, {"chr21": "CTCCGTCGTA"}],
+                                                         [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                                 "SVs": [{"type": "DIVERGENCE", "number": 1,
                                                                          "min_length": 5, "max_length": 5}]}],
-                                                         hap1, hap2, bed),
-                                              TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
-                                                         [par, {"sim_settings": {"prioritize_top": True},
-                                                                "SVs": [{"type": "DIVERGENCE", "number": 1, 'divergence_prob': 0,
-                                                                         "min_length": 10, "max_length": 10}]}],
-                                                         hap1, hap2, bed),
-                                              TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
-                                                         [par, {"sim_settings": {"prioritize_top": True},
+                                                         self.hap1, self.hap2, self.bed),
+                                              TestObject([self.ref_file, {"chr21": "CTCCGTCGTA"}],
+                                                         [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                                 "SVs": [{"type": "DIVERGENCE", "number": 1, 'divergence_prob': 1,
                                                                          "min_length": 10, "max_length": 10}]}],
-                                                         hap1, hap2, bed),
-                                              TestObject([ref_file, {"chr21": "CTCCGTCGTA"}],
-                                                         [par, {"sim_settings": {"prioritize_top": True},
+                                                         self.hap1, self.hap2, self.bed),
+                                              TestObject([self.ref_file, {"chr21": "CTCCGTCGTA"}],
+                                                         [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                                 "SVs": [{"type": "DIVERGENCE", "number": 1, 'divergence_prob': 0.2,
                                                                          "min_length": 10, "max_length": 10}]}],
-                                                         hap1, hap2, bed)
+                                                         self.hap1, self.hap2, self.bed)
                                               ]
 
-        self.test_objects_filter_chroms = [TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA",
+        self.test_objects_filter_chroms = [TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA",
                                                                   "chr20": "CTCCGT"}],
-                                                      [par, {"sim_settings": {"prioritize_top": True,
+                                                      [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                               "filter_small_chr": 10},
                                                              "SVs": [{"type": "DEL", "number": 1,
                                                                       "max_length": 3,
                                                                       "min_length": 3}]}],
-                                                      hap1, hap2, bed),
-                                           TestObject([ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA",
+                                                      self.hap1, self.hap2, self.bed),
+                                           TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA",
                                                                   "chr20": "CTCCGT"}],
-                                                      [par, {"sim_settings": {"prioritize_top": True,
+                                                      [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
                                                                               "filter_small_chr": 50},
                                                              "SVs": [{"type": "DEL", "number": 1,
                                                                       "max_length": 3,
                                                                       "min_length": 3}]}],
-                                                      hap1, hap2, bed)]
+                                                      self.hap1, self.hap2, self.bed)]
 
-        self.test_objects_req_space = [TestObject([ref_file, {"chr21": "CTCCGT"}],
-                                                  [par, {"sim_settings": {"prioritize_top": True},
+        self.test_objects_req_space = [TestObject([self.ref_file, {"chr21": "CTCCGT"}],
+                                                  [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                          "SVs": [{"type": "DEL", "number": 1,
                                                                   "max_length": 9,
                                                                   "min_length": 9}]}],
-                                                  hap1, hap2, bed)]
+                                                  self.hap1, self.hap2, self.bed)]
         # ----------- test objects for SNPs -----------
-        self.test_objects_SNPs = [TestObject([ref_file, {"chr21": "C"}],
-                                             [par, {"sim_settings": {"prioritize_top": True},
+        self.test_objects_SNPs = [TestObject([self.ref_file, {"chr21": "C"}],
+                                             [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                     "SVs": [{"type": "SNP", "number": 1}]}],
-                                             hap1, hap2, bed),
-                                  TestObject([ref_file, {"chr21": "CTGTTGACCG"}],
-                                             [par, {"sim_settings": {"prioritize_top": True},
+                                             self.hap1, self.hap2, self.bed),
+                                  TestObject([self.ref_file, {"chr21": "CTGTTGACCG"}],
+                                             [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
                                                     "SVs": [{"type": "SNP", "number": 4}]}],
-                                             hap1, hap2, bed)
+                                             self.hap1, self.hap2, self.bed)
                                   ]
 
     def test_is_overlapping(self):
@@ -839,14 +834,10 @@ class TestSVSimulator(unittest.TestCase):
         # the divergence operator will mutate each base in an event interval with probability p
         # --> going to check for randomized placement of a divergence by checking that the output sequence
         # --> is not contained in the unedited reference (for event of length 5 and dummy reference: CTCCGTCGTA)
-        # obj. 1, divergence probability = 0; obj. 2, divergence probability = 1; obj. 3, divergence probability = 0.2
         for i in range(len(self.test_objects_divergence_event)):
             changed_frag_1, changed_frag_2 = self.helper_test_known_output_svs(self.test_objects_divergence_event[i])
-            if i != 1:
-                self.assertTrue(changed_frag_1 not in self.test_objects_divergence_event[i].ref or
-                                changed_frag_2 not in self.test_objects_divergence_event[i].ref)
-            else:
-                self.assertTrue(changed_frag_1 == changed_frag_2 == 'CTCCGTCGTA')
+            self.assertTrue(changed_frag_1 not in self.test_objects_divergence_event[i].ref or
+                            changed_frag_2 not in self.test_objects_divergence_event[i].ref)
             self.assertTrue(len(changed_frag_1) == len(changed_frag_2) == 10)
 
 

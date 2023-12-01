@@ -105,11 +105,14 @@ class SV_Simulator:
         global time_start
         print("Setting up Simulator...")
 
-        self.ref_file = ref_file
-        self.ref_fasta = FastaFile(ref_file)  # FastaFile generates a new index file if one is not found
+        # TODO: will need to extract the ref from the config
+        # self.ref_file = ref_file
+        # self.ref_fasta = FastaFile(ref_file)  # FastaFile generates a new index file if one is not found
         self.formatter = FormatterIO(par_file)
         self.formatter.yaml_to_var_list()
         config = self.formatter.config
+        self.ref_file = config['sim_settings']['reference']
+        self.ref_fasta = FastaFile(self.ref_file)  # FastaFile generates a new index file if one is not found
         self.svs_config = config['SVs']  # config for what SVs to simulate
 
         self.sim_settings = config['sim_settings']
@@ -433,13 +436,6 @@ def run_insilicosv():
     bed_out = args["bedpe"]
     stats_file = args["stats"]
     log_file = args["log_file"]
-
-    '''fasta_in = "debugging/inputs/test.fna"
-    yaml_in = "debugging/inputs/par.yaml"
-    fasta1_out = "debugging/inputs/test1_out.fna"
-    fasta2_out = "debugging/inputs/test2_out.fna"
-    bed_out = "debugging/inputs/out.bed"
-    stats_file = "debugging/inputs/stats.txt"'''
 
     sim = SV_Simulator(args["ref"], args["config"], log_file=args["log_file"])
     sim.produce_variant_genome(args["hap1"], args["hap2"], args["ins_fasta"], args["bedpe"], args["stats"],
