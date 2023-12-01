@@ -4,17 +4,16 @@ from setuptools import setup
 setup(
     name = "insilicosv",
     version = "0.0.1",
-    description = ("Simulator of complex structural variants in the genome "),
-    #license = "BSD",
-    #keywords = "DNA simulation structural variant",
+    description = ("Structural variant simulation"),
+    license = "MIT",
     url = "https://github.com/PopicLab/insilicoSV",
 
     packages=['insilicosv'],
     #long_description=read('README.md'),
-    long_description='Simulator of complex genomic structural variants that support custom variant structures',
+    long_description='Simulator of genomic structural variants that supports complex and custom variant structures',
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Topic :: Utilities",
-        "License :: OSI Approved :: BSD License",
+        "License :: OSI Approved :: MIT License",
     ],
 )

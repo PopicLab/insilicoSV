@@ -1,19 +1,26 @@
-# insilicoSV
-insilicoSV is a software to design and simulate simple and complex structural variants, both novel and known. 
+# insilicoSV: a framework for structural variant simulation 
 
-## Requirements  (Prerequisites)
-* Python 3.6 and up - [Install](https://www.python.org/downloads/)
+## Overview
+
+TODO
 
 ## Installation
 
-`$ pip install -r requirements.txt`
+Prerequisite: Python 3.6 and up - [Install](https://www.python.org/downloads/)
+
+* Clone the repository: ```git clone git@github.com:PopicLab/insilicoSV.git ```
+
+TODO: list of installation options
+
+* `$ pip install -r install/requirements.txt`
+
+* Set the ```PYTHONPATH``` as follows: ```export PYTHONPATH=${PYTHONPATH}:/path/to/insilicoSV```
+
 
 ## To Run
 ```
-samtools faidx <ref.fna>   # if index file already produced, skip this line
-python simulate.py <ref.fna> <par.yaml> <prefix>
+python simulate.py <config.yaml> 
 ```
-**NB:** Before running will also need to set `PYTHONPATH` to point to the insilicoSV directory with `export PYTHONPATH={/path/to/insilicoSV}`
 
 ## Documentation
 For documentation outlining the different features of insilicoSV along with usage examples and data resources, please refer to the wiki:
