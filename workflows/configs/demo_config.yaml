@@ -1,5 +1,6 @@
 # YAML CONFIG FILE
 sim_settings:
+    reference: 'chr21_ref/chr21.fa'
     max_tries: 200
     prioritize_top: True
 SVs:
