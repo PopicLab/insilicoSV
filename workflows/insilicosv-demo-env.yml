@@ -1,9 +1,8 @@
-name: run-insilicosv-009-env
+name: insilicosv-demo-env
 channels:
   - conda-forge
   - bioconda
   - defaults
-  - popiclab-dev
 dependencies:
   - _libgcc_mutex=0.1=conda_forge
   - _openmp_mutex=4.5=2_gnu
@@ -382,4 +381,3 @@ dependencies:
   - zstd=1.5.5=hfc55251_0
   - pip:
       - insilicosv==0.0.5
-prefix: /data/ilya/mc3/envs/run-insilicosv-009-env
