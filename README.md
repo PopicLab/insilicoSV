@@ -6,34 +6,33 @@ TODO
 
 ## Installation
 
-Prerequisite: Python 3.6 and up - [Install](https://www.python.org/downloads/)
+Prerequisite: Python 3.8 and up - [Install](https://www.python.org/downloads/)
 
-* Clone the repository: ```git clone git@github.com:PopicLab/insilicoSV.git ```
+Installation using pip:
 
-TODO: list of installation options
-
-* `$ pip install -r install/requirements.txt`
-
-* Set the ```PYTHONPATH``` as follows: ```export PYTHONPATH=${PYTHONPATH}:/path/to/insilicoSV```
-
+* `$ pip install insilicosv`
 
 ## To Run
 ```
-python simulate.py <config.yaml> 
+insilicosv <reference_fasta> <config_yml> <output_prefix>
 ```
 
 ## Documentation
 For documentation outlining the different features of insilicoSV along with usage examples and data resources, please refer to the wiki:
 <!-- toc -->
-- [Input guidelines](https://github.com/PopicLab/insilicoSV/wiki#input-guidelines)
-- [Example Use Cases](https://github.com/PopicLab/insilicoSV/wiki#example-use-cases)
-- [SV Grammar](https://github.com/PopicLab/insilicoSV/wiki/SV-Grammar)
-- [Benchmark Genomes](https://github.com/PopicLab/insilicoSV/wiki/Benchmark-Genomes)
-- [Automated Pipelines and Additional Utilities](https://github.com/PopicLab/insilicoSV/wiki/Automated-pipelines-and-additional-utilities)
-- [Example SV Visualizations](https://github.com/PopicLab/insilicoSV/wiki/Example-SV-visualizations)
+- [Input guidelines](docs/input_guidelines.md)
+- [Example Use Cases](docs/example_use_cases.md)
+- [SV Grammar](docs/sv_grammar.md)
+- [Benchmark Genomes](docs/benchmark_genomes.md)
+- [Additional Utilities](docs/automated_pipelines_and_additional_utilities.md)
+- [Example SV Visualizations](docs/example_sv_visualizations.md)
 
 
 ## Authors
 Chris Rohlicek - crohlice@broadinstitute.org
 
 Nick Jiang - nickj@berkeley.edu
+
+Ilya Shlyakhter - ilya@broadinstitute.org
+
+Victoria Popic - vpopic@broadinstitute.org
