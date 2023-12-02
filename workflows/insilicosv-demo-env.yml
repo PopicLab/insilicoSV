@@ -1,4 +1,4 @@
-name: insilicosv-demo-env
+name: run-insilicosv-008-env
 channels:
   - conda-forge
   - bioconda
@@ -113,6 +113,7 @@ dependencies:
   - jupyterlab=4.0.9=pyhd8ed1ab_0
   - jupyterlab_pygments=0.3.0=pyhd8ed1ab_0
   - jupyterlab_server=2.25.2=pyhd8ed1ab_0
+  - k8=0.2.5=hdcf5f25_4
   - keyutils=1.6.1=h166bdaf_0
   - kiwisolver=1.4.5=py38h7f3f72f_1
   - krb5=1.21.2=h659d440_0
@@ -158,6 +159,7 @@ dependencies:
   - matplotlib-base=3.2.2=py38h5d868c9_1
   - matplotlib-inline=0.1.6=pyhd8ed1ab_0
   - mdurl=0.1.0=pyhd8ed1ab_0
+  - minimap2=2.26=he4a0461_2
   - mistune=3.0.2=pyhd8ed1ab_0
   - multidict=6.0.4=py38h01eb140_1
   - nb_conda_kernels=2.3.1=pyhd8ed1ab_3
