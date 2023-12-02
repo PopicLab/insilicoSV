@@ -88,6 +88,7 @@ dependencies:
   - humanfriendly=10.0=pyhd8ed1ab_6
   - icu=67.1=he1b5a44_0
   - idna=3.6=pyhd8ed1ab_0
+  - igv=2.4.9=0
   - importlib-metadata=6.9.0=pyha770c72_0
   - importlib_metadata=6.9.0=hd8ed1ab_0
   - importlib_resources=6.1.1=pyhd8ed1ab_0
@@ -172,6 +173,7 @@ dependencies:
   - notebook-shim=0.2.3=pyhd8ed1ab_0
   - numpy=1.24.4=py38h59b608b_0
   - oauth2client=4.1.3=py_0
+  - openjdk=8.0.382=hd590300_0
   - openjpeg=2.5.0=h488ebb8_3
   - openssl=3.2.0=hd590300_1
   - overrides=7.4.0=pyhd8ed1ab_0
