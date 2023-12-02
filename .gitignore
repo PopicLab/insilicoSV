@@ -25,3 +25,4 @@ test/inputs/test.fa.fai
 .ipynb_checkpoints
 workflows/output/
 workflows/chr21_ref/
+workflows/IGV_screenshots/
