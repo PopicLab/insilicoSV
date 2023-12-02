@@ -608,7 +608,7 @@ class TestSVSimulator(unittest.TestCase):
         # target_frags: optional input frags to be checked for match with output frags
         config = config_event_obj
         config.initialize_files()
-        curr_sim = SV_Simulator(config.ref, config.par)
+        curr_sim = SV_Simulator(config.par)
         curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         config.remove_test_files()
@@ -665,7 +665,7 @@ class TestSVSimulator(unittest.TestCase):
                 continue
             config = self.test_objects_overlap_simple[i]
             config.initialize_files()
-            curr_sim = SV_Simulator(config.ref, config.par)
+            curr_sim = SV_Simulator(config.par)
             curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
             changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
             if i == 0:
@@ -693,12 +693,9 @@ class TestSVSimulator(unittest.TestCase):
                 continue
             config = self.test_objects_overlap_cplx[i]
             config.initialize_files()
-            curr_sim = SV_Simulator(config.ref, config.par)
+            curr_sim = SV_Simulator(config.par)
             curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
             # changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
-            for sv in curr_sim.svs:
-                print(f'SV: {(sv.start, sv.end)}')
-                print(f'SV source events: {[(ev.start, ev.end) for ev in sv.source_events]}')
             if i == 0:
                 self.helper_test_known_output_svs(self.test_objects_overlap_cplx[i], ['CTGATGA', 'CGATGAT'])
             elif i == 1:
@@ -735,7 +732,7 @@ class TestSVSimulator(unittest.TestCase):
         for i in range(len(self.test_objects_partial_overlap)):
             config = self.test_objects_partial_overlap[i]
             config.initialize_files()
-            curr_sim = SV_Simulator(config.ref, config.par)
+            curr_sim = SV_Simulator(config.par)
             curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
             # to simplify checking the diffnt possible outcomes of each test: sorting SVs by start position
             curr_sim.svs.sort(key=lambda x: x.start)
@@ -781,7 +778,7 @@ class TestSVSimulator(unittest.TestCase):
         for i in range(len(self.test_objects_known_elt_mix)):
             config = self.test_objects_known_elt_mix[i]
             config.initialize_files()
-            curr_sim = SV_Simulator(config.ref, config.par)
+            curr_sim = SV_Simulator(config.par)
             curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
             changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
             sv_intervals = [(sv.start, sv.end) for sv in curr_sim.svs]
@@ -865,7 +862,7 @@ class TestSVSimulator(unittest.TestCase):
         # test of calling choose_rand_pos and avoiding pre-specified intervals
         config_no_dis = self.test_objects_no_dis[0]
         config_no_dis.initialize_files()
-        curr_sim = SV_Simulator(config_no_dis.ref, config_no_dis.par)
+        curr_sim = SV_Simulator(config_no_dis.par)
         curr_sim.sim_settings['max_tries'] = 2000
         # define an interval in the simulation events dict that will be avoided in the pos choosing procedure
         curr_sim.event_ranges["Chromosome19"] = [(15, 83)]
@@ -877,7 +874,7 @@ class TestSVSimulator(unittest.TestCase):
         # test of avoiding pre-specified intervals by reading them in from a vcf
         config_no_dis = self.test_objects_no_dis[4]
         config_no_dis.initialize_files()
-        curr_sim = SV_Simulator(config_no_dis.ref, config_no_dis.par)
+        curr_sim = SV_Simulator(config_no_dis.par)
         # --> example config is a chr19 DEL from pos 15-83 (same as above test)
         curr_sim.sim_settings['max_tries'] = 2000
         curr_sim.choose_rand_pos(curr_sim.svs, curr_sim.ref_fasta)
@@ -887,13 +884,13 @@ class TestSVSimulator(unittest.TestCase):
         for i in range(len(self.test_objects_filter_chroms)):
             config_filter_chrom = self.test_objects_filter_chroms[i]
             config_filter_chrom.initialize_files()
-            curr_sim = SV_Simulator(config_filter_chrom.ref, config_filter_chrom.par)
+            curr_sim = SV_Simulator(config_filter_chrom.par)
             self.assertEqual(set(curr_sim.len_dict.keys()), ({'chr21'} if i == 0 else set()))
 
     def test_req_space_filtering(self):
         config_req_sapce = self.test_objects_req_space[0]
         config_req_sapce.initialize_files()
-        curr_sim = SV_Simulator(config_req_sapce.ref, config_req_sapce.par)
+        curr_sim = SV_Simulator(config_req_sapce.par)
         with self.assertRaises(Exception):
             curr_sim.choose_rand_pos(curr_sim.svs, curr_sim.ref_fasta)
 
