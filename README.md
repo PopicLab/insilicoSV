@@ -2,15 +2,19 @@
 
 ## Overview
 
-TODO
+insilicoSV generates synthetic diploid genome sequences, given a reference genome and a configuration file.
+
+It supports the following functionality:
+
+* 19 types of structural variants (simple and complex), indels, and SNPs
+* a grammar to define custom structural rearrangement signatures
+* random, context-aware (e.g., in repeat regions), or fixed-mode genome placement
 
 ## Installation
 
 Prerequisite: Python 3.6 and up - [Install](https://www.python.org/downloads/)
 
 * Clone the repository: ```git clone git@github.com:PopicLab/insilicoSV.git ```
-
-TODO: list of installation options
 
 * `$ pip install -r install/requirements.txt`
 
