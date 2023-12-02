@@ -23,7 +23,7 @@ Prerequisite: Python 3.6 and up - [Install](https://www.python.org/downloads/)
 
 ## To Run
 ```
-python simulate.py <config.yaml> 
+python insilicosv/simulate.py <config.yaml> 
 ```
 
 ## Documentation
