@@ -97,7 +97,4 @@ A $&#8594$ A\*
 
 ![divergence](sample_imgs/DIVERGENCE_20798718_20799646.png)
 
-### divergent repeat
-
-![divergent_repeat](sample_imgs/div_repeat_19857334_19865475.png)
 
