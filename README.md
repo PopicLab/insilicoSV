@@ -28,7 +28,8 @@ Installation using conda:
 insilicosv <config_yml>
 ```
 
-The config file syntax is detailed below.  Outputs go into the directory where the config file is stored.
+The config file syntax is detailed in the [Input guidelines](docs/input_guidelines.md) section of the
+documentation.  Outputs go into the directory where the config file is stored.
 
 ## Documentation
 For documentation outlining the different features of insilicoSV along with usage examples and data resources, please refer to the wiki:
