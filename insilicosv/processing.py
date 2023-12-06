@@ -31,7 +31,6 @@ class FormatterIO:
                     continue
                 else:
                     raise Exception("Number (of type int > 0) is a required parameter for all SVs")
-            # makes sure required attributes are written into parameter file
             if "min_length" not in config_sv:
                 raise Exception("Min length must be specified on all SVs!")
             if "max_length" not in config_sv:
@@ -39,7 +38,6 @@ class FormatterIO:
             if "number" not in config_sv:
                 raise Exception("Number is a required parameter for all SVs")
 
-            # makes sure attributes are the correct datatype
             elif "type" in config_sv and not isinstance(config_sv["type"], str):
                 raise Exception("Invalid {} type for SV \'type\' attribute, str expected".format(type(config_sv["type"])))
         valid_optional_par = ["fail_if_placement_issues", "max_tries", "generate_log_file", "filter_small_chr",
@@ -70,7 +68,6 @@ class FormatterIO:
                     config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
                 else:
                     config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
-                # make sure max_length >= min_length >= 0
                 assert all(max_len >= min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
             if "divergence_prob" in config_sv:
                 if config_sv["type"] != "DIVERGENCE":
@@ -86,9 +83,6 @@ class FormatterIO:
                 config_sv["target"] = None
 
         # setting default values for sim_settings fields
-        # if 'sim_settings' not in self.config.keys():
-        #     self.config['sim_settings'] = {'max_tries': 50, 'prioritize_top': True, 'fail_if_placement_issues': False}
-        # else:
         if 'max_tries' not in self.config['sim_settings']:
             self.config['sim_settings']['max_tries'] = 50
         if 'fail_if_placement_issues' not in self.config['sim_settings']:
@@ -220,7 +214,6 @@ class FormatterIO:
                 # and target intervals taken from corresponding target events (if no match, then deletion)
                 sv_record_info = {}
                 for ev in sv.events_dict.values():
-                    # skip dispersion events
                     if ev.symbol.startswith(Symbols.DIS.value):
                         continue
                     sv_record_info[ev.symbol] = {'source_s': ev.start, 'source_e': ev.end, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv + 1}
@@ -338,7 +331,7 @@ def collect_args():
 
     args = parser.parse_args()
     output_dir = os.path.dirname(args.config)
-    args_dict = {"ref": args.ref, "config": args.config, "ins_fasta": os.path.join(output_dir, "sim.insertions.fa"),
+    args_dict = {"config": args.config, "ins_fasta": os.path.join(output_dir, "sim.insertions.fa"),
                  "hap1": os.path.join(output_dir, "sim.hapA.fa"), "hap2": os.path.join(output_dir, "sim.hapB.fa"),
                  "bedpe": os.path.join(output_dir, "sim.bed"), "stats": os.path.join(output_dir, "sim.stats.txt"),
                  "log_file": os.path.join(output_dir, "sim.log"), "random_seed": args.random_seed}

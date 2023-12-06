@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "insilicosv"
-version = "0.0.1"
+version = "0.0.5"
 authors = [
   { name="Chris Rohlicek", email="crohlice@broadinstitute.org" },
   { name="Nick Jiang", email="nickj@berkeley.edu" },
@@ -32,6 +32,7 @@ dependencies = [
         'six'
              
 ]
+license = {text = "MIT"}
 
 [project.urls]
 Homepage = "https://github.com/PopicLab/insilicoSV"
@@ -39,4 +40,3 @@ Issues = "https://github.com/PopicLab/insilicoSV/issues"
 
 [project.scripts]
 insilicosv = "insilicosv.simulate:run_insilicosv"
-
