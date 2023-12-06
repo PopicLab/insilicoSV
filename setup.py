@@ -3,8 +3,9 @@ from setuptools import setup
 
 setup(
     name = "insilicosv",
-    version = "0.0.5",
+    version = "0.0.1",
     description = ("Structural variant simulation"),
+    license = "MIT",
     url = "https://github.com/PopicLab/insilicoSV",
 
     packages=['insilicosv'],

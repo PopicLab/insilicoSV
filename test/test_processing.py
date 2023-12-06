@@ -338,7 +338,7 @@ class TestProcessing(unittest.TestCase):
         # function to execute the shared logic for simulating SVs from test objects and generating bed/vcf output
         config = test_objects_dict[sv_type]
         config.initialize_files()
-        curr_sim = SV_Simulator(config.par)
+        curr_sim = SV_Simulator(config.ref, config.par)
         curr_sim.apply_transformations(FastaFile(curr_sim.ref_file))
         if output_type == 'bed':
             if ins_fasta:

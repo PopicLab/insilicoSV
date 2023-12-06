@@ -123,8 +123,9 @@ class TestKnownSVs(unittest.TestCase):
     def helper_test_simple_sv(self, config_event_obj, target_frags=None):
         # template test method for simple SVs
         config = config_event_obj
+        print(config)
         config.initialize_files()
-        fixed_sim = SV_Simulator(config.par)
+        fixed_sim = SV_Simulator(config.ref, config.par)
         fixed_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
         changed_frag_hap1, changed_frag_hap2 = config.get_actual_frag(return_haps='both')
         config.remove_test_files()

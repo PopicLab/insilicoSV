@@ -12,41 +12,32 @@ It supports the following functionality:
 
 ## Installation
 
-Prerequisite: Python 3.8 and up - [Install](https://www.python.org/downloads/)
+Prerequisite: Python 3.6 and up - [Install](https://www.python.org/downloads/)
 
-Installation using pip:
+* Clone the repository: ```git clone git@github.com:PopicLab/insilicoSV.git ```
 
-* `$ pip install insilicosv`
+* `$ pip install -r install/requirements.txt`
 
-Installation using conda:
+* Set the ```PYTHONPATH``` as follows: ```export PYTHONPATH=${PYTHONPATH}:/path/to/insilicoSV```
 
-* Install and configure [bioconda](https://bioconda.github.io/)
-* Install insilicosv with `conda install insilicosv`
 
 ## To Run
 ```
-insilicosv <config_yml>
+python insilicosv/simulate.py <config.yaml> 
 ```
-
-The config file syntax is detailed below.  Outputs go into the directory where the config file is stored.
 
 ## Documentation
 For documentation outlining the different features of insilicoSV along with usage examples and data resources, please refer to the wiki:
 <!-- toc -->
-- [Input guidelines](docs/input_guidelines.md)
-- [Example Use Cases](docs/example_use_cases.md)
-- [SV Grammar](docs/sv_grammar.md)
-- [Benchmark Genomes](docs/benchmark_genomes.md)
-- [Additional Utilities](docs/automated_pipelines_and_additional_utilities.md)
-- [Example SV Visualizations](docs/example_sv_visualizations.md)
-- [Tutorial Jupyter notebook](docs/demo_notebook.md)
+- [Input guidelines](https://github.com/PopicLab/insilicoSV/wiki#input-guidelines)
+- [Example Use Cases](https://github.com/PopicLab/insilicoSV/wiki#example-use-cases)
+- [SV Grammar](https://github.com/PopicLab/insilicoSV/wiki/SV-Grammar)
+- [Benchmark Genomes](https://github.com/PopicLab/insilicoSV/wiki/Benchmark-Genomes)
+- [Automated Pipelines and Additional Utilities](https://github.com/PopicLab/insilicoSV/wiki/Automated-pipelines-and-additional-utilities)
+- [Example SV Visualizations](https://github.com/PopicLab/insilicoSV/wiki/Example-SV-visualizations)
 
 
 ## Authors
 Chris Rohlicek - crohlice@broadinstitute.org
 
 Nick Jiang - nickj@berkeley.edu
-
-Ilya Shlyakhter - ilya@broadinstitute.org
-
-Victoria Popic - vpopic@broadinstitute.org
