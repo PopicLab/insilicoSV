@@ -2,7 +2,7 @@
 
 insilicoSV uses a grammatical notation to represent the various types of SVs that can be supported by the simulator. A graphical representation of the notation is given below:
 
-[[sample_imgs/fig.png]]
+![Graphical representation of insilicoSV grammar](sample_imgs/fig.png)
 
 The form of a given SV's transformation of the genome is represented with a grammatical notation that describes the mapping from input reference sequence to output synthetic donor sequence. With this notation, the reference sequence is given by a series of capital letters corresponding to the intervals affected by the SV, and the donor sequence is given by a transformation of those letters that reflects the ways in which the reference intervals are mutated by the SV. For example, a deletion-flanked inversion (delINV) is notated as AB $&#8594$ b, in which the left side of the expression indicates the two reference intervals involved in the delINV and the right side indicates the donor sequence that will appear in place of AB, that is the inverted interval b (the lowercase indicating that B will appear inverted in the donor). Although SNPs are not considered to be a type of structural variant, we include them here as another valid event type for simulation (see [use cases](example_use_cases.md#example-1b---example-snp-specification) for usage examples).
 
