@@ -1,8 +1,14 @@
-# insilicoSV: a framework for structural variant simulation 
+# insilicoSV (WIP): a framework for structural variant simulation 
 
 ## Overview
 
-TODO
+insilicoSV generates synthetic diploid genome sequences, given a reference genome and a configuration file.
+
+It supports the following functionality:
+
+* 19 types of structural variants (simple and complex), indels, and SNPs
+* a grammar to define custom structural rearrangement signatures
+* random, context-aware (e.g., in repeat regions), or fixed-mode genome placement
 
 ## Installation
 
@@ -12,10 +18,16 @@ Installation using pip:
 
 * `$ pip install insilicosv`
 
+Installation using conda:
+
+* Install and configure [bioconda](https://bioconda.github.io/)
+* Install insilicosv with `conda install insilicosv`
+
 ## To Run
 ```
-insilicosv <reference_fasta> <config_yml> <output_prefix>
-```
+insilicosv <config_yml>
+
+The config file syntax is detailed below.  Outputs go into the directory where the config file is stored.
 
 ## Documentation
 For documentation outlining the different features of insilicoSV along with usage examples and data resources, please refer to the wiki:
