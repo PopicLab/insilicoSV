@@ -25,3 +25,8 @@ test/inputs/test.fa.fai
 .ipynb_checkpoints
 workflows/output/
 workflows/chr21_ref/
+
+# Workflow-related
+.snakemake/
+results/
+workflows/IGV_screenshots/
