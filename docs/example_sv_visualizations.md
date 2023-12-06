@@ -4,7 +4,9 @@ Below are IGV pileup images of each of the predefined SV types with short read a
 
 ### DEL
 A $&#8594 &#x2205$
+
 ![DEL](sample_imgs/DEL_39373784_39375651.png)
+
 ### DUP
 A $&#8594$ AA'
 ![DUP](sample_imgs/DUP_19113463_19118988.png)
