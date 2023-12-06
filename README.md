@@ -24,20 +24,25 @@ Installation using conda:
 * Install insilicosv with `conda install insilicosv`
 
 ## To Run
+The recommended workflow for running insilicoSV is as follows:
+1. Create a new directory
+2. Populate a simulation config file and place it in the directory
+3. Run insilicoSV providing the config file as input:
 ```
 insilicosv <config_yml>
 ```
+4. Results will be produced in this directory
 
-The config file syntax is detailed below.  Outputs go into the directory where the config file is stored.
+The config file syntax is detailed in the [Input guidelines](docs/input_guidelines.md) section of the
+documentation.
 
 ## Documentation
-For documentation outlining the different features of insilicoSV along with usage examples and data resources, please refer to the wiki:
+For documentation outlining the different features of insilicoSV along with usage examples and data resources, please refer to the following sections:
 <!-- toc -->
 - [Input guidelines](docs/input_guidelines.md)
 - [Example Use Cases](docs/example_use_cases.md)
 - [SV Grammar](docs/sv_grammar.md)
 - [Benchmark Genomes](docs/benchmark_genomes.md)
-- [Additional Utilities](docs/automated_pipelines_and_additional_utilities.md)
 - [Example SV Visualizations](docs/example_sv_visualizations.md)
 - [Tutorial Jupyter notebook](docs/demo_notebook.md)
 
