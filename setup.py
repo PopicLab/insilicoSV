@@ -5,7 +5,6 @@ setup(
     name = "insilicosv",
     version = "0.0.5",
     description = ("Structural variant simulation"),
-    license = "MIT",
     url = "https://github.com/PopicLab/insilicoSV",
 
     packages=['insilicosv'],

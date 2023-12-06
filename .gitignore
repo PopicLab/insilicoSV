@@ -30,3 +30,4 @@ workflows/chr21_ref/
 .snakemake/
 results/
 workflows/IGV_screenshots/
+
