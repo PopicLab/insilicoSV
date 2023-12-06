@@ -26,6 +26,7 @@ Installation using conda:
 ## To Run
 ```
 insilicosv <config_yml>
+```
 
 The config file syntax is detailed below.  Outputs go into the directory where the config file is stored.
 
@@ -38,6 +39,7 @@ For documentation outlining the different features of insilicoSV along with usag
 - [Benchmark Genomes](docs/benchmark_genomes.md)
 - [Additional Utilities](docs/automated_pipelines_and_additional_utilities.md)
 - [Example SV Visualizations](docs/example_sv_visualizations.md)
+- [Tutorial Jupyter notebook](docs/demo_notebook.md)
 
 
 ## Authors
