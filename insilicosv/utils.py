@@ -126,11 +126,11 @@ class OverlapEvents:
 
         # optional list of Alu pairs to be used as flanking Alus for DELs/DUPs (to simulate Alu-mediated CNVs)
         # --> dict of form {SV_identifier: [(chrom_1, a_1, b_1), ..., (chrom_n, a_n, b_n)]}
-        self.alu_pairs = self.populate_alu_pairs(config['SVs'])
+        self.alu_pairs = self.populate_alu_pairs(config['variant_sets'])
 
     def get_num_overlap_counts(self, config):
         # populate nested dict of the form {sv type: {element type: num_overlap}}
-        for sv in config['SVs']:
+        for sv in config['variant_sets']:
             sv_config_key = get_sv_config_identifier(sv)
             # building separate counts dictionaries for complete overlaps, partial overlaps, and alu-mediated intervals
             for overlap_count, count_dict in [('num_overlap', self.svtype_overlap_counts), ('num_partial_overlap', self.svtype_partial_overlap_counts)]:

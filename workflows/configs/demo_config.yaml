@@ -3,19 +3,19 @@ sim_settings:
     reference: 'chr21_ref/chr21.fa'
     max_tries: 200
     prioritize_top: True
-SVs:
+variant_sets:
     - type: "DEL"
       number: 5
-      min_length: 50
-      max_length: 1000
+      min_length: [50]
+      max_length: [1000]
     - type: "DUP"
       number: 5
-      min_length: 50
-      max_length: 1000
+      min_length: [50]
+      max_length: [1000]
     - type: "INV"
       number: 5
-      min_length: 50
-      max_length: 1000
+      min_length: [50]
+      max_length: [1000]
     - type: "dDUP"
       number: 5
       min_length:

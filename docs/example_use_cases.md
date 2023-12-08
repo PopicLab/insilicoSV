@@ -7,15 +7,15 @@ To incorporate SVs from the predefined library of SV types, a configuration file
 # YAML config file
 sim_settings:
     reference: {path}/{to}/ref.fa
-SVs:
+variant_sets:
     - type: "INS"
       number: 10
-      min_length: 5
-      max_length: 10
+      min_length: [5]
+      max_length: [10]
     - type: "INVdel"
       number: 2
-      min_length: 5
-      max_length: 10
+      min_length: [5]
+      max_length: [10]
     - type: "dupINVdel"
       number: 1
       min_length:
@@ -34,7 +34,7 @@ This [summary config](summary_config.md) contains an example specifying the even
 ### Example 1b - Example SNP/INDEL specification
 SNPs and INDELs are supported by insilicoSV as well. Because SNPs are only a single base in length, they only need to be specified with `number` as in the example below:
 ```yaml
-SVs:
+variant_sets:
   - type: "SNP"
     number: 10
 ```
@@ -46,7 +46,7 @@ Custom SVs can be specified by manually describing the desired variant with the 
 # YAML config file
 sim_settings:
     reference: {path}/{to}/ref.fa
-SVs:
+variant_sets:
     - type: "Custom"
       source: AB_C_D
       target: bb'_AEc'_EDC
@@ -85,7 +85,7 @@ To edit an input reference file with a known set of variants the user can provid
 # YAML config file
 sim_settings:
     reference: {path}/{to}/ref.fa
-SVs:
+variant_sets:
     - vcf_path: {path_to_vcf}
 ```
 ```
@@ -97,12 +97,12 @@ When initializing a new simulation the user can include a list of banned genome 
 ```yaml
 sim_settings:
     reference: {path}/{to}/ref.fa
-SVs:
-    - avoid_intervals: "{path}/{to}/{banned_intervals}.vcf"
+avoid_intervals: "{path}/{to}/{banned_intervals}.vcf"
+variant_sets:
     - type: "DEL"
       number: 3
-      min_length: 1000
-      max_length: 10000
+      min_length: [1000]
+      max_length: [10000]
     - type: "DUP"
       number: 3
     ...
@@ -120,20 +120,16 @@ sim_settings:
     reference: {path}/{to}/ref.fa
 overlap_events:
     bed: '/{path_to}/{candidate_overlap_events}.bed'
-SVs:
+variant_sets:
     - type: "DEL"
       number: 10
-      min_length:
-        - 5
-      max_length:
-        - 5
+      min_length: [5]
+      max_length: [5]
       num_overlap: 5
     - type: "DUP"
       number: 10
-      min_length:
-        - 5
-      max_length:
-        - 5
+      min_length: [5]
+      max_length: [5]
       num_overlap: 2
 ```
 Multiple BED files can be given as input and their records will be combined and drawn from during SV placement (in this
@@ -170,11 +166,11 @@ sim_settings:
     reference: {path}/{to}/ref.fa
 overlap_events:
     bed: '/{path_to}/{candidate_overlap_events}.bed'
-SVs:
+variant_sets:
     - type: "DEL"
       number: 10
-      min_length: 500
-      max_length: 1000
+      min_length: [500]
+      max_length: [1000]
       num_alu_mediated: 5
 ```
 
@@ -186,11 +182,11 @@ sim_settings:
 overlap_events:
     bed: ['/{path_to}/{candidate_overlap_events_1}.bed','/{path_to}/{candidate_overlap_events_2}.bed']
     allow_types: ['L1HS', 'L1PA3']
-SVs:
+variant_sets:
     - type: "DEL"
       number: 10
-      min_length: 500
-      max_length: 1000
+      min_length: [500]
+      max_length: [1000]
       num_overlap: [3, 5]
 ```
 By providing a list in the `num_overlap` field, each number given in the list will be interpreted as the desired overlap count for the corresponding entry in the `allow_types` list. As a result, any list given in the `num_overlap` field must be of the same length as the `allow_types` list. `0` is a valid entry in the `num_overlap` list, and are required if one wishes to only specify overlap counts for a subset of the element types given in `allow_types`.
@@ -203,11 +199,11 @@ sim_settings:
 overlap_events:
     bed: ['/{path_to}/{candidate_overlap_events_1}.bed','/{path_to}/{candidate_overlap_events_2}.bed']
     allow_types: ['L1HS', 'L1PA3']
-SVs:
+variant_sets:
     - type: "DEL"
       number: 10
-      min_length: 500
-      max_length: 1000
+      min_length: [500]
+      max_length: [1000]
       num_partial_overlap: [3, 5]
 ```
 
@@ -222,12 +218,10 @@ below (and if it is not provided it will be drawn uniformly from (0.5, 1.0)):
 ```yaml
 sim_settings:
     reference: {path}/{to}/ref.fa
-SVs:
+variant_sets:
     - type: "DIVERGENCE"
       number: 3
       divergence_prob: 0.2
-      min_length:
-        - 500
-      max_length:
-        - 1000
+      min_length: [500]
+      max_length: [1000]
 ```

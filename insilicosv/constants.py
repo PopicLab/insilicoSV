@@ -88,6 +88,5 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
 DEFAULT_CONFIG = {"sim_settings": {"max_tries": 100,
                                    "fail_if_placement_issues": False,
                                    "generate_log_file": False,
-                                   "filter_small_chr": True,
                                    "prioritize_top": False},
-                  "SVs": {}}
+                  "variant_sets": {}}

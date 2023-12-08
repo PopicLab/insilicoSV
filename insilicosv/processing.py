@@ -20,7 +20,7 @@ class FormatterIO:
         """
         check method for yaml given with SVs given for randomized placement on reference
         """
-        config_svs = config['SVs']
+        config_svs = config['variant_sets']
         for config_sv in config_svs:
             if "avoid_intervals" in config_sv:
                 continue
@@ -45,7 +45,7 @@ class FormatterIO:
         for parameter in config['sim_settings']:
             if parameter not in valid_optional_par:
                 raise Exception("\"{}\" is an invalid argument under sim_settings".format(parameter))
-        valid_keys = ["sim_settings", "SVs", "overlap_events"]  # valid arguments at the top level
+        valid_keys = ["sim_settings", "variant_sets", "overlap_events", "avoid_intervals"]  # valid arguments at the top level
         for key in config:
             if key not in valid_keys:
                 raise Exception("Unknown argument \"{}\"".format(key))
@@ -53,19 +53,21 @@ class FormatterIO:
     def postproc_config_dict(self):
         if 'sim_settings' not in self.config.keys():
             raise Exception("Must include \'sim_settings\' sections specifying at least \'reference\' path")
+        if "filter_small_chr" in self.config.keys() and not isinstance(self.config["filter_small_chr"], int):
+            raise Exception("Must provide value of type int to \'filter_small_chr\'")
         if "reference" not in self.config["sim_settings"]:
             raise Exception("Must include reference FASTA file in \'reference\' field of \'sim_settings\'")
         elif self.config["sim_settings"]["reference"].split(".")[-1] not in ["fa", "fna", "fasta"]:
             raise Exception("Input reference must be of type .fa, .fna, or .fasta")
-        if "vcf_path" not in self.config["SVs"][0]:
+        if "vcf_path" not in self.config["variant_sets"][0]:
             self.run_checks_randomized(self.config)
-        for config_sv in self.config['SVs']:
-            if "avoid_intervals" in config_sv or "vcf_path" in config_sv:
+        for config_sv in self.config['variant_sets']:
+            if "vcf_path" in config_sv:
                 continue
             # SV event length specification - not applicable for SNPs
             if config_sv["type"] != "SNP":
-                if isinstance(config_sv["min_length"], int):
-                    config_sv["length_ranges"] = [(config_sv["min_length"], config_sv["max_length"])]
+                if not isinstance(config_sv["min_length"], list) or not isinstance(config_sv["max_length"], list):
+                    raise Exception("Must provide entries of type list to \'min_length\' and \'max_length\'")
                 else:
                     config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
                 assert all(max_len >= min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
