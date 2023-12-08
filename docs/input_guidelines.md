@@ -12,23 +12,21 @@ sim_settings:
 variant_sets:
     - type: "INS"
       number: 10
-      min_length: 5
-      max_length: 10
+      min_length: [5]
+      max_length: [10]
     - type: "INVdel"
       number: 2
-      min_length: 5
-      max_length: 10
+      min_length: [5]
+      max_length: [10]
 ```
 
-Further examples of configuration files can be found in the documentation section [Example Use Cases](example_use_cases.md).
-
 The following parameters can be given for each variant set.  Each parameter is required unless otherwise specified.
-1. *type*: str, the variant type.  insilicoSV supports a predefined list of SV types and allows users to enter a custom transformation. Either "Custom" or one of the 19 predefined variant types named in the below table should be entered.
-2. *number*: int, describes how many of the specified variant type to simulate for this variant set.
-3. *min_length*: list, provides the minimum length for each variant part.  SNPs, indels and simple SVs have a single part, while complex SVs
+1. *type*: str - the variant type.  insilicoSV supports a predefined list of SV types and allows users to enter a custom transformation. Either "Custom" or one of the 19 predefined variant types named in [this figure](sv_grammar.md) should be entered.
+2. *number*: int - describes how many of the specified variant type to simulate for this variant set.
+3. *min_length*: list - provides the minimum length for each variant part.  SNPs, indels and simple SVs have a single part, while complex SVs
 may have multiple parts; e.g. INVdel variants have two.  The order of part lengths in the list must correspond to the alphabetical order
 of part names used when defining the variant type; see [Example 2](https://github.com/PopicLab/insilicoSV-dev/blob/develop/docs/example_use_cases.md#example-2---custom-svs) for an illustration. List of length=1 should be provided for variants with a single source interval.
-4. *max_length*: list, analogous to min_length.  Must provide the same number of entries as min_length, note that max_length >= min_length >= 0 for all elements in each
+4. *max_length*: list - analogous to min_length.  Must provide the same number of entries as min_length, note that max_length >= min_length >= 0 for all elements in each
 5. *source=None [for variant sets of type Custom]*: Source sequence for a custom SV, see below to find instructions on how to create a transformation
 6. *target=None [for variant sets of type Custom]*: Target sequence for a custom SV, see below to find instructions on how to create a transformation
 
@@ -42,7 +40,7 @@ The following parameters can be set under the "sim_settings" key to change defau
 
 The following parameters can be set on the top level of the config file and provide higher-order controls over SV placement:
 1. *avoid_intervals*: str - path to VCF containing intervals to be ignored during SV placement (see [example config](https://github.com/PopicLab/insilicoSV-dev/blob/develop/docs/example_use_cases.md#example-4---marking-banned-intervals-of-the-genome))
-2. *overlap_events*: str - path to BED file containing genome elements to be used for overlapping SV placement (see [example config](https://github.com/PopicLab/insilicoSV-dev/blob/develop/docs/example_use_cases.md#example-5---placing-events-at-known-repetitive-element-intervals))
+2. *overlap_events*: str - path to BED file containing genome elements to be used for overlapping SV placement (see [example config](https://github.com/PopicLab/insilicoSV-dev/blob/develop/docs/example_use_cases.md#example-5---placing-svs-at-known-repetitive-element-intervals))
 
 Examples of the full set of simulation options available through various config inputs can be found in the [example use cases](https://github.com/PopicLab/insilicoSV-dev/blob/develop/docs/example_use_cases.md) page.
 
