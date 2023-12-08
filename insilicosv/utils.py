@@ -13,39 +13,6 @@ class NestedDict(defaultdict):
     def __call__(self):
         return NestedDict(self.default_factory)
 
-
-def get_original_base_pos(genome_vcf, query_loc, query_chrom):
-    # calculates the input reference position of the base that corresponds
-    # to the one at position query_loc in the output reference (i.e., adjusts the
-    # input ref position by the cumulative change in ref length caused by
-    # the variants from [0, query_loc)
-    # **for now: just admits DEL, DUP, INV
-    vcf = VariantFile(genome_vcf)
-    # need to make sure vcf recs sorted by position and separated by chrom
-    vcf_recs = defaultdict(list)
-    for rec in vcf.fetch():
-        vcf_recs[rec.chrom].append((rec.id, rec.start, rec.stop))
-    for chrom in vcf_recs.keys():
-        vcf_recs[chrom].sort(key=lambda x: x[1])
-    # total the cumulative change in ref length from all the SVs *ending* before p
-    p = query_loc
-    i = 0
-    while i < len(vcf_recs[query_chrom]) and vcf_recs[query_chrom][i][1] <= p:
-        rec_id, rec_start, rec_stop = vcf_recs[query_chrom][i]
-        rec_len = rec_stop - rec_start
-        if rec_id == 'DEL' and rec_start <= p:
-            p += rec_len
-        if rec_id == 'DUP' and rec_stop <= p:
-            p -= rec_len
-        i += 1
-    # check if p is internal to an INV; edge case not covered by the above loop
-    surrounding_inv = next((rec for rec in vcf_recs[query_chrom] if rec[1] <= p < rec[2] and rec[0] == 'INV'), None)
-    if surrounding_inv is not None:
-        sv_id, sv_start, sv_end = surrounding_inv
-        p += (sv_end - sv_start) - ((p - sv_start) * 2 + 1)
-    return p
-
-
 def is_overlapping(event_ranges, addition, called_from_helper=False, strictly_partial=False):
     # addition: tuple (start, end)
     # event_ranges: list containing tuples
@@ -159,11 +126,11 @@ class OverlapEvents:
 
         # optional list of Alu pairs to be used as flanking Alus for DELs/DUPs (to simulate Alu-mediated CNVs)
         # --> dict of form {SV_identifier: [(chrom_1, a_1, b_1), ..., (chrom_n, a_n, b_n)]}
-        self.alu_pairs = self.populate_alu_pairs(config['SVs'])
+        self.alu_pairs = self.populate_alu_pairs(config['variant_sets'])
 
     def get_num_overlap_counts(self, config):
         # populate nested dict of the form {sv type: {element type: num_overlap}}
-        for sv in config['SVs']:
+        for sv in config['variant_sets']:
             sv_config_key = get_sv_config_identifier(sv)
             # building separate counts dictionaries for complete overlaps, partial overlaps, and alu-mediated intervals
             for overlap_count, count_dict in [('num_overlap', self.svtype_overlap_counts), ('num_partial_overlap', self.svtype_partial_overlap_counts)]:
@@ -357,15 +324,3 @@ class OverlapEvents:
         if partial_overlap and rand_elt is not None:
             rand_elt = self.get_partially_overlapping_interval(*rand_elt, minsize, maxsize)
         return rand_elt, elt_type
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Special use case for utils.py: Commandline access to get_original_base_pos()')
-    parser.add_argument('--genome_vcf', type=str, help='Path to vcf describing simulated SVs populating the synthetic genome')
-    parser.add_argument('--query_loc', type=int, help='Query genome locus (given with respect to synthetic reference)')
-    parser.add_argument('--query_chrom', type=int, help='Corresponding chromosome of the query locus')
-    args = parser.parse_args()
-
-    print('Input reference position corresponding to mutated reference position (%s) %d: %d' %
-          (args.query_chrom, args.query_loc, get_original_base_pos(args.genome_vcf, args.query_loc, args.query_chrom)))
-

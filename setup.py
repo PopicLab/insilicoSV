@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name = "insilicosv",
-    version = "0.0.5",
+    version = "0.0.6",
     description = ("Structural variant simulation"),
     url = "https://github.com/PopicLab/insilicoSV",
 
