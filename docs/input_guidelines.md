@@ -44,9 +44,9 @@ Each line/entry of the BED file describes a single SV component, which we descri
 7. *event_type*: Describes the transformation made by the event, either an INS, DEL, INV, TRA, DUP, INVDUP, or INVTRA.
 8. *event_size*: Size of the reference fragment impacted by the event
 9. *zygosity*: {0/1, 1/0} = heterozygous, 1/1 = homozygous. insilicoSV gives each SV a 50% chance of being heterozygous or homozygous, and if the SV is heterozygous it is given a 50% chance of being placed on haplotype A or B. 
-10. *parent_sv*: Describes the parent SV the event is a component of (for instance, the INV record from a dupINVdup will have "dupINVdup" as its parent SV). If a custom SV was provided, the name becomes "source>target"
-11. *nth_sv*: int, index to count each SV. All events of a SV belong in the same index.
-12. *order*: int, for insertion-like operations such as TRA, INS, or DUP, the "order" index describes in which order events that target the same position were compiled. Events with INV and DEL operations have an order of 0.
+10. *parent_sv*: Describes the parent SV the event is a component of, for instance "dupINVdup." If a custom SV was provided, the name becomes "source>target"
+11. *sv_id*: int, index to count up each SV (note: not the events). All events of a SV belong in the same index.
+
 
 Example BED file output are given below:
 ```

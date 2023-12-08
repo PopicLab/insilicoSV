@@ -18,7 +18,7 @@ class TestProcObject(TestObject):
 
     def extract_bed_records(self):
         # parse bed record into dict for easy comparison
-        # --> example split bed record: ['chr19', '0', '3', 'chr19', '0', '3', 'DEL', '3', '1/1', 'DEL', '1', '0']
+        # --> example split bed record: ['chr19', '0', '3', 'chr19', '0', '3', 'DEL', '3', '1/1', 'DEL', '1']
         bed_records = []
         with open(self.bed) as f:
             for line in f:
@@ -26,7 +26,7 @@ class TestProcObject(TestObject):
                 bed_record = {'source_chr': ln[0], 'source_s': ln[1], 'source_e': ln[2],
                               'target_chr': ln[3], 'target_s': ln[4], 'target_e': ln[5],
                               'ev_type': ln[6], 'len': ln[7], 'zyg': ln[8], 'parent_type': ln[9],
-                              'nth_sv': ln[10], 'order': ln[11]}
+                              'sv_id': ln[10]}
                 bed_records.append(bed_record)
         return bed_records
 
@@ -369,10 +369,7 @@ class TestProcessing(unittest.TestCase):
         self.assertTrue(all([record['source_chr'] == record['target_chr'] == chrom for record in records]))
         self.assertTrue(all([record['parent_type'] == sv_type for record in records]))
         self.assertTrue(all([record['len'] == len for record in records]))
-        self.assertTrue(all([record['nth_sv'] == '1' for record in records]))
-        self.assertTrue(
-            all([record['order'] == str(int(record['ev_type'] in constants.NONZERO_ORDER_OPERATIONS)) for record in
-                 records]))
+        self.assertTrue(all([record['sv_id'] == '1' for record in records]))
         self.assertTrue(set([record['zyg'] for record in records]) in [{'1/1'}, {'0/1'}, {'1/0'}])
 
     def singleton_event_vcf_tests(self, record, sv_type, chrom, possible_intervals, possible_targets=None):
@@ -522,7 +519,7 @@ class TestProcessing(unittest.TestCase):
     def test_nth_sv_entry(self):
         records = self.initialize_test(self.test_objects_multievent, 'INVdup')
         for i in range(len(records)):
-            self.assertTrue(records[i]['nth_sv'] == str(i + 1))
+            self.assertTrue(records[i]['sv_id'] == str(i + 1))
 
     def test_export_vcf_simple_events(self):
         for sv_type in ['DEL', 'DUP', 'INV', 'INS']:

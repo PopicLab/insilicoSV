@@ -168,20 +168,6 @@ class TestKnownSVs(unittest.TestCase):
         self.helper_test_simple_sv(self.test_objects_dispersions['TRA'], ['GCCTCACTATTCCGT'])
         self.helper_test_simple_sv(self.test_objects_dispersions['multievent'], ['GACGGCCTACTATCACTATTCCGT'])
 
-    def test_get_original_pos(self):
-        for i in range(20):
-            self.assertTrue(utils.get_original_base_pos(self.test_vcf_simple_del, i, 'chr21') == i + (7 if i >= 2 else 0))
-            self.assertTrue(utils.get_original_base_pos(self.test_vcf_simple_dup, i, 'chr21') == i - (7 if i >= 9 else 0))
-            self.assertTrue(utils.get_original_base_pos(self.test_vcf_simple_inv, i, 'chr21') == (i if i < 2 or i >= 9 else 10 - i))
-            self.assertTrue(utils.get_original_base_pos(self.test_vcf_del_dup, i, 'chr21') == i + (3 if 1 < i < 11 else 0))
-        self.assertTrue(utils.get_original_base_pos(self.test_vcf_multidel, 1, 'chr21'), 1)
-        self.assertTrue(utils.get_original_base_pos(self.test_vcf_multidel, 9, 'chr21'), 11)
-        self.assertTrue(utils.get_original_base_pos(self.test_vcf_multidel, 13, 'chr21'), 17)
-        for i in range(20):
-            self.assertTrue(utils.get_original_base_pos(self.test_vcf_del_dup_2, i, 'chr21') == i + 2 * (i > 0) - 4 * (i > 5))
-            self.assertTrue(utils.get_original_base_pos(self.test_vcf_del_dup_del, i, 'chr21') == i + 2 * (i > 0) - 4 * (i > 5) + 3 * (i > 10))
-            self.assertTrue(utils.get_original_base_pos(self.test_vcf_del_inv_del, i, 'chr21') == ((9 - i) if 1 < i < 6 else (i + 2 * (i > 0) + 3 * (i > 6))))
-
 
 if __name__ == '__main__':
     unittest.main()

@@ -46,11 +46,9 @@ class Operations(Enum):
     UNDEFINED = "UNDEFINED"
     DIV = "DIV"
 
-
 # list of operations corresponding to events that should have bed record with order > 0
 NONZERO_ORDER_OPERATIONS = [Operations.TRA.value, Operations.INS.value, Operations.DUP.value, Operations.INVDUP.value,
                             Operations.INVTRA.value, Operations.DIV.value]
-
 
 class Zygosity(Enum):
     UNDEFINED = -1

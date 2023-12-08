@@ -96,7 +96,7 @@ class FormatterIO:
             raise Exception("YAML File {} failed to be open".format(self.par_file))
         self.postproc_config_dict()
 
-    def write_to_file(self, sv, bedfile, source_s, source_e, target_s, target_e, transform, event, nth_sv, order=0):
+    def write_to_file(self, sv, bedfile, source_s, source_e, target_s, target_e, transform, event, sv_id):
         assert (not event.symbol.startswith(Symbols.DIS.value))
         if transform == Operations.INS.value:
             transform_length = event.length
@@ -114,8 +114,7 @@ class FormatterIO:
                        str(transform_length),
                        '%d/%d' % (int(sv.hap[0]), int(sv.hap[1])),
                        sv.name,
-                       str(nth_sv),
-                       str(order)]
+                       str(sv_id)]
                 fout.write("\t".join(row) + "\n")
 
     @staticmethod
@@ -189,7 +188,7 @@ class FormatterIO:
                 else:
                     ins_pos = None
                     order = 0
-                sv_record_info[src_sym]['order'] = order
+                # sv_record_info[src_sym]['order'] = order
         return sorted([params for params in sv_record_info.values()], key=lambda params: params['source_s'])
 
     def export_to_bedpe(self, svs, bedfile, ins_fasta=None, reset_file=True):
@@ -197,15 +196,14 @@ class FormatterIO:
             utils.reset_file(bedfile)
             if ins_fasta:
                 utils.reset_file(ins_fasta)
-        for nth_sv, sv in enumerate(svs):
+        for sv_id, sv in enumerate(svs):
             # SVs with multiple source events will be split into multiple bed records (one for each)
             if len(sv.events_dict) == 1:
                 ev = list(sv.sv_blocks.target_events_dict.values())[0] if sv.type == Variant_Type.INS\
                         else list(sv.events_dict.values())[0]
                 op = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)[1]
                 record_info = {'source_s': ev.start, 'source_e': ev.end, 'target_s': ev.start, 'target_e': ev.end,
-                               'transform': op, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv + 1,
-                               'order': int(op in NONZERO_ORDER_OPERATIONS)}
+                               'transform': op, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'sv_id': sv_id + 1}
                 self.write_to_file(**record_info)
                 if op == Operations.INS.value:
                     self.export_insertions(sv.start_chr, ev.start, ev.source_frag, ins_fasta)
@@ -216,7 +214,7 @@ class FormatterIO:
                 for ev in sv.events_dict.values():
                     if ev.symbol.startswith(Symbols.DIS.value):
                         continue
-                    sv_record_info[ev.symbol] = {'source_s': ev.start, 'source_e': ev.end, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'nth_sv': nth_sv + 1}
+                    sv_record_info[ev.symbol] = {'source_s': ev.start, 'source_e': ev.end, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'sv_id': sv_id + 1}
                     (target_s, target_e), operation = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)
                     sv_record_info[ev.symbol]['target_s'] = target_s
                     sv_record_info[ev.symbol]['target_e'] = target_e
