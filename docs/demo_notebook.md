@@ -11,8 +11,15 @@ reads at the sites of the simulated variants.
 
 To run the notebook, first create a conda environment with all dependencies
 used in the notebook.  The environment definition is provided in
-`workflows/insilicosv-demo-env.reqs.txt`.  After setting up
-[bioconda](https://bioconda.github.io/), create the environment with the command
+`workflows/insilicosv-demo-env.reqs.txt`.  First, set up
+[bioconda](https://bioconda.github.io/).   If you're using an M1 Mac,
+[install Rosetta 2](https://support.apple.com/en-us/HT211861), and run these commands:
+```
+conda config --add subdirs osx-64
+conda config --add subdirs noarch
+```
+
+Then, create the environment with the command
 
 ```
 conda create -n insilicosv-demo-env --file workflows/insilicosv-demo-env.reqs.txt
