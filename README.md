@@ -42,7 +42,6 @@ For documentation outlining the different features of insilicoSV along with usag
 - [Input guidelines](docs/input_guidelines.md)
 - [Example Use Cases](docs/example_use_cases.md)
 - [SV Grammar](docs/sv_grammar.md)
-- [Benchmark Genomes](docs/benchmark_genomes.md)
 - [Example SV Visualizations](docs/example_sv_visualizations.md)
 - [Tutorial Jupyter notebook](docs/demo_notebook.md)
 

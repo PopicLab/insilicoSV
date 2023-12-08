@@ -5,8 +5,8 @@ using insilicoSV to generate a synthetic diploid genome and simulating
 reads for downstream analysis. In the notebook, we provide an example
 configuration file including a small set of simple and complex
 variants, and we include calls to DWGSIM and PBSIM3 to generate short
-and long reads respectively. Additionally we include utilities to
-parse insilicoSV output and generate IGV pileup images of the aligned
+and long reads respectively. Additionally, we include utilities to
+parse insilicoSV output and plot the size distributions of the simulated SVs, as well as generate IGV pileup images of the aligned
 reads at the sites of the simulated variants.
 
 To run the notebook, first create a conda environment with all dependencies

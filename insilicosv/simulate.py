@@ -107,7 +107,7 @@ class SV_Simulator:
         config = self.formatter.config
         self.ref_file = config['sim_settings']['reference']
         self.ref_fasta = FastaFile(self.ref_file)
-        self.svs_config = config['SVs']
+        self.svs_config = config['variant_sets']
 
         self.sim_settings = config['sim_settings']
         if log_file and "generate_log_file" in self.sim_settings.keys():
@@ -138,10 +138,9 @@ class SV_Simulator:
         self.svs = []
         self.event_ranges = defaultdict(list)
 
-        for d in self.svs_config:
-            if "avoid_intervals" in d:
-                # extract {chrom: [(start, end)]} intervals from vcf, add intervals from vcf to event range
-                self.extract_vcf_event_intervals(d["avoid_intervals"])
+        if "avoid_intervals" in config:
+            # extract {chrom: [(start, end)]} intervals from vcf, add intervals from vcf to event range
+            self.extract_vcf_event_intervals(config["avoid_intervals"])
 
         self.overlap_events = None if "overlap_events" not in config.keys() \
             else utils.OverlapEvents(config, allow_chroms=self.order_ids)
@@ -202,8 +201,6 @@ class SV_Simulator:
         """
         if self.mode == "randomized":
             for sv_config in self.svs_config:
-                if "avoid_intervals" in sv_config:
-                    continue
                 for num in range(sv_config["number"]):
                     # logic for placing events at intervals given in overlap bed file:
                     # for the first (sv_config["num_overlap"]) events, instantiate the SV at the next valid repeat elt interval
@@ -229,7 +226,7 @@ class SV_Simulator:
                                                 div_prob=(None if 'divergence_prob' not in sv_config.keys() else sv_config['divergence_prob']))
 
                     # For divergent repeat simulation, need div_dDUP to be homozygous
-                    if self.sim_settings.get("homozygous_only", False) or random.randint(0, 1) or sv.type == Variant_Type.div_dDUP:
+                    if self.sim_settings.get("homozygous_only", False) or random.randint(0, 1):
                         sv.ishomozygous = Zygosity.HOMOZYGOUS
                         sv.hap = [True, True]
                     else:
