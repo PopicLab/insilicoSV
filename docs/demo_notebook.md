@@ -25,7 +25,7 @@ conda activate insilicosv-demo-env
 
 To ensure that the current insilicosv version is installed, run
 ```
-pip install insilicosv==0.0.6
+pip install --upgrade insilicosv
 ```
 
 and launch the notebook with `jupyter notebook workflows/demo.ipynb` .
