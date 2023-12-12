@@ -18,10 +18,10 @@ Installation using pip:
 
 * `$ pip install insilicosv`
 
-<!-- Installation using conda:
+Installation using conda:
 
 * Install and configure [bioconda](https://bioconda.github.io/)
-* Install insilicosv with `conda install insilicosv` -->
+* Install insilicosv with `conda install insilicosv`
 
 ## To Run
 The recommended workflow for running insilicoSV is as follows:
