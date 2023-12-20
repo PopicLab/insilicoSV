@@ -1,4 +1,4 @@
-# insilicoSV (WIP): a framework for structural variant simulation 
+# insilicoSV: a framework for structural variant simulation 
 
 ## Overview
 
