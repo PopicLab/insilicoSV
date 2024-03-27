@@ -20,6 +20,9 @@ dist/
 # Files sometimes left after tests
 test/inputs/test.fa
 test/inputs/test.fa.fai
+test/inputs/test*.fna
+test/inputs/test*.fna.fai
+test/inputs/par.yaml
 
 # Outputs from the demo notebook
 .ipynb_checkpoints

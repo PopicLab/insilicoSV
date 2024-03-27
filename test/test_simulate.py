@@ -798,10 +798,9 @@ class TestSVSimulator(unittest.TestCase):
                                 any('TCGTC' in frag for frag in [changed_frag_1, changed_frag_2]))
             if i == 2:
                 # test case for valid alu-pair selection taking precedence over single element overlap selection
-                # --> the single overlap element should fail to find the (18,22) Alu because it should be claimed by
-                # --> the alu-mediated DEL that will need that for the right breakpoint
-                self.assertIn((6, 20), sv_intervals)
-                self.assertNotIn((18, 22), sv_intervals)
+                # --> the single overlap element should have overlap_event == None because the only valid Alu should be
+                # --> claimed by the alu-mediated DEL that will need that for the right breakpoint
+                self.assertIsNone(curr_sim.svs[0].overlap_event)
             if i == 3:
                 # test case of specifying counts of zero for certain element types
                 self.assertIn((10, 18), sv_intervals)
