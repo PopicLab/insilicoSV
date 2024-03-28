@@ -1,13 +1,14 @@
+from collections import defaultdict
+import argparse
+import copy
+import itertools
 import os
 import random
-import itertools
-import copy  # <- utils for making copies of python objects
-import argparse
+
 import numpy as np
-from insilicosv.constants import *
-from collections import defaultdict
 from pysam import VariantFile
 
+from insilicosv.constants import Symbols
 
 class NestedDict(defaultdict):
     def __call__(self):
@@ -110,7 +111,7 @@ class OverlapEvents:
         # elements will be stored in a dict keyed on element name
         self.overlap_events_dict = defaultdict(list)
         self.allow_chroms = allow_chroms
-        self.allow_types = None if 'allow_types' not in config['overlap_events'].keys() else config['overlap_events']['allow_types']
+        self.allow_types =config['overlap_events'].get('allow_types')
         if isinstance(self.allow_types, str):
             self.allow_types = [self.allow_types]
         self.svtype_overlap_counts = defaultdict(NestedDict(int))
@@ -118,7 +119,7 @@ class OverlapEvents:
         self.svtype_alu_mediated_counts = defaultdict(NestedDict(int))
         self.get_num_overlap_counts(config)
 
-        if type(config['overlap_events']['bed']) is list:
+        if isinstance(config['overlap_events']['bed'], list):
             for bed_path in config['overlap_events']['bed']:
                 self.parse_bed_file(bed_path, allow_chroms=self.allow_chroms, allow_types=self.allow_types)
         else:
@@ -134,7 +135,7 @@ class OverlapEvents:
             sv_config_key = get_sv_config_identifier(sv)
             # building separate counts dictionaries for complete overlaps, partial overlaps, and alu-mediated intervals
             for overlap_count, count_dict in [('num_overlap', self.svtype_overlap_counts), ('num_partial_overlap', self.svtype_partial_overlap_counts)]:
-                if overlap_count in sv.keys():
+                if overlap_count in sv:
                     if isinstance(sv[overlap_count], int) and sv[overlap_count] > 0:
                         # set overlap type label based on specified allow_types
                         if self.allow_types is not None and len(self.allow_types) == 1:
@@ -146,7 +147,7 @@ class OverlapEvents:
                         for i in range(len(sv[overlap_count])):
                             if sv[overlap_count][i] > 0:  # <- only counting entries in list > 0
                                 count_dict[sv_config_key][self.allow_types[i]] = sv[overlap_count][i]
-            if 'num_alu_mediated' in sv.keys():
+            if 'num_alu_mediated' in sv:
                 self.svtype_alu_mediated_counts[sv_config_key] = sv['num_alu_mediated']
 
     def parse_bed_file(self, bed_fname, allow_chroms=None, allow_types=None):
@@ -169,31 +170,31 @@ class OverlapEvents:
                     continue
                 self.overlap_events_dict[elt_type].append((chr_name, int(start), int(end)))
         # shuffle the lists of each element type for random selection
-        for k in self.overlap_events_dict.keys():
+        for k in self.overlap_events_dict:
             random.shuffle(self.overlap_events_dict[k])
 
     def get_single_element_interval(self, sv_config_id, sv_config, partial_overlap):
         if len(self.overlap_events_dict) == 0:
             return None, None, None
         counts_dict = self.svtype_partial_overlap_counts if partial_overlap else self.svtype_overlap_counts
-        elt_type = list(counts_dict[sv_config_id].keys())[0]
+        elt_type = list(counts_dict[sv_config_id])[0]
         # if this elt_type doesn't have any matching elts in the element dict, remove it and move on to the next elt
-        while elt_type != 'ALL' and not any([elt_type in ovlp_type for ovlp_type in self.overlap_events_dict.keys()]):
+        while elt_type != 'ALL' and not any([elt_type in ovlp_type for ovlp_type in self.overlap_events_dict]):
             del counts_dict[sv_config_id][elt_type]
             if len(counts_dict[sv_config_id]) == 0:
                 del counts_dict[sv_config_id]
                 break
-            elt_type = list(counts_dict[sv_config_id].keys())[0]
+            elt_type = list(counts_dict[sv_config_id])[0]
         # if num_overlaps was given as a single number rather than an element-specific list, draw a random element for overlap
-        repeat_elt, retrieved_type = self.__getitem__(sv_config_id=sv_config_id,
-                                                      minsize=sv_config['length_ranges'][0][0],
-                                                      maxsize=sv_config['length_ranges'][0][1],
-                                                      elt_type=(None if elt_type == 'ALL' else elt_type),
-                                                      partial_overlap=partial_overlap)
+        repeat_elt, retrieved_type = self.get_repeat_elt(sv_config_id=sv_config_id,
+                                                         minsize=sv_config['length_ranges'][0][0],
+                                                         maxsize=sv_config['length_ranges'][0][1],
+                                                         elt_type=(None if elt_type == 'ALL' else elt_type),
+                                                         partial_overlap=partial_overlap)
         return repeat_elt, retrieved_type, elt_type
 
     def populate_alu_pairs(self, svs_config):
-        if not any('num_alu_mediated' in d.keys() for d in svs_config):
+        if not any('num_alu_mediated' in d for d in svs_config):
             return None
         # construct dict of form {chrom: [(start, end)]} Alu interval tuples
         alu_intervals = defaultdict(list)
@@ -201,20 +202,20 @@ class OverlapEvents:
             if 'Alu' in elt_type:
                 for chrom, start, end in elt_list:
                     alu_intervals[chrom].append((int(start), int(end)))
-        for chrom in alu_intervals.keys():
+        for chrom in alu_intervals:
             random.shuffle(alu_intervals[chrom])
         alu_pairs_dict = {}
         # construct the lists of viable flanking pairs for each SV config with a nonzero num_alu_mediated specified
         for sv_config in svs_config:
             sv_config_id = get_sv_config_identifier(sv_config)
-            if 'num_alu_mediated' in sv_config.keys():
+            if 'num_alu_mediated' in sv_config:
                 alu_intervals_copy = copy.deepcopy(alu_intervals)
                 alu_pairs = []
                 sv_min, sv_max = sv_config['min_length'], sv_config['max_length']
                 for _ in range(self.svtype_alu_mediated_counts[sv_config_id]):
                     viable_matches = []
                     while len(viable_matches) == 0:
-                        if len(alu_intervals_copy.keys()) == 0 or not any(len(v) > 1 for v in alu_intervals_copy.values()):
+                        if len(alu_intervals_copy) == 0 or not any(len(v) > 1 for v in alu_intervals_copy.values()):
                             break  # <-- no Alus remaining to choose from
                         # choose a random starting (left) Alu
                         rand_chrom = random.choice([chrom for chrom, alus in alu_intervals_copy.items() if len(alus) > 1])
@@ -277,20 +278,20 @@ class OverlapEvents:
         return elt_chrom, interval_left, interval_left + sv_size
 
     def decrement_counts(self, sv_config_id, input_elt_type, partial_overlap):
-        # decrement the relevant counts dict based on element extracted in __getitem__()
+        # decrement the relevant counts dict based on element extracted in get_repeat_elt()
         counts_dict = self.svtype_partial_overlap_counts if partial_overlap else self.svtype_overlap_counts
         counts_dict[sv_config_id][input_elt_type] -= 1
         if counts_dict[sv_config_id][input_elt_type] == 0:
             del counts_dict[sv_config_id][input_elt_type]
-            if len(counts_dict[sv_config_id].keys()) == 0:
+            if len(counts_dict[sv_config_id]) == 0:
                 del counts_dict[sv_config_id]
 
-    def __getitem__(self, sv_config_id, minsize, maxsize, elt_type=None, partial_overlap=False):
+    def get_repeat_elt(self, sv_config_id, minsize, maxsize, elt_type=None, partial_overlap=False):
         input_elt_type = 'ALL' if elt_type is None else elt_type
-        if elt_type in self.overlap_events_dict.keys():  # <- elt_type given, and elements of matching type are in the dict
+        if elt_type in self.overlap_events_dict:  # <- elt_type given, and elements of matching type are in the dict
             rand_elt = next((elt for elt in self.overlap_events_dict[elt_type] if minsize <= self.get_intrvl_len(*elt) <= maxsize), None) \
                         if not partial_overlap else next(elt for elt in self.overlap_events_dict[elt_type])
-        elif len(self.overlap_events_dict.keys()) > 0:  # <- element dict is non-empty; elt_type not given, or is given as a prefix
+        elif len(self.overlap_events_dict) > 0:  # <- element dict is non-empty; elt_type not given, or is given as a prefix
             if elt_type is None:
                 elt_type_mapping = {elt: elt_type for (elt_type, elt_list) in self.overlap_events_dict.items() for elt in elt_list}
                 # elt_type-agnostic branch: draw random element from combined list of elements across all types
@@ -300,7 +301,7 @@ class OverlapEvents:
                                  (self.elt_type_is_allowed(elt_type_mapping[elt]))), None)
             else:
                 # elt_type prefix branch: choose an element whose name begins with elt_type
-                prefix_matches = [element_type for element_type in self.overlap_events_dict.keys() if element_type.startswith(elt_type)]
+                prefix_matches = [element_type for element_type in self.overlap_events_dict if element_type.startswith(elt_type)]
                 if len(prefix_matches) > 0:
                     random.shuffle(prefix_matches)
                     elt_type = prefix_matches.pop()
@@ -319,7 +320,7 @@ class OverlapEvents:
             if len(self.overlap_events_dict[elt_type]) == 0:
                 del self.overlap_events_dict[elt_type]
             self.decrement_counts(sv_config_id, input_elt_type, partial_overlap)
-        elif elt_type in self.overlap_events_dict.keys():  # <- case in which elements of valid type but not size were available
+        elif elt_type in self.overlap_events_dict:  # <- case in which elements of valid type but not size were available
             self.decrement_counts(sv_config_id, input_elt_type, partial_overlap)
         if partial_overlap and rand_elt is not None:
             rand_elt = self.get_partially_overlapping_interval(*rand_elt, minsize, maxsize)

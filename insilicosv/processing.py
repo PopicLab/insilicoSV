@@ -1,13 +1,16 @@
-import yaml
-import sys
-import pysam
 import argparse
 import os
+import sys
 import time
-from insilicosv import utils
-from insilicosv.constants import *
-from pysam import FastaFile
 
+from pysam import FastaFile
+import pysam
+import yaml
+
+from insilicosv import utils
+from insilicosv.constants import \
+    MAX_BUFFER_SIZE, Variant_Type, DISPERSION_TYPES, Operations, \
+    NONZERO_ORDER_OPERATIONS, Symbols
 
 class FormatterIO:
     def __init__(self, par_file):
@@ -51,9 +54,9 @@ class FormatterIO:
                 raise Exception("Unknown argument \"{}\"".format(key))
 
     def postproc_config_dict(self):
-        if 'sim_settings' not in self.config.keys():
+        if 'sim_settings' not in self.config:
             raise Exception("Must include \'sim_settings\' sections specifying at least \'reference\' path")
-        if "filter_small_chr" in self.config.keys() and not isinstance(self.config["filter_small_chr"], int):
+        if "filter_small_chr" in self.config and not isinstance(self.config["filter_small_chr"], int):
             raise Exception("Must provide value of type int to \'filter_small_chr\'")
         if "reference" not in self.config["sim_settings"]:
             raise Exception("Must include reference FASTA file in \'reference\' field of \'sim_settings\'")
@@ -138,28 +141,28 @@ class FormatterIO:
         determines target interval and operation for multi-source events
         """
         # A -> A'
-        if ev + Symbols.DUP.value in target_events_dict.keys():
+        if ev + Symbols.DUP.value in target_events_dict:
             trg_sym = ev + Symbols.DUP.value
             return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), \
-                Operations.DUP.value if ev in target_events_dict.keys() else Operations.TRA.value
+                Operations.DUP.value if ev in target_events_dict else Operations.TRA.value
         # A -> a'
-        elif ev.lower() + Symbols.DUP.value in target_events_dict.keys():
+        elif ev.lower() + Symbols.DUP.value in target_events_dict:
             trg_sym = ev.lower() + Symbols.DUP.value
             return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.INVDUP.value
         # A -> a
-        elif ev.lower() in target_events_dict.keys():
+        elif ev.lower() in target_events_dict:
             trg_sym = ev.lower()
             return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.INV.value
         # A -> A* (in the case of a custom event in which an event is divergently duplicated)
-        elif ev + Symbols.DIV.value in target_events_dict.keys():
+        elif ev + Symbols.DIV.value in target_events_dict:
             trg_sym = ev + Symbols.DIV.value
             return (target_events_dict[trg_sym].start, target_events_dict[trg_sym].end), Operations.DIV.value
         # A -> A (insertion if source A is undefined, identity otherwise)
-        elif ev in target_events_dict.keys():
+        elif ev in target_events_dict:
             return (target_events_dict[ev].start, target_events_dict[ev].end), \
                 Operations.INS.value if source_events_dict[ev].start is None else Operations.IDENTITY.value
         # A -> [none]
-        elif ev not in [sym[0] for sym in target_events_dict.keys()]:
+        elif ev not in [sym[0] for sym in target_events_dict]:
             return (source_events_dict[ev].start, source_events_dict[ev].end), Operations.DEL.value
         # otherwise unknown mapping
         else:
@@ -178,7 +181,7 @@ class FormatterIO:
         for block in sv.target_symbol_blocks:
             for target_event in block:
                 if target_event.symbol.startswith(Symbols.DIS.value) or \
-                        target_event.symbol in sv_record_info.keys():  # <- prevent collision with A' and A if both in target
+                        target_event.symbol in sv_record_info:  # <- prevent collision with A' and A if both in target
                     continue
                 src_sym = target_event.symbol[0].upper()
                 if sv_record_info[src_sym]['transform'] in NONZERO_ORDER_OPERATIONS:

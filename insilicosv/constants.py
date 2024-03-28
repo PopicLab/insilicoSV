@@ -84,9 +84,3 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
           Variant_Type.INV_dDUP: [("A", "_"), ("A", "_", "a'")],
           Variant_Type.div_dDUP: [("A", "_"), ("A", "_", "A*")],
           Variant_Type.DIVERGENCE: [("A",), ("A*",)]}
-
-DEFAULT_CONFIG = {"sim_settings": {"max_tries": 100,
-                                   "fail_if_placement_issues": False,
-                                   "generate_log_file": False,
-                                   "prioritize_top": False},
-                  "variant_sets": {}}

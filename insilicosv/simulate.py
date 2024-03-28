@@ -1,14 +1,16 @@
-import random
-from insilicosv import utils
-import logging
-import time
+from collections import defaultdict
 from os import write
-from insilicosv.processing import FormatterIO, collect_args
+import logging
+import random
+import time
+
 from pysam import FastaFile
 from pysam import VariantFile
-from insilicosv.constants import *
-from insilicosv.structural_variant import Structural_Variant, Event
-from collections import defaultdict
+
+from insilicosv import utils
+from insilicosv.processing import FormatterIO, collect_args
+from insilicosv.constants import Variant_Type, Zygosity, Symbols
+from insilicosv.structural_variant import Structural_Variant
 
 time_start = time.time()
 
@@ -110,7 +112,7 @@ class SV_Simulator:
         self.svs_config = config['variant_sets']
 
         self.sim_settings = config['sim_settings']
-        if log_file and "generate_log_file" in self.sim_settings.keys():
+        if log_file and "generate_log_file" in self.sim_settings:
             logging.basicConfig(filename=log_file, filemode="w", level=logging.DEBUG,
                                 format='[%(name)s: %(levelname)s - %(asctime)s] %(message)s')
             self.log_to_file("YAML Configuration: {}".format(config))
@@ -142,7 +144,7 @@ class SV_Simulator:
             # extract {chrom: [(start, end)]} intervals from vcf, add intervals from vcf to event range
             self.extract_vcf_event_intervals(config["avoid_intervals"])
 
-        self.overlap_events = None if "overlap_events" not in config.keys() \
+        self.overlap_events = None if "overlap_events" not in config \
             else utils.OverlapEvents(config, allow_chroms=self.order_ids)
 
         self.initialize_svs()
@@ -208,13 +210,13 @@ class SV_Simulator:
                     elt_type = None
                     if self.overlap_events is not None:
                         sv_config_identifier = utils.get_sv_config_identifier(sv_config)
-                        if sv_config_identifier in self.overlap_events.svtype_overlap_counts.keys():
+                        if sv_config_identifier in self.overlap_events.svtype_overlap_counts:
                             repeat_elt, retrieved_type, elt_type = self.overlap_events.get_single_element_interval(
                                 sv_config_identifier, sv_config, partial_overlap=False)
-                        elif sv_config_identifier in self.overlap_events.svtype_partial_overlap_counts.keys():
+                        elif sv_config_identifier in self.overlap_events.svtype_partial_overlap_counts:
                             repeat_elt, retrieved_type, elt_type = self.overlap_events.get_single_element_interval(
                                 sv_config_identifier, sv_config, partial_overlap=True)
-                        elif sv_config_identifier in self.overlap_events.svtype_alu_mediated_counts.keys():
+                        elif sv_config_identifier in self.overlap_events.svtype_alu_mediated_counts:
                             repeat_elt, retrieved_type = self.overlap_events.get_alu_mediated_interval(sv_config_identifier)
                     if sv_config['type'] == Variant_Type.SNP:
                         sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode, length_ranges=[(1, 1)])
@@ -223,7 +225,7 @@ class SV_Simulator:
                                                 length_ranges=sv_config["length_ranges"], source=sv_config["source"],
                                                 target=sv_config["target"],
                                                 overlap_event=(repeat_elt + (retrieved_type if elt_type in ['ALL', None] else elt_type,) if repeat_elt is not None else None),
-                                                div_prob=(None if 'divergence_prob' not in sv_config.keys() else sv_config['divergence_prob']))
+                                                div_prob=sv_config.get("divergence_prob"))
 
                     # For divergent repeat simulation, need div_dDUP to be homozygous
                     if self.sim_settings.get("homozygous_only", False) or random.randint(0, 1):
@@ -368,10 +370,6 @@ class SV_Simulator:
                 sv.active = True
                 self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(new_intervals, rand_id, sv))
                 chr_event_ranges.extend(new_intervals)
-                # populates insertions with random sequence - these event symbols only show up in target transformation
-                for event in sv.events_dict.values():
-                    if event.source_frag is None and event.length > 0:
-                        event.source_frag = utils.generate_seq(event.length)
                 sv.assign_locations(sv.start)
             else:
                 inactive_svs_total += 1
