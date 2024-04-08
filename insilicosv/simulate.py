@@ -1,6 +1,7 @@
 from collections import defaultdict
 from os import write
 import logging
+import os
 import random
 import time
 
@@ -79,6 +80,7 @@ class StatsCollection:
         def write_item(fout, name, item, prefix=""):
             fout.write("{}{}: {}\n".format(prefix, str(name), str(item)))
 
+        os.makedirs(os.path.dirname(fileout), exist_ok=True)
         with open(fileout, "w") as fout:
             fout.write("===== Overview =====\n")
             write_item(fout, "SVs successfully simulated", str(self.active_svs) + "/" + str(self.total_svs))
@@ -120,13 +122,14 @@ class SV_Simulator:
         # get all chromosome ids
         self.order_ids = self.ref_fasta.references
         self.len_dict = dict()  # stores mapping with key = chromosome, value = chromosome length
+        self.filtered_chroms = set()
         for id in self.order_ids:
             chrom_len = self.ref_fasta.get_reference_length(id)
+            self.len_dict[id] = chrom_len
+            print("Length of chromosome {}: {}".format(id, self.len_dict[id]))
             if 'filter_small_chr' in self.sim_settings and chrom_len < self.sim_settings['filter_small_chr']:
+                self.filtered_chroms.add(id)
                 print("Filtering chromosome {}: Length of {} below threshold of {}".format(id, chrom_len, self.sim_settings['filter_small_chr']))
-            else:
-                self.len_dict[id] = chrom_len
-                print("Length of chromosome {}: {}".format(id, self.len_dict[id]))
 
         # initialize stats file to be generated after all edits and exporting are finished
         self.stats = StatsCollection(self.order_ids, self.len_dict)
@@ -165,7 +168,8 @@ class SV_Simulator:
         # random assignment of SV to a chromosome (unless we have a predetermined chromosome for this event)
         valid_chrs = self.order_ids
         if check_size is not None:
-            valid_chrs = [chrom for chrom, chr_size in self.len_dict.items() if chr_size >= check_size]
+            valid_chrs = [chrom for chrom, chr_size in self.len_dict.items() if chr_size >= check_size and
+                          chrom not in self.filtered_chroms]
         if len(valid_chrs) == 0:
             raise Exception("SVs are too big for the reference!")
         rand_id = valid_chrs[random.randint(0, len(valid_chrs) - 1)] if fixed_chrom is None else fixed_chrom
@@ -236,7 +240,7 @@ class SV_Simulator:
                         sv.hap = random.choice([[True, False], [False, True]])
 
                     self.svs.append(sv)
-            if not self.sim_settings["prioritize_top"]:
+            if not ("prioritize_top" in self.sim_settings and self.sim_settings["prioritize_top"]):
                 random.shuffle(self.svs)
         else:  # mode == "fixed"
             self.process_vcf(self.vcf_path)

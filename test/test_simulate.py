@@ -72,6 +72,7 @@ class TestSVSimulator(unittest.TestCase):
         # runs before every test
         self.ref_file = "test/inputs/test.fna"
         self.par = "test/inputs/par.yaml"
+        self.stats_file = "test/output/stats.txt"
 
         self.hap1 = "test/inputs/test1.fna"
         self.hap2 = "test/inputs/test2.fna"
@@ -578,7 +579,20 @@ class TestSVSimulator(unittest.TestCase):
                                                              "variant_sets": [{"type": "DEL", "number": 1,
                                                                       "max_length": [3],
                                                                       "min_length": [3]}]}],
-                                                      self.hap1, self.hap2, self.bed)]
+                                                      self.hap1, self.hap2, self.bed),
+                                           TestObject(
+                                               [self.ref_file, {"chr1": "CTCCGT",
+                                                                "chr2": "CTCCGT",
+                                                                "chr3": "CTCCGT",
+                                                                "chrM": "C"}],
+                                               [self.par,
+                                                {"sim_settings": {"reference": self.ref_file, "prioritize_top": True,
+                                                                  "filter_small_chr": 4},
+                                                 "variant_sets": [{"type": "DEL", "number": 1,
+                                                                   "max_length": [3],
+                                                                   "min_length": [3]}]}],
+                                               self.hap1, self.hap2, self.bed)
+                                           ]
 
         self.test_objects_req_space = [TestObject([self.ref_file, {"chr21": "CTCCGT"}],
                                                   [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True},
@@ -890,16 +904,23 @@ class TestSVSimulator(unittest.TestCase):
         self.assertEqual(curr_sim.event_ranges, {'chr19': [(15, 83), (0, 15)]})
 
     def test_chromosome_filtering(self):
-        for i in range(len(self.test_objects_filter_chroms)):
-            config_filter_chrom = self.test_objects_filter_chroms[i]
+        for config_filter_chrom, chrom_list in zip(self.test_objects_filter_chroms, [{'chr20'}, {'chr20', 'chr21'}, {'chrM'}]):
             config_filter_chrom.initialize_files()
             curr_sim = SV_Simulator(config_filter_chrom.par)
-            self.assertEqual(set(curr_sim.len_dict.keys()), ({'chr21'} if i == 0 else set()))
+            self.assertEqual(set(curr_sim.filtered_chroms), (chrom_list))
+            # checking for error in case where set of filtered chromosomes is equal to full set of ref chromosomes
+            if set(curr_sim.len_dict.keys()) == set(curr_sim.filtered_chroms):
+                with self.assertRaises(Exception):
+                    curr_sim.produce_variant_genome(config_filter_chrom.hap1, config_filter_chrom.hap2, config_filter_chrom.ref,
+                                                    config_filter_chrom.bed, export_to_file=False)
+            else:
+                curr_sim.produce_variant_genome(config_filter_chrom.hap1, config_filter_chrom.hap2, config_filter_chrom.ref,
+                                                config_filter_chrom.bed, export_to_file=False)
 
     def test_req_space_filtering(self):
-        config_req_sapce = self.test_objects_req_space[0]
-        config_req_sapce.initialize_files()
-        curr_sim = SV_Simulator(config_req_sapce.par)
+        config_req_space = self.test_objects_req_space[0]
+        config_req_space.initialize_files()
+        curr_sim = SV_Simulator(config_req_space.par)
         with self.assertRaises(Exception):
             curr_sim.choose_rand_pos(curr_sim.svs, curr_sim.ref_fasta)
 
