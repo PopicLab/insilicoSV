@@ -9,7 +9,8 @@ class Variant_Type(Enum):
     INV = "INV"
     DUP = "DUP"
     SNP = "SNP"
-    TRA = "TRA"
+    TRA_UNBALANCED = "TRA_UNBALANCED"
+    TRA_BALANCED = "TRA_BALANCED"
     dupINVdup = "dupINVdup"
     delINVdel = "delINVdel"
     delINVdup = "delINVdup"
@@ -29,8 +30,8 @@ class Variant_Type(Enum):
 
 
 # list of dispersion-based events (listing explicitly to prevent having to parse from symbols)
-DISPERSION_TYPES = [Variant_Type.dDUP, Variant_Type.INV_dDUP,
-                    Variant_Type.TRA, Variant_Type.div_dDUP,
+DISPERSION_TYPES = [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.TRA_UNBALANCED,
+                    Variant_Type.TRA_BALANCED, Variant_Type.div_dDUP,
                     Variant_Type.dDUP_iDEL, Variant_Type.INS_iDEL]
 
 
@@ -68,7 +69,8 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
           Variant_Type.DEL: [("A",), ()],
           Variant_Type.INV: [("A",), ("a",)],
           Variant_Type.DUP: [("A",), ("A", "A'")],
-          Variant_Type.TRA: [("A", "_"), ("_", "A'")],
+          Variant_Type.TRA_UNBALANCED: [("A", "_"), ("_", "A'")],
+          Variant_Type.TRA_BALANCED: [("A", "_", "B"), ("B'", "_", "A'")],
           Variant_Type.dupINVdup: [("A", "B", "C"), ("A", "c'", "b", "a'", "C")],
           Variant_Type.delINVdel: [("A", "B", "C"), ("b",)],
           Variant_Type.delINVdup: [("A", "B", "C"), ("c'", "b", "C")],

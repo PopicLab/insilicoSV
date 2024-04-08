@@ -31,7 +31,7 @@ class TestKnownSVs(unittest.TestCase):
         self.test_vcf_div_dDUP = "test/inputs/example_div_dDUP.vcf"
         self.test_vcf_dDUP = "test/inputs/example_dDUP.vcf"
         self.test_vcf_INV_dDUP = "test/inputs/example_INV_dDUP.vcf"
-        self.test_vcf_TRA = "test/inputs/example_TRA.vcf"
+        self.test_vcf_TRA_UNBAL = "test/inputs/example_TRA_UNBAL.vcf"
         self.test_vcf_multi_dispersion = "test/inputs/example_multi_dispersion.vcf"
 
         self.ref_file = "test/inputs/test.fna"
@@ -112,7 +112,7 @@ class TestKnownSVs(unittest.TestCase):
                                                                 self.hap1, self.hap2, self.bed),
                                          'TRA': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                            [self.par, {"sim_settings": {"reference": self.ref_file},
-                                                                       "variant_sets": [{"vcf_path": self.test_vcf_TRA}]}],
+                                                                       "variant_sets": [{"vcf_path": self.test_vcf_TRA_UNBAL}]}],
                                                            self.hap1, self.hap2, self.bed),
                                          'multievent': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                                   [self.par,

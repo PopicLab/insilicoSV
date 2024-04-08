@@ -80,7 +80,11 @@ chr21	124	135	chr21	159	160	TRA	    10	0/1	AB_C_D>bb'_AEc'_EDC	1	1
 ```
 
 ### Example 3 - Editing reference with known SVs
-To edit an input reference file with a known set of variants the user can provide them in a VCF file. The events in the VCF must be non-overlapping. All single-interval and dispersion-based predefined variant types are supported for this use case (i.e., DEL, DUP, INV, INS, dDUP, INV_dDUP, TRA, INVdup, and SNP). For insertions, VCF records may be specified with the insertion sequence given in an INFO field called `INSSEQ` (provided a matching header line is included as well). All VCF records are expected to include an info field `SVTYPE` to record variant type. The commandline call to perform this reference edit is:
+To edit an input reference file with a known set of variants the user can provide them in a VCF file. 
+The predefined variant types supported for this use case are DEL, DUP, INV, INS, dDUP, INV_dDUP, TRA_UNBALANCED, INVdup, 
+and SNP. For insertions, VCF records may be specified with the insertion sequence given in an INFO field called `INSSEQ`
+(provided a matching header line is included as well). All VCF records are expected to include an info field `SVTYPE`
+to record variant type. The commandline call to perform this reference edit is:
 ```yaml
 # YAML config file
 sim_settings:
@@ -154,7 +158,7 @@ The output VCF file will label which SVs were placed at specified intervals with
 ```
 chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVERLAP_EV=L1HS  GT  0/1
 ```
-For SVs involving dispersions (dDUP, INV_dDUP, TRA) the position is assigned such that the source event of the SV (the component
+For SVs involving dispersions (dDUP, INV_dDUP, TRA_UNBALANCED, TRA_BALANCED) the position is assigned such that the source event of the SV (the component
 getting duplicated or translocated) is placed at the selected element interval. For complex SVs with multiple non-dispersion
 source fragments (e.g., delINVdel), one of the non-dispersion source fragments is chosen at random to be the overlapping
 component with the selected known element.

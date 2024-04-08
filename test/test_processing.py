@@ -137,11 +137,11 @@ class TestProcessing(unittest.TestCase):
                                                                                "max_length": [3, 3],
                                                                                "min_length": [3, 3]}]}],
                                                                     self.hap1, self.hap2, self.bed, self.vcf),
-                                         'TRA': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
+                                         'TRA_UNBALANCED': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
                                                                [self.par,
                                                                 {"sim_settings": {"reference": self.ref_file,
                                                                                   "prioritize_top": True},
-                                                                 "variant_sets": [{"type": "TRA", "number": 1,
+                                                                 "variant_sets": [{"type": "TRA_UNBALANCED", "number": 1,
                                                                           "max_length": [3, 3],
                                                                           "min_length": [3, 3]}]}],
                                                                self.hap1, self.hap2, self.bed, self.vcf)}
@@ -441,7 +441,7 @@ class TestProcessing(unittest.TestCase):
                 self.assertTrue(records[2]['ev_type'] == 'INVDUP')
 
     def test_export_bedpe_dispersions(self):
-        for sv_type in ['dDUP', 'INV_dDUP', 'TRA']:
+        for sv_type in ['dDUP', 'INV_dDUP', 'TRA_UNBALANCED']:
             record = self.initialize_test(self.test_objects_dispersions, sv_type)[0]
             self.singleton_event_bed_tests([record], sv_type, 'chr19', '3')
             # interval checks accounting for forward or backward orientation of dispersion
@@ -451,7 +451,7 @@ class TestProcessing(unittest.TestCase):
                 self.assertTrue(record['ev_type'] == 'DUP')
             elif sv_type == 'INV_dDUP':
                 self.assertTrue(record['ev_type'] == 'INVDUP')
-            else:  # <- TRA
+            else:  # <- TRA_UNBALANCED
                 self.assertTrue(record['ev_type'] == 'TRA')
 
     def test_export_bedpe_del_inv(self):
@@ -533,7 +533,7 @@ class TestProcessing(unittest.TestCase):
             self.singleton_event_vcf_tests(record, sv_type, 'chr19', [('1', '6')])
 
     def test_export_vcf_dispersions(self):
-        for sv_type in ['dDUP', 'INV_dDUP', 'TRA']:
+        for sv_type in ['dDUP', 'INV_dDUP', 'TRA_UNBALANCED']:
             record = self.initialize_test(self.test_objects_dispersions, sv_type, output_type='vcf')[0]
             self.singleton_event_vcf_tests(record, sv_type, 'chr19', [('4', '6'), ('1', '3')], ['0', '6'])
 

@@ -183,16 +183,17 @@ class Structural_Variant:
                 disp_ev.source_frag = ref_fasta.fetch(disp_ev.source_chr, disp_ev.start, disp_ev.end)
                 self.events_dict[symbol] = disp_ev
         # storing the insertion seq for INSs/SNPs with an insertion sequence / alt allele given in the vcf
-        if vcf_record.info['SVTYPE'] == 'SNP':
+        if vcf_record.id == 'SNP':
             # NB: only supporting SNP records with a single allele ALT reported
             self.insseq_from_rec = vcf_record.alts[0]
-        if vcf_record.info['SVTYPE'] == 'INS':
+        if 'SVTYPE' in vcf_record.info and vcf_record.info['SVTYPE'] == 'INS':
             if 'INSSEQ' in vcf_record.info:
                 self.insseq_from_rec = vcf_record.info['INSSEQ'][0]
             source_ev = Event(length=source_len, symbol=Symbols.REQUIRED_SOURCE.value)
             self.events_dict[Symbols.REQUIRED_SOURCE.value] = source_ev
             self.start = vcf_record.start
             self.end = self.start
+            print(f'======= TEST {self.start=}, {self.end=}')
         else:
             self.start = self.events_dict[Symbols.REQUIRED_SOURCE.value].start
             self.end = self.events_dict[Symbols.REQUIRED_SOURCE.value].end if '_1' not in self.events_dict else self.events_dict['_1'].end
@@ -272,21 +273,7 @@ class Structural_Variant:
         else:
             for idx, block in enumerate(self.target_symbol_blocks):
                 new_frag = ''
-                if len(block) == 0:
-                    # TRA branch: delete the A-length interval on the opposite side of the dispersion as our A'
-                    if idx == 0:
-                        del_len = len(self.target_symbol_blocks[2][0].source_frag)
-                        disp_ev = self.target_symbol_blocks[1][0]
-                        block_start = disp_ev.start - del_len
-                        block_end = disp_ev.start
-                    else:
-                        del_len = len(self.target_symbol_blocks[idx - 2][0].source_frag)
-                        disp_ev = self.target_symbol_blocks[idx - 1][0]
-                        block_start = disp_ev.end
-                        block_end = block_start + del_len
-                    changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
-                    continue
-                if block[0].symbol.startswith(Symbols.DIS.value):
+                if len(block) == 0 or block[0].symbol.startswith(Symbols.DIS.value):
                     continue
                 for i in range(len(block)):
                     ev = block[i]
@@ -296,11 +283,10 @@ class Structural_Variant:
                     if i == len(block) - 1:
                         block_end = ev.end
                 changed_fragments.append([self.start_chr, block_start, block_end, new_frag])
-            # DEL logic: for all source events whose symbol doesn't appear (in any form) in the target symbols,
-            # create a deletion fragment over that interval
-            target_symbols = [ev.symbol[0].upper() for bl in self.target_symbol_blocks for ev in bl]
+            # Create a deletion over the source symbol unless it appears in the target as an INV or DIV
+            target_symbols = [ev.symbol.upper() for bl in self.target_symbol_blocks for ev in bl]
             for source_sym in self.events_dict.keys():
-                if not source_sym.startswith(Symbols.DIS.value) and source_sym not in target_symbols:
+                if source_sym not in target_symbols and source_sym + Symbols.DIV.value not in target_symbols:
                     del_ev = self.events_dict[source_sym]
                     changed_fragments.append([del_ev.source_chr, del_ev.start, del_ev.end, ''])
 

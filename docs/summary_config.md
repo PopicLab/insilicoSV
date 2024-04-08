@@ -20,7 +20,7 @@ SVs:
       max_length:
         - 1000  # minimum size for block A
         - 10000  # minimum size for block _
-    - type: "TRA"  # "A_" -> "_A"
+    - type: "TRA_UNBALANCED"  # "A_" -> "_A"
       number: 3
       min_length:
         - 500  # minimum size for block A
@@ -28,6 +28,16 @@ SVs:
       max_length:
         - 1000  # maximum size for block A
         - 10000  # maximum size for block _
+    - type: "TRA_BALANCED"  # "A_B" -> "B_A"
+      number: 3
+      min_length:
+        - 500  # minimum size for block A
+        - 5000  # minimum size for block _
+        - 500  # minimum size for block B
+      max_length:
+        - 1000  # maximum size for block A
+        - 10000  # maximum size for block _
+        - 1000  # maximum size for block B
     - type: "DEL"  # "A" -> ""
       number: 3
       min_length: 1000  # minimum size for block A

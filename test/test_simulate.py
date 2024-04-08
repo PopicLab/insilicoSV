@@ -177,7 +177,7 @@ class TestSVSimulator(unittest.TestCase):
         # test objects for bidirectional tests
         self.test_dispersion_objects = [TestObject([self.ref_file, {"Chromosome19": "CT"}],
                                                    [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "variant_sets": [
-                                                       {"type": "TRA",
+                                                       {"type": "TRA_UNBALANCED",
                                                         "number": 1,
                                                         "min_length": [1, 1],
                                                         "max_length": [1, 1]}]}],
@@ -209,6 +209,13 @@ class TestSVSimulator(unittest.TestCase):
                                                         "number": 1,
                                                         "min_length": [1, 1, 1],
                                                         "max_length": [1, 1, 1]}]}],
+                                                   self.hap1, self.hap2, self.bed),
+                                        TestObject([self.ref_file, {"Chromosome19": "CTTTA"}],
+                                                   [self.par, {"sim_settings": {"reference": self.ref_file, "prioritize_top": True}, "variant_sets": [
+                                                       {"type": "TRA_BALANCED",
+                                                        "number": 1,
+                                                        "min_length": [1, 1, 3],
+                                                        "max_length": [1, 1, 3]}]}],
                                                    self.hap1, self.hap2, self.bed)
                                         ]
         self.test_objects_ins = [TestObject([self.ref_file, {"Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
@@ -353,7 +360,7 @@ class TestSVSimulator(unittest.TestCase):
                                                             "overlap_events": {
                                                                 "bed": [self.test_overlap_bed, self.test_overlap_bed_2],
                                                                 "allow_types": ["L1HS", "AluSz6"]},
-                                                            "variant_sets": [{"type": "TRA", "number": 1,
+                                                            "variant_sets": [{"type": "TRA_UNBALANCED", "number": 1,
                                                                      "min_length": [4, 1],
                                                                      "max_length": [6, 1],
                                                                      "num_overlap": 1},
@@ -646,8 +653,8 @@ class TestSVSimulator(unittest.TestCase):
         self.helper_test_known_output_svs(self.test_objects_simple_invs[1], ['G'])
 
     def test_bidirectional_dispersion_events(self):
-        # TRA
-        # same output for forward and backward TRA
+        # TRA_UNBALANCED -- ref: CT
+        # same output for forward and backward TRA_UNBALANCED
         self.helper_test_known_output_svs(self.test_dispersion_objects[0], ['TC'])
         # dDUP
         # different output for forward and backward dDUP
@@ -658,6 +665,8 @@ class TestSVSimulator(unittest.TestCase):
         self.helper_test_known_output_svs(self.test_dispersion_objects[3], ['CTC', 'GTG'])
         # INS_iDEL
         self.helper_test_known_output_svs(self.test_dispersion_objects[4], ['TC', 'GT'])
+        # reciprocal TRA_BALANCED -- ref: CTA
+        self.helper_test_known_output_svs(self.test_dispersion_objects[5], ['ATTTC'])
 
     def test_overlap_placement_simple(self):
         # simple events
@@ -700,12 +709,12 @@ class TestSVSimulator(unittest.TestCase):
             if i == 0:
                 self.helper_test_known_output_svs(self.test_objects_overlap_cplx[i], ['CTGATGA', 'CGATGAT'])
             elif i == 1:
-                # TRA [5,10) -> [10]; INV_dDUP [1,2) -> [0] or [3] - source ref: CTGATATGGAC
+                # TRA_UNBALANCED [5,10) -> [10]; INV_dDUP [1,2) -> [0] or [3] - source ref: CTGATATGGAC
                 changed_frag_1, changed_frag_2 = self.helper_test_known_output_svs(self.test_objects_overlap_cplx[i])
                 # need to account for the events being placed on opposite haplotypes, so will check for each separately
                 # --> check for INV_dDUP in first four characters of output refs
                 self.assertTrue(changed_frag_1[:4] in ['CTGA', 'ACTG'] or changed_frag_2[:4] in ['CTGA', 'ACTG'])
-                # --> check for TRA in second half of refs
+                # --> check for TRA_UNBALANCED in second half of refs
                 self.assertTrue(changed_frag_1[-7:] in ['TCATGGA', 'ATGGATC'] or changed_frag_2[-7:] in ['TCATGGA', 'ATGGATC'])
             elif i == 2:
                 for sv in curr_sim.svs:

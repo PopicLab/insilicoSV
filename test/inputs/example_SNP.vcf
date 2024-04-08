@@ -12,4 +12,4 @@
 ##INFO=<ID=DP, Number=1,Type=Integer,Description="Read Depth">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
-chr21	3	SNP	A	G	.	PASS	SVTYPE=SNP;DP=60	GT	1/1
+chr21	3	SNP	A	G	.	PASS	DP=60	GT	1/1
