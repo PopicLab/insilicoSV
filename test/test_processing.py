@@ -1,14 +1,11 @@
 from insilicosv.simulate import SV_Simulator
 from insilicosv.processing import FormatterIO
-from test_simulate import TestObject
+from test.test_simulate import TestObject
 from pysam import VariantFile, FastaFile
 from collections import defaultdict, Counter
 from insilicosv.utils import NestedDict
 import unittest
-import sys
-import os
 from insilicosv import utils
-from insilicosv import constants
 
 
 class TestProcObject(TestObject):
@@ -62,269 +59,380 @@ class TestProcessing(unittest.TestCase):
         self.test_overlap_bed_11 = "test/inputs/example_overlap_events_11.bed"
 
         self.test_objects_simple_events = {'DEL': TestProcObject([self.ref_file, {"chr19": "CTG"}],
-                                                                 [self.par, {"sim_settings": {"reference": self.ref_file,
-                                                                                              "max_tries": 50, "prioritize_top": True},
-                                                                             "variant_sets": [{"type": "DEL", "number": 1,
-                                                                                      "max_length": [3],
-                                                                                      "min_length": [3]}]}],
+                                                                 [self.par,
+                                                                  {"sim_settings": {"reference": self.ref_file,
+                                                                                    "max_tries": 50,
+                                                                                    "prioritize_top": True},
+                                                                   "variant_sets": [{"type": "DEL", "number": 1,
+                                                                                     "length_ranges": [[3, 3]]}]}],
                                                                  self.hap1, self.hap2, self.bed, self.vcf),
                                            'DUP': TestProcObject([self.ref_file, {"chr19": "CTG"}],
-                                                                 [self.par, {"sim_settings": {"reference": self.ref_file,
-                                                                                              "max_tries": 50, "prioritize_top": True},
-                                                                             "variant_sets": [{"type": "DUP", "number": 1,
-                                                                                      "max_length": [3],
-                                                                                      "min_length": [3]}]}],
+                                                                 [self.par,
+                                                                  {"sim_settings": {"reference": self.ref_file,
+                                                                                    "max_tries": 50,
+                                                                                    "prioritize_top": True},
+                                                                   "variant_sets": [{"type": "DUP", "number": 1,
+                                                                                     "length_ranges": [[3, 3]]}]}],
                                                                  self.hap1, self.hap2, self.bed, self.vcf),
                                            'INV': TestProcObject([self.ref_file, {"chr19": "CTG"}],
-                                                                 [self.par, {"sim_settings": {"reference": self.ref_file,
-                                                                                              "max_tries": 50, "prioritize_top": True},
-                                                                             "variant_sets": [{"type": "INV", "number": 1,
-                                                                                      "max_length": [3],
-                                                                                      "min_length": [3]}]}],
+                                                                 [self.par,
+                                                                  {"sim_settings": {"reference": self.ref_file,
+                                                                                    "max_tries": 50,
+                                                                                    "prioritize_top": True},
+                                                                   "variant_sets": [{"type": "INV", "number": 1,
+                                                                                     "length_ranges": [[3, 3]]}]}],
                                                                  self.hap1, self.hap2, self.bed, self.vcf),
                                            'INS': TestProcObject([self.ref_file, {"chr19": "C"}],
-                                                                 [self.par, {"sim_settings": {"reference": self.ref_file,
-                                                                                              "max_tries": 50, "prioritize_top": True},
-                                                                             "variant_sets": [{"type": "INS", "number": 1,
-                                                                                      "max_length": [3],
-                                                                                      "min_length": [3]}]}],
+                                                                 [self.par,
+                                                                  {"sim_settings": {"reference": self.ref_file,
+                                                                                    "max_tries": 50,
+                                                                                    "prioritize_top": True},
+                                                                   "variant_sets": [{"type": "INS", "number": 1,
+                                                                                     "length_ranges": [[3, 3]]}]}],
                                                                  self.hap1, self.hap2, self.bed, self.vcf)}
         self.test_objects_flanked_inversions = {'dupINVdup': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
                                                                             [self.par,
-                                                                             {"sim_settings": {"reference": self.ref_file,
-                                                                                               "prioritize_top": True},
-                                                                              "variant_sets": [{"type": "dupINVdup", "number": 1,
-                                                                                       "max_length": [2, 2, 2],
-                                                                                       "min_length": [2, 2, 2]}]}],
+                                                                             {"sim_settings": {
+                                                                                 "reference": self.ref_file,
+                                                                                 "prioritize_top": True},
+                                                                              "variant_sets": [
+                                                                                  {"type": "dupINVdup", "number": 1,
+                                                                                   "length_ranges": [[2, 2], [2, 2], [2, 2]]}]}],
                                                                             self.hap1, self.hap2, self.bed, self.vcf),
                                                 'delINVdel': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
                                                                             [self.par,
-                                                                             {"sim_settings": {"reference": self.ref_file,
-                                                                                               "prioritize_top": True},
-                                                                              "variant_sets": [{"type": "delINVdel", "number": 1,
-                                                                                       "max_length": [2, 2, 2],
-                                                                                       "min_length": [2, 2, 2]}]}],
+                                                                             {"sim_settings": {
+                                                                                 "reference": self.ref_file,
+                                                                                 "prioritize_top": True},
+                                                                              "variant_sets": [
+                                                                                  {"type": "delINVdel", "number": 1,
+                                                                                   "length_ranges": [[2, 2], [2, 2], [2, 2]]}]}],
                                                                             self.hap1, self.hap2, self.bed, self.vcf),
                                                 'dupINVdel': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
                                                                             [self.par,
-                                                                             {"sim_settings": {"reference": self.ref_file,
-                                                                                               "prioritize_top": True},
-                                                                              "variant_sets": [{"type": "dupINVdel", "number": 1,
-                                                                                       "max_length": [2, 2, 2],
-                                                                                       "min_length": [2, 2, 2]}]}],
+                                                                             {"sim_settings": {
+                                                                                 "reference": self.ref_file,
+                                                                                 "prioritize_top": True},
+                                                                              "variant_sets": [
+                                                                                  {"type": "dupINVdel", "number": 1,
+                                                                                   "length_ranges": [[2, 2], [2, 2], [2, 2]]}]}],
                                                                             self.hap1, self.hap2, self.bed, self.vcf),
                                                 'delINVdup': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
                                                                             [self.par,
-                                                                             {"sim_settings": {"reference": self.ref_file,
-                                                                                               "prioritize_top": True},
-                                                                              "variant_sets": [{"type": "delINVdup", "number": 1,
-                                                                                       "max_length": [2, 2, 2],
-                                                                                       "min_length": [2, 2, 2]}]}],
+                                                                             {"sim_settings": {
+                                                                                 "reference": self.ref_file,
+                                                                                 "prioritize_top": True},
+                                                                              "variant_sets": [
+                                                                                  {"type": "delINVdup", "number": 1,
+                                                                                   "length_ranges": [[2, 2], [2, 2], [2, 2]]}]}],
                                                                             self.hap1, self.hap2, self.bed, self.vcf)}
         self.test_objects_dispersions = {'dDUP': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
                                                                 [self.par,
                                                                  {"sim_settings": {"reference": self.ref_file,
                                                                                    "prioritize_top": True},
                                                                   "variant_sets": [{"type": "dDUP", "number": 1,
-                                                                           "max_length": [3, 3],
-                                                                           "min_length": [3, 3]}]}],
+                                                                                    "length_ranges": [[3, 3], [3, 3]]}]}],
                                                                 self.hap1, self.hap2, self.bed, self.vcf),
                                          'INV_dDUP': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
                                                                     [self.par,
                                                                      {"sim_settings": {"reference": self.ref_file,
                                                                                        "prioritize_top": True},
                                                                       "variant_sets": [{"type": "INV_dDUP", "number": 1,
-                                                                               "max_length": [3, 3],
-                                                                               "min_length": [3, 3]}]}],
+                                                                                        "length_ranges": [[3, 3], [3, 3]]}]}],
                                                                     self.hap1, self.hap2, self.bed, self.vcf),
-                                         'TRA_UNBALANCED': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
+                                         'TRA_NONRECIPROCAL': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
                                                                [self.par,
                                                                 {"sim_settings": {"reference": self.ref_file,
                                                                                   "prioritize_top": True},
-                                                                 "variant_sets": [{"type": "TRA_UNBALANCED", "number": 1,
-                                                                          "max_length": [3, 3],
-                                                                          "min_length": [3, 3]}]}],
+                                                                 "variant_sets": [{"type": "TRA_NONRECIPROCAL", "number": 1,
+                                                                                   "length_ranges": [[3, 3], [3, 3]]}]}],
                                                                self.hap1, self.hap2, self.bed, self.vcf)}
         self.test_objects_del_inv = {'delINV': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
                                                               [self.par,
                                                                {"sim_settings": {"reference": self.ref_file,
                                                                                  "prioritize_top": True},
                                                                 "variant_sets": [{"type": "delINV", "number": 1,
-                                                                         "max_length": [3, 3],
-                                                                         "min_length": [3, 3]}]}],
+                                                                                  "length_ranges": [[3, 3], [3, 3]]}]}],
                                                               self.hap1, self.hap2, self.bed, self.vcf),
                                      'INVdel': TestProcObject([self.ref_file, {"chr19": "ACTGTC"}],
                                                               [self.par,
                                                                {"sim_settings": {"reference": self.ref_file,
                                                                                  "prioritize_top": True},
                                                                 "variant_sets": [{"type": "INVdel", "number": 1,
-                                                                         "max_length": [3, 3],
-                                                                         "min_length": [3, 3]}]}],
+                                                                                  "length_ranges": [[3, 3], [3, 3]]}]}],
                                                               self.hap1, self.hap2, self.bed, self.vcf)}
         self.test_objects_idel = {'dDUP_iDEL': TestProcObject([self.ref_file, {"chr19": "ACTGTCAG"}],
                                                               [self.par,
                                                                {"sim_settings": {"reference": self.ref_file,
                                                                                  "prioritize_top": True},
                                                                 "variant_sets": [{"type": "dDUP_iDEL", "number": 1,
-                                                                         "max_length": [3, 3, 2],
-                                                                         "min_length": [3, 3, 2]}]}],
+                                                                                  "length_ranges": [[3, 3], [3, 3], [2, 2]]}]}],
                                                               self.hap1, self.hap2, self.bed, self.vcf),
                                   'INS_iDEL': TestProcObject([self.ref_file, {"chr19": "ACTGTCAG"}],
                                                              [self.par,
                                                               {"sim_settings": {"reference": self.ref_file,
                                                                                 "prioritize_top": True},
                                                                "variant_sets": [{"type": "INS_iDEL", "number": 1,
-                                                                        "max_length": [3, 3, 2],
-                                                                        "min_length": [3, 3, 2]}]}],
+                                                                                 "length_ranges": [[3, 3], [3, 3], [2, 2]]}]}],
                                                              self.hap1, self.hap2, self.bed, self.vcf)}
         self.test_objects_dup_inv = {'dup_INV': TestProcObject([self.ref_file, {"chr19": "ACTGTCAG"}],
                                                                [self.par,
                                                                 {"sim_settings": {"reference": self.ref_file,
                                                                                   "prioritize_top": True},
                                                                  "variant_sets": [{"type": "dup_INV", "number": 1,
-                                                                          "max_length": [4, 4],
-                                                                          "min_length": [4, 4]}]}],
+                                                                                   "length_ranges": [[4, 4], [4, 4]]}]}],
                                                                self.hap1, self.hap2, self.bed, self.vcf),
                                      'INV_dup': TestProcObject([self.ref_file, {"chr19": "ACTGTCAG"}],
                                                                [self.par,
                                                                 {"sim_settings": {"reference": self.ref_file,
                                                                                   "prioritize_top": True},
                                                                  "variant_sets": [{"type": "INV_dup", "number": 1,
-                                                                          "max_length": [4, 4],
-                                                                          "min_length": [4, 4]}]}],
+                                                                                   "length_ranges": [[4, 4], [4, 4]]}]}],
                                                                self.hap1, self.hap2, self.bed, self.vcf)}
         self.test_objects_INVdup = {'INVdup': TestProcObject([self.ref_file, {"chr19": "ACTG"}],
                                                              [self.par,
                                                               {"sim_settings": {"reference": self.ref_file,
                                                                                 "prioritize_top": True},
                                                                "variant_sets": [{"type": "INVdup", "number": 1,
-                                                                        "max_length": [4],
-                                                                        "min_length": [4]}]}],
+                                                                                 "length_ranges": [[4, 4]]}]}],
                                                              self.hap1, self.hap2, self.bed, self.vcf)}
-        self.test_objects_multievent = {'INVdup': TestProcObject([self.ref_file, {"chr19": "ACTGCTAATGCGTTCACTGCTAATGCGTTC"}],
-                                                                 [self.par,
-                                                                  {"sim_settings": {"reference": self.ref_file,
-                                                                                    "max_tries": 200, "prioritize_top": True},
-                                                                   "variant_sets": [{"type": "INVdup", "number": 3,
-                                                                            "max_length": [4],
-                                                                            "min_length": [2]}]}],
-                                                                 self.hap1, self.hap2, self.bed, self.vcf)}
-        self.test_objects_overlap_simple = {'overlap1': TestProcObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                                       [self.par, {"sim_settings": {"reference": self.ref_file,
-                                                                                                    "prioritize_top": True,
-                                                                                                    "fail_if_placement_issues": True},
-                                                                                   "overlap_events": {
-                                                                                   "bed": [self.test_overlap_bed, self.test_overlap_bed_2],
-                                                                                   "allow_types": ["L1HS", "ALR/Alpha"]},
-                                                                                   "variant_sets": [{"type": "DEL", "number": 5,
-                                                                                            "min_length": [1], "max_length": [5],
-                                                                                            "num_overlap": [2, 1]}]}],
-                                                                       self.hap1, self.hap2, self.bed, self.vcf),
-                                            'overlap2': TestProcObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                                       [self.par, {"sim_settings": {"reference": self.ref_file,
-                                                                                                    "prioritize_top": True},
-                                                                                   "overlap_events": {
-                                                                                   "bed": [self.test_overlap_bed, self.test_overlap_bed_2],
-                                                                                   "allow_types": ["L1HS", "ALR/Alpha"]},
-                                                                                   "variant_sets": [{"type": "DEL", "number": 4,
-                                                                                            "min_length": [1], "max_length": [5],
-                                                                                            "num_overlap": [3, 1]}]}],
-                                                                       self.hap1, self.hap2, self.bed, self.vcf),
-                                            'overlap3': TestProcObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                                       [self.par, {"sim_settings": {"reference": self.ref_file,
-                                                                                                    "prioritize_top": True,
-                                                                                                    "fail_if_placement_issues": True},
-                                                                                   "overlap_events": {
-                                                                                   "bed": [self.test_overlap_bed, self.test_overlap_bed_2],
-                                                                                   "allow_types": ["L1", "ALR"]},
-                                                                                   "variant_sets": [{"type": "DEL", "number": 5,
-                                                                                            "min_length": [1], "max_length": [5],
-                                                                                            "num_overlap": [3, 2]}]}],
-                                                                       self.hap1, self.hap2, self.bed, self.vcf),
-                                            'overlap4': TestProcObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                                       [self.par, {"sim_settings": {"reference": self.ref_file,
-                                                                                                    "prioritize_top": True,
-                                                                                                    "fail_if_placement_issues": True},
-                                                                                   "overlap_events": {
-                                                                                       "bed": [self.test_overlap_bed, self.test_overlap_bed_2],
-                                                                                       "allow_types": "L1"},
-                                                                                   "variant_sets": [{"type": "DEL", "number": 5,
-                                                                                            "min_length": [1], "max_length": [5],
-                                                                                            "num_overlap": 2}]}],
-                                                                       self.hap1, self.hap2, self.bed, self.vcf),
-                                            'overlap5': TestProcObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                                       [self.par, {"sim_settings": {"reference": self.ref_file,
-                                                                                                    "prioritize_top": True,
-                                                                                                    "fail_if_placement_issues": True},
-                                                                                   "overlap_events": {
-                                                                                        "bed": self.test_overlap_bed_3,
-                                                                                        "allow_types": "ALR"},
-                                                                                   "variant_sets": [{"type": "DEL", "number": 5,
-                                                                                            "min_length": [1], "max_length": [5],
-                                                                                            "num_overlap": 2}]}],
-                                                                       self.hap1, self.hap2, self.bed, self.vcf),
-                                            'overlap6': TestProcObject([self.ref_file, {"chr21": "CCTCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTATCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                                       [self.par, {"sim_settings": {"reference": self.ref_file,
-                                                                                                    "prioritize_top": True,
-                                                                                                    "fail_if_placement_issues": True},
-                                                                                   "overlap_events": {"bed": self.test_overlap_bed_11,
-                                                                                                      "allow_types": ['Alu', 'L1', 'L2', 'SVA', 'HERVK']},
-                                                                                   "variant_sets": [{"type": "DEL", "number": 5,
-                                                                                            "min_length": [2], "max_length": [4],
-                                                                                            "num_overlap": [1, 1, 1, 1, 1]},
-                                                                                           {"type": "DEL", "number": 5,
-                                                                                            "min_length": [6], "max_length": [8],
-                                                                                            "num_overlap": [1, 1, 1, 1, 1]}]}],
-                                                                       self.hap1, self.hap2, self.bed, self.vcf),
-                                            'overlap7': TestProcObject([self.ref_file, {"chr21": "CCTCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTATCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                                       [self.par, {"sim_settings": {"reference": self.ref_file,
-                                                                                                    "prioritize_top": True,
-                                                                                                    "fail_if_placement_issues": True},
-                                                                        "overlap_events": {"bed": self.test_overlap_bed_11,
-                                                                                           "allow_types": ['Alu', 'L1', 'L2', 'SVA', 'HERVK']},
-                                                                                   "variant_sets": [{"type": "DEL", "number": 5,
-                                                                                            "min_length": [1], "max_length": [1],
-                                                                                            "num_partial_overlap": [1, 1, 1, 1, 1]},
-                                                                                           {"type": "DEL", "number": 5,
-                                                                                            "min_length": [2], "max_length": [2],
-                                                                                            "num_partial_overlap": [1, 1, 1, 1, 1]}]}],
-                                                                       self.hap1, self.hap2, self.bed, self.vcf),
-                                            'overlap8': TestProcObject([self.ref_file, {"chr21": "CCTCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTATCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                                       [self.par, {"sim_settings": {"reference": self.ref_file,
-                                                                                                    "prioritize_top": True,
-                                                                                                    "fail_if_placement_issues": True},
-                                                                                   "overlap_events": {"bed": self.test_overlap_bed_11,
-                                                                                                      "allow_types": ['Alu', 'L1', 'L2', 'SVA', 'HERVK']},
-                                                                                   "variant_sets": [{"type": "dDUP", "number": 5,
-                                                                                            "min_length": [2, 1], "max_length": [4, 1],
-                                                                                            "num_overlap": [1, 1, 1, 1, 1]},
-                                                                                           {"type": "dDUP", "number": 5,
-                                                                                            "min_length": [6, 1], "max_length": [8, 1],
-                                                                                            "num_overlap": [1, 1, 1, 1, 1]}]}],
-                                                                       self.hap1, self.hap2, self.bed, self.vcf),
-                                            'overlap9': TestProcObject([self.ref_file, {"chr21": "CCTCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTATCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                                       [self.par, {"sim_settings": {"reference": self.ref_file,
-                                                                                                    "prioritize_top": True,
-                                                                                                    "fail_if_placement_issues": True},
-                                                                                   "overlap_events": {"bed": self.test_overlap_bed_11,
-                                                                                                      "allow_types": ['Alu', 'L1', 'L2', 'SVA', 'HERVK']},
-                                                                                   "variant_sets": [{"type": "dDUP", "number": 5,
-                                                                                            "min_length": [1, 1], "max_length": [1, 1],
-                                                                                            "num_partial_overlap": [1, 1, 1, 1, 1]},
-                                                                                           {"type": "dDUP", "number": 5,
-                                                                                            "min_length": [1, 1], "max_length": [2, 1],
-                                                                                            "num_partial_overlap": [1, 1, 1, 1, 1]}]}],
-                                                                       self.hap1, self.hap2, self.bed, self.vcf)
-                                            }
-        self.test_objects_alu_mediated = {'alu_med1': TestProcObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
-                                                                     [self.par, {"sim_settings": {"reference": self.ref_file,
-                                                                                                  "prioritize_top": True,
-                                                                                                  "fail_if_placement_issues": True},
-                                                                                 "overlap_events": {"bed": self.test_overlap_bed_4},
-                                                                                 "variant_sets": [{"type": "DEL", "number": 1,
-                                                                                          "min_length": [13], "max_length": [15],
-                                                                                          "num_alu_mediated": 1}]}],
-                                                                     self.hap1, self.hap2, self.bed, self.vcf)}
+        self.test_objects_multievent = {
+            'INVdup': TestProcObject([self.ref_file, {"chr19": "ACTGCTAATGCGTTCACTGCTAATGCGTTC"}],
+                                     [self.par,
+                                      {"sim_settings": {"reference": self.ref_file,
+                                                        "max_tries": 200, "prioritize_top": True},
+                                       "variant_sets": [{"type": "INVdup", "number": 3,
+                                                         "length_ranges": [[2, 4]]}]}],
+                                     self.hap1, self.hap2, self.bed, self.vcf)}
+        self.test_objects_overlap_simple = {
+            'overlap1': TestProcObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                       [self.par, {"sim_settings": {"reference": self.ref_file,
+                                                                    "prioritize_top": True,
+                                                                    "max_tries": 2000,
+                                                                    "fail_if_placement_issues": True},
+                                                   "overlap_regions": [self.test_overlap_bed, self.test_overlap_bed_2],
+                                                   "variant_sets": [{"type": "DEL", "number": 1,
+                                                                     "length_ranges": [[1, 3]],
+                                                                     "overlap_type": "exact",
+                                                                     "overlap_region_type": "L1HS"},
+                                                                    {"type": "DEL", "number": 1,
+                                                                     "length_ranges": [[1, 5]],
+                                                                     "overlap_type": "exact",
+                                                                     "overlap_region_type": "ALR/Alpha"}
+                                                                    ]}],
+                                       self.hap1, self.hap2, self.bed, self.vcf),
+            'overlap2': TestProcObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                       [self.par, {"sim_settings": {"reference": self.ref_file,
+                                                                    "prioritize_top": True,
+                                                                    "max_tries": 2000,
+                                                                    "fail_if_placement_issues": True},
+                                                   "overlap_regions": [self.test_overlap_bed, self.test_overlap_bed_2],
+                                                   "variant_sets": [{"type": "DEL", "number": 2,
+                                                                     "length_ranges": [[1, 3]],
+                                                                     "overlap_type": "exact",
+                                                                     "overlap_region_type": "L1"},
+                                                                    {"type": "DEL", "number": 2,
+                                                                     "length_ranges": [[1, 5]],
+                                                                     "overlap_type": "exact",
+                                                                     "overlap_region_type": "ALR"}
+                                                                    ]}],
+                                       self.hap1, self.hap2, self.bed, self.vcf),
+            'overlap3': TestProcObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                       [self.par, {"sim_settings": {"reference": self.ref_file,
+                                                                    "prioritize_top": True,
+                                                                    "max_tries": 2000,
+                                                                    "fail_if_placement_issues": True},
+                                                   "overlap_regions": [self.test_overlap_bed, self.test_overlap_bed_2],
+                                                   "variant_sets": [{"type": "DEL", "number": 2,
+                                                                     "length_ranges": [[1, 5]],
+                                                                     "overlap_type": "exact",
+                                                                     "overlap_region_type": "L1HS"}
+                                                                    ]}],
+                                       self.hap1, self.hap2, self.bed, self.vcf),
+            'overlap4': TestProcObject([self.ref_file, {
+                "chr21": "CCTCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTATCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                       [self.par, {"sim_settings": {"reference": self.ref_file,
+                                                                    "prioritize_top": True,
+                                                                    "max_tries": 2000,
+                                                                    "fail_if_placement_issues": True},
+                                                   "overlap_regions": self.test_overlap_bed_11,
+                                                   "variant_sets": [{"type": "DEL", "number": 1,
+                                                                     "length_ranges": [[1, 1]],
+                                                                     "overlap_type": "partial",
+                                                                     "overlap_region_type": "L2"},
+                                                                    {"type": "DEL", "number": 1,
+                                                                     "length_ranges": [[1, 1]],
+                                                                     "overlap_type": "partial",
+                                                                     "overlap_region_type": "HERVK"}
+                                                                     ]}],
+                                       self.hap1, self.hap2, self.bed, self.vcf),
+            'overlap5': TestProcObject([self.ref_file, {
+                "chr21": "CCTCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTATCCGTCGTACTAAGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                       [self.par, {"sim_settings": {"reference": self.ref_file,
+                                                                    "prioritize_top": True,
+                                                                    "max_tries": 2000,
+                                                                    "min_intersv_dist": 0,
+                                                                    "fail_if_placement_issues": True},
+                                                   "overlap_regions": self.test_overlap_bed_11,
+                                                   "variant_sets": [
+                                                       {"type": "dDUP", "number": 1,
+                                                        "length_ranges": [[1, 1], [1, 1]],
+                                                        "overlap_type": "partial",
+                                                        "overlap_region_type": "Alu"},
+                                                       {"type": "dDUP", "number": 1,
+                                                        "length_ranges": [[1, 1], [1, 1]],
+                                                        "overlap_type": "partial",
+                                                        "overlap_region_type": "L1"},
+                                                       {"type": "dDUP", "number": 1,
+                                                        "length_ranges": [[1, 1], [1, 1]],
+                                                        "overlap_type": "partial",
+                                                        "overlap_region_type": "L2"},
+                                                       {"type": "dDUP", "number": 1,
+                                                        "length_ranges": [[1, 1], [1, 1]],
+                                                        "overlap_type": "partial",
+                                                        "overlap_region_type": "SVA"},
+                                                       {"type": "dDUP", "number": 1,
+                                                        "length_ranges": [[1, 1], [1, 1]],
+                                                        "overlap_type": "partial",
+                                                        "overlap_region_type": "HERVK"},
+                                                       {"type": "dDUP", "number": 1,
+                                                        "length_ranges": [[1, 2], [1, 1]],
+                                                        "overlap_type": "partial",
+                                                        "overlap_region_type": "Alu"},
+                                                       {"type": "dDUP", "number": 1,
+                                                        "length_ranges": [[1, 2], [1, 1]],
+                                                        "overlap_type": "partial",
+                                                        "overlap_region_type": "L1"},
+                                                       {"type": "dDUP", "number": 1,
+                                                        "length_ranges": [[1, 2], [1, 1]],
+                                                        "overlap_type": "partial",
+                                                        "overlap_region_type": "L2"},
+                                                       {"type": "dDUP", "number": 1,
+                                                        "length_ranges": [[1, 2], [1, 1]],
+                                                        "overlap_type": "partial",
+                                                        "overlap_region_type": "SVA"},
+                                                       {"type": "dDUP", "number": 1,
+                                                        "length_ranges": [[1, 2], [1, 1]],
+                                                        "overlap_type": "partial",
+                                                        "overlap_region_type": "HERVK"}
+                                                    ]}],
+                                       self.hap1, self.hap2, self.bed, self.vcf)
+            }
+        self.test_objects_alu_mediated = {
+            'alu_med1': TestProcObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
+                                       [self.par, {"sim_settings": {"reference": self.ref_file,
+                                                                    "prioritize_top": True,
+                                                                    "fail_if_placement_issues": True},
+                                                   "overlap_regions": self.test_overlap_bed_4,
+                                                   "variant_sets": [{"type": "DEL", "number": 1,
+                                                                     "length_ranges": [[13, 15]],
+                                                                     "overlap_type": "flanked",
+                                                                     "overlap_region_type": "Alu"}]}],
+                                       self.hap1, self.hap2, self.bed, self.vcf)}
+        self.test_objects_frag_level_overlap = {
+            'delINVdel':
+                TestProcObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
+                               [self.par, {"sim_settings": {"reference": self.ref_file},
+                                           "overlap_regions": self.test_overlap_bed,
+                                           "variant_sets": [{"type": "delINVdel", "number": 1,
+                                                             "length_ranges": [[4, 6], [2, 2], [2, 2]],
+                                                             "overlap_type": "exact",
+                                                             "overlap_region_type": ["L1HS", None, None, None]}]}],
+                               self.hap1, self.hap2, self.bed, self.vcf),
+            'Custom':
+                TestProcObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
+                               [self.par, {"sim_settings": {"reference": self.ref_file},
+                                           "overlap_regions": self.test_overlap_bed,
+                                           "variant_sets": [{"type": "Custom",
+                                                             "source": "ABCD",
+                                                             "target": "AbCd",
+                                                             "number": 1,
+                                                             "length_ranges": [[4, 6], [2, 2], [2, 2], [4, 6]],
+                                                             "overlap_type": "exact",
+                                                             "overlap_region_type": ["L1HS", None]}]}],
+                               self.hap1, self.hap2, self.bed, self.vcf)
+        }
+        self.test_objects_invalid_overlap_regions = {
+            'overlap_regions':
+                TestProcObject([self.ref_file, {"chr21": "CTTG"}],
+                               [self.par, {"sim_settings": {"reference": self.ref_file},
+                                           "variant_sets": [{"type": "delINVdel", "number": 1,
+                                                             "length_ranges": [[4, 6], [2, 2], [2, 2]],
+                                                             "overlap_type": "exact",
+                                                             "overlap_region_type": ["L1HS", None, None]}]}],
+                               self.hap1, self.hap2, self.bed, self.vcf),
+        }
+        self.test_objects_invalid_full_sv = {
+            'invalid_full_sv_dDUP':
+                TestProcObject([self.ref_file, {"chr21": "CTTG"}],
+                               [self.par, {"sim_settings": {"reference": self.ref_file,
+                                                            "prioritize_top": True},
+                                           "overlap_regions": self.test_overlap_bed,
+                                           "variant_sets": [{"type": "dDUP", "number": 1,
+                                                             "length_ranges": [[4, 6], [2, 2]],
+                                                             "overlap_type": "exact",
+                                                             "overlap_component": "full_sv"}]}],
+                               self.hap1, self.hap2, self.bed, self.vcf),
+            'invalid_full_sv_custom':
+                TestProcObject([self.ref_file, {"chr21": "CTTG"}],
+                               [self.par, {"sim_settings": {"reference": self.ref_file,
+                                                            "prioritize_top": True},
+                                           "overlap_regions": self.test_overlap_bed,
+                                           "variant_sets": [{"type": "Custom",
+                                                             "source": "A_BC",
+                                                             "target": "A_bC",
+                                                             "number": 1,
+                                                             "length_ranges": [[2, 2], [2, 2], [2, 2], [2, 2]],
+                                                             "overlap_type": "exact",
+                                                             "overlap_component": "full_sv"}]}],
+                               self.hap1, self.hap2, self.bed, self.vcf),
+        }
+        self.test_objects_invalid_src_trg = {
+            'invalid_src_prefedined':
+                TestProcObject([self.ref_file, {"chr21": "CTTG"}],
+                               [self.par, {"sim_settings": {"reference": self.ref_file,
+                                                            "prioritize_top": True},
+                                           "overlap_regions": self.test_overlap_bed,
+                                           "variant_sets": [{"type": "delINV", "number": 1,
+                                                             "length_ranges": [[4, 6], [2, 2]],
+                                                             "overlap_type": "exact",
+                                                             "overlap_component": "source"}]}],
+                               self.hap1, self.hap2, self.bed, self.vcf),
+            'invalid_trg_predefined':
+                TestProcObject([self.ref_file, {"chr21": "CTTG"}],
+                               [self.par, {"sim_settings": {"reference": self.ref_file,
+                                                            "prioritize_top": True},
+                                           "overlap_regions": self.test_overlap_bed,
+                                           "variant_sets": [{"type": "delINV", "number": 1,
+                                                             "length_ranges": [[4, 6], [2, 2]],
+                                                             "overlap_component": "target"}]}],
+                               self.hap1, self.hap2, self.bed, self.vcf),
+            'invalid_src_custom':
+                TestProcObject([self.ref_file, {"chr21": "CTTG"}],
+                               [self.par, {"sim_settings": {"reference": self.ref_file,
+                                                            "prioritize_top": True},
+                                           "overlap_regions": self.test_overlap_bed,
+                                           "variant_sets": [{"type": "Custom",
+                                                             "source": "ABC",
+                                                             "target": "AbC",
+                                                             "number": 1,
+                                                             "length_ranges": [[2, 2], [2, 2], [2, 2]],
+                                                             # "overlap_type": "exact",
+                                                             "overlap_component": "source"}]}],
+                               self.hap1, self.hap2, self.bed, self.vcf),
+            'invalid_trg_custom':
+                TestProcObject([self.ref_file, {"chr21": "CTTG"}],
+                               [self.par, {"sim_settings": {"reference": self.ref_file,
+                                                            "prioritize_top": True},
+                                           "overlap_regions": self.test_overlap_bed,
+                                           "variant_sets": [{"type": "Custom",
+                                                             "source": "ABC",
+                                                             "target": "AbC",
+                                                             "number": 1,
+                                                             "length_ranges": [[2, 2], [2, 2], [2, 2]],
+                                                             "overlap_component": "target"}]}],
+                               self.hap1, self.hap2, self.bed, self.vcf),
+        }
 
         self.formatter = FormatterIO(self.par)
 
@@ -441,7 +549,7 @@ class TestProcessing(unittest.TestCase):
                 self.assertTrue(records[2]['ev_type'] == 'INVDUP')
 
     def test_export_bedpe_dispersions(self):
-        for sv_type in ['dDUP', 'INV_dDUP', 'TRA_UNBALANCED']:
+        for sv_type in ['dDUP', 'INV_dDUP', 'TRA_NONRECIPROCAL']:
             record = self.initialize_test(self.test_objects_dispersions, sv_type)[0]
             self.singleton_event_bed_tests([record], sv_type, 'chr19', '3')
             # interval checks accounting for forward or backward orientation of dispersion
@@ -451,7 +559,7 @@ class TestProcessing(unittest.TestCase):
                 self.assertTrue(record['ev_type'] == 'DUP')
             elif sv_type == 'INV_dDUP':
                 self.assertTrue(record['ev_type'] == 'INVDUP')
-            else:  # <- TRA_UNBALANCED
+            else:  # <- TRA_NONRECIPROCAL
                 self.assertTrue(record['ev_type'] == 'TRA')
 
     def test_export_bedpe_del_inv(self):
@@ -483,7 +591,7 @@ class TestProcessing(unittest.TestCase):
                 if (record['source_s'], record['source_e']) == (record['target_s'], record['target_e']):
                     self.assertTrue(record['ev_type'] == 'DEL')
                 else:
-                    # for dDUP_iDEL, the source \neq target record is the DUP, for INS_iDEL it is TRA
+                    # for dDUP_iDEL, the source \neq target record is the DUP, for INS_iDEL it is TRA_NONRECIPROCAL
                     if sv_type == 'dDUP_iDEL':
                         self.assertTrue(record['ev_type'] == 'DUP')
                     else:
@@ -533,7 +641,7 @@ class TestProcessing(unittest.TestCase):
             self.singleton_event_vcf_tests(record, sv_type, 'chr19', [('1', '6')])
 
     def test_export_vcf_dispersions(self):
-        for sv_type in ['dDUP', 'INV_dDUP', 'TRA_UNBALANCED']:
+        for sv_type in ['dDUP', 'INV_dDUP', 'TRA_NONRECIPROCAL']:
             record = self.initialize_test(self.test_objects_dispersions, sv_type, output_type='vcf')[0]
             self.singleton_event_vcf_tests(record, sv_type, 'chr19', [('4', '6'), ('1', '3')], ['0', '6'])
 
@@ -566,45 +674,38 @@ class TestProcessing(unittest.TestCase):
 
     def test_export_overlap(self):
         elt_type_counts = defaultdict(NestedDict(int))
-        elt_type_counts['overlap1'] = {'L1HS': 2, 'ALR/Alpha': 1, 'NONE': 2}
-        elt_type_counts['overlap2'] = {'L1HS': 2, 'ALR/Alpha': 1, 'NONE': 1}
-        # *the vcf INFO overlap event field will reflect the label given in the config (i.e., whether just a prefix or full elt name)
-        elt_type_counts['overlap3'] = {'L1': 3, 'ALR': 2}
-        elt_type_counts['overlap4'] = {'L1': 2, 'NONE': 3}
-        # --> overlap5: case in which allow_types not specified; reported type will take full repName provided in bed file
-        elt_type_counts['overlap5'] = {'ALR': 1, 'NONE': 4}
-        elt_type_counts['overlap6'] = {'Alu': 1, 'L1': 2, 'L2': 1, 'SVA': 1, 'HERVK': 2, 'NONE': 3}
-        elt_type_counts['overlap7'] = {'Alu': 2, 'L1': 2, 'L2': 2, 'SVA': 2, 'HERVK': 2}
-        elt_type_counts['overlap8'] = {'Alu': 1, 'L1': 2, 'L2': 1, 'SVA': 1, 'HERVK': 2, 'NONE': 3}
-        elt_type_counts['overlap9'] = {'Alu': 2, 'L1': 2, 'L2': 2, 'SVA': 2, 'HERVK': 2}
+        elt_type_counts['overlap1'] = {'L1HS': 1, 'ALR/Alpha': 1}
+        # *the vcf INFO overlap event field will reflect the label given in the bed file
+        elt_type_counts['overlap2'] = {'L1HS': 1, 'L1PA15': 1, 'ALR/Alpha': 2}
+        elt_type_counts['overlap3'] = {'L1HS': 2}
+        elt_type_counts['overlap4'] = {'L2': 1, 'HERVK': 1}
+        elt_type_counts['overlap5'] = {'AluSz6': 1, 'AluY': 1, 'L1HS': 1, 'L1PA15': 1, 'L2': 2, 'SVA': 2, 'HERVK': 2}
         elt_type_counts['alu_med1'] = {'ALU_MEDIATED': 1}
-        for test_case in ['overlap1', 'overlap2', 'overlap3', 'overlap4', 'overlap5']:
+
+        for test_case in self.test_objects_overlap_simple.keys():
             records = self.initialize_test(self.test_objects_overlap_simple, test_case, output_type='vcf')
-            ovlp_evs = [record['INFO']['OVERLAP_EV'] if 'OVERLAP_EV' in record['INFO'].keys() else 'NONE' for record in records]
-            self.assertEqual(dict(Counter(ovlp_evs)), elt_type_counts[test_case])
-        # Special case tests: low probability failure case when events are failed to be placed (want to repeat until all
-        # are placed – we're testing the reporting of the records when all events appear)
-
-        def repeat_until_successful_placement():
-            try:
-                return self.initialize_test(self.test_objects_overlap_simple, test_case, output_type='vcf')
-            except:
-                return None
-
-        for test_case in ['overlap6', 'overlap7', 'overlap8', 'overlap9']:
-            while True:
-                records = repeat_until_successful_placement()
-                if records is not None:
-                    break
-                else:
-                    continue
-            ovlp_evs = [record['INFO']['OVERLAP_EV'] if 'OVERLAP_EV' in record['INFO'].keys() else 'NONE' for record in records]
+            ovlp_evs = [record['INFO']['OVERLAP_EV'] if 'OVERLAP_EV' in record['INFO'].keys() else 'NONE' for record in
+                        records]
             self.assertEqual(dict(Counter(ovlp_evs)), elt_type_counts[test_case])
 
         for test_case in ['alu_med1']:
             records = self.initialize_test(self.test_objects_alu_mediated, test_case, output_type='vcf')
-            ovlp_evs = [record['INFO']['OVERLAP_EV'] if 'OVERLAP_EV' in record['INFO'].keys() else 'NONE' for record in records]
+            ovlp_evs = [record['INFO']['OVERLAP_EV'] if 'OVERLAP_EV' in record['INFO'].keys() else 'NONE' for record in
+                        records]
             self.assertEqual(dict(Counter(ovlp_evs)), elt_type_counts[test_case])
+
+    def test_config_validity(self):
+        ovlp_region_list_msg = "if \'overlap_region_type\' given as list, must have length equal to number of SV components"
+        ovlp_regions_missing_msg = "Must provide \'overlap_regions\' entry if \'overlap_type\', \'overlap_region_type\', or \'overlap_component\' are specified"
+        invalid_full_sv_msg = "Cannot specify \'overlap_component\': \'full_sv\' for dispersion SVs"
+        invalid_src_trg_msg = "Cannot specify \'overlap_component\': {\'source\'/\'target\'} for non-dispersion SVs"
+        for test_obj, error_message in zip([self.test_objects_frag_level_overlap, self.test_objects_invalid_overlap_regions,
+                                            self.test_objects_invalid_full_sv, self.test_objects_invalid_src_trg],
+                                           [ovlp_region_list_msg, ovlp_regions_missing_msg,
+                                            invalid_full_sv_msg, invalid_src_trg_msg]):
+            for sv_type in test_obj.keys():
+                with self.assertRaisesRegex(Exception, error_message):
+                    self.initialize_test(test_obj, sv_type)
 
 
 if __name__ == "__main__":

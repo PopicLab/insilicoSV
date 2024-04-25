@@ -1,12 +1,14 @@
 import random
-
+import itertools
+from intervaltree import IntervalTree
+from collections import defaultdict
 from insilicosv import utils
 from insilicosv.constants import \
     SV_KEY, Symbols, Variant_Type, Zygosity, DISPERSION_TYPES
 
 class Structural_Variant:
-    def __init__(self, sv_type, mode, length_ranges=None, source=None, target=None, vcf_rec=None, ref_fasta=None,
-                 overlap_event=None, div_prob=None):
+    def __init__(self, sv_type, sv_chrom, mode, length_ranges=None, chrom_length=None, source=None, target=None, vcf_rec=None, ref_fasta=None,
+                 overlap_events=None, div_prob=None, blacklist_regions=None):
         """
         sv_type: Enum either specifying one of the prewritten classes or a Custom transformation
         mode: flag to indicate whether constructor called in fixed or randomized mode
@@ -15,7 +17,8 @@ class Structural_Variant:
         target: tuple representing target sequence, optional
         vcf_rec: (fixed mode) vcf record giving sv information that will instantiate the event
         ref_fasta: for extracting reference frag for vcf records in fixed mode initialization
-        overlap_event: (chr, start, end, elt_type) tuple representing the genome element that this SV is meant to overlap, optional
+        overlap_events: {symbol: (chr, start, end, elt_type)} dict representing the genome elements that this SV is meant to overlap, optional
+        blacklist_regions: list of (chr, start, end, elt_type) tuples representing blacklist regions that this SV is meant not to overlap, optional
         """
         self.type = sv_type
         if self.type != Variant_Type.Custom:
@@ -26,21 +29,21 @@ class Structural_Variant:
             self.name = str("".join(self.source)) + ">" + str("".join(self.target))
 
         utils.validate_symbols(self.source, self.target)
-        self.source_unique_char, self.target_unique_char = \
-            Structural_Variant.add_unique_dispersion_ids(self.source), \
-            Structural_Variant.add_unique_dispersion_ids(self.target)
+        self.source_symbols, self.target_symbols = utils.reformat_seq(self.source), utils.reformat_seq(self.target)
 
         self.start = None
         self.end = None
-        self.start_chr = None
+        self.start_chr = sv_chrom
+        self.chrom_length = chrom_length  # <- only required in randomized mode
         self.req_space = None  # required space for SV, sum of event lengths
         self.source_events = []  # list of Event classes for every symbol in source sequence
         self.events_dict = dict()  # maps every unique symbol in source and target to an Event class
         self.changed_fragments = []  # list recording new fragments to be placed in the output ref
         self.dispersion_flip = False  # orientation of dispersion event
         self.insseq_from_rec = None  # space to store INSSEQ for fixed-mode INS event
-        self.overlap_event = overlap_event  # <- element tuple of form (chrom, start, end, type) (optional)
+        self.overlap_events = overlap_events
         self.div_prob = div_prob  # <- divergence probability param (optionally given for type == DIVERGENCE)
+        self.blacklist_region_trees = self.construct_interval_trees(blacklist_regions) if blacklist_regions is not None else None
 
         if self.type in DISPERSION_TYPES:
             if random.randint(0, 1):
@@ -65,25 +68,6 @@ class Structural_Variant:
         return "<SV transformation \"{}\" -> \"{}\" taking up {} non-dispersion spaces>".format(
             ''.join(self.source), ''.join(self.target),
             sum([event.length for event in self.source_events if not event.symbol.startswith(Symbols.DIS.value)]))
-
-    @staticmethod
-    def add_unique_dispersion_ids(transformation):
-        """In a tuple defining the source or target of a transformation (see constants.SV_KEY),
-        make each dispersion event unique by appending a unique ID.
-
-        Examples:
-           ("A", "_") becomes ("A", "_1")
-           ("A", "_", "B", "_", "C") becomes ("A", "_1", "B", "_2", "C")
-        """
-        unique_transform = []
-        unique_id = 1
-        for component in transformation:
-            if component != Symbols.DIS.value:
-                unique_transform.append(component)
-            else:
-                unique_transform.append(component + str(unique_id))
-                unique_id += 1
-        return tuple(unique_transform)
 
     def get_event_frag(self, event, symbol):
         """Returns the target event sequence obtained from the source event
@@ -116,7 +100,103 @@ class Structural_Variant:
         else:
             return event.source_frag
 
-    def initialize_events(self, length_ranges):
+    @staticmethod
+    def construct_interval_trees(regions):
+        trees = defaultdict(IntervalTree)
+        for chrom, start, end in regions:
+            trees[chrom].addi(start, end)
+        return trees
+
+    @staticmethod
+    def get_internal_breakpoints(roi_start, roi_end, frag_ranges):
+        """
+        for an overlap placement in "full_sv" mode, need to set the full sv
+        start and end to the roi bounds and then find suitable internal breakpoints
+        """
+        frag_bounds = [[0, 0] for _ in range(len(frag_ranges))]
+        frag_bounds[0][0], frag_bounds[-1][1] = roi_start, roi_end
+        # determine valid combinations of frag sizes and randomly choose from possible options
+        allowed_length_combinations = [cbn for cbn in itertools.product(*[range(start, end + 1) for start, end in frag_ranges])
+                                       if sum(cbn) == roi_end - roi_start]
+        frag_sizes = list(random.choice(allowed_length_combinations))
+        # fill in the missing breakpoints based on the selected fragment sizes
+        for i in range(len(frag_bounds)):
+            if frag_bounds[i][0] == 0:
+                frag_bounds[i][0] += sum(frag_sizes[:i]) + frag_bounds[0][0]
+            if frag_bounds[i][1] == 0:
+                frag_bounds[i][1] += sum(frag_sizes[:i + 1]) + frag_bounds[0][0]
+        return frag_bounds
+
+    def assign_breakpoints(self, all_symbols, symbols_dict):
+        """
+        helper function to assign event breakpoints WRT overlap region – handles the
+        cases in which one or multiple fragments are involved in the overlap region
+        """
+        if self.overlap_events is not None and 'full_sv' in self.overlap_events:
+            # overlap_component: "full_sv" -> the fragments must all be adjacent to treat the SV as a single interval
+            frag_ranges = [r for l, r in symbols_dict.values()]
+            frag_bounds = self.get_internal_breakpoints(int(self.overlap_events['full_sv'][1]),
+                                                        int(self.overlap_events['full_sv'][2]), frag_ranges)
+            for idx, symbol in enumerate(all_symbols):
+                frag_start, frag_end = tuple(frag_bounds[idx])
+                frag_len = frag_end - frag_start
+                self.events_dict[symbol] = Event(length=frag_len, symbol=symbol, start=frag_start, end=frag_end)
+        else:
+            # create Events for the overlap frags first
+            if self.overlap_events is not None:
+                for symbol, roi in self.overlap_events.items():
+                    if roi is None:
+                        continue
+                    if symbol[0] == Symbols.DIS.value:
+                        # if 'target' was given for overlap_component, place start or end of dispersion (depending on
+                        # orientation) at a random point within the overlap region
+                        disp_len = symbols_dict[symbol][0]  # <- will be None if dispersion is unbounded
+                        # will need to query the corresponding source frag to check if its position has been set already
+                        source_frag = all_symbols[all_symbols.index(symbol) - 1]
+                        # if the source and target are both being placed at ROIs, need to set self.dispersion_flip to
+                        # agree with their relative positions
+                        if source_frag in self.events_dict:
+                            self.dispersion_flip = self.events_dict[source_frag].start > int(roi[1])
+                        if self.dispersion_flip:
+                            # BED start positions are non-inclusive, but end positions are inclusive
+                            disp_start = random.randint(int(roi[1]) + 1, int(roi[2]))
+                            if source_frag in self.events_dict and disp_len is None:
+                                disp_end = self.events_dict[source_frag].start
+                                disp_len = disp_end - disp_start
+                            elif source_frag not in self.events_dict and disp_len is None:
+                                disp_end = disp_start + random.randint(*symbols_dict[symbol][1])
+                                disp_len = disp_end - disp_start
+                            elif source_frag in self.events_dict and disp_len is not None:
+                                raise Exception('Cannot specify overlap for source fragment and target locus without making the dispersion unbounded')
+                            else:  # <- source_frag not in self.events_dict and disp_len is not None
+                                disp_end = disp_start + disp_len
+                        else:
+                            disp_end = random.randint(int(roi[1]) + 1, int(roi[2]))
+                            if source_frag in self.events_dict and disp_len is None:
+                                disp_start = self.events_dict[source_frag].end
+                                disp_len = disp_end - disp_start
+                            elif source_frag not in self.events_dict and disp_len is None:
+                                disp_start = disp_end - random.randint(*symbols_dict[symbol][1])
+                                disp_len = disp_end - disp_start
+                            elif source_frag in self.events_dict and disp_len is not None:
+                                raise Exception('Cannot specify overlap for source fragment and target locus without making the dispersion unbounded')
+                            else:  # <- source_frag not in self.events_dict and disp_len is not None
+                                disp_start = disp_end - disp_len
+                        event = Event(length=disp_len, symbol=symbol, start=disp_start, end=disp_end)
+                    else:
+                        ovlp_event_len = int(roi[2]) - int(roi[1])
+                        event = Event(length=ovlp_event_len, symbol=symbol, start=int(roi[1]), end=int(roi[2]))
+                    self.events_dict[symbol] = event
+            # and setting the remaining unset fragments
+            for symbol in all_symbols:
+                if symbol in self.events_dict:
+                    continue
+                # unbounded dispersions in SVs with no overlap constraints will still need to be set
+                frag_len = symbols_dict[symbol][0] if symbols_dict[symbol][0] is not None else\
+                    random.randint(*symbols_dict[symbol][1])
+                self.events_dict[symbol] = Event(length=frag_len, symbol=symbol)
+
+    def initialize_events(self, lengths):
         """
         Initializes event classes and creates a mapping of symbol to event
 
@@ -124,35 +204,35 @@ class Structural_Variant:
         -> returns list of events in source sequence
         """
         all_symbols = []
-        for ele in self.source_unique_char + self.target_unique_char:
+        for ele in self.source_symbols + self.target_symbols:
             if len(ele) > 0 and (len(ele) == 1 or ele.startswith(Symbols.DIS.value)) and ele.upper() not in all_symbols:
                 all_symbols.append(ele.upper())
+        assert Symbols.DIS.value > 'Z' and all(len(s) <= 2 for s in all_symbols)
         all_symbols.sort()
 
-        # symbol_len: (key = symbol, value = chosen length)
-        symbol_len = dict()
-        if len(length_ranges) > 1:  # values given by user represents custom ranges for each event symbol of variant in lexicographical order
-            assert (len(length_ranges) == len(all_symbols)), \
-                "Number of length_ranges entered does not match the number of symbols (remember foreign insertions and dispersions) present!"
-            for idx, symbol in enumerate(all_symbols):
-                symbol_len[symbol] = random.randint(length_ranges[idx][0], length_ranges[idx][1])
-        elif len(length_ranges) == 1:  # value given by user represents length (same range) of each event within variant in lexicographical order
-            for symbol in all_symbols:
-                symbol_len[symbol] = random.randint(length_ranges[0][0], length_ranges[0][1])
-        else:
-            raise Exception("length_ranges parameter expects at least one tuple")
-
-        ovlp_frag = random.choice([frag for frag in self.source_unique_char if frag[0] != '_']) if self.overlap_event is not None else None
-        for idx, symbol in enumerate(all_symbols):
-            if self.overlap_event is not None and symbol == ovlp_frag:
-                ovlp_event_len = int(self.overlap_event[2]) - int(self.overlap_event[1])
-                event = Event(length=ovlp_event_len, symbol=symbol,
-                              start=int(self.overlap_event[1]), end=int(self.overlap_event[2]))
+        # symbols_dict: (key = symbol, value = (chosen length, length range))
+        symbols_dict = dict()
+        assert (len(lengths) == len(all_symbols)), \
+            "Number of lengths entered does not match the number of symbols (remember foreign insertions and dispersions) present!"
+        non_unbounded_disp_space = 0
+        num_unbounded_disps = sum(len_max is None for (len_min, len_max) in lengths)
+        for symbol, (len_min, len_max) in zip(all_symbols, lengths):
+            if len_max is not None:
+                rand_len = random.randint(len_min, len_max)
+                non_unbounded_disp_space += rand_len if symbol in self.source_symbols else 0
+                symbols_dict[symbol] = (rand_len, (len_min, len_max))
             else:
-                event = Event(length=symbol_len[symbol], symbol=symbol)
-            self.events_dict[symbol] = event
+                # unbounded dispersion – don't want to select a length because it'll need to be
+                # determined by the target and source positions
+                # <- None allowable as upper bound for dispersion: interpret as chrom-len upper bound
+                assert symbol[0] == Symbols.DIS.value, "only dispersions can be unbounded"
 
-        for symbol in self.source_unique_char:
+                len_max = max(len_min, self.chrom_length // num_unbounded_disps - non_unbounded_disp_space)
+                symbols_dict[symbol] = (None, (len_min, len_max))
+
+        self.assign_breakpoints(all_symbols, symbols_dict)
+
+        for symbol in self.source_symbols:
             self.source_events.append(self.events_dict[symbol])
 
         if self.dispersion_flip:
@@ -163,7 +243,7 @@ class Structural_Variant:
     def initialize_events_fixed(self, vcf_record, ref_fasta):
         # initialization method for SV read in from vcf
         source_len = vcf_record.stop - vcf_record.start if 'SVLEN' not in vcf_record.info else vcf_record.info['SVLEN']
-        for symbol in self.source_unique_char:
+        for symbol in self.source_symbols:
             if symbol == Symbols.REQUIRED_SOURCE.value:
                 source_ev = Event(length=source_len, symbol=symbol)
                 source_ev.start = vcf_record.start
@@ -193,15 +273,10 @@ class Structural_Variant:
             self.events_dict[Symbols.REQUIRED_SOURCE.value] = source_ev
             self.start = vcf_record.start
             self.end = self.start
-            print(f'======= TEST {self.start=}, {self.end=}')
         else:
             self.start = self.events_dict[Symbols.REQUIRED_SOURCE.value].start
             self.end = self.events_dict[Symbols.REQUIRED_SOURCE.value].end if '_1' not in self.events_dict else self.events_dict['_1'].end
         self.start_chr = vcf_record.chrom
-
-        # handling for divergent repeat simulation logic (div_dDUPs placed into R1 need to correspond to dDUPs in R2)
-        if self.type == Variant_Type.div_dDUP:
-            self.target_unique_char = ("A", "_1", "A'")
 
         self.active = True
         if vcf_record.samples[0]['GT'] == (1, 1):
@@ -255,6 +330,9 @@ class Structural_Variant:
                         ev.end = target_events[i - 1].end
                     source_event = self.events_dict[ev.symbol[0].upper()]
                     ev.source_frag = self.get_event_frag(source_event, ev.symbol)
+                    # --> need to generate novel source sequence if event is INS
+                    if ev.source_frag is None:
+                        ev.source_frag = utils.generate_seq(ev.length)
 
         self.sv_blocks.generate_target_events_dict()
 
@@ -275,7 +353,7 @@ class Structural_Variant:
                 new_frag = ''
                 if len(block) == 0 or block[0].symbol.startswith(Symbols.DIS.value):
                     continue
-                for i in range(len(block)):
+                for i, ev in enumerate(block):
                     ev = block[i]
                     new_frag += ev.source_frag
                     if i == 0:
@@ -296,7 +374,7 @@ class Structural_Variant:
     def clean_event_storage(self):
         # remove source fragments from events to save space as they are no longer needed
         for event in self.events_dict.values():
-            if event.symbol in self.source_unique_char:  # do not clean out insertion fragments as they'll need to be exported later
+            if event.symbol in self.source_symbols:  # do not clean out insertion fragments as they'll need to be exported later
                 event.source_frag = "Removed"
 
 
@@ -331,7 +409,7 @@ class Blocks:
         self.target_events_dict = None
 
     def generate_blocks(self):
-        self.target_blocks = self.find_blocks(self.sv.target_unique_char)
+        self.target_blocks = self.find_blocks(self.sv.target_symbols)
 
     def find_blocks(self, transformation):
         # transformation: tuple of strings (source or target chars)

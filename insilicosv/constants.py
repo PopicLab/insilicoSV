@@ -9,8 +9,8 @@ class Variant_Type(Enum):
     INV = "INV"
     DUP = "DUP"
     SNP = "SNP"
-    TRA_UNBALANCED = "TRA_UNBALANCED"
-    TRA_BALANCED = "TRA_BALANCED"
+    TRA_NONRECIPROCAL = "TRA_NONRECIPROCAL"
+    TRA_RECIPROCAL = "TRA_RECIPROCAL"
     dupINVdup = "dupINVdup"
     delINVdel = "delINVdel"
     delINVdup = "delINVdup"
@@ -25,14 +25,12 @@ class Variant_Type(Enum):
     dDUP = "dDUP"
     Custom = "Custom"
     INV_dDUP = "INV_dDUP"
-    div_dDUP = "div_dDUP"
     DIVERGENCE = "DIVERGENCE"
 
 
 # list of dispersion-based events (listing explicitly to prevent having to parse from symbols)
-DISPERSION_TYPES = [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.TRA_UNBALANCED,
-                    Variant_Type.TRA_BALANCED, Variant_Type.div_dDUP,
-                    Variant_Type.dDUP_iDEL, Variant_Type.INS_iDEL]
+DISPERSION_TYPES = [Variant_Type.dDUP, Variant_Type.INV_dDUP, Variant_Type.TRA_NONRECIPROCAL,
+                    Variant_Type.TRA_RECIPROCAL, Variant_Type.dDUP_iDEL, Variant_Type.INS_iDEL]
 
 
 class Operations(Enum):
@@ -64,13 +62,13 @@ class Symbols(Enum):
     REQUIRED_SOURCE = "A"  # event symbol of the required source/main event all SVs must have
 
 
-SV_KEY = {Variant_Type.INS: [(), ("A")],
+SV_KEY = {Variant_Type.INS: [(), ("A",)],
           Variant_Type.SNP: [("A",), ("A*",)],
           Variant_Type.DEL: [("A",), ()],
           Variant_Type.INV: [("A",), ("a",)],
           Variant_Type.DUP: [("A",), ("A", "A'")],
-          Variant_Type.TRA_UNBALANCED: [("A", "_"), ("_", "A'")],
-          Variant_Type.TRA_BALANCED: [("A", "_", "B"), ("B'", "_", "A'")],
+          Variant_Type.TRA_NONRECIPROCAL: [("A", "_"), ("_", "A'")],
+          Variant_Type.TRA_RECIPROCAL: [("A", "_", "B"), ("B'", "_", "A'")],
           Variant_Type.dupINVdup: [("A", "B", "C"), ("A", "c'", "b", "a'", "C")],
           Variant_Type.delINVdel: [("A", "B", "C"), ("b",)],
           Variant_Type.delINVdup: [("A", "B", "C"), ("c'", "b", "C")],
@@ -84,5 +82,4 @@ SV_KEY = {Variant_Type.INS: [(), ("A")],
           Variant_Type.INV_dup: [("A", "B"), ("b'", "a", "B")],
           Variant_Type.dDUP: [("A", "_"), ("A", "_", "A'")],
           Variant_Type.INV_dDUP: [("A", "_"), ("A", "_", "a'")],
-          Variant_Type.div_dDUP: [("A", "_"), ("A", "_", "A*")],
           Variant_Type.DIVERGENCE: [("A",), ("A*",)]}

@@ -12,12 +12,10 @@ sim_settings:
 variant_sets:
     - type: "INS"
       number: 10
-      min_length: [5]
-      max_length: [10]
+      length_ranges: [[5, 10]]
     - type: "INVdel"
       number: 2
-      min_length: [5]
-      max_length: [10]
+      length_ranges: [[5, 10]]
 ```
 
 The following parameters can be given for each variant set.  Each parameter is required unless otherwise specified.

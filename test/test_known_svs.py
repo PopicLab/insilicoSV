@@ -28,10 +28,9 @@ class TestKnownSVs(unittest.TestCase):
         self.test_vcf_del_inv_del = "test/inputs/example_del_inv_del.vcf"
         self.test_vcf_dup_dup_ins = "test/inputs/example_dup_dup_ins.vcf"
         self.test_vcf_multidel_multisnp = "test/inputs/example_multiDEL_multiSNP.vcf"
-        self.test_vcf_div_dDUP = "test/inputs/example_div_dDUP.vcf"
         self.test_vcf_dDUP = "test/inputs/example_dDUP.vcf"
         self.test_vcf_INV_dDUP = "test/inputs/example_INV_dDUP.vcf"
-        self.test_vcf_TRA_UNBAL = "test/inputs/example_TRA_UNBAL.vcf"
+        self.test_vcf_TRA_NONRECIP = "test/inputs/example_TRA_NONRECIP.vcf"
         self.test_vcf_multi_dispersion = "test/inputs/example_multi_dispersion.vcf"
 
         self.ref_file = "test/inputs/test.fna"
@@ -98,11 +97,7 @@ class TestKnownSVs(unittest.TestCase):
                                                                                     "variant_sets": [{"vcf_path": self.test_vcf_multidel_multisnp}]}],
                                                                         self.hap1, self.hap2, self.bed),
                                         }
-        self.test_objects_dispersions = {'div_dDUP': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
-                                                                [self.par, {"sim_settings": {"reference": self.ref_file},
-                                                                            "variant_sets": [{"vcf_path": self.test_vcf_div_dDUP}]}],
-                                                                self.hap1, self.hap2, self.bed),
-                                         'dDUP': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
+        self.test_objects_dispersions = {'dDUP': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                             [self.par, {"sim_settings": {"reference": self.ref_file},
                                                                         "variant_sets": [{"vcf_path": self.test_vcf_dDUP}]}],
                                                             self.hap1, self.hap2, self.bed),
@@ -112,7 +107,7 @@ class TestKnownSVs(unittest.TestCase):
                                                                 self.hap1, self.hap2, self.bed),
                                          'TRA': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                            [self.par, {"sim_settings": {"reference": self.ref_file},
-                                                                       "variant_sets": [{"vcf_path": self.test_vcf_TRA_UNBAL}]}],
+                                                                       "variant_sets": [{"vcf_path": self.test_vcf_TRA_NONRECIP}]}],
                                                            self.hap1, self.hap2, self.bed),
                                          'multievent': TestObject([self.ref_file, {"chr21": "GCACTATCTCTCCGT"}],
                                                                   [self.par,
@@ -162,7 +157,6 @@ class TestKnownSVs(unittest.TestCase):
                                                                                  'GCACGGGGGTATCTCTCCTCCGT'])
 
     def test_dispersion_events(self):
-        self.helper_test_simple_sv(self.test_objects_dispersions['div_dDUP'], ['GCACTATCTCACTATTCCGT'])
         self.helper_test_simple_sv(self.test_objects_dispersions['dDUP'], ['GCACTATCTCACTATTCCGT'])
         self.helper_test_simple_sv(self.test_objects_dispersions['INV_dDUP'], ['GCACTATCTCATAGTTCCGT'])
         self.helper_test_simple_sv(self.test_objects_dispersions['TRA'], ['GCCTCACTATTCCGT'])

@@ -18,14 +18,15 @@ time_start = time.time()
 
 class StatsCollection:
     """collection of information for stats file, if requested"""
+    # def __init__(self, chr_lens):
     def __init__(self, chr_ids, chr_lens):
         self.num_heterozygous = 0
         self.num_homozygous = 0
         self.total_svs = 0
         self.active_svs = 0
         self.active_events_chr = dict()
-        self.chr_ids = chr_ids
         self.chr_lengths = chr_lens
+        self.chr_ids = chr_ids
         self.avg_len = [0, 0]  # Average length of SV events/components
         self.len_frags_chr = dict()  # Lengths of altered fragments within chromosome
         self.sv_types = dict()
@@ -112,6 +113,8 @@ class SV_Simulator:
         self.ref_file = config['sim_settings']['reference']
         self.ref_fasta = FastaFile(self.ref_file)
         self.svs_config = config['variant_sets']
+        self.min_intersv_dist = int(config['sim_settings']['min_intersv_dist']) if \
+            'min_intersv_dist' in config['sim_settings'] else 1
 
         self.sim_settings = config['sim_settings']
         if log_file and "generate_log_file" in self.sim_settings:
@@ -143,12 +146,11 @@ class SV_Simulator:
         self.svs = []
         self.event_ranges = defaultdict(list)
 
-        if "avoid_intervals" in config:
-            # extract {chrom: [(start, end)]} intervals from vcf, add intervals from vcf to event range
-            self.extract_vcf_event_intervals(config["avoid_intervals"])
+        self.blacklist_regions = None if "blacklist_regions" not in config.keys() \
+            else utils.BlacklistRegions(config)
 
-        self.overlap_events = None if "overlap_events" not in config \
-            else utils.OverlapEvents(config, allow_chroms=self.order_ids)
+        self.overlap_regions = None if "overlap_regions" not in config.keys() \
+            else utils.OverlapRegions(config, allow_chroms=self.order_ids)
 
         self.initialize_svs()
 
@@ -166,22 +168,26 @@ class SV_Simulator:
 
     def get_rand_chr(self, check_size=None, fixed_chrom=None):
         # random assignment of SV to a chromosome (unless we have a predetermined chromosome for this event)
-        valid_chrs = self.order_ids
-        if check_size is not None:
-            valid_chrs = [chrom for chrom, chr_size in self.len_dict.items() if chr_size >= check_size and
-                          chrom not in self.filtered_chroms]
+        valid_chrs = [chrom for chrom, chr_size in self.len_dict.items() if chrom not in self.filtered_chroms and
+                      (check_size is None or chr_size >= check_size)]
         if len(valid_chrs) == 0:
-            raise Exception("SVs are too big for the reference!")
-        rand_id = valid_chrs[random.randint(0, len(valid_chrs) - 1)] if fixed_chrom is None else fixed_chrom
+            raise Exception("No valid chromosomes remaining")
+        rand_id = random.choice(valid_chrs) if fixed_chrom is None else fixed_chrom
         chr_len = self.len_dict[rand_id]
-        chr_event_ranges = self.event_ranges[rand_id]
-        assert rand_id is not None
-        return rand_id, chr_len, chr_event_ranges
 
-    def extract_vcf_event_intervals(self, vcf_path):
-        vcf = VariantFile(vcf_path)
-        for rec in vcf.fetch():
-            self.event_ranges[rec.chrom].append((rec.start, rec.stop))
+        return rand_id, chr_len
+
+    def extract_event_intervals(self, file_path):
+        if file_path.endswith('.vcf') or file_path.endswith('.vcf.gz'):
+            for rec in VariantFile(file_path).fetch():
+                self.event_ranges[rec.chrom].append((rec.start, rec.stop))
+        elif file_path.endswith('.bed'):
+            with open(file_path) as f:
+                for line in f:
+                    chrom, start, stop = tuple(line.split()[:3])
+                    self.event_ranges[chrom].append((int(start), int(stop)))
+        else:
+            raise Exception('extract_event_intervals() called on file of invalid type')
 
     def process_vcf(self, vcf_path):
         # process vcf containing SVs to be added (deterministically) to reference
@@ -191,7 +197,7 @@ class SV_Simulator:
         for rec in vcf.fetch():
             svtype = Variant_Type(rec.info['SVTYPE']) if 'SVTYPE' in rec.info else Variant_Type(rec.id)
             self.event_ranges[rec.chrom].append((rec.start, rec.stop))
-            sv = Structural_Variant(sv_type=svtype, mode='fixed', vcf_rec=rec, ref_fasta=self.ref_fasta)
+            sv = Structural_Variant(sv_type=svtype, sv_chrom=rec.chrom, mode='fixed', vcf_rec=rec, ref_fasta=self.ref_fasta)
             self.svs.append(sv)
             active_svs_total += 1
             self.log_to_file("Intervals {} added to Chromosome \"{}\"".format(self.event_ranges[rec.chrom], rec.chrom))
@@ -207,31 +213,35 @@ class SV_Simulator:
         """
         if self.mode == "randomized":
             for sv_config in self.svs_config:
+                # collect sv_config-level info
+                sv_blacklist_regions = self.blacklist_regions.get_roi(sv_config) \
+                    if 'blacklist_region_type' in sv_config else None
                 for num in range(sv_config["number"]):
-                    # logic for placing events at intervals given in overlap bed file:
-                    # for the first (sv_config["num_overlap"]) events, instantiate the SV at the next valid repeat elt interval
-                    repeat_elt = None
-                    elt_type = None
-                    if self.overlap_events is not None:
+                    repeat_elts = None
+                    if self.overlap_regions is not None:
                         sv_config_identifier = utils.get_sv_config_identifier(sv_config)
-                        if sv_config_identifier in self.overlap_events.svtype_overlap_counts:
-                            repeat_elt, retrieved_type, elt_type = self.overlap_events.get_single_element_interval(
+                        if sv_config_identifier in self.overlap_regions.svtype_overlap_counts:
+                            repeat_elts = self.overlap_regions.get_overlap_intervals(
                                 sv_config_identifier, sv_config, partial_overlap=False)
-                        elif sv_config_identifier in self.overlap_events.svtype_partial_overlap_counts:
-                            repeat_elt, retrieved_type, elt_type = self.overlap_events.get_single_element_interval(
+                        elif sv_config_identifier in self.overlap_regions.svtype_partial_overlap_counts:
+                            repeat_elts = self.overlap_regions.get_overlap_intervals(
                                 sv_config_identifier, sv_config, partial_overlap=True)
-                        elif sv_config_identifier in self.overlap_events.svtype_alu_mediated_counts:
-                            repeat_elt, retrieved_type = self.overlap_events.get_alu_mediated_interval(sv_config_identifier)
+                        elif sv_config_identifier in self.overlap_regions.svtype_alu_mediated_counts:
+                            repeat_elts = self.overlap_regions.get_alu_mediated_interval(sv_config_identifier)
+                    sv_chrom, chr_len = self.get_rand_chr(fixed_chrom=(
+                        None if repeat_elts is None or list(repeat_elts.values()) == [None] else
+                        list(repeat_elts.values())[0][0]))
                     if sv_config['type'] == Variant_Type.SNP:
-                        sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode, length_ranges=[(1, 1)])
+                        sv = Structural_Variant(sv_type=sv_config["type"], sv_chrom=sv_chrom, mode=self.mode, length_ranges=[(1, 1)],
+                                                chrom_length=chr_len, blacklist_regions=sv_blacklist_regions)
                     else:
-                        sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
-                                                length_ranges=sv_config["length_ranges"], source=sv_config["source"],
-                                                target=sv_config["target"],
-                                                overlap_event=(repeat_elt + (retrieved_type if elt_type in ['ALL', None] else elt_type,) if repeat_elt is not None else None),
-                                                div_prob=sv_config.get("divergence_prob"))
+                        sv = Structural_Variant(sv_type=sv_config["type"], sv_chrom=sv_chrom, mode=self.mode,
+                                                length_ranges=sv_config["length_ranges"], chrom_length=chr_len,
+                                                source=sv_config["source"], target=sv_config["target"],
+                                                overlap_events=repeat_elts,
+                                                div_prob=(None if 'divergence_prob' not in sv_config else sv_config['divergence_prob']),
+                                                blacklist_regions=sv_blacklist_regions)
 
-                    # For divergent repeat simulation, need div_dDUP to be homozygous
                     if self.sim_settings.get("homozygous_only", False) or random.randint(0, 1):
                         sv.ishomozygous = Zygosity.HOMOZYGOUS
                         sv.hap = [True, True]
@@ -291,7 +301,7 @@ class SV_Simulator:
             self.stats.get_info(self.svs)
             self.stats.export_data(stats_file)
 
-    def choose_rand_pos(self, svs, ref_fasta, verbose=False):
+    def choose_rand_pos(self, svs, ref_fasta):
         """
         randomly positions SVs and stores reference fragments in SV events
 
@@ -315,65 +325,62 @@ class SV_Simulator:
                                 sv, active_svs_total, len(svs)))
                     valid = False
                     break
-                rand_id, chr_len, chr_event_ranges = self.get_rand_chr(check_size=sv.req_space,
-                                                                       fixed_chrom=(None if sv.overlap_event is None
-                                                                                    else sv.overlap_event[0]))
-                if not (sv.dispersion_flip and sv.overlap_event is not None):
-                    # if an overlap event is given, need to find the SV start position based on which fragment has been
-                    # set to the overlap event interval
-                    if sv.overlap_event is not None:
-                        start_pos = 0
-                        for frag in sv.source_events[::-1]:
-                            if frag.start is not None:
-                                start_pos = frag.start
-                            else:
-                                start_pos -= frag.length
-                    else:
-                        start_pos = random.randint(0, chr_len - sv.req_space)
-                    # define the space in which SV operates
-                    new_intervals = []  # tracks new ranges of blocks
-                    sv.start, sv.start_chr = start_pos, rand_id
-                    sv.end = sv.start + sv.req_space
-                    block_start = sv.start
+                new_intervals = []
+                sv_event_new_vals = []
+
+                # if no overlap, randomly draw start position, otherwise use the overlap to anchor SV placement
+                if all(frag.start is None for frag in sv.source_events):
+                    start_pos = random.randint(0, sv.chrom_length - sv.req_space)
                 else:
-                    # to assign event "A" to a repeat interval in a flipped dispersion event, need to
-                    # anchor the sv to the end of "A" and get the start position by subtracting off the total size
-                    end_pos = int(sv.overlap_event[2])
-                    start_pos = end_pos - sv.req_space
-                    new_intervals = []
-                    sv.start, sv.start_chr = start_pos, rand_id
-                    sv.end = end_pos
-                    block_start = sv.start
+                    start_pos = 0
+                    for frag in sv.source_events[::-1]:
+                        if frag.start is not None:
+                            start_pos = frag.start
+                        else:
+                            start_pos -= frag.length
+                sv_start = start_pos
+                sv_end = sv_start + sv.req_space
+                block_start = sv_start
 
                 for sv_event in sv.source_events:
-                    sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length
-                    sv_event.source_chr = rand_id
-                    frag = ref_fasta.fetch(rand_id, sv_event.start, sv_event.end)
-                    sv_event.source_frag = frag
+                    sv_event_source_chr = sv.start_chr
+                    sv_event_start, sv_event_end = start_pos, start_pos + sv_event.length
+                    frag = ref_fasta.fetch(sv.start_chr, sv_event_start, sv_event_end)
+                    sv_event_source_frag = frag
+                    sv_event_new_vals.append((sv_event_source_chr, sv_event_start, sv_event_end, sv_event_source_frag))
                     start_pos += sv_event.length
 
                     if sv_event.symbol.startswith(Symbols.DIS.value):
-                        if utils.is_overlapping(chr_event_ranges, (block_start, sv_event.start)):
+                        if utils.is_overlapping(self.event_ranges[sv.start_chr],
+                                                (block_start - self.min_intersv_dist, sv_event_start + self.min_intersv_dist)) or \
+                                (sv.blacklist_region_trees is not None and
+                                 sv.blacklist_region_trees[sv.start_chr].overlap(block_start, sv_event_start)):
                             valid = False
                             break
-                        new_intervals.append((block_start, sv_event.start))
-                        block_start = sv_event.end
+                        new_intervals.append((block_start, sv_event_start))
+                        block_start = sv_event_end
                     elif utils.percent_N(frag) > 0.05:
                         valid = False
                         break
                 # catches the last (and perhaps only) block in sequence
-                if utils.is_overlapping(chr_event_ranges, (block_start, sv.end)):
+                if utils.is_overlapping(self.event_ranges[sv.start_chr], (block_start - self.min_intersv_dist,
+                                                                          sv_end + self.min_intersv_dist)) or \
+                        (sv.blacklist_region_trees is not None and
+                         sv.blacklist_region_trees[sv.start_chr].overlap(block_start, sv_end)):
                     valid = False
                     continue
                 else:
-                    new_intervals.append((block_start, sv.end))
+                    new_intervals.append((block_start, sv_end))
 
             # adds new SV to simulate only if chosen positions were valid
             if valid:
                 active_svs_total += 1
                 sv.active = True
-                self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(new_intervals, rand_id, sv))
-                chr_event_ranges.extend(new_intervals)
+                sv.start, sv.end = sv_start, sv_end
+                for sv_event, sv_event_new_val in zip(sv.source_events, sv_event_new_vals):
+                    sv_event.source_chr, sv_event.start, sv_event.end, sv_event.source_frag = sv_event_new_val
+                self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(new_intervals, sv.start_chr, sv))
+                self.event_ranges[sv.start_chr].extend(new_intervals)
                 sv.assign_locations(sv.start)
             else:
                 inactive_svs_total += 1

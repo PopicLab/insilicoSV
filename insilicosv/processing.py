@@ -10,7 +10,7 @@ import yaml
 from insilicosv import utils
 from insilicosv.constants import \
     MAX_BUFFER_SIZE, Variant_Type, DISPERSION_TYPES, Operations, \
-    NONZERO_ORDER_OPERATIONS, Symbols
+    NONZERO_ORDER_OPERATIONS, Symbols, SV_KEY
 
 class FormatterIO:
     def __init__(self, par_file):
@@ -25,7 +25,7 @@ class FormatterIO:
         """
         config_svs = config['variant_sets']
         for config_sv in config_svs:
-            if "avoid_intervals" in config_sv:
+            if "blacklist_regions" in config_sv:
                 continue
             elif "type" not in config_sv:
                 raise Exception("\"Type\" attribute must be specified! For custom transformations, enter in \"Custom\"")
@@ -34,21 +34,19 @@ class FormatterIO:
                     continue
                 else:
                     raise Exception("Number (of type int > 0) is a required parameter for all SVs")
-            if "min_length" not in config_sv:
-                raise Exception("Min length must be specified on all SVs!")
-            if "max_length" not in config_sv:
-                raise Exception("Max length must be specified on all SVs!")
+            if "length_ranges" not in config_sv:
+                raise Exception("Length ranges must be specified on all SVs!")
             if "number" not in config_sv:
                 raise Exception("Number is a required parameter for all SVs")
 
             elif "type" in config_sv and not isinstance(config_sv["type"], str):
                 raise Exception("Invalid {} type for SV \'type\' attribute, str expected".format(type(config_sv["type"])))
         valid_optional_par = ["fail_if_placement_issues", "max_tries", "generate_log_file", "filter_small_chr",
-                              "prioritize_top", "homozygous_only", "reference"]  # valid arguments within sim_settings
+                              "prioritize_top", "homozygous_only", "reference", "min_intersv_dist"]  # valid arguments within sim_settings
         for parameter in config['sim_settings']:
             if parameter not in valid_optional_par:
                 raise Exception("\"{}\" is an invalid argument under sim_settings".format(parameter))
-        valid_keys = ["sim_settings", "variant_sets", "overlap_events", "avoid_intervals"]  # valid arguments at the top level
+        valid_keys = ["sim_settings", "variant_sets", "overlap_regions", "blacklist_regions"]  # valid arguments at the top level
         for key in config:
             if key not in valid_keys:
                 raise Exception("Unknown argument \"{}\"".format(key))
@@ -67,25 +65,58 @@ class FormatterIO:
         for config_sv in self.config['variant_sets']:
             if "vcf_path" in config_sv:
                 continue
-            # SV event length specification - not applicable for SNPs
-            if config_sv["type"] != "SNP":
-                if not isinstance(config_sv["min_length"], list) or not isinstance(config_sv["max_length"], list):
-                    raise Exception("Must provide entries of type list to \'min_length\' and \'max_length\'")
-                else:
-                    config_sv["length_ranges"] = list(zip(config_sv["min_length"], config_sv["max_length"]))
-                assert all(max_len >= min_len >= 0 for (min_len, max_len) in config_sv["length_ranges"]), "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
-            if "divergence_prob" in config_sv:
-                if config_sv["type"] != "DIVERGENCE":
-                    raise Exception("divergence_prob can only be given for event type DIVERGENCE")
-                else:
-                    assert isinstance(config_sv["divergence_prob"], int) or isinstance(config_sv["divergence_prob"], float), \
-                        "Must give \'divergence_prob\'"
-                    assert 1 >= config_sv["divergence_prob"] > 0, "divergence_prob must be in (0,1]"
-
+            assert "type" in config_sv, "\'type\' missing from \'variant_sets\' config entry"
+            if any(ovlp_field in config_sv for ovlp_field in ["overlap_type", "overlap_region_type", "overlap_component"]):
+                assert "overlap_regions" in self.config, "Must provide \'overlap_regions\' entry if \'overlap_type\', " \
+                                                       "\'overlap_region_type\', or \'overlap_component\' are specified"
             config_sv["type"] = Variant_Type(config_sv["type"])
             if config_sv["type"] != Variant_Type.Custom:
                 config_sv["source"] = None
                 config_sv["target"] = None
+            if 'overlap_component' in config_sv and config_sv['overlap_component'] in ['source', 'target']:
+                if not (config_sv['type'] in DISPERSION_TYPES or (
+                        config_sv['source'] is not None and Symbols.DIS.value in config_sv['source'])):
+                    raise Exception(
+                        'Cannot specify \'overlap_component\': {\'source\'/\'target\'} for non-dispersion SVs')
+            elif 'overlap_component' in config_sv and config_sv['overlap_component'] == 'full_sv':
+                if config_sv['type'] in DISPERSION_TYPES or (
+                        config_sv['source'] is not None and Symbols.DIS.value in config_sv['source']):
+                    raise Exception('Cannot specify \'overlap_component\': \'full_sv\' for dispersion SVs')
+            frags = self.get_grammar(config_sv)
+            unbounded_disps = []
+            # SV event length specification - not applicable for SNPs
+            if config_sv["type"] != Variant_Type.SNP:
+                if not isinstance(config_sv["length_ranges"], list):
+                    raise Exception("Must provide list of tuples to \'length\'")
+                for i, frag in enumerate(frags):
+                    min_len, max_len = config_sv["length_ranges"][i]
+                    if frag[0] != '_':
+                        assert min_len is not None and max_len is not None, "Min and max length must be non-None for non-dispersion fragments"
+                        assert max_len >= min_len >= 0, "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
+                    else:
+                        assert min_len is not None, "Min length must be non-None for dispersion fragments"
+                        if max_len is not None:
+                            assert max_len >= min_len >= 0, "Max length must be >= min length for all SVs! Also ensure that all length values are >= 0."
+                        else:
+                            unbounded_disps.append(i)
+                            assert min_len >= 0, "Min length must be >= 0 for all SVs!"
+            if "divergence_prob" in config_sv:
+                assert isinstance(config_sv["divergence_prob"], (int, float)), \
+                    "Must give \'divergence_prob\'"
+                assert 1 >= config_sv["divergence_prob"] >= 0, "divergence_prob must be in [0,1]"
+                assert config_sv["type"] != "SNP" or config_sv["divergence_prob"] == 1, \
+                    "divergence_prob for SNPs is always 1"
+
+            # if overlap_region_type given as list, must provide a list of equal length to the number of frags in SV
+            if "overlap_region_type" in config_sv and isinstance(config_sv["overlap_region_type"], list):
+                assert len(frags) == len(config_sv["overlap_region_type"]), "if \'overlap_region_type\' given as list, " \
+                                                                           "must have length equal to number of SV components"
+                # Can only support multiple non-None overlap frags if separated by unbounded dispersions
+                roi_idxs = [i for i, roi in enumerate(config_sv['overlap_region_type']) if roi is not None]
+                if len(roi_idxs) > 1:
+                    for i in range(len(roi_idxs) - 1):
+                        assert any([roi_idxs[i] < elt <= roi_idxs[i + 1] for elt in unbounded_disps]), \
+                            '\'overlap_region_type\' can only be non-None for multiple fragments that are separated by an unbounded dispersion'
 
         # setting default values for sim_settings fields
         if 'max_tries' not in self.config['sim_settings']:
@@ -196,6 +227,20 @@ class FormatterIO:
                 # sv_record_info[src_sym]['order'] = order
         return sorted([params for params in sv_record_info.values()], key=lambda params: params['source_s'])
 
+    @staticmethod
+    def get_grammar(sv_config):
+        """
+        Collect the sorted symbols in corresponding order of length_ranges given
+        in variant_sets config entry for a given SV (either predefined or custom)
+        """
+        if sv_config["type"] != Variant_Type.Custom:
+            src_frags, trg_frags = map(utils.reformat_seq, SV_KEY[sv_config["type"]])
+            union_frags = set(c[0].upper() if c[0].isalnum() else c for c in src_frags + trg_frags)
+        else:
+            src_frags, trg_frags = map(utils.reformat_seq, (list(sv_config["source"]), list(sv_config["target"])))
+            union_frags = set(c[0].upper() if c[0].isalnum() else c for c in src_frags + trg_frags)
+        return sorted([c for c in union_frags if c.isalnum()]) + [c for c in union_frags if not c.isalnum()]
+
     def export_to_bedpe(self, svs, bedfile, ins_fasta=None, reset_file=True):
         if reset_file:
             utils.reset_file(bedfile)
@@ -247,7 +292,7 @@ class FormatterIO:
         vcf_file.header.info.add('SVMETHOD', number=1, type='String', description="SV detection method")
         vcf_file.header.info.add('TARGET', number=1, type='Integer', description="Target location for divergent repeat")
         vcf_file.header.info.add('OVERLAP_EV', number=1, type='String', description="Bool. indicator for the event being"
-                                                                                    "placed at an overlap_events interval")
+                                                                                    "placed at an overlap_regions interval")
         vcf_file.header.formats.add('GT', number=1, type='String', description="Genotype")
 
         vcf_out_file = pysam.VariantFile(vcffile, 'w', header=vcf_file.header)
@@ -277,8 +322,10 @@ class FormatterIO:
                     info_field = {'SVTYPE': sv.type.value, 'SVLEN': sv.events_dict[Symbols.REQUIRED_SOURCE.value].length}
                 else:
                     info_field = {'SVTYPE': sv.type.value, 'SVLEN': rec_end - rec_start}
-            if sv.overlap_event is not None:
-                info_field['OVERLAP_EV'] = sv.overlap_event[3]
+            if sv.overlap_events is not None:
+                ovlp_str = '_'.join(ovlp[3] for ovlp in sv.overlap_events.values() if ovlp is not None)
+                if ovlp_str != '':
+                    info_field['OVERLAP_EV'] = ovlp_str
 
             vcf_record = vcf_out_file.header.new_record(contig=sv.start_chr, start=rec_start, stop=rec_end,
                                                         alleles=['N', '<%s>' % sv.type.value], id=sv.type.value,
