@@ -124,6 +124,10 @@ class FormatterIO:
         if 'fail_if_placement_issues' not in self.config['sim_settings']:
             self.config['sim_settings']['fail_if_placement_issues'] = False
 
+        # assign a unique ID to each variant set
+        for variant_set_id, variant_set in enumerate(self.config['variant_sets']):
+            variant_set['variant_set_id'] = f'variant_set_{variant_set_id:03}'
+
     def yaml_to_var_list(self):
         try:
             with open(self.par_file) as yaml_file:

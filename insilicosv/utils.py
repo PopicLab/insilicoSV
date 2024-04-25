@@ -118,12 +118,7 @@ def divergence(seq, divergence_prob=None):
 
 
 def get_sv_config_identifier(sv_config):
-    # helper function to yield a uniquely identifying string for a given SV config entry
-    # --> usage: needing to index into overlap events dicts to access info specific to a set of SVs simulated with a given set of params
-    min_lens, max_lens = tuple(zip(*sv_config['length_ranges']))
-    min_str = str(min_lens) if isinstance(min_lens, int) else '_'.join(map(str, min_lens))
-    max_str = str(max_lens) if isinstance(max_lens, int) else '_'.join(map(str, max_lens))
-    return '_'.join([str(v) for k, v in sv_config.items() if k != 'length_ranges']) + '_' + min_str + '_' + max_str
+    return sv_config['variant_set_id']
 
 
 class RegionsOfInterest:
