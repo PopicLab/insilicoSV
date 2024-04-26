@@ -6,6 +6,7 @@ from insilicosv import utils
 from insilicosv.constants import \
     SV_KEY, Symbols, Variant_Type, Zygosity, DISPERSION_TYPES
 
+
 class Structural_Variant:
     def __init__(self, sv_type, sv_chrom, mode, length_ranges=None, chrom_length=None, source=None, target=None, vcf_rec=None, ref_fasta=None,
                  overlap_events=None, div_prob=None, blacklist_regions=None):

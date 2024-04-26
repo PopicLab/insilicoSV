@@ -152,6 +152,9 @@ class SV_Simulator:
         self.overlap_regions = None if "overlap_regions" not in config.keys() \
             else utils.OverlapRegions(config, allow_chroms=self.order_ids)
 
+        self.active_svs_total = 0
+        self.inactive_svs_total = 0
+
         self.initialize_svs()
 
         print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
@@ -191,7 +194,7 @@ class SV_Simulator:
 
     def process_vcf(self, vcf_path):
         # process vcf containing SVs to be added (deterministically) to reference
-        active_svs_total = 0
+        self.active_svs_total = 0
         time_start_local = 0
         vcf = VariantFile(vcf_path)
         for rec in vcf.fetch():
@@ -199,10 +202,10 @@ class SV_Simulator:
             self.event_ranges[rec.chrom].append((rec.start, rec.stop))
             sv = Structural_Variant(sv_type=svtype, sv_chrom=rec.chrom, mode='fixed', vcf_rec=rec, ref_fasta=self.ref_fasta)
             self.svs.append(sv)
-            active_svs_total += 1
+            self.active_svs_total += 1
             self.log_to_file("Intervals {} added to Chromosome \"{}\"".format(self.event_ranges[rec.chrom], rec.chrom))
             time_dif = time.time() - time_start_local
-            print("{} SVs successfully placed ========== {} seconds".format(active_svs_total, time_dif), end="\r")
+            print("{} SVs successfully placed ========== {} seconds".format(self.active_svs_total, time_dif), end="\r")
             time_start_local = time.time()
 
     def initialize_svs(self):
@@ -218,7 +221,7 @@ class SV_Simulator:
                     if 'blacklist_region_type' in sv_config else None
                 for num in range(sv_config["number"]):
                     repeat_elts = None
-                    if self.overlap_regions is not None:
+                    if 'overlap_type' in sv_config or 'overlap_component' in sv_config:
                         sv_config_identifier = utils.get_sv_config_identifier(sv_config)
                         if sv_config_identifier in self.overlap_regions.svtype_overlap_counts:
                             repeat_elts = self.overlap_regions.get_overlap_intervals(
@@ -228,6 +231,10 @@ class SV_Simulator:
                                 sv_config_identifier, sv_config, partial_overlap=True)
                         elif sv_config_identifier in self.overlap_regions.svtype_alu_mediated_counts:
                             repeat_elts = self.overlap_regions.get_alu_mediated_interval(sv_config_identifier)
+                        # if SV intended to overlap ROI but no ROI is successfully found, fail to place
+                        if repeat_elts is None or set(repeat_elts.values()) == {None}:
+                            self.inactive_svs_total += 1
+                            continue
                     sv_chrom, chr_len = self.get_rand_chr(fixed_chrom=(
                         None if repeat_elts is None or list(repeat_elts.values()) == [None] else
                         list(repeat_elts.values())[0][0]))
@@ -308,9 +315,9 @@ class SV_Simulator:
         svs: list of Structural Variant objects
         ref_fasta: FastaFile with access to reference file
         """
-        active_svs_total = 0
-        inactive_svs_total = 0
         time_start_local = time.time()
+        if self.sim_settings["fail_if_placement_issues"] and self.inactive_svs_total > 0:
+            raise Exception("Failure to place SVs at specified ROI-constrained positions")
         for sv in svs:
             tries = 0
             valid = False
@@ -322,7 +329,7 @@ class SV_Simulator:
                         raise Exception(
                             "Failed to simulate {}, {} / {} SVs successfully simulated (set fail_if_placement_issues "
                             "to False to override placement failures)".format(
-                                sv, active_svs_total, len(svs)))
+                                sv, self.active_svs_total, self.active_svs_total + self.inactive_svs_total))
                     valid = False
                     break
                 new_intervals = []
@@ -374,7 +381,7 @@ class SV_Simulator:
 
             # adds new SV to simulate only if chosen positions were valid
             if valid:
-                active_svs_total += 1
+                self.active_svs_total += 1
                 sv.active = True
                 sv.start, sv.end = sv_start, sv_end
                 for sv_event, sv_event_new_val in zip(sv.source_events, sv_event_new_vals):
@@ -383,7 +390,7 @@ class SV_Simulator:
                 self.event_ranges[sv.start_chr].extend(new_intervals)
                 sv.assign_locations(sv.start)
             else:
-                inactive_svs_total += 1
+                self.inactive_svs_total += 1
                 if tries != self.sim_settings["max_tries"] + 1:
                     self.log_to_file("{} only got {} tries instead of the max {}".format(sv, tries, self.sim_settings[
                         "max_tries"] + 1), key="WARNING")
@@ -391,7 +398,8 @@ class SV_Simulator:
             time_dif = time.time() - time_start_local
             print(
                 "{} / {} SVs successfully placed ========== {} / {} SVs unsuccessfully placed, {} tries, {} seconds".format(
-                    active_svs_total, len(svs), inactive_svs_total, len(svs), tries, time_dif), end="\r")
+                    self.active_svs_total, self.active_svs_total + self.inactive_svs_total,
+                    self.inactive_svs_total, self.active_svs_total + self.inactive_svs_total, tries, time_dif), end="\r")
             time_start_local = time.time()
 
     def apply_transformations(self, ref_fasta):

@@ -122,7 +122,7 @@ class FormatterIO:
         if 'max_tries' not in self.config['sim_settings']:
             self.config['sim_settings']['max_tries'] = 50
         if 'fail_if_placement_issues' not in self.config['sim_settings']:
-            self.config['sim_settings']['fail_if_placement_issues'] = False
+            self.config['sim_settings']['fail_if_placement_issues'] = True
 
         # assign a unique ID to each variant set
         for variant_set_id, variant_set in enumerate(self.config['variant_sets']):
