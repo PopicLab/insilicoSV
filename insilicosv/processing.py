@@ -88,6 +88,8 @@ class FormatterIO:
             if config_sv["type"] != Variant_Type.SNP:
                 if not isinstance(config_sv["length_ranges"], list):
                     raise Exception("Must provide list of tuples to \'length\'")
+                if len(config_sv["length_ranges"]) != len(frags):
+                    raise Exception(f"SV of type {config_sv['type']} requires {len(frags)} length_ranges")
                 for i, frag in enumerate(frags):
                     min_len, max_len = config_sv["length_ranges"][i]
                     if frag[0] != '_':
