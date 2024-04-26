@@ -21,6 +21,7 @@ classifiers = [
 ]
 dependencies = [
         'cycler',
+        'intervaltree',
         'kiwisolver',
         'matplotlib',
         'numpy',
