@@ -15,7 +15,7 @@ variant_sets:
       length_ranges: [[5, 10]]
     - type: "INVdel"
       number: 2
-      length_ranges: [[5, 10]]
+      length_ranges: [[5, 10], [5, 10]]
 ```
 
 The following parameters can be given for each variant set.  Each parameter is required unless otherwise specified.
