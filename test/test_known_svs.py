@@ -33,6 +33,8 @@ class TestKnownSVs(unittest.TestCase):
         self.test_vcf_TRA_NONRECIP = "test/inputs/example_TRA_NONRECIP.vcf"
         self.test_vcf_multi_dispersion = "test/inputs/example_multi_dispersion.vcf"
 
+        self.test_vcf_allele_freq_1 = "test/inputs/example_allele_freq_1.vcf"
+
         self.ref_file = "test/inputs/test.fna"
         self.par = "test/inputs/par.yaml"
         self.hap1 = "test/inputs/test1.fna"
@@ -115,6 +117,11 @@ class TestKnownSVs(unittest.TestCase):
                                                                     "variant_sets": [{"vcf_path": self.test_vcf_multi_dispersion}]}],
                                                                   self.hap1, self.hap2, self.bed)}
 
+        self.test_objects_allele_freq = {'deterministic': TestObject([self.ref_file, {"chr21": "GCACTATCTCTGCACTATCTCGCACTATCTCTT"}],
+                                                                     [self.par, {"sim_settings": {"reference": self.ref_file},
+                                                                                 "variant_sets": [{"vcf_path": self.test_vcf_allele_freq_1}]}],
+                                                                     self.hap1, self.hap2, self.bed)}
+
     def helper_test_simple_sv(self, config_event_obj, target_frags=None):
         # template test method for simple SVs
         config = config_event_obj
@@ -161,6 +168,9 @@ class TestKnownSVs(unittest.TestCase):
         self.helper_test_simple_sv(self.test_objects_dispersions['INV_dDUP'], ['GCACTATCTCATAGTTCCGT'])
         self.helper_test_simple_sv(self.test_objects_dispersions['TRA'], ['GCCTCACTATTCCGT'])
         self.helper_test_simple_sv(self.test_objects_dispersions['multievent'], ['GACGGCCTACTATCACTATTCCGT'])
+
+    def test_allele_freq(self):
+        self.helper_test_simple_sv(self.test_objects_allele_freq['deterministic'], 'GCACTATCTCTGCAGCACTATCTCTT')
 
 
 if __name__ == '__main__':

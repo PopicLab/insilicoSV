@@ -198,6 +198,9 @@ class SV_Simulator:
         time_start_local = 0
         vcf = VariantFile(vcf_path)
         for rec in vcf.fetch():
+            # accounting for allele frequency if given in record (only add SV w.p. = allele freq)
+            if 'AF' in rec.info and random.random() > rec.info['AF'][0]:
+                continue
             svtype = Variant_Type(rec.info['SVTYPE']) if 'SVTYPE' in rec.info else Variant_Type(rec.id)
             self.event_ranges[rec.chrom].append((rec.start, rec.stop))
             sv = Structural_Variant(sv_type=svtype, sv_chrom=rec.chrom, mode='fixed', vcf_rec=rec, ref_fasta=self.ref_fasta)

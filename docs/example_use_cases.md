@@ -1,5 +1,8 @@
 # Example Use Cases
-insilicoSV provides various simulation features that can be used together or separately to generate synthetic genomes with varying levels of control over SV placement. Examples of the different use cases are provided below.
+insilicoSV provides various simulation features that can be used together or separately to generate synthetic genomes with varying levels of control over SV placement. Examples of the different use cases with matching config file structure are provided below. For all of these cases, commandline usage is:
+```
+insilicosv <config.yaml>
+```
 
 ### Example 1 - Predefined SV types
 To incorporate SVs from the predefined library of SV types, a configuration file of the following form can be provided with parameters provided for the count and min/max length for each set of SVs to be included in the output genome.
@@ -94,9 +97,8 @@ sim_settings:
 variant_sets:
     - vcf_path: "{path_to_vcf}"
 ```
-```
-insilicosv <config.yaml>
-```
+If a population-level VCF is being provided in which records include an allele frequency info field (see [VCF spec. 4.2](https://samtools.github.io/hts-specs/VCFv4.2.pdf)),
+each variant will be added to the output genome with probability equal to its given allele frequency value.
 
 ### Example 4 - Marking genome blacklist intervals
 When initializing a new simulation the user can include a blacklist of genome intervals (i.e., intervals that specified
