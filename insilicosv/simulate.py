@@ -335,6 +335,11 @@ class SV_Simulator:
                                 sv, self.active_svs_total, self.active_svs_total + self.inactive_svs_total))
                     valid = False
                     break
+                
+                if sv.req_space > sv.chrom_length:
+                    valid = False
+                    continue
+
                 new_intervals = []
                 sv_event_new_vals = []
 
@@ -400,7 +405,7 @@ class SV_Simulator:
 
             time_dif = time.time() - time_start_local
             print(
-                "{} / {} SVs successfully placed ========== {} / {} SVs unsuccessfully placed, {} tries, {} seconds".format(
+                "{} / {} SVs successfully placed ========== {} / {} SVs not placed, {} tries, {} seconds".format(
                     self.active_svs_total, self.active_svs_total + self.inactive_svs_total,
                     self.inactive_svs_total, self.active_svs_total + self.inactive_svs_total, tries, time_dif), end="\r")
             time_start_local = time.time()
