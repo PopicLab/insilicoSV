@@ -850,15 +850,6 @@ class TestSVSimulator(unittest.TestCase):
                                                         self.hap1, self.hap2, self.bed)
                                              ]
 
-        self.test_objects_fully_contained = [TestObject([self.ref_file, {"chr21": "CTCCGTAGTA"}],
-                                                        [self.par, {"sim_settings": {"reference": self.ref_file},
-                                                                    "overlap_regions": self.test_overlap_bed_4,
-                                                                    "variant_sets": [{"type": "DEL", "number": 1,
-                                                                                      "length_ranges": [[2, 2]],
-                                                                                      "overlap_type": "contained"}]}],
-                                                        self.hap1, self.hap2, self.bed)
-                                             ]
-
         # ---------- test objects for divergence event ------------
         self.test_objects_divergence_event = [TestObject([self.ref_file, {"chr21": "CTCCGTCGTA"}],
                                                          [self.par, {"sim_settings": {"reference": self.ref_file,
@@ -1394,9 +1385,6 @@ class TestSVSimulator(unittest.TestCase):
                 partial_ovl_sv = curr_sim.svs[(sv_intervals.index((11, 15)) + 1) % 2]
                 self.assertTrue(utils.is_overlapping([(2, 4)], (partial_ovl_sv.start, partial_ovl_sv.end)) or
                                 utils.is_overlapping([(22, 25)], (partial_ovl_sv.start, partial_ovl_sv.end)))
-
-    def test_fully_contained_placement(self):
-        pass
 
     def test_alu_mediated_placement(self):
         for i in range(len(self.test_objects_alu_mediated)):
