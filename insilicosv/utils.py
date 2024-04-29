@@ -16,6 +16,7 @@ class NestedDict(defaultdict):
     def __call__(self):
         return NestedDict(self.default_factory)
 
+
 def is_overlapping(event_ranges, addition, called_from_helper=False, strictly_partial=False):
     # addition: tuple (start, end)
     # event_ranges: list containing tuples
