@@ -272,6 +272,12 @@ class FormatterIO:
                         continue
                     sv_record_info[ev.symbol] = {'source_s': ev.start, 'source_e': ev.end, 'sv': sv, 'event': ev, 'bedfile': bedfile, 'sv_id': sv_id + 1}
                     (target_s, target_e), operation = self.get_event_target_operation(ev.symbol, sv.sv_blocks.target_events_dict, sv.events_dict)
+                    if operation == Operations.INS.value:
+                        target_ev = sv.sv_blocks.target_events_dict[ev.symbol]
+                        sv_record_info[ev.symbol]['source_s'] = target_s
+                        sv_record_info[ev.symbol]['source_e'] = target_e
+                        sv_record_info[ev.symbol]['event'] = target_ev
+                        self.export_insertions(sv.start_chr, target_s, target_ev.source_frag, ins_fasta)
                     sv_record_info[ev.symbol]['target_s'] = target_s
                     sv_record_info[ev.symbol]['target_e'] = target_e
                     sv_record_info[ev.symbol]['transform'] = operation
