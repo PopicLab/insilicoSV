@@ -16,8 +16,8 @@ variant_sets:
       max_length: [10]
     - type: "INVdel"
       number: 2
-      min_length: [5]
-      max_length: [10]
+      min_length: [5, 5]
+      max_length: [10, 10]
 ```
 
 The following parameters can be given for each variant set.  Each parameter is required unless otherwise specified.
