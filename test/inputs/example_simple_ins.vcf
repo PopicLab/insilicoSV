@@ -7,7 +7,7 @@
 ##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
 ##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Length of structural variant">
 ##INFO=<ID=SVMETHOD,Number=1,Type=String,Description="SV detection method">
-##INFO=<ID=INSSEQ,Number=.,Type=String,Description="Sequences of insertion.">
+##INFO=<ID=INSSEQ,Number=1,Type=String,Description="Novel insertion sequence">
 ##INFO=<ID=TARGET,Number=1,Type=Integer,Description="Target location for divergent repeat">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE

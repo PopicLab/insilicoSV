@@ -30,8 +30,9 @@ dependencies = [
         'pysam',
         'python-dateutil',
         'PyYAML',
-        'six'
-             
+        'six',
+        'sortedcontainers',
+        'typing_extensions'
 ]
 license = {text = "MIT"}
 
