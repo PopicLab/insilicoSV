@@ -40,4 +40,4 @@ Homepage = "https://github.com/PopicLab/insilicoSV"
 Issues = "https://github.com/PopicLab/insilicoSV/issues"
 
 [project.scripts]
-insilicosv = "insilicosv.simulate:run_insilicosv"
+insilicosv = "insilicosv.simulate:run_simulator"

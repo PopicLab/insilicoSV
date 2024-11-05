@@ -112,10 +112,7 @@ class SVSimulator:
         chk('reference' in sim_settings, 'Missing reference under sim_settings')
         chk(utils.is_readable_file(sim_settings['reference']), f'reference must be a readable file')
         ref_idx = sim_settings['reference'] + '.fai'
-        chk(not utils.is_readable_file(ref_idx) or
-            os.path.getmtime(ref_idx) >=
-            os.path.getmtime(sim_settings['reference']),
-            f'reference index out of date: {ref_idx}')
+        chk(utils.is_readable_file(ref_idx), f'reference index must be a readable file')
         chk(isinstance(config.get('variant_sets'), list),
             'variant_sets must specify a list')
 
