@@ -1,433 +1,553 @@
-import random
-from insilicosv import utils
+#!/usr/bin/env python3
+
+"""insilicoSV: simulator of structural variants.
+
+(redesigned version)
+"""
+
+import argparse
+from collections import defaultdict, Counter
+import copy
+import functools
 import logging
+import os
+import os.path
+import random
+import shutil
 import time
-from os import write
-from insilicosv.processing import FormatterIO, collect_args
+from typing_extensions import Any, Optional, cast
+
 from pysam import FastaFile
-from pysam import VariantFile
-from insilicosv.constants import *
-from insilicosv.structural_variant import Structural_Variant, Event
-from collections import defaultdict
+import yaml
 
-time_start = time.time()
+from insilicosv import utils
+from insilicosv.utils import (
+    Locus, Region, RegionSet, RegionFilter, OverlapMode, chk, error_context,
+    n_valid_placements, has_duplicates, if_not_none)
+from insilicosv.sv_defs import (SV, Operation, Transform, TransformType,
+                                Breakend, BreakendRegion)
+from insilicosv.variant_set_makers import make_variant_set_from_config
+from insilicosv.output import OutputWriter
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(levelname)s %(message)s')
 
-class StatsCollection:
-    """collection of information for stats file, if requested"""
-    def __init__(self, chr_ids, chr_lens):
-        self.num_heterozygous = 0
-        self.num_homozygous = 0
-        self.total_svs = 0
-        self.active_svs = 0
-        self.active_events_chr = dict()
-        self.chr_ids = chr_ids
-        self.chr_lengths = chr_lens
-        self.avg_len = [0, 0]  # Average length of SV events/components
-        self.len_frags_chr = dict()  # Lengths of altered fragments within chromosome
-        self.sv_types = dict()
+class SVSimulator:
 
-        for id in self.chr_ids:
-            self.len_frags_chr[id] = 0
-            self.active_events_chr[id] = 0
+    """
+    Simulates SVs from a given config.
+    """
 
-    def get_info(self, svs):
-        """
-        collects all information for stats file after all edits are completed
+    config: dict[str, Any]
+    svs: list[SV]
+    rois: RegionSet
+    rois_list: list[Region]
+    rois_list_pos: int
+    used_sv_regions: RegionSet
+    translocated_chroms: set[str]
+    blacklist_regions: RegionSet
 
-        svs: list of Structural_Variant objects
-        -> return None
-        """
-        self.total_svs = len(svs)
-        self.min_event_len = min([event.length for sv in svs if sv.active for key, event in sv.events_dict.items() if
-                                  not event.symbol.startswith(Symbols.DIS.value)])
-        self.max_event_len = max([event.length for sv in svs if sv.active for key, event in sv.events_dict.items() if
-                                  not event.symbol.startswith(Symbols.DIS.value)])
+    reference: FastaFile
+    chrom_lengths: dict[str, int]
+    output_path: str
+    verbose: bool
 
-        for sv in svs:
-            if sv.active:
-                self.active_svs += 1
-                if sv.name in self.sv_types:
-                    self.sv_types[sv.name] += 1
-                else:
-                    self.sv_types[sv.name] = 1
+    def __init__(self, config_path):
 
-                if sv.hap[0] and sv.hap[1]:  # homozygous SV
-                    self.num_homozygous += 1
-                else:  # heterozygous SV
-                    self.num_heterozygous += 1
+        try:
+            with open(config_path) as config_yaml:
+                self.config = yaml.safe_load(config_yaml)
+        except Exception as exception:
+            chk(False, f'Error reading config file {config_path}: {exception}')
 
-                # add up the lengths of impacted regions on the reference
-                for frag in sv.changed_fragments:
-                    self.len_frags_chr[frag[0]] += frag[2] - frag[1]
+        self.convert_legacy_config()
+        self.pre_check_config()
 
-                # count up average length of non-dispersion events
-                for symbol in sv.events_dict:
-                    if not symbol.startswith(Symbols.DIS.value):
-                        event = sv.events_dict[symbol]
-                        self.avg_len[0] += event.length
-                        self.avg_len[1] += 1
-        self.avg_len = self.avg_len[0] // self.avg_len[1] if self.avg_len[1] != 0 else 0
+        self.verbose = self.config['sim_settings'].get('verbose', False)
+        if self.verbose:
+            loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+            for a_logger in loggers:
+                a_logger.setLevel(logging.DEBUG)
 
-    def export_data(self, fileout):
-        """
-        Exports all collected data to entered file
-        fileout: Location to export stats file
-        """
-        def write_item(fout, name, item, prefix=""):
-            fout.write("{}{}: {}\n".format(prefix, str(name), str(item)))
-
-        with open(fileout, "w") as fout:
-            fout.write("===== Overview =====\n")
-            write_item(fout, "SVs successfully simulated", str(self.active_svs) + "/" + str(self.total_svs))
-            for sv_type in self.sv_types:
-                write_item(fout, sv_type, self.sv_types[sv_type], prefix="\t- ")
-            write_item(fout, "Homozygous SVs", self.num_homozygous)
-            write_item(fout, "Heterozygous SVs", self.num_heterozygous)
-            write_item(fout, "Average length of SV symbols/components (excluding dispersions)", self.avg_len)
-            write_item(fout, "Min length of non-dispersion event", self.min_event_len)
-            write_item(fout, "Max length of non-dispersion event", self.max_event_len)
-            for id in self.chr_ids:
-                fout.write("\n===== {} =====\n".format(id))
-                write_item(fout, "Length of sequence", self.chr_lengths[id])
-                write_item(fout, "Total impacted length of reference chromosome", self.len_frags_chr[id])
+        if 'random_seed' in self.config['sim_settings']:
+            random_seed = self.config['sim_settings']['random_seed']
+            chk(isinstance(random_seed, (type(None), int, float, str)),
+                'invalid random_seed')
+            if random_seed == 'time':
+                random_seed = time.time_ns() % 1000000000
+            logger.info(f'random seed: {random_seed}')
+            random.seed(random_seed)
 
 
-class SV_Simulator:
-    def __init__(self, par_file, log_file=None):
-        """
-        par_file: file location to configuration file (.yaml)
-        log_file: location to store log file with diagnostic information if config parameters indicate so
-        """
-        global time_start
-        print("Setting up Simulator...")
+        self.output_path = os.path.dirname(config_path)
+        
+        self.reference = FastaFile(self.config['sim_settings']['reference'])
+        self.chrom_lengths = { chrom: chrom_length
+                               for chrom, chrom_length in zip(self.reference.references,
+                                                              self.reference.lengths) }
 
-        self.formatter = FormatterIO(par_file)
-        self.formatter.yaml_to_var_list()
-        config = self.formatter.config
-        self.ref_file = config['sim_settings']['reference']
-        self.ref_fasta = FastaFile(self.ref_file)
-        self.svs_config = config['variant_sets']
+        self.used_sv_regions = RegionSet()
+        self.translocated_chroms = set()
+        
+    def pre_check_config(self) -> None:
+        config = self.config
 
-        self.sim_settings = config['sim_settings']
-        if log_file and "generate_log_file" in self.sim_settings.keys():
-            logging.basicConfig(filename=log_file, filemode="w", level=logging.DEBUG,
-                                format='[%(name)s: %(levelname)s - %(asctime)s] %(message)s')
-            self.log_to_file("YAML Configuration: {}".format(config))
+        chk(isinstance(config, dict), 'Config must be a dict')
 
-        # get all chromosome ids
-        self.order_ids = self.ref_fasta.references
-        self.len_dict = dict()  # stores mapping with key = chromosome, value = chromosome length
-        for id in self.order_ids:
-            chrom_len = self.ref_fasta.get_reference_length(id)
-            if 'filter_small_chr' in self.sim_settings and chrom_len < self.sim_settings['filter_small_chr']:
-                print("Filtering chromosome {}: Length of {} below threshold of {}".format(id, chrom_len, self.sim_settings['filter_small_chr']))
+        for k in config:
+            chk(k in ('sim_settings', 'variant_sets', 'overlap_regions', 'blacklist_regions'),
+                f'invalid top-level config: {k}')
+
+        chk('sim_settings' in config, 'Missing sim_settings')
+        sim_settings = config['sim_settings']
+        chk(isinstance(sim_settings, dict), 'sim_settings must be a dict')
+
+        for k in sim_settings:
+            chk(k in ('reference', 'max_tries', 'homozygous_only', 'min_intersv_dist',
+                      'random_seed', 'output_no_haps', 'output_paf', 'output_svops_bed',
+                      'output_paf_intersv', 'verbose'),
+                f'invalid sim_settings key: {k}')
+
+        chk('reference' in sim_settings, 'Missing reference under sim_settings')
+        chk(utils.is_readable_file(sim_settings['reference']), f'reference must be a readable file')
+        ref_idx = sim_settings['reference'] + '.fai'
+        chk(not utils.is_readable_file(ref_idx) or
+            os.path.getmtime(ref_idx) >=
+            os.path.getmtime(sim_settings['reference']),
+            f'reference index out of date: {ref_idx}')
+        chk(isinstance(config.get('variant_sets'), list),
+            'variant_sets must specify a list')
+
+        if 'overlap_regions' in config:
+            config['overlap_regions'] = utils.as_list(config['overlap_regions'])
+            chk(isinstance(config['overlap_regions'], list),
+                'overlap_regions must be a list')
+            chk(all(utils.is_readable_file(overlap_spec) for overlap_spec in config['overlap_regions']),
+                'Each item in overlap_regions must be a readable file')
+        else:
+            for variant_set in config['variant_sets']:
+                chk(isinstance(variant_set, dict), f'variant set must be a dict: {variant_set}')
+                for key in variant_set.keys():
+                    chk(not key.startswith('overlap_'),
+                        f'Using {key} in {variant_set} requires specifying overlap_regions in global config')
+
+    def convert_legacy_config(self) -> None:
+        chk(isinstance(self.config, dict), 'Config must be a dict')
+        chk('sim_settings' in self.config, 'Missing sim_settings')
+
+        for k in ('prioritize_top', 'fail_if_placement_issues'):
+            if k in self.config['sim_settings']:
+                del self.config['sim_settings'][k]
+                logger.warning(f'Please remove deprecated setting {k}')
+
+        for variant_set in self.config.get('variant_sets', []):
+            variant_set_orig = copy.deepcopy(variant_set)
+            with error_context(variant_set):
+                cfg = variant_set
+                chk(isinstance(cfg, dict), 'each variant set must be a dict')
+                if 'min_length' in cfg and 'max_length' in cfg:
+                    chk('length_ranges' not in cfg, 'cannot combine old and new syntax for length ranges')
+                    chk(utils.is_list_of((int, type(None)), cfg['min_length']), f'bad min_length')
+                    chk(utils.is_list_of((int, type(None)), cfg['max_length']), f'bad max_length')
+                    chk(len(cfg['min_length']) == len(cfg['max_length']),
+                        f'min/max length lists must have same length')
+                    cfg['length_ranges'] = [
+                        [min_len, max_len] for min_len, max_len in zip(cfg['min_length'], cfg['max_length'])]
+                    del cfg['min_length']
+                    del cfg['max_length']
+                    logger.warning(f'Please update to use length_ranges: {variant_set_orig}')
+
+                for old, new in (('overlap_type', 'overlap_mode'),
+                                 ('vcf_path', 'import')):
+                    if old in cfg:
+                        chk(new not in cfg, f'cannot combine old and new syntax for {new}')
+                        cfg[new] = cfg[old]
+                        del cfg[old]
+                        logger.warning(f'Please update to use {new}: {variant_set_orig}')
+
+                if cfg.get('type') == 'TRA_UNBALANCED':
+                    cfg['type'] = 'TRA_NONRECIPROCAL'
+                    logger.warning(f'Please update to use TRA_NONRECIPROCAL: {variant_set_orig}')
+                if cfg.get('type') == 'TRA_BALANCED':
+                    cfg['type'] = 'TRA_RECIPROCAL'
+                    logger.warning(f'Please update to use TRA_RECIPROCAL: {variant_set_orig}')
+
+
+    def load_rois(self) -> None:
+        self.rois = RegionSet.from_beds(
+            utils.as_list(self.config.get('overlap_regions', [])),
+            verbose=self.verbose)
+
+        # we model unconstrained placement as constrained placement with
+        # overlap mode 'contained' and roi 'all reference'
+        all_reference = (
+            RegionSet.from_fasta(self.config['sim_settings']['reference'],
+                                 region_kind='_reference_'))
+        self.rois.add_region_set(all_reference)
+
+        self.rois_list = list(self.rois.get_region_list())
+        random.shuffle(self.rois_list)
+        self.rois_list_pos = 0
+
+        self.blacklist_regions = RegionSet()
+        for blacklist_region_file in utils.as_list(self.config.get('blacklist_regions', [])):
+            if blacklist_region_file.lower().endswith('.bed'):
+                self.blacklist_regions.add_region_set(RegionSet.from_beds([blacklist_region_file]))
+            elif blacklist_region_file.lower().endswith('.vcf'):
+                self.blacklist_regions.add_region_set(RegionSet.from_vcf(blacklist_region_file))
             else:
-                self.len_dict[id] = chrom_len
-                print("Length of chromosome {}: {}".format(id, self.len_dict[id]))
+                chk(f'Cannot import blacklist regions from {blacklist_region_file}: '
+                    f'unsupported file type')
 
-        # initialize stats file to be generated after all edits and exporting are finished
-        self.stats = StatsCollection(self.order_ids, self.len_dict)
+    def run(self) -> None:
 
-        self.mode = "randomized"
-        self.vcf_path = None
-        if "vcf_path" in self.svs_config[0]:
-            self.mode = "fixed"
-            self.vcf_path = self.svs_config[0]["vcf_path"]
+        self.construct_svs()
+        self.place_svs()
+        self.output_results()
 
+    def construct_svs(self) -> None:
         self.svs = []
-        self.event_ranges = defaultdict(list)
+        for vset_num, variant_set_config in enumerate(self.config['variant_sets']):
+            vset_svs = make_variant_set_from_config(variant_set_config, self.config['sim_settings'])
+            for sv in vset_svs:
+                sv.info['VSET'] = vset_num
+            self.svs.extend(vset_svs)
 
-        if "avoid_intervals" in config:
-            # extract {chrom: [(start, end)]} intervals from vcf, add intervals from vcf to event range
-            self.extract_vcf_event_intervals(config["avoid_intervals"])
+        assert not has_duplicates(sv.sv_id for sv in self.svs)
 
-        self.overlap_events = None if "overlap_events" not in config.keys() \
-            else utils.OverlapEvents(config, allow_chroms=self.order_ids)
+    def place_svs(self) -> None:
 
-        self.initialize_svs()
+        self.load_rois()
 
-        print("Finished Setting up Simulator in {} seconds\n".format(time.time() - time_start))
-        time_start = time.time()
+        # TODO: globally optimize SV placement
+        
+        # Currently, we place SVs one at a time.
 
-    def __repr__(self):
-        return "All structural variants entered into simulator: {}".format(self.svs)
+        random.shuffle(self.svs)
 
-    def log_to_file(self, info, key="DEBUG"):
-        # only logs to file if config setting indicates so
-        key_to_func = {"DEBUG": logging.debug, "WARNING": logging.warning}
-        if "generate_log_file" in self.sim_settings and self.sim_settings["generate_log_file"]:
-            key_to_func[key](info)
+        self.determine_sv_placement_order()
 
-    def get_rand_chr(self, check_size=None, fixed_chrom=None):
-        # random assignment of SV to a chromosome (unless we have a predetermined chromosome for this event)
-        valid_chrs = self.order_ids
-        if check_size is not None:
-            valid_chrs = [chrom for chrom, chr_size in self.len_dict.items() if chr_size >= check_size]
-        if len(valid_chrs) == 0:
-            raise Exception("SVs are too big for the reference!")
-        rand_id = valid_chrs[random.randint(0, len(valid_chrs) - 1)] if fixed_chrom is None else fixed_chrom
-        chr_len = self.len_dict[rand_id]
-        chr_event_ranges = self.event_ranges[rand_id]
-        assert rand_id is not None
-        return rand_id, chr_len, chr_event_ranges
+        t_start_placing = time.time()
+        logger.info(f'Placing {len(self.svs)} svs')
+        t_last_status = time.time()
+        for sv_num, sv in enumerate(self.svs):
+            t_start_placing_sv = time.time()
+            logger.debug(f'Placing {sv_num=} {sv=}')
+            with error_context(sv.config_descr):
+                self.place_sv(sv)
+            logger.debug(f'Placed {sv_num=} {sv=} in {time.time()-t_start_placing_sv}s')
+            assert sv.is_placed()
+            for operation in sv.operations:
+                if operation.chromosomal_translocation_source_breakend is not None:
+                    assert operation.source_region is not None
+                    self.translocated_chroms |= {operation.source_region.chrom,
+                                                 operation.target_region.chrom}
 
-    def extract_vcf_event_intervals(self, vcf_path):
-        vcf = VariantFile(vcf_path)
-        for rec in vcf.fetch():
-            self.event_ranges[rec.chrom].append((rec.start, rec.stop))
+            for region in sv.get_regions():
+                region_padded = region.padded(self.config['sim_settings'].get('min_intersv_dist', 1))
 
-    def process_vcf(self, vcf_path):
-        # process vcf containing SVs to be added (deterministically) to reference
-        active_svs_total = 0
-        time_start_local = 0
-        vcf = VariantFile(vcf_path)
-        for rec in vcf.fetch():
-            svtype = Variant_Type(rec.info['SVTYPE']) if 'SVTYPE' in rec.info else Variant_Type(rec.id)
-            self.event_ranges[rec.chrom].append((rec.start, rec.stop))
-            sv = Structural_Variant(sv_type=svtype, mode='fixed', vcf_rec=rec, ref_fasta=self.ref_fasta)
-            self.svs.append(sv)
-            active_svs_total += 1
-            self.log_to_file("Intervals {} added to Chromosome \"{}\"".format(self.event_ranges[rec.chrom], rec.chrom))
-            time_dif = time.time() - time_start_local
-            print("{} SVs successfully placed ========== {} seconds".format(active_svs_total, time_dif), end="\r")
-            time_start_local = time.time()
+                self.used_sv_regions.add_region(region_padded)
+                new_roi_pieces = self.rois.chop(region_padded)
 
-    def initialize_svs(self):
+                for new_roi_piece in new_roi_pieces:
+                    self.rois_list.insert(random.randint(0, len(self.rois_list)), new_roi_piece)
+
+            if time.time() - t_last_status > 10:
+                logger.info(f'Placed {sv_num} of {len(self.svs)} SVs in {time.time()-t_start_placing:.1f}s')
+                t_last_status = time.time()
+        logger.info(f'Placed {len(self.svs)} svs in {time.time()-t_start_placing:.1f}s.')
+
+    def determine_sv_placement_order(self) -> None:
+        # place most constrained SVs first
+        logger.debug(f'Deciding placement order for {len(self.svs)} SVs')
+        relevant_rois: dict[RegionFilter, list[Region]] = {}
+        for sv in self.svs:
+            with error_context(sv.config_descr):
+                if sv.fixed_placement:
+                    sv.num_valid_placements = 1
+                else:
+                    assert sv.roi_filter is not None
+                    if sv.roi_filter not in relevant_rois:
+                        logger.debug(f'getting relevant rois for {sv.roi_filter}')
+                        relevant_rois[sv.roi_filter] = self.rois.filtered(
+                            region_filter=sv.roi_filter).get_region_list()
+                        logger.debug(f'got relevant rois for {sv.roi_filter}')
+
+                    assert sv.overlap_mode is not None
+
+                    sv.num_valid_placements = self.estimate_num_valid_placements(
+                        regions=relevant_rois[sv.roi_filter],
+                        overlap_mode=sv.overlap_mode,
+                        anchor_length=sv.get_anchor_length())
+                chk(sv.num_valid_placements > 0, f'No valid placements for SV')
+
+        self.svs.sort(key=lambda sv: sv.num_valid_placements)
+
+    def is_placement_valid(self, sv: SV, placement: list[Locus],
+                           roi: Optional[Region] = None,
+                           blacklist_regions: Optional[RegionSet] = None) -> bool:
+        """Returns False if proposed placement of `sv` would run off chromosome or 
+        touch blacklisted or already-used regions."""
+        is_chromosomal_translocation = any(operation.chromosomal_translocation_source_breakend is not None
+                                           for operation in sv.operations)
+        for op_region in sv.get_regions(placement, roi):
+            if self.used_sv_regions.overlaps_region(op_region):
+                return False
+
+            if blacklist_regions is not None and blacklist_regions.overlaps_region(op_region):
+                return False
+
+            if op_region.start < 0 or op_region.end > self.chrom_lengths[op_region.chrom]:
+                return False
+
+            if utils.percent_N(self.reference.fetch(reference=op_region.chrom,
+                                                    start=op_region.start,
+                                                    end=op_region.end)) > 0.05:
+                return False
+
+            if is_chromosomal_translocation and op_region.chrom in self.translocated_chroms:
+                return False
+
+        return True
+    # end: def is_placement_valid(...)
+
+    @functools.cache
+    def get_relevant_blacklist_regions(self, blacklist_filter: Optional[RegionFilter]) -> RegionSet:
+        return (RegionSet() if blacklist_filter is None else
+                self.blacklist_regions.filtered(region_filter=blacklist_filter))
+
+    @staticmethod
+    def estimate_num_valid_placements(regions: list[Region], anchor_length: Optional[int],
+                                      overlap_mode: OverlapMode) -> int:
+        if overlap_mode == OverlapMode.EXACT:
+            return len(regions)
+        assert anchor_length is not None
+        n_plc = 0
+        for region in regions:
+            n_plc += n_valid_placements(region_length=region.length(),
+                                        anchor_length=anchor_length,
+                                        overlap_mode=overlap_mode)
+            if n_plc > 10000:
+                break
+        return n_plc
+
+    def choose_anchor_placement(
+            self, roi_filter: Optional[RegionFilter],
+            anchor_length: Optional[int],
+            overlap_mode: OverlapMode) -> tuple[Optional[Region], Optional[Region]]:
+        """Finds the next ROI that meets `roi_filter` (if given) and on which at least
+        one anchor placement of `anchor_length` satisfying `overlap_mode` is possible,
+        randomly chooses an anchor placement on the ROI, and returns the pair (anchor, roi).
+        If no suitable placement exists for any ROI, returns (None, None).
         """
-        Creates Structural_Variant objects for every SV to simulate and decides zygosity
-        self.mode: flag indicating whether SVs are to be randomly generated or read in from VCF
-        self.vcf_path: optional path that will be used if mode=="fixed"
-        """
-        if self.mode == "randomized":
-            for sv_config in self.svs_config:
-                for num in range(sv_config["number"]):
-                    # logic for placing events at intervals given in overlap bed file:
-                    # for the first (sv_config["num_overlap"]) events, instantiate the SV at the next valid repeat elt interval
-                    repeat_elt = None
-                    elt_type = None
-                    if self.overlap_events is not None:
-                        sv_config_identifier = utils.get_sv_config_identifier(sv_config)
-                        if sv_config_identifier in self.overlap_events.svtype_overlap_counts.keys():
-                            repeat_elt, retrieved_type, elt_type = self.overlap_events.get_single_element_interval(
-                                sv_config_identifier, sv_config, partial_overlap=False)
-                        elif sv_config_identifier in self.overlap_events.svtype_partial_overlap_counts.keys():
-                            repeat_elt, retrieved_type, elt_type = self.overlap_events.get_single_element_interval(
-                                sv_config_identifier, sv_config, partial_overlap=True)
-                        elif sv_config_identifier in self.overlap_events.svtype_alu_mediated_counts.keys():
-                            repeat_elt, retrieved_type = self.overlap_events.get_alu_mediated_interval(sv_config_identifier)
-                    if sv_config['type'] == Variant_Type.SNP:
-                        sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode, length_ranges=[(1, 1)])
+
+        n_rois_tried = 0
+
+        while n_rois_tried < len(self.rois_list):
+            self.rois_list_pos = (self.rois_list_pos + 1) % len(self.rois_list)
+            n_rois_tried += 1
+
+            roi = self.rois_list[self.rois_list_pos]
+            if roi not in self.rois:
+                continue
+
+            if roi_filter and not roi_filter.satisfied_for(roi):
+                continue
+
+            assert (0 <= roi.orig_start <= roi.start <= roi.end <= roi.orig_end
+                    <= self.chrom_lengths[roi.chrom])
+
+            if overlap_mode == OverlapMode.EXACT:
+                assert anchor_length is None
+                if (roi.start != roi.orig_start or
+                    roi.end != roi.orig_end):
+                    continue
+                return (roi, roi)
+
+            assert anchor_length is not None
+
+            n_plc = n_valid_placements(anchor_length=anchor_length, overlap_mode=overlap_mode,
+                                       region_length=roi.length())
+            if not n_plc:
+                continue
+
+            if overlap_mode == OverlapMode.CONTAINED:
+                offset = random.randint(0, n_plc-1)
+                if anchor_length == 0:
+                    offset += 1
+                anchor_region = roi.replace(start=roi.start + offset,
+                                            end=roi.start + offset + anchor_length)
+                return (anchor_region, roi)
+
+            if overlap_mode == OverlapMode.PARTIAL:
+                assert anchor_length > 1
+                assert roi.length() > 1
+                max_overlap = min(anchor_length-1, roi.length()-1)
+                assert max_overlap > 0
+
+                if (roi.start != roi.orig_start and 
+                    roi.end != roi.orig_end):
+                    continue
+
+                offset = random.randint(1, max_overlap)
+                anchor_region_choices = []
+                if roi.start == roi.orig_start:
+                    anchor_region_choices.append(roi.replace(start=roi.start + offset - anchor_length,
+                                                             end=roi.start + offset))
+                if roi.end == roi.orig_end:
+                    anchor_region_choices.append(roi.replace(start=roi.end - offset,
+                                                             end=roi.end - offset + anchor_length))
+                anchor_region = random.choice(anchor_region_choices)
+                return (anchor_region, roi)
+        # end: while self.rois_list_pos != start_rois_list_pos:
+
+        return (None, None)
+
+    # end: def choose_anchor_placement(...)
+
+    def place_sv(self, sv: SV) -> None:
+
+        assert not sv.is_placed()
+
+        if sv.fixed_placement:
+            chk(self.is_placement_valid(sv, sv.fixed_placement),
+                f'cannot place imported SV')
+            sv.set_placement(placement=sv.fixed_placement, roi=None)
+            return
+
+        assert sv.overlap_mode is not None and sv.anchor is not None
+
+        n_placement_attempts = 0
+        max_tries = self.config["sim_settings"].get("max_tries", 1000)
+
+        blacklist_regions = self.get_relevant_blacklist_regions(sv.blacklist_filter)
+
+        while not sv.is_placed() and (n_placement_attempts < max_tries):
+            n_placement_attempts += 1
+            
+            anchor_region, anchor_roi = (
+                self.choose_anchor_placement(
+                    roi_filter=sv.roi_filter,
+                    anchor_length=sv.get_anchor_length(),
+                    overlap_mode=sv.overlap_mode))
+
+            chk(anchor_region is not None, f"No anchor placements for variant")
+            assert anchor_region is not None and anchor_roi is not None
+            assert anchor_region.chrom == anchor_roi.chrom
+
+            breakend_interval_lengths = list(sv.breakend_interval_lengths)
+            if sv.overlap_mode == OverlapMode.EXACT:
+                assert (breakend_interval_lengths[sv.anchor.start_breakend] is None and
+                        sv.breakend_interval_min_lengths[sv.anchor.start_breakend] is None)
+                breakend_interval_lengths[sv.anchor.start_breakend] = anchor_region.length()
+                
+            placement_dict: dict[Breakend, Locus] = {
+                sv.anchor.start_breakend: Locus(chrom=anchor_region.chrom, pos=anchor_region.start)}
+
+            def place_interchrom(breakend_locus: Locus) -> Locus:
+                new_chrom_choices = [chrom for chrom, chrom_length in self.chrom_lengths.items()
+                                     if chrom != breakend_locus.chrom and chrom_length >= 2]
+                chk(new_chrom_choices, f'interchromosomal events require >1 chrom of length >1')
+                new_chrom = random.choice(new_chrom_choices)
+                return Locus(chrom=new_chrom,
+                             pos=random.randint(1, self.chrom_lengths[new_chrom]-1))
+
+            breakend_locus = placement_dict[sv.anchor.start_breakend]
+            for breakend in range(sv.anchor.start_breakend-1, -1, -1):
+
+                if breakend_interval_lengths[breakend] is None and sv.is_interchromosomal:
+                    breakend_locus = place_interchrom(breakend_locus)
+                else:
+                    if breakend_interval_lengths[breakend] is not None:
+                        breakend_interval_length = breakend_interval_lengths[breakend]
                     else:
-                        sv = Structural_Variant(sv_type=sv_config["type"], mode=self.mode,
-                                                length_ranges=sv_config["length_ranges"], source=sv_config["source"],
-                                                target=sv_config["target"],
-                                                overlap_event=(repeat_elt + (retrieved_type if elt_type in ['ALL', None] else elt_type,) if repeat_elt is not None else None),
-                                                div_prob=(None if 'divergence_prob' not in sv_config.keys() else sv_config['divergence_prob']))
+                        # unbounded intra-chromosomal dispersion
+                        min_dispersion_len = if_not_none(sv.breakend_interval_min_lengths[breakend], 0)
+                        breakend_interval_length = random.randint(
+                            min_dispersion_len, max(min_dispersion_len, breakend_locus.pos))
+                    assert isinstance(breakend_interval_length, int)
+                    breakend_locus = breakend_locus.shifted(-breakend_interval_length)
+                placement_dict[breakend] = breakend_locus
 
-                    # For divergent repeat simulation, need div_dDUP to be homozygous
-                    if self.sim_settings.get("homozygous_only", False) or random.randint(0, 1):
-                        sv.ishomozygous = Zygosity.HOMOZYGOUS
-                        sv.hap = [True, True]
+            breakend_locus = placement_dict[sv.anchor.start_breakend]
+            for breakend in range(sv.anchor.start_breakend+1, len(breakend_interval_lengths)+1):
+                if breakend_interval_lengths[breakend-1] is None and sv.is_interchromosomal:
+                    breakend_locus = place_interchrom(breakend_locus)
+                else:
+                    if breakend_interval_lengths[breakend-1] is not None:
+                        breakend_interval_length = breakend_interval_lengths[breakend-1]
                     else:
-                        sv.ishomozygous = Zygosity.HETEROZYGOUS
-                        sv.hap = random.choice([[True, False], [False, True]])
+                        min_dispersion_len = if_not_none(sv.breakend_interval_min_lengths[breakend-1], 0)
+                        breakend_interval_length = random.randint(
+                            min_dispersion_len,
+                            max(min_dispersion_len,
+                                self.chrom_lengths[breakend_locus.chrom] - breakend_locus.pos))
+                    assert isinstance(breakend_interval_length, int)
+                    breakend_locus = breakend_locus.shifted(breakend_interval_length)
+                placement_dict[breakend] = breakend_locus
 
-                    self.svs.append(sv)
-            if not self.sim_settings["prioritize_top"]:
-                random.shuffle(self.svs)
-        else:  # mode == "fixed"
-            self.process_vcf(self.vcf_path)
+            placement: list[Locus] = [placement_dict[breakend]
+                                      for breakend in sv.breakends]
 
+            if self.is_placement_valid(sv, placement, anchor_roi, blacklist_regions):
+                sv.set_placement(placement=placement, roi=anchor_roi)
+        # end: while not sv.is_placed() and (n_placement_attempts < max_tries):
+
+        if not sv.is_placed():
+            raise RuntimeError(f'Could not place SV within {max_tries=}')
+
+        if sv.is_placed():
+            logger.debug(f'Placed {sv=} within {n_placement_attempts=}')
+
+    # end: def place_sv(self, sv)
+
+    def output_results(self) -> None:
+        logger.info('Writing outputs')
+        output_writer = OutputWriter(self.svs, self.reference, self.chrom_lengths,
+                                     self.output_path, self.config)
+        output_writer.output_vcf()
+        output_writer.output_haps()
+        output_writer.output_novel_insertions()
+        output_writer.output_stats()
+
+        # dev only
+        output_writer.output_svops_bed()
+
+        self.reference.close()
+
+        logger.info(f'Output path: {self.output_path}')
+
+    # for testing only
     def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta, bedfile, stats_file=None, initial_reset=True,
                                verbose=False, export_to_file=True):
-        """
-        initial_reset: boolean to indicate if output file should be overwritten (True) or appended to (False)
-        stats_file: whether a stats file summarizing SVs simulated will be generated in same directory the reference genome is located in
-        """
-        global time_start
-        if initial_reset:
-            utils.reset_file(fasta1_out)
-            utils.reset_file(fasta2_out)
-        ref_fasta = self.ref_fasta
-        self.apply_transformations(ref_fasta)
-        print("Finished SV placements and transformations in {} seconds".format(time.time() - time_start))
-        time_start = time.time()
-        active_svs = [sv for sv in self.svs if sv.active]
-        print("Starting Export Process...")
-        for x in range(2):
-            edits_dict = dict()
-            for id in self.order_ids:
-                edits_dict[id] = []
-            if x == 0:
-                fasta_out = fasta1_out
-            elif x == 1:
-                fasta_out = fasta2_out
-            for sv in active_svs:
-                if sv.hap[x]:
-                    for frag in sv.changed_fragments:
-                        edits_dict[frag[0]].append(frag[1:])
-            for id in edits_dict:
-                edits_dict[id].sort()
-                self.event_ranges[id].sort()
-            self.log_to_file("Event Ranges: {}".format(self.event_ranges))
-            self.log_to_file("Intervals for hap {}: {}".format(x, edits_dict))
-            for id in self.order_ids:
-                edits_x = edits_dict[id]
-                utils.fail_if_any_overlapping(edits_x)
-                self.formatter.export_variants_to_fasta(id, edits_x, fasta_out, ref_fasta, verbose=verbose)
-                print("ID {} exported to fasta file {} in {} seconds".format(id, fasta_out, time.time() - time_start))
-                time_start = time.time()
-        if export_to_file:
-            self.formatter.export_to_bedpe(active_svs, bedfile, ins_fasta=ins_fasta, reset_file=initial_reset)
-            self.formatter.export_to_vcf(active_svs, self.stats, vcffile=bedfile[:-4]+'.vcf')
-        if stats_file:
-            self.stats.get_info(self.svs)
-            self.stats.export_data(stats_file)
+        self.run()
+        shutil.copyfile(os.path.join(self.output_path, 'sim.hapA.fa'), fasta1_out)
+        shutil.copyfile(os.path.join(self.output_path, 'sim.hapB.fa'), fasta2_out)
+        shutil.copyfile(os.path.join(self.output_path, 'sim.novel_insertions.fa'), ins_fasta)
 
-    def choose_rand_pos(self, svs, ref_fasta, verbose=False):
-        """
-        randomly positions SVs and stores reference fragments in SV events
+# end: class SVSimulator
 
-        svs: list of Structural Variant objects
-        ref_fasta: FastaFile with access to reference file
-        """
-        active_svs_total = 0
-        inactive_svs_total = 0
-        time_start_local = time.time()
-        for sv in svs:
-            tries = 0
-            valid = False
-            while not valid:
-                tries += 1
-                valid = True
-                if tries > self.sim_settings["max_tries"]:
-                    if self.sim_settings["fail_if_placement_issues"]:
-                        raise Exception(
-                            "Failed to simulate {}, {} / {} SVs successfully simulated (set fail_if_placement_issues "
-                            "to False to override placement failures)".format(
-                                sv, active_svs_total, len(svs)))
-                    valid = False
-                    break
-                rand_id, chr_len, chr_event_ranges = self.get_rand_chr(check_size=sv.req_space,
-                                                                       fixed_chrom=(None if sv.overlap_event is None
-                                                                                    else sv.overlap_event[0]))
-                if not (sv.dispersion_flip and sv.overlap_event is not None):
-                    # if an overlap event is given, need to find the SV start position based on which fragment has been
-                    # set to the overlap event interval
-                    if sv.overlap_event is not None:
-                        start_pos = 0
-                        for frag in sv.source_events[::-1]:
-                            if frag.start is not None:
-                                start_pos = frag.start
-                            else:
-                                start_pos -= frag.length
-                    else:
-                        start_pos = random.randint(0, chr_len - sv.req_space)
-                    # define the space in which SV operates
-                    new_intervals = []  # tracks new ranges of blocks
-                    sv.start, sv.start_chr = start_pos, rand_id
-                    sv.end = sv.start + sv.req_space
-                    block_start = sv.start
-                else:
-                    # to assign event "A" to a repeat interval in a flipped dispersion event, need to
-                    # anchor the sv to the end of "A" and get the start position by subtracting off the total size
-                    end_pos = int(sv.overlap_event[2])
-                    start_pos = end_pos - sv.req_space
-                    new_intervals = []
-                    sv.start, sv.start_chr = start_pos, rand_id
-                    sv.end = end_pos
-                    block_start = sv.start
+def parse_args():
+    parser = argparse.ArgumentParser()
 
-                for sv_event in sv.source_events:
-                    sv_event.start, sv_event.end = start_pos, start_pos + sv_event.length
-                    sv_event.source_chr = rand_id
-                    frag = ref_fasta.fetch(rand_id, sv_event.start, sv_event.end)
-                    sv_event.source_frag = frag
-                    start_pos += sv_event.length
+    parser.add_argument('-c', '--config', required=True, help='yaml config file')
+    
+    return parser.parse_args()
 
-                    if sv_event.symbol.startswith(Symbols.DIS.value):
-                        if utils.is_overlapping(chr_event_ranges, (block_start, sv_event.start)):
-                            valid = False
-                            break
-                        new_intervals.append((block_start, sv_event.start))
-                        block_start = sv_event.end
-                    elif utils.percent_N(frag) > 0.05:
-                        valid = False
-                        break
-                # catches the last (and perhaps only) block in sequence
-                if utils.is_overlapping(chr_event_ranges, (block_start, sv.end)):
-                    valid = False
-                    continue
-                else:
-                    new_intervals.append((block_start, sv.end))
 
-            # adds new SV to simulate only if chosen positions were valid
-            if valid:
-                active_svs_total += 1
-                sv.active = True
-                self.log_to_file("Intervals {} added to Chromosome \"{}\" for SV {}".format(new_intervals, rand_id, sv))
-                chr_event_ranges.extend(new_intervals)
-                # populates insertions with random sequence - these event symbols only show up in target transformation
-                for event in sv.events_dict.values():
-                    if event.source_frag is None and event.length > 0:
-                        event.source_frag = utils.generate_seq(event.length)
-                sv.assign_locations(sv.start)
-            else:
-                inactive_svs_total += 1
-                if tries != self.sim_settings["max_tries"] + 1:
-                    self.log_to_file("{} only got {} tries instead of the max {}".format(sv, tries, self.sim_settings[
-                        "max_tries"] + 1), key="WARNING")
+def run_simulator():
+    start_time = time.time()
 
-            time_dif = time.time() - time_start_local
-            print(
-                "{} / {} SVs successfully placed ========== {} / {} SVs unsuccessfully placed, {} tries, {} seconds".format(
-                    active_svs_total, len(svs), inactive_svs_total, len(svs), tries, time_dif), end="\r")
-            time_start_local = time.time()
+    logger.info('insilicoSV version 1.0')
 
-    def apply_transformations(self, ref_fasta):
-        """
-        Randomly chooses positions for all SVs and carries out all edits
-        Populates event classes within SVs with reference fragments and start & end positions
-        Stores list of changes, which each have an interval and a sequence to substitute the reference frag with, in SV
+    args = parse_args()
 
-        ref_fasta: FastaFile with access to reference
-        mode: flag indicating whether we're adding SVs to the reference in a randomized or deterministic way
-        """
-        if self.mode == "randomized":
-            # select random positions for SVs
-            self.choose_rand_pos(self.svs, ref_fasta)
-            print()
+    simulator = SVSimulator(config_path=args.config)
+    
+    simulator.run()
 
-        total = 0
-        for sv in self.svs:
-            if sv.active:
-                sv.change_fragment()
-                total += 1
-                self.log_to_file("Events Dict after all edits: {} ".format(sv.events_dict))
+    logger.info(f'insilicoSV finished in {time.time()-start_time:.1f}s')
 
-    def close(self):
-        self.ref_fasta.close()
-
-def run_insilicosv():
-    sim_start = time.time()
-
-    args = collect_args()
-    if args["random_seed"]:
-        random.seed(args["random_seed"])
-        print(f"Random seed: {args['random_seed']}")
-    yaml_in = args["config"]
-    fasta1_out = args["hap1"]
-    fasta2_out = args["hap2"]
-    ins_fasta = args["ins_fasta"]
-    bed_out = args["bedpe"]
-    stats_file = args["stats"]
-    log_file = args["log_file"]
-
-    sim = SV_Simulator(args["config"], log_file=args["log_file"])
-    sim.produce_variant_genome(args["hap1"], args["hap2"], args["ins_fasta"], args["bedpe"], args["stats"],
-                               verbose=False)
-    print("Simulation completed in {} seconds".format(time.time() - sim_start))
-
-if __name__ == "__main__":
-    run_insilicosv()
+if __name__ == '__main__':
+    run_simulator()
