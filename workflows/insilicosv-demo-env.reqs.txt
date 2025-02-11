@@ -17,7 +17,6 @@ nb_conda_kernels
 samtools
 bedtools
 bcftools
-snakemake
 # insilicoSV dependencies
 bwa
 cycler

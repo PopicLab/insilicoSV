@@ -1,4 +1,4 @@
-version 1.0
+version 2.0
 
 #
 # Workflow to simulate genomes with SVs, simulate reads from them,

@@ -6,13 +6,20 @@ reads for downstream analysis. In the notebook, we provide an example
 configuration file including a small set of simple and complex
 variants, and we include calls to DWGSIM and PBSIM3 to generate short
 and long reads respectively. Additionally, we include utilities to
-parse insilicoSV output and plot the size distributions of the simulated SVs, as well as generate IGV pileup images of the aligned
+parse insilicoSV output and plot the size distributions of the simulated SVs, 
+as well as generate IGV pileup images of the aligned
 reads at the sites of the simulated variants.
 
 To run the notebook, first create a conda environment with all dependencies
 used in the notebook.  The environment definition is provided in
 `workflows/insilicosv-demo-env.reqs.txt`.  First, set up
-[bioconda](https://bioconda.github.io/).   If you're using an M1 Mac,
+[bioconda](https://bioconda.github.io/).   
+```
+conda config --add channels bioconda
+conda config --add channels conda-forge
+```
+
+If you're using an M1 Mac,
 [install Rosetta 2](https://support.apple.com/en-us/HT211861), and run these commands:
 ```
 conda config --add subdirs osx-64
@@ -30,9 +37,9 @@ Activate the environment with
 conda activate insilicosv-demo-env
 ```
 
-To ensure that the current insilicosv version is installed, run
+To ensure that the current insilicosv version is installed, run the command:
 ```
 pip install --upgrade insilicosv
 ```
 
-and launch the notebook with `jupyter notebook workflows/demo.ipynb` .
+Launch the notebook with `jupyter notebook workflows/demo.ipynb` .

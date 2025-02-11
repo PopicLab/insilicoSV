@@ -33,16 +33,16 @@ insilicosv <config_yml>
 ```
 4. Results will be produced in this directory
 
-The config file syntax is detailed in the [Input guidelines](docs/input_guidelines.md) section of the
+The config file syntax is detailed in the [Input guidelines](docs/inputs) section of the
 documentation.
 
 ## Documentation
 For documentation outlining the different features of insilicoSV along with usage examples and data resources, please refer to the following sections:
 <!-- toc -->
-- [Input guidelines](docs/input_guidelines.md)
-- [Example Use Cases](docs/example_use_cases.md)
+- [Input guidelines](docs/inputs)
+- [Example Use Cases](docs/use_cases)
 - [SV Grammar](docs/sv_grammar.md)
-- [Example SV Visualizations](docs/example_sv_visualizations.md)
+- [Example SV Visualizations](docs/sv_gallery)
 - [Tutorial Jupyter notebook](docs/demo_notebook.md)
 
 

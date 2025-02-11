@@ -1,25 +1,21 @@
 from collections import defaultdict, Counter, namedtuple
 from contextlib import closing
-from copy import deepcopy
-import dataclasses
 import logging
 import os
 import os.path
 import re
-from typing_extensions import Any, Optional, Literal, cast
-
-from pysam import FastaFile, VariantFile
+from pysam import VariantFile
 
 from insilicosv import utils
-from insilicosv.utils import (Region, Locus)
-from insilicosv.sv_defs import (SV, Operation, Transform, TransformType, BreakendRegion)
-from insilicosv.variant_set_makers import get_vcf_header_infos
+from insilicosv.utils import Region, Locus
+from insilicosv.sv_defs import Operation, Transform, TransformType, BreakendRegion
+from insilicosv.variant_set import get_vcf_header_infos
 
 logger = logging.getLogger(__name__)
 
 class StatsCollector:
 
-    def __init__(self, chroms: list[str], chrom_lengths: list[int]):
+    def __init__(self, chroms, chrom_lengths):
         assert len(chroms) == len(chrom_lengths)
         self.num_heterozygous = 0
         self.num_homozygous = 0
@@ -27,10 +23,11 @@ class StatsCollector:
         self.total_svs = 0
         self.chroms = chroms
         self.chrom_lengths = chrom_lengths
-        self.len_frags_chr: dict[str, int] = defaultdict(int)  # Lengths of altered fragments within chromosome
-        self.sv_types: dict[str, int] = Counter()
+        self.len_frags_chr = defaultdict(int)  # Lengths of altered fragments within chromosome
+        self.sv_types = Counter()
+        self.region_types = Counter()
 
-    def get_info(self, svs: list[SV]) -> None:
+    def get_info(self, svs):
         """
         collects all information for stats file after all edits are completed
         """
@@ -48,7 +45,8 @@ class StatsCollector:
             self.placed_svs += 1
             sv_type = sv.info.get('SVTYPE', 'UNKNOWN')
             self.sv_types[sv_type] += 1
-
+            if (sv.roi is not None) and (sv.roi.kind != '_reference_'):
+                self.region_types[sv.roi.kind] += 1
             assert sv.genotype is not None
             if sv.genotype[0] and sv.genotype[1]:
                 self.num_homozygous += 1
@@ -68,12 +66,12 @@ class StatsCollector:
                     self.max_region_len = src_reg.length()
         self.avg_len = tot_frags_len // tot_frags_count if tot_frags_count != 0 else 0
 
-    def export_data(self, fileout) -> None:
+    def export_data(self, fileout):
         """
         Exports all collected data to entered file
         fileout: Location to export stats file
         """
-        def write_item(fout, name, item, prefix="") -> None:
+        def write_item(fout, name, item, prefix=""):
             fout.write("{}{}: {}\n".format(prefix, str(name), str(item)))
 
         os.makedirs(os.path.dirname(fileout), exist_ok=True)
@@ -87,6 +85,8 @@ class StatsCollector:
             write_item(fout, "Average length of impacted reference regions", self.avg_len)
             write_item(fout, "Min length of impacted reference region", self.min_region_len)
             write_item(fout, "Max length of impacted reference region", self.max_region_len)
+            if self.region_types:
+                write_item(fout, "NUmber of SVs per ROI types", self.region_types)
             for chrom, chrom_length in zip(self.chroms, self.chrom_lengths):
                 fout.write(f"\n===== {chrom} =====\n")
                 write_item(fout, "Length of sequence", chrom_length)
@@ -112,33 +112,26 @@ PafRecord = namedtuple('PafRecord', [
 
 class OutputWriter:
 
-    def __init__(self, svs: list[SV], reference: FastaFile,
-                 chrom_lengths: dict[str, int], output_path: str,
-                 config: dict[str, Any]):
+    def __init__(self, svs, reference, chrom_lengths, output_path, config):
         self.svs = svs
         self.reference = reference
         self.chrom_lengths = chrom_lengths
         self.output_path = output_path
         self.config = config
 
-    def output_haps(self) -> None:
-        if self.config['sim_settings'].get('output_no_haps', False):
+    def output_haps(self):
+        if self.config.get('output_no_haps', False):
             logger.warning('Skipping haps output')
             return
         for hap_index, hap_fa in enumerate(['sim.hapA.fa', 'sim.hapB.fa']):
             self.output_hap(os.path.join(self.output_path, hap_fa), hap_index)
 
-    def output_hap(self, hap_fa: str, hap_index: int) -> None:
-
+    def output_hap(self, hap_fa, hap_index):
         paf_records = []
-        hap_chrom_lengths: dict[str, int] = {}
+        hap_chrom_lengths = {}
         with open(hap_fa, 'w') as sim_fa:
-
             chrom2operations: dict[str, list[Operation]] = self.get_chrom2operations(hap_index)
-            chrom2operations = self.apply_chromosomal_translocations(chrom2operations)
-
-            for chrom, chrom_length in zip(self.reference.references,
-                                           self.reference.lengths):
+            for chrom, chrom_length in zip(self.reference.references, self.reference.lengths):
                 hap_str = ['hapA', 'hapB'][hap_index]
                 hap_chrom = f'{chrom}_{hap_str}'
                 sim_fa.write(f'>{hap_chrom}\n')
@@ -148,7 +141,6 @@ class OutputWriter:
                     # paf format: https://cran.r-project.org/web/packages/pafr/vignettes/Introduction_to_pafr.html
                     paf_mapq = 60
                     for _ in range(operation.transform.n_copies):
-                        paf_rec = None
                         if operation.transform_type == TransformType.DEL:
                             assert operation.source_region is not None
                             paf_rec = PafRecord(
@@ -194,21 +186,19 @@ class OutputWriter:
                                     mapping_quality=paf_mapq,
                                     tags=f'cg:Z:{len(seq)}I')
 
-
                             if operation.transform_type == TransformType.INV:
                                 seq = utils.reverse_complement(seq)
                                 paf_rec = paf_rec._replace(strand='-')
-
-                            if (operation.transform.divergence_prob > 0 or 
+                            if (operation.transform.divergence_prob > 0 or
                                 operation.transform.replacement_seq is not None):
                                 seq_orig = seq
                                 seq = utils.if_not_none(
                                     operation.transform.replacement_seq,
                                     utils.divergence(seq, operation.transform.divergence_prob))
                                 assert len(seq) == len(seq_orig)
-
                             sim_fa.write(seq)
                             hap_chrom_pos += len(seq)
+
                         # end: if operation.transform_type == TransformType.DEL:
 
                         assert paf_rec is not None
@@ -222,14 +212,12 @@ class OutputWriter:
 
                 hap_chrom_lengths[hap_chrom] = hap_chrom_pos
                 sim_fa.write('\n')
-
             # end: for chrom, chrom_length in zip(...)
         # end: with open(hap_fa, 'w') as sim_fa
-
-        if self.config['sim_settings'].get('output_paf', False):
+        if self.config.get('output_paf', False):
             hap_paf = hap_fa.replace('.fa', '.paf')
 
-            new_paf_records: list[PafRecord] = []
+            new_paf_records = []
             for paf_rec_num, paf_rec in enumerate(paf_records):
                 if (paf_rec.target_start == paf_rec.target_end and
                     paf_rec.query_start == paf_rec.query_end):
@@ -243,12 +231,12 @@ class OutputWriter:
 
     # end: def output_hap(self, hap_fa, hap_index)
 
-    def get_chrom2operations(self, hap_index: int) -> dict[str, list[Operation]]:
+    def get_chrom2operations(self, hap_index):
         """For each chromosome, make a list of operations targeting that chromosome,
         sorted along the chromosome.  Add identity operations for regions not touched
         by SVs."""
-        chrom2operations: dict[str, list[Operation]] = defaultdict(list)
-        target_region2transform: dict[Region, Transform] = {}
+        chrom2operations = defaultdict(list)
+        target_region2transform = {}
         for sv in self.svs:
             assert sv.genotype is not None
             if sv.genotype[hap_index]:
@@ -256,7 +244,7 @@ class OutputWriter:
                     assert operation.target_region is not None
                     if operation.is_in_place:
                         if operation.target_region in target_region2transform:
-                            assert (operation.transform  == 
+                            assert (operation.transform ==
                                     target_region2transform[operation.target_region])
                             continue
                         target_region2transform[operation.target_region] = operation.transform
@@ -282,84 +270,9 @@ class OutputWriter:
             
             chrom2operations[chrom].extend(intersv_ops)
             chrom2operations[chrom].sort(key=lambda operation: operation.target_region)
-
         return chrom2operations
 
-    def apply_chromosomal_translocations(
-            self, chrom2operations: dict[str, list[Operation]]) -> dict[str, list[Operation]]:
-        chrom2operations_new: dict[str, list[Operation]] = dict()
-        for chromA, chromA_ops in chrom2operations.items():
-            for chromA_op_idx, chromA_op in enumerate(chromA_ops):
-                if chromA_op.chromosomal_translocation_source_breakend is not None:
-                    chromB = chromA_op.source_region.chrom
-                    if chromA > chromB:
-                        continue
-
-                    for chromB_op_idx, chromB_op in enumerate(chrom2operations[chromB]):
-                        if chromB_op.chromosomal_translocation_source_breakend is not None:
-                            break
-                        
-                    assert chromB_op.target_region.chrom == chromA_op.source_region.chrom
-                    assert chromB_op.target_region.start == chromA_op.source_region.start
-                    assert chromB_op.target_region.end == chromA_op.source_region.end
-                    assert chromA_op.target_region.chrom == chromB_op.source_region.chrom
-                    assert chromA_op.target_region.start == chromB_op.source_region.start
-                    assert chromA_op.target_region.end == chromB_op.source_region.end
-
-                    chromA_length = self.chrom_lengths[chromA]
-                    chromB_length = self.chrom_lengths[chromB]
-                    chromA_3prime = (chromA_op.target_region.start > (chromA_length / 2))
-                    chromB_3prime = (chromB_op.target_region.start > (chromB_length / 2))
-
-                    chromA_ops = chrom2operations[chromA]
-                    chromB_ops = chrom2operations[chromB]
-
-                    def inverted_op(operation: Operation) -> Operation:
-                        inverted_transform_type: dict[TransformType, TransformType] = {
-                            TransformType.IDENTITY: TransformType.INV,
-                            TransformType.INV: TransformType.IDENTITY,
-                            TransformType.DEL: TransformType.DEL}
-                        op_copy = deepcopy(operation)
-                        op_copy.transform = dataclasses.replace(
-                            op_copy.transform,
-                            transform_type=inverted_transform_type[op_copy.transform.transform_type])
-                        return op_copy
-
-                    def inverted_ops(operations: list[Operation]) -> list[Operation]:
-                        return [inverted_op(operation) for operation in operations[::-1]]
-
-                    chromA_ops_5prime, chromA_ops_3prime = (
-                        chromA_ops[:chromA_op_idx], chromA_ops[chromA_op_idx+1:])
-                    chromB_ops_5prime, chromB_ops_3prime = (
-                        chromB_ops[:chromB_op_idx], chromB_ops[chromB_op_idx+1:])
-
-                    if chromA_3prime and chromB_3prime:
-                        chromA_ops_new = chromA_ops_5prime + chromB_ops_3prime
-                        chromB_ops_new = chromB_ops_5prime + chromA_ops_3prime
-                    elif not chromA_3prime and not chromB_3prime:
-                        chromA_ops_new = chromB_ops_5prime + chromA_ops_3prime
-                        chromB_ops_new = chromA_ops_5prime + chromB_ops_3prime
-                    elif chromA_3prime and not chromB_3prime:
-                        chromA_ops_new = chromA_ops_5prime + inverted_ops(chromB_ops_5prime)
-                        chromB_ops_new = (inverted_ops(chromA_ops_3prime) +
-                                          chromB_ops_3prime)
-                    elif not chromA_3prime and chromB_3prime:
-                        chromA_ops_new = (inverted_ops(chromB_ops_3prime) +
-                                          chromA_ops_3prime)
-                        chromB_ops_new = (chromB_ops_5prime +
-                                          inverted_ops(chromA_ops_5prime))
-
-                    chrom2operations_new[chromA] = chromA_ops_new if chromA_op.chromosomal_translocation_active else chrom2operations[chromA]
-                    chrom2operations_new[chromB] = chromB_ops_new if chromB_op.chromosomal_translocation_active else chrom2operations[chromB]
-                # end: if chromA_op.chromosomal_translocation_source_breakend is not None
-            # end: for chromA_op_idx, chromA_op in enumerate(chromA_ops)
-        # end: for chromA, chromA_ops in chrom2operations.items()
-        chrom2operations = dict(chrom2operations)
-        chrom2operations.update(chrom2operations_new)
-        return chrom2operations
-    # end: def apply_chromosomal_translocations(...)
-
-    def output_novel_insertions(self) -> None:
+    def output_novel_insertions(self):
         with open(os.path.join(self.output_path, 'sim.novel_insertions.fa'), 'w') as (
                 sim_novel_insertions_fa):
             for sv in self.svs:
@@ -371,7 +284,7 @@ class OutputWriter:
                         sim_novel_insertions_fa.write(f'>{seq_id}\n')
                         sim_novel_insertions_fa.write(f'{operation.novel_insertion_seq}\n')
 
-    def output_vcf(self) -> None:
+    def output_vcf(self):
         vcf_path = os.path.join(self.output_path, 'sim.vcf')
         with open(vcf_path, "w") as vcf:
             vcf.write("##fileformat=VCFv4.2\n")
@@ -394,8 +307,7 @@ class OutputWriter:
                 vcf_records: list[dict] = []
 
                 for sv in self.svs:
-                    vcf_records.extend(sv.to_vcf_records(self.config['sim_settings']))
-
+                    vcf_records.extend(sv.to_vcf_records(self.config))
                 assert not utils.has_duplicates(vcf_rec['id'] for vcf_rec in vcf_records)
                 for vcf_rec in sorted(vcf_records, key=lambda rec: (rec['contig'], rec['start'])):
                     self.check_vcf_record(vcf_rec)
@@ -407,7 +319,7 @@ class OutputWriter:
         # end: with closing(VariantFile(vcf_path)) as vcf_file
     # end: def output_vcf(self)
 
-    def check_vcf_record(self, vcf_rec: dict[str, Any]) -> None:
+    def check_vcf_record(self, vcf_rec):
         assert set(vcf_rec.keys()) >= {'id', 'contig', 'start', 'stop', 'qual',
                                        'filter', 'alleles', 'samples'}
         assert not any(c.isspace() or c == ';' for c in vcf_rec['id'])
@@ -418,8 +330,8 @@ class OutputWriter:
                 for val in utils.as_list(info_val):
                     assert re.search(r'[\s;,=]', val) is None
 
-    def output_svops_bed(self) -> None:
-        if not self.config['sim_settings'].get('output_svops_bed', False):
+    def output_svops_bed(self):
+        if not self.config.get('output_svops_bed', False):
             return
 
         with open(os.path.join(self.output_path, 'sim.svops.bed'), 'w') as out:
@@ -447,7 +359,7 @@ class OutputWriter:
                                                  op_str + '_src']))
                                   + '\n')
 
-    def output_stats(self) -> None:
+    def output_stats(self):
         stats_collector = StatsCollector(chroms=list(self.reference.references),
                                          chrom_lengths=list(self.reference.lengths))
         stats_collector.get_info(self.svs)
