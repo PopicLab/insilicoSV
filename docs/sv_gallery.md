@@ -3,6 +3,15 @@
 Below are IGV pileup images of each of the predefined SV types with short read alignment and pair orientation highlighted 
 to demonstrate the alignment signatures manifested by each SV.
 
+### SNP
+
+![SNP](gallery/SNP.png)
+
+### INS
+$\emptyset \rightarrow$ A
+
+![INS](gallery/INS.png)
+
 ### DEL
 A $\rightarrow \emptyset$
 

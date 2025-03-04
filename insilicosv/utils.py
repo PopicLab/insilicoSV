@@ -7,7 +7,7 @@ import logging
 import os
 import os.path
 import random
-from typing_extensions import Optional
+from typing_extensions import Optional, override
 from intervaltree import IntervalTree
 import pysam
 from sortedcontainers import SortedSet  # type: ignore
@@ -147,10 +147,25 @@ class RegionFilter:
         if (self.region_kinds is not None and
             (not region.kind or
              not any((region_kinds.upper() == 'ALL' and region.kind != '_reference_') or
-                     region.kind.startswith(region_kinds)
+                     region_kinds in region.kind
                      for region_kinds in self.region_kinds))):
             return False
         return True
+
+@dataclass(frozen=True)
+class TandemRepeatRegionFilter(RegionFilter):
+    min_num_repeats: int = 0
+
+    @override
+    def satisfied_for(self, region: Region) -> bool:
+        if not super().satisfied_for(region):
+            return False
+        try:
+            repeat_unit_length: int = int(region.data)
+        except ValueError:
+            return False
+        return repeat_unit_length * self.min_num_repeats <= region.length()
+
 
 class OverlapMode(Enum):
 
@@ -177,7 +192,8 @@ class RegionSet:
             if len(chrom2region) > 100000:
                 logger.debug(f'RegionSet init: {chrom=} {len(chrom2region)=}')
             self.chrom2itree[chrom] = IntervalTree.from_tuples((region.start, region.end, region)
-                                                         for region in chrom2region)
+                                                                for region in chrom2region)
+
 
     def __contains__(self, region):
         overlap = list(self.chrom2itree[region.chrom].overlap(region.start, region.end))
@@ -207,7 +223,7 @@ class RegionSet:
                         chk(False, f'{loc}: invalid start or end of region')
                     chk(start < end, f'{loc}: region start must be less than end')
                     chk(0 <= start, f'{loc}: region start must be non-negative')
-                    motif = fields[-1] if len(fields) >= 5 else ''
+                    motif = fields[4] if len(fields) >= 5 else ''
                     data = len(motif)
                     regions.append(Region(chrom=chrom, start=start,
                                           end=end, kind=kind, data=data,

@@ -140,9 +140,24 @@ class OutputWriter:
                 for operation in chrom2operations[chrom]:
                     # paf format: https://cran.r-project.org/web/packages/pafr/vignettes/Introduction_to_pafr.html
                     paf_mapq = 60
-                    for _ in range(operation.transform.n_copies):
+                    n_copies = operation.transform.n_copies
+                    if operation.motif is not None:
+                        # In the trEXP case the number of copies is encoded in the motif
+                        n_copies = 1
+                    for _ in range(n_copies):
+                        seq = None
                         if operation.transform_type == TransformType.DEL:
                             assert operation.source_region is not None
+                            target_end = operation.source_region.end
+                            length = operation.source_region.length()
+                            if operation.motif is not None:
+                                length = len(operation.motif)
+                                target_end = operation.source_region.start + length
+                                # the rest of the tandem repeat region is kept
+                                seq = self.reference.fetch(
+                                        reference=operation.source_region.chrom,
+                                        start=target_end,
+                                        end=operation.source_region.end)
                             paf_rec = PafRecord(
                                 query_name=hap_chrom, query_length=None,
                                 query_start=hap_chrom_pos, query_end=hap_chrom_pos,
@@ -150,16 +165,19 @@ class OutputWriter:
                                 target_name=operation.source_region.chrom,
                                 target_length=self.chrom_lengths[operation.source_region.chrom],
                                 target_start=operation.source_region.start,
-                                target_end=operation.source_region.end,
-                                residue_matches=0, alignment_block_length=operation.source_region.length(),
+                                target_end=target_end,
+                                residue_matches=0, alignment_block_length=length,
                                 mapping_quality=paf_mapq,
                                 tags=f'cg:Z:{operation.source_region.length()}D')
                         else:
                             if operation.source_region is not None:
-                                seq = self.reference.fetch(
-                                    reference=operation.source_region.chrom,
-                                    start=operation.source_region.start,
-                                    end=operation.source_region.end)
+                                if operation.motif is None:
+                                    seq = self.reference.fetch(
+                                        reference=operation.source_region.chrom,
+                                        start=operation.source_region.start,
+                                        end=operation.source_region.end)
+                                else:
+                                    seq = operation.motif
                                 paf_rec = PafRecord(
                                     query_name=hap_chrom, query_length=None,
                                     query_start=hap_chrom_pos, query_end=hap_chrom_pos + len(seq),
@@ -196,6 +214,7 @@ class OutputWriter:
                                     operation.transform.replacement_seq,
                                     utils.divergence(seq, operation.transform.divergence_prob))
                                 assert len(seq) == len(seq_orig)
+                        if seq is not None:
                             sim_fa.write(seq)
                             hap_chrom_pos += len(seq)
 

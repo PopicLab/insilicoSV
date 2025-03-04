@@ -5,7 +5,7 @@ pip
 setuptools
 # Read simulators
 dwgsim
-pbsim3
+pbsim3<=3.0.4
 #lrsim
 # Read mappers
 bwa

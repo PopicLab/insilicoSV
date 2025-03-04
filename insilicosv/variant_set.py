@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from contextlib import closing
 import copy
-from dataclasses import dataclass
 import math
 import logging
 import random
@@ -12,9 +11,9 @@ import re
 from pysam import FastaFile, VariantFile
 
 from insilicosv import utils
-from insilicosv.utils import Region, RegionFilter, OverlapMode, Locus, error_context, chk
+from insilicosv.utils import RegionFilter, OverlapMode, Locus, error_context, chk, TandemRepeatRegionFilter
 from insilicosv.sv_defs import (Transform, TransformType, BreakendRegion, Operation, SV, VariantType, BaseSV,
-                                Syntax, Symbol, SV_KEY)
+                                Syntax, Symbol, SV_KEY, TandemRepeatExpansionContractionSV)
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +43,7 @@ class VariantSet(ABC):
     def __init__(self, vset_config, config):
         self.vset_config = copy.deepcopy(vset_config)
         self.config = config
-        self.overlap_kinds = self.vset_config.get('overlap_region_type', 'all')
+        self.overlap_kinds = utils.as_list(self.vset_config.get('overlap_region_type', 'all'))
         self.overlap_ranges = []
         self.header = []
         self.overlap_mode = None
@@ -581,48 +580,6 @@ class FromGrammarVariantSet(SimulatedVariantSet):
 
 # end: class FromGrammarVariantSetMaker
 
-#############################################
-# Constructing SVs involving tandem repeats #
-#############################################
-
-@dataclass(frozen=True)
-class TandemRepeatRegionFilter(RegionFilter):
-    min_num_repeats: int = 0
-
-    @override
-    def satisfied_for(self, region: Region) -> bool:
-        if not super().satisfied_for(region):
-            return False
-        try:
-            repeat_unit_length: int = int(region.data)
-            assert 0 < repeat_unit_length <= region.length()
-        except ValueError:
-            return False
-        return repeat_unit_length * self.min_num_repeats <= region.length()
-
-@dataclass
-class TandemRepeatExpansionContractionSV(BaseSV):
-
-    num_repeats_in_placement: int = 0
-
-    @override
-    def set_placement(self, placement, roi):
-        self.roi = roi
-        repeat_unit_length: int = int(roi.data)
-        shift_length: int = repeat_unit_length * self.num_repeats_in_placement
-        super().set_placement(placement=[placement[0], placement[0].shifted(shift_length)], roi=roi)
-
-    @override
-    def to_vcf_records(self, config):
-        sv_type_str = self.info['SVTYPE']
-        vcf_rec = super().to_vcf_records(config)[0]
-        vcf_rec['info']['SVTYPE'] = sv_type_str
-        vcf_rec['alleles'] = ['N', '<%s>' % sv_type_str]
-        assert self.roi is not None
-        vcf_rec['info']['SVLEN'] = self.roi.length()
-        vcf_rec['stop'] = self.roi.end
-        return [vcf_rec]
-                
 class TandemRepeatVariantSet(SimulatedVariantSet):
 
     @override
@@ -653,9 +610,14 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
     def simulate_sv(self):
 
         repeat_count_change = random.randint(*self.vset_config['repeat_count_change_range'])
+        info = dict(SVTYPE=self.vset_config['type'].value, TR_CHANGE=repeat_count_change)
+        overlap_region_type = (tuple(utils.as_list(self.vset_config['overlap_region_type']))
+                               if 'overlap_region_type' in self.vset_config else 'all')
+        anchor = BreakendRegion(0, 1)
+        self.overlap_mode = OverlapMode.EXACT
 
         chk(self.overlap_mode in [None, OverlapMode.EXACT], 'overlap_mode must be "exact" for Tandem Repeat')
-        if self.vset_config['type']  == VariantType.trEXP:
+        if self.vset_config['type'] == VariantType.trEXP:
             breakend_interval_lengths = [None]
             operations = [Operation(transform=Transform(transform_type=TransformType.IDENTITY,
                                                         is_in_place=False,
@@ -664,12 +626,8 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                                     target_insertion_breakend=0,
                                     target_insertion_order=(0,),
                                     op_info={'SOURCE_LETTER': 'A'})]
-            anchor = BreakendRegion(0, 1)
-            self.overlap_mode = OverlapMode.EXACT
-            info = dict(SVTYPE=self.vset_config['type'] .value, TR_CHANGE=repeat_count_change)
-            overlap_region_type = (tuple(utils.as_list(self.vset_config['overlap_region_type']))
-                                   if 'overlap_region_type' in self.vset_config else 'all')
-            roi_filter = TandemRepeatRegionFilter(min_num_repeats=repeat_count_change,
+            # We only need the repeat motif to be present once.
+            roi_filter = TandemRepeatRegionFilter(min_num_repeats=1,
                                                   region_kinds=overlap_region_type)
             return TandemRepeatExpansionContractionSV(
                 sv_id=self.make_sv_id(),
@@ -687,21 +645,16 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                 config_descr=self.vset_config['config_descr'],
                 num_repeats_in_placement=1,
                 dispersions=[])
-        elif self.vset_config['type']  == VariantType.trCON:
+        elif self.vset_config['type'] == VariantType.trCON:
             breakend_interval_lengths = [None]
             operations = [Operation(transform=Transform(transform_type=TransformType.DEL,
-                                                        is_in_place=True),
+                                                        is_in_place=True, n_copies=1),
                                     source_breakend_region=BreakendRegion(0, 1),
                                     op_info={'SOURCE_LETTER': 'A'})]
-            anchor = BreakendRegion(0, 1)
-            self.overlap_mode = OverlapMode.EXACT
 
             # ensure there are enough existing repeats to delete.
-            overlap_region_type = (tuple(utils.as_list(self.vset_config['overlap_region_type']))
-                                   if 'overlap_region_type' in self.vset_config else 'all')
             roi_filter = TandemRepeatRegionFilter(min_num_repeats=repeat_count_change,
                                                   region_kinds=overlap_region_type)
-            info = dict(SVTYPE=self.vset_config['type'].value, TR_CHANGE=repeat_count_change)
 
             return TandemRepeatExpansionContractionSV(
                 sv_id=self.make_sv_id(),

@@ -19,7 +19,7 @@ from intervaltree import Interval, IntervalTree
 from pysam import FastaFile
 import yaml
 
-from insilicosv import utils
+from insilicosv import utils, __version__
 from insilicosv.utils import (
     Locus, Region, RegionSet, OverlapMode, chk, error_context,
     has_duplicates, if_not_none, pairwise)
@@ -30,6 +30,9 @@ from insilicosv.output import OutputWriter
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s')
+
+DEFAULT_PERCENT_N = 0.05
+DEFAULT_MAX_TRIES = 100
 
 class SVSimulator:
 
@@ -264,7 +267,7 @@ class SVSimulator:
             # Ensure the regions covered by the SV do not contain a proportion of Ns above th_proportion_N
             if utils.percent_N(self.reference.fetch(reference=op_region.chrom,
                                                     start=op_region.start,
-                                                    end=op_region.end)) > self.config.get('th_proportion_N', 0.05):
+                                                    end=op_region.end)) > self.config.get('th_proportion_N', DEFAULT_PERCENT_N):
                 return False
         return True
     # end: def is_placement_valid(...)
@@ -368,6 +371,7 @@ class SVSimulator:
         # Add the beginning of the ROIs list at the end of the list of ROIs to check to ensure all are checked in case we run out.
         for region in (roi_list[roi_index:] + roi_list[:init_roi]):
             roi_index += 1
+            if not roi_filter.satisfied_for(region): continue
             # Slice the reference regions with the blacklisted ones.
             if blacklist_regions is not None and region.chrom in blacklist_regions.chrom2itree:
                 overlaps = blacklist_regions.chrom2itree[region.chrom].overlap(region.start, region.end)
@@ -597,7 +601,7 @@ class SVSimulator:
             sv.set_placement(placement=sv.fixed_placement, roi=None)
             return
         n_placement_attempts = 0
-        max_tries = self.config.get("max_tries", 100)
+        max_tries = self.config.get("max_tries", DEFAULT_MAX_TRIES)
         blacklist_regions = self.get_relevant_blacklist_regions(sv.blacklist_filter)
         sv_set = sv.info['VSET']
         init_roi = 0
@@ -670,7 +674,7 @@ class SVSimulator:
             if placement_dict is None: continue
             placement: list[Locus] = [placement_dict[breakend] for breakend in sv.breakends]
             if not self.is_placement_valid(sv, placement): continue
-            sv.set_placement(placement=placement, roi=roi)
+            sv.set_placement(placement=placement, roi=roi, operation=sv.operations[0])
         # end: while not sv.is_placed() and (n_placement_attempts < max_tries):
         if not sv.is_placed():
             raise RuntimeError(f'Could not place SV within {max_tries=}')
@@ -720,7 +724,7 @@ def parse_args():
 def run_simulator():
     start_time = time.time()
 
-    logger.info('insilicoSV version 2.0')
+    logger.info('insilicoSV version %s' % __version__)
 
     args = parse_args()
 

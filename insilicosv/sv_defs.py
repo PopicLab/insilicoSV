@@ -56,6 +56,8 @@ class Operation:
 
     op_info: Optional[dict] = None
 
+    motif: Optional[str] = None
+
     @property
     def transform_type(self):
         return self.transform.transform_type
@@ -214,7 +216,7 @@ class SV(ABC):
     def __str__(self):
         return self.config_descr
 
-    def set_placement(self, placement, roi):
+    def set_placement(self, placement, roi, operation=None):
         placement = copy(placement)
 
         self.placement = placement
@@ -379,6 +381,33 @@ class BaseSV(SV):
         return sv_vcf_recs
 # end: class BaseSV(SV)
 
+#############################################
+# Constructing SVs involving tandem repeats #
+#############################################
+@dataclass
+class TandemRepeatExpansionContractionSV(BaseSV):
+
+    num_repeats_in_placement: int = 0
+
+    @override
+    def set_placement(self, placement, roi, operation):
+        self.roi = roi
+        # The operation gets the motif to insert or delete
+        operation.motif = roi.motif * self.num_repeats_in_placement * operation.transform.n_copies
+        super().set_placement(placement=placement, roi=roi)
+
+    @override
+    def to_vcf_records(self, config):
+        sv_type_str = self.info['SVTYPE']
+        vcf_rec = super().to_vcf_records(config)[0]
+        vcf_rec['info']['SVTYPE'] = sv_type_str
+        vcf_rec['alleles'] = ['N', '<%s>' % sv_type_str]
+        assert self.roi is not None
+        vcf_rec['info']['SVLEN'] = self.roi.length()
+        vcf_rec['stop'] = self.roi.end
+        return [vcf_rec]
+
+
 class Syntax:
     DISPERSION = '_'
 
@@ -388,6 +417,7 @@ class Syntax:
     ANCHOR_START = '('
     ANCHOR_END = ')'
 
+TR = [VariantType.trCON, VariantType.trEXP]
 
 SV_KEY = {
     VariantType.INS: ((), ("A",)),

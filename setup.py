@@ -1,9 +1,9 @@
-import os
+from insilicosv import __version__
 from setuptools import setup
 
 setup(
     name = "insilicosv",
-    version = "2.0.0",
+    version = __version__,
     description = ("Structural variant simulation"),
     url = "https://github.com/PopicLab/insilicoSV",
 

@@ -29,7 +29,7 @@ The recommended workflow for running insilicoSV is as follows:
 2. Populate a simulation config file and place it in the directory
 3. Run insilicoSV providing the config file as input:
 ```
-insilicosv <config_yml>
+insilicosv -c <config_yml>
 ```
 4. Results will be produced in this directory
 
