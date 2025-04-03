@@ -313,7 +313,7 @@ class BaseSV(SV):
             if (operation.transform_type == TransformType.IDENTITY) and operation.is_in_place:
                 if (operation.transform.divergence_prob == 1) and (self.breakend_interval_lengths[0] == 1):
                     op_type_str = 'SNP'
-                else:
+                elif operation.transform.divergence_prob > 0:
                     op_type_str = 'DIVERGENCE'
 
             sv_info = dict(self.info)
@@ -361,11 +361,11 @@ class BaseSV(SV):
             alleles = ['N', '<%s>' % op_type_str]
             if len(self.operations) > 1:
                 sv_id += f'_{op_idx}'
-                sv_info['PARENT_SVID'] = self.sv_id
-                sv_info['PARENT_SVTYPE'] = sv_type_str
             else:
                 sv_info['SVTYPE'] = sv_type_str
                 alleles = ['N', '<%s>' % sv_type_str]
+            sv_info['PARENT_SVID'] = self.sv_id
+            sv_info['PARENT_SVTYPE'] = sv_type_str
             for key, value in operation.op_info.items():
                 sv_info[key] = value
 

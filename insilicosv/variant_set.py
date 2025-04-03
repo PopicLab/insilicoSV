@@ -69,6 +69,17 @@ class VariantSet(ABC):
             self.vset_config['overlap_region_length_range'] if 'overlap_region_length_range' in self.vset_config else
             [None, None])
 
+        self.vset_config['type'] = self.vset_config['type'].replace(" ", "")
+        if '->' in self.vset_config['type']:
+            self.svtype = VariantType.Custom
+            grammar = self.vset_config['type'].split('->')
+        else:
+            chk(self.vset_config['type'] in VariantType, 'The type {} does not match the predefined types {}'.format(
+                self.vset_config['type'], [var.value for var in VariantType]))
+            self.svtype = VariantType(self.vset_config['type'])
+            grammar = SV_KEY[VariantType(self.vset_config['type'])]
+        self.source = grammar[0]
+        self.target = grammar[1]
 
     def get_sampled_int_value(self, value, locals_dict=
     None):
@@ -143,6 +154,8 @@ class VariantSet(ABC):
         n_divergence_prob = 0
         # Keep track of the letters that have been deleted or moved for which DEL operations have to be added.
         delete_letters = {letter: True for letter in lhs if letter.name != Syntax.DISPERSION}
+        # If a custom event specifies letters that are not modified and only use for placing constraints, we want ot keep track of them
+        identities_to_add = {letter: True for letter in lhs if letter.name != Syntax.DISPERSION}
         # Parse the rhs to define the operations.
         for rhs_str in rhs_strs:
             chk(rhs_str not in [Syntax.ANCHOR_START, Syntax.ANCHOR_END], f'The anchor can only be specified in the '
@@ -209,6 +222,8 @@ class VariantSet(ABC):
             # We do not add operations for inplace identity transformations without divergence (do not affect the sequence).
             if (transform_type != TransformType.IDENTITY or not is_in_place or divergence_prob > 0 or replacement_seq is not None
                     or n_copies > 1):
+                # The letter has been involved in an operation and is not a placeholder.
+                identities_to_add[symbol] = False
                 operation = Operation(transform=transform, op_info={'SOURCE_LETTER': symbol.name})
                 if is_in_place and not n_copies > 1:
                     operation.source_breakend_region = BreakendRegion(current_breakend - 1, current_breakend)
@@ -236,11 +251,23 @@ class VariantSet(ABC):
                             novel_insertions[symbol] = novel_insertion
                         operation.novel_insertion_seq = novel_insertions[symbol]
                 operations.append(operation)
+        # Add the deletions
         for letter, delete in delete_letters.items():
             if delete:
+                # The symbol is involved in a DEL, it is not a placeholder.
+                identities_to_add[letter] = False
                 source_index = lhs.index(letter)
                 # The symbol was deleted, we add a DEL operation.
                 transform = Transform(transform_type=TransformType.DEL, is_in_place=True)
+                operation = Operation(transform=transform, op_info={'SOURCE_LETTER': letter.name})
+                operation.source_breakend_region = BreakendRegion(source_index, source_index + 1)
+                operations.append(operation)
+        # Add the identities for place holder letters
+        for letter, identity in identities_to_add.items():
+            if identity:
+                source_index = lhs.index(letter)
+                # The symbol was deleted, we add a DEL operation.
+                transform = Transform(transform_type=TransformType.IDENTITY, is_in_place=True)
                 operation = Operation(transform=transform, op_info={'SOURCE_LETTER': letter.name})
                 operation.source_breakend_region = BreakendRegion(source_index, source_index + 1)
                 operations.append(operation)
@@ -264,29 +291,24 @@ class SimulatedVariantSet(VariantSet):
         chk(isinstance(vset_config.get('number'), int) and vset_config['number'] >= 0,
             f'Missing or bad "number" of variants to generate')
 
-        try:
-            self.vset_config['type'] = VariantType(vset_config['type'])
-        except ValueError:
-            chk(False, 'Invalid variant type')
-
         self.preprocess_config()
 
     def preprocess_config(self):
         chk('divergence_prob' not in self.vset_config or isinstance(self.vset_config['divergence_prob'], list),
             'divergence_prob must be a list of floats in ]0, 1] or ranges')
 
-        if (self.vset_config['type'] == VariantType.DUP) and ('n_copies' not in self.vset_config):
+        if (self.svtype == VariantType.DUP) and ('n_copies' not in self.vset_config):
             self.vset_config['n_copies'] = [1]
         if 'n_copies' in self.vset_config:
             chk(isinstance(self.vset_config['n_copies'], list), 'The number of copies must a list of integers or ranges.')
-        if self.vset_config['type'] == "mCNV":
+        if self.svtype == "mCNV":
             chk(('n_copies' in self.vset_config) and (self.vset_config['n_copies'][0] > 1),
                 f'n_copies has to be provided and be above 1 for a mCNV.')
     # end: def preprocess_config(self)
         
     @property
     def sv_type(self):
-        return self.vset_config['type']
+        return self.svtype
 
     def get_roi_filter(self):
         if self.overlap_mode is None:
@@ -324,7 +346,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
     @override
     @classmethod
     def can_make_from(cls, vset_config):
-        return vset_config.get("type") in [k.value for k in SV_KEY.keys()] + ['Custom']
+        return vset_config.get("type") in [k.value for k in SV_KEY.keys()] or '->' in vset_config.get("type")
 
     @override
     def preprocess_config(self):
@@ -333,8 +355,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         for vset_config_key in self.vset_config:
             chk(vset_config_key in (
                 'type', 'number',
-                'source', 'target',
-                'length_ranges', 'dispersion_ranges',
+                'length_ranges',
                 'overlap_region_type', 'overlap_region_length_range',
                 'overlap_mode',
                 'blacklist_region_type',
@@ -347,7 +368,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
 
         vset_cfg = self.vset_config
 
-        if vset_cfg['type'] not in (VariantType.SNP,):
+        if self.svtype not in (VariantType.SNP,):
             chk('length_ranges' in vset_cfg, 'Please specify length ranges')
             chk(isinstance(vset_cfg['length_ranges'], list), 'length_ranges must be a list')
             for length_range in vset_cfg['length_ranges']:
@@ -357,7 +378,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                      isinstance(length_range[1], (type(None), int, str))),
                     'invalid length_ranges')
                 
-        if vset_cfg['type'] == VariantType.SNP:
+        if self.svtype == VariantType.SNP:
             chk(vset_cfg.get('length_ranges') in (None, [[1, 1]]),
                 'length range for SNP can only be [1, 1]')
             chk('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] == [1],
@@ -380,24 +401,8 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 utils.is_list_of(str, self.vset_config.get(src_trg)),
                 f'elements of {src_trg} must be strings')
 
-        if self.vset_config['type']  == VariantType.Custom:
-            chk('source' in self.vset_config and 'target' in self.vset_config,
-                'Please provide "source" and "target" grammar for custom SV')
-        else:
-            lhs_strs, rhs_strs = SV_KEY[VariantType(self.vset_config['type'] )]
-            if 'source' in self.vset_config:
-                lhs_strs = tuple(self.vset_config['source'])
-                chk(tuple(s for s in lhs_strs if s not in (Syntax.ANCHOR_START, Syntax.ANCHOR_END)) ==
-                    SV_KEY[VariantType(self.vset_config['type'] )][0],
-                    f'Source spec does not match built-in spec')
-            else:
-                self.vset_config['source'] = lhs_strs
-            chk('target' not in self.vset_config, f'Please do not provide a target for predefined types.'
-                                                  f'If needed, anchors must be specified in the source')
-            self.vset_config['target'] = rhs_strs
-
         rhs_strs_list: list[str] = []
-        for c in self.vset_config['target']:
+        for c in self.target:
             if c in (Syntax.DIVERGENCE, Syntax.MULTIPLE_COPIES):
                 chk(rhs_strs_list and rhs_strs_list[-1] and rhs_strs_list[-1][0].isalpha(),
                     f'{c} must modify a symbol')
@@ -405,23 +410,21 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             else:
                 rhs_strs_list.append(c)
 
-        self.vset_config['target'] = rhs_strs_list
+        self.target = rhs_strs_list
 
         # Anchor the whole SV if overlap mode is specified, no anchor is provided and there is no dispersion.
-        if ((self.overlap_mode is not None) and (Syntax.DISPERSION not in self.vset_config['source']) and
-                (Syntax.ANCHOR_START not in self.vset_config['source'])):
-            self.vset_config['source'] = tuple([Syntax.ANCHOR_START, *self.vset_config['source'], Syntax.ANCHOR_END])
+        if ((self.overlap_mode is not None) and (Syntax.DISPERSION not in self.source) and
+                (Syntax.ANCHOR_START not in self.source)):
+            self.source = tuple([Syntax.ANCHOR_START, *self.source, Syntax.ANCHOR_END])
 
     @property
     def is_interchromosomal(self):
         return self.vset_config.get('interchromosomal', False)
 
-    def symmetrize(self):
-        lhs_strs = self.vset_config['source']
-        rhs_strs = self.vset_config['target']
+    def symmetrize(self, lhs_strs, rhs_strs, letter_ranges):
         # Enforce the symmetry of the predefined SVs with duplications or dispersions.
-        if (("DUP" in self.vset_config['type'].name or "TRA" in self.vset_config['type'].name or
-                 "iDEL" in self.vset_config['type'].name)
+        if (("DUP" in self.svtype.name or "TRA" in self.svtype.name or
+                 "iDEL" in self.svtype.name)
                  and (not self.is_interchromosomal)
                  and random.randint(0, 1)):
             def flip_anchor(val: str) -> str:
@@ -433,13 +436,11 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             lhs_strs = tuple(map(flip_anchor, lhs_strs))[::-1]
             rhs_strs = tuple(map(flip_anchor, rhs_strs))[::-1]
             if "length_ranges" in self.vset_config:
-                self.vset_config['length_ranges'] = self.vset_config['length_ranges'][::-1]
-            if "dispersion_ranges" in self.vset_config:
-                self.vset_config['dispersion_ranges'] = self.vset_config['dispersion_ranges'][::-1]
+                letter_ranges = letter_ranges[::-1]
         chk(all(len(rhs)<3 for rhs in rhs_strs), f'The operators + and * cannot be used at the same time {rhs_strs}.')
-        return lhs_strs, rhs_strs
+        return lhs_strs, rhs_strs, letter_ranges
 
-    # Randomly pick distances withing the ranges define for each symbol
+    # Randomly pick distances withing the ranges defined for each symbol
     @staticmethod
     def pick_symbol_lengths(length_ranges, dispersion_ranges, letter_indexes):
         ranges = length_ranges + dispersion_ranges
@@ -480,7 +481,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                         # The bound is dependent of another letter
                         no_space_bound = bound.strip()
                         format_bound = [int(char) if char.isdigit() else char for char in no_space_bound]
-                        letters_bound= [(idx, char) for idx, char in enumerate(format_bound) if isinstance(char, str) and char.isalpha()]
+                        letters_bound = [(idx, char) for idx, char in enumerate(format_bound) if isinstance(char, str) and char.isalpha()]
                         chk(all(letter in letter_indexes for _, letter in letters_bound), f'The length of a symbol depends on {letters_bound}'
                                                                                     f'one of which is not define in neither the source nor target.')
                         computed_letter = 0
@@ -524,12 +525,26 @@ class FromGrammarVariantSet(SimulatedVariantSet):
 
     @override
     def simulate_sv(self) -> SV:
-        lhs_strs, rhs_strs = self.symmetrize()
+        lhs_strs = self.source
+        rhs_strs = self.target
+        svtype = self.svtype
         length_ranges = self.vset_config['length_ranges'] if 'length_ranges' in self.vset_config else []
-        dispersion_ranges = self.vset_config['dispersion_ranges'] if 'dispersion_ranges' in self.vset_config else []
-        num_dispersion = len([letter for letter in lhs_strs if letter == Syntax.DISPERSION])
-        chk(num_dispersion == len(dispersion_ranges),
-            f'Missing dispersion length ranges, {len(dispersion_ranges)} provided, {num_dispersion} expected')
+        letter_ranges = length_ranges
+        dispersion_ranges = []
+        # Find the length ranges corresponding to dispersions and those corresponding to letters
+        lhs_strs_no_anchor = [letter for letter in lhs_strs if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]]
+        dispersions = [idx for idx, letter in enumerate(lhs_strs_no_anchor) if letter == Syntax.DISPERSION]
+        if dispersions:
+            if svtype != VariantType.Custom:
+                letter_ranges = length_ranges[:-1]
+                dispersion_ranges = [length_ranges[-1]]
+            else:
+                letter_ranges = [length_range for idx, length_range in enumerate(length_ranges) if
+                                 idx not in dispersions]
+                dispersion_ranges = [length_range for idx, length_range in enumerate(length_ranges) if
+                                     idx in dispersions]
+
+        lhs_strs, rhs_strs, letter_ranges = self.symmetrize(lhs_strs, rhs_strs, letter_ranges)
         letters = [letter for letter in lhs_strs if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START, Syntax.DISPERSION]]
         chk(len(letters) == len(set(letters)), f'Duplicate LHS symbol {letters}')
 
@@ -537,11 +552,12 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         for letter in rhs_strs:
             if letter[0].upper() not in letters + [Syntax.ANCHOR_END, Syntax.ANCHOR_START, Syntax.DISPERSION]:
                 letters.append(letter[0].upper())
-        chk(len(length_ranges) == len(letters), f'Missing length ranges, expected {len(letters)} provided {len(length_ranges)}')
+        chk(len(length_ranges) == len(letters) + len(dispersions),
+            f'Mismatched length ranges, expected {len(letters) + len(dispersions)} provided {len(length_ranges)}')
         letter_indexes = {letter: index for index, letter in enumerate(letters)}
 
         # Compute the lengths of the different symbols and dispersions from the length ranges.
-        symbol_lengths, symbol_min_lengths = self.pick_symbol_lengths(length_ranges, dispersion_ranges, letter_indexes)
+        symbol_lengths, symbol_min_lengths = self.pick_symbol_lengths(letter_ranges, dispersion_ranges, letter_indexes)
 
         novel_insertion_seqs = self.novel_insertion_seqs
         n_copies_list = self.vset_config.get('n_copies', [])
@@ -572,10 +588,10 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                       config_descr=self.vset_config['config_descr'])
 
     def construct_info(self):
-        sv_type_str = self.vset_config['type'] .value
-        source_str = ''.join(self.vset_config['source'])
-        target_str = ''.join(self.vset_config['target'])
-        grammar = f'{source_str}>{target_str}'
+        sv_type_str = self.svtype.value
+        source_str = ''.join(self.source)
+        target_str = ''.join(self.target)
+        grammar = f'{source_str}->{target_str}'
         return {'SVTYPE': sv_type_str, 'GRAMMAR': grammar}
 
 # end: class FromGrammarVariantSetMaker
@@ -610,14 +626,14 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
     def simulate_sv(self):
 
         repeat_count_change = random.randint(*self.vset_config['repeat_count_change_range'])
-        info = dict(SVTYPE=self.vset_config['type'].value, TR_CHANGE=repeat_count_change)
+        info = dict(SVTYPE=self.svtype.value, TR_CHANGE=repeat_count_change)
         overlap_region_type = (tuple(utils.as_list(self.vset_config['overlap_region_type']))
                                if 'overlap_region_type' in self.vset_config else 'all')
         anchor = BreakendRegion(0, 1)
         self.overlap_mode = OverlapMode.EXACT
 
         chk(self.overlap_mode in [None, OverlapMode.EXACT], 'overlap_mode must be "exact" for Tandem Repeat')
-        if self.vset_config['type'] == VariantType.trEXP:
+        if self.svtype == VariantType.trEXP:
             breakend_interval_lengths = [None]
             operations = [Operation(transform=Transform(transform_type=TransformType.IDENTITY,
                                                         is_in_place=False,
@@ -645,7 +661,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                 config_descr=self.vset_config['config_descr'],
                 num_repeats_in_placement=1,
                 dispersions=[])
-        elif self.vset_config['type'] == VariantType.trCON:
+        elif self.svtype == VariantType.trCON:
             breakend_interval_lengths = [None]
             operations = [Operation(transform=Transform(transform_type=TransformType.DEL,
                                                         is_in_place=True, n_copies=1),

@@ -123,9 +123,9 @@ def test_pick_symbol_length():
 
 
 def test_FromGrammarVariantSetMaker():
-    set_maker = FromGrammarVariantSet(vset_config={'type': 'Custom', 'number': 1,
-                                                        'source':'ABC_', 'target': 'A_BC', 'length_ranges':[[1,1],
-                                           [2,2], [3,3]], 'dispersion_ranges':[[1,1]]})
+    set_maker = FromGrammarVariantSet(vset_config={'type': 'ABC_ -> A_BC', 'number': 1,
+                                                        'length_ranges':[[1,1],
+                                           [2,2], [3,3], [1, 1]]})
     sv = set_maker.simulate_sv()
     assert sv.breakend_interval_lengths == [1, 2, 3, 1]
     operations = get_operations(sv.operations)
@@ -133,21 +133,22 @@ def test_FromGrammarVariantSetMaker():
     assert set([(TransformType.IDENTITY, False, (1, 2, 4, 1)), (TransformType.IDENTITY, False, (2, 3, 4, 2)),
                 (TransformType.DEL, True, (1, 2, None, None)), (TransformType.DEL, True, (2, 3, None, None))]) == operations
 
-    set_maker = FromGrammarVariantSet(vset_config={'type': 'Custom', 'number': 1,
-                                                        'source': 'AB_C', 'target': 'A_BC', 'length_ranges': [[1, 1],
+    set_maker = FromGrammarVariantSet(vset_config={'type': 'AB_C -> A_BC', 'number': 1,
+                                                        'length_ranges': [[1, 1],
                                                                                                               [2, 2],
-                                                                                                              [3, 3]],
-                                                        'dispersion_ranges': [[1, 1]]})
+                                                                                                              [1, 1],
+                                                                                                              [3, 3]]})
     sv = set_maker.simulate_sv()
     assert sv.breakend_interval_lengths == [1, 2, 1, 3]
     operations = get_operations(sv.operations)
     assert set([(TransformType.IDENTITY, False, (1, 2, 3, 1)), (TransformType.DEL, True, (1, 2, None, None))]) == operations
 
-    set_maker = FromGrammarVariantSet(vset_config={'type': 'Custom', 'number': 1,
-                                                        'source': 'A_B_C', 'target': 'c_A_B', 'length_ranges': [[1, 1],
+    set_maker = FromGrammarVariantSet(vset_config={'type': 'A_B_C -> c_A_B', 'number': 1,
+                                                        'length_ranges': [[1, 1],
+                                                                                                                [1, 1],
                                                                                                               [2, 2],
-                                                                                                              [3, 3]],
-                                                        'dispersion_ranges': [[1, 1], [1, 1]]})
+                                                                                                                [1, 1],
+                                                                                                              [3, 3]]})
     sv = set_maker.simulate_sv()
     assert sv.breakend_interval_lengths == [1, 1, 2, 1, 3]
     operations = get_operations(sv.operations)
@@ -158,8 +159,7 @@ def test_FromGrammarVariantSetMaker():
                 ]) == operations
 
     set_maker = FromGrammarVariantSet(vset_config={'type': 'nrTRA', 'number': 1,
-                                                        'length_ranges': [[1, 1]],
-                                                        'dispersion_ranges': [[2, 2]]})
+                                                        'length_ranges': [[1, 1], [2, 2]]})
     sv = set_maker.simulate_sv()
     assert (sv.breakend_interval_lengths == [1, 2]) or (sv.breakend_interval_lengths == [2, 1])
     operations = get_operations(sv.operations)
@@ -167,67 +167,66 @@ def test_FromGrammarVariantSetMaker():
             (set([(TransformType.IDENTITY, False, (1, 2, 0, 1)), (TransformType.DEL, True, (1, 2, None, None))]) == operations))
 
     set_maker = FromGrammarVariantSet(vset_config={'type': 'rTRA', 'number': 1,
-                                                        'length_ranges': [[1, 1], [3,3]],
-                                                        'dispersion_ranges': [[2, 2]]})
+                                                        'length_ranges': [[1, 1], [3,3], [2, 2]]})
     sv = set_maker.simulate_sv()
     assert (sv.breakend_interval_lengths == [1, 2, 3]) or (sv.breakend_interval_lengths == [3, 2, 1])
     operations = get_operations(sv.operations)
     assert (set([(TransformType.IDENTITY, False, (0, 1, 2, 2)), (TransformType.DEL, True, (0, 1, None, None)),
                  (TransformType.IDENTITY, False, (2, 3, 0, 1)), (TransformType.DEL, True, (2, 3, None, None))]) == operations)
 
-    set_maker = FromGrammarVariantSet(vset_config={'type': 'Custom', 'number': 1,
-                                                        'source': 'A___B', 'target': '_A_B_', 'length_ranges': [[1, 1],
-                                                                                                              [3, 3]],
-                                                        'dispersion_ranges': [[1, 1], [5, 5], [3, 3]]})
+    set_maker = FromGrammarVariantSet(vset_config={'type': 'A___B -> _A_B_', 'number': 1,
+                                                        'length_ranges': [[1, 1],
+                                                                                                                [1, 1],
+                                                                                                                [5, 5],
+                                                                                                                [3, 3],
+                                                                                                              [3, 3]]})
     sv = set_maker.simulate_sv()
     assert sv.breakend_interval_lengths == [1, 1, 5, 3, 3]
     operations = get_operations(sv.operations)
     assert set([(TransformType.IDENTITY, False, (0, 1, 2, 1)), (TransformType.IDENTITY, False, (4, 5, 3, 2)),
                 (TransformType.DEL, True, (0, 1, None, None)), (TransformType.DEL, True, (4, 5, None, None))]) == operations
 
-    set_maker = FromGrammarVariantSet(vset_config={'type': 'Custom', 'number': 1,
-                                                        'source': 'AB', 'target': 'ACB', 'length_ranges': [[1, 1], [2, 2],
-                                                                                                                [3, 3]],
-                                                        'dispersion_ranges': []})
+    set_maker = FromGrammarVariantSet(vset_config={'type': 'AB -> ACB', 'number': 1,
+                                                        'length_ranges': [[1, 1], [2, 2],
+                                                                                                                [3, 3]]})
     sv = set_maker.simulate_sv()
     assert sv.breakend_interval_lengths == [1, 2]
     operations = get_operations(sv.operations)
     assert set([(TransformType.IDENTITY, False, (None, None, 1, 1))]) == operations
 
-    set_maker = FromGrammarVariantSet(vset_config={'type': 'Custom', 'number': 1,
-                                                        'source': 'ABC', 'target': 'BCA', 'length_ranges': [[1, 1],
+    set_maker = FromGrammarVariantSet(vset_config={'type': 'ABC -> BCA', 'number': 1,
+                                                        'length_ranges': [[1, 1],
                                                                                                               [2, 2],
-                                                                                                              [3, 3]],
-                                                        'dispersion_ranges': []})
+                                                                                                              [3, 3]]})
     sv = set_maker.simulate_sv()
     assert sv.breakend_interval_lengths == [1, 2, 3]
     operations = get_operations(sv.operations)
     assert set([(TransformType.IDENTITY, False, (0, 1, 3, 1)), (TransformType.DEL, True, (0, 1, None, None))]) == operations
 
-    set_maker = FromGrammarVariantSet(vset_config={'type': 'Custom', 'number': 1,
-                                                        'source': 'AB_', 'target': '_bA', 'length_ranges': [[1, 1],
-                                                                                                            [3, 3]],
-                                                        'dispersion_ranges': [[4, 4]]})
+    set_maker = FromGrammarVariantSet(vset_config={'type': 'AB_ -> _bA', 'number': 1,
+                                                        'length_ranges': [[1, 1],
+                                                                                                            [3, 3],
+                                                                                                            [4, 4]]})
     sv = set_maker.simulate_sv()
     assert sv.breakend_interval_lengths == [1, 3, 4]
     operations = get_operations(sv.operations)
     assert set([(TransformType.IDENTITY, False, (0, 1, 3, 2)), (TransformType.INV, False, (1, 2, 3, 1)),
                 (TransformType.DEL, True, (0, 1, None, None)), (TransformType.DEL, True, (1, 2, None, None))]) == operations
 
-    set_maker = FromGrammarVariantSet(vset_config={'type': 'Custom', 'number': 1,
-                                                        'source': 'AB', 'target': 'A',
-                                                        'length_ranges': [[1, 1], [2, 2]],
-                                                        'dispersion_ranges': []})
+    set_maker = FromGrammarVariantSet(vset_config={'type': 'AB -> A', 'number': 1,
+                                                        'length_ranges': [[1, 1], [2, 2]]})
     sv = set_maker.simulate_sv()
     assert sv.breakend_interval_lengths == [1, 2]
     operations = get_operations(sv.operations)
     assert set([(TransformType.DEL, True, (1, 2, None, None))]) == operations
 
-    set_maker = FromGrammarVariantSet(vset_config={'type': 'Custom', 'number': 1,
-                                                        'source': 'A___B', 'target': '__B_C', 'length_ranges': [[1, 1],
+    set_maker = FromGrammarVariantSet(vset_config={'type': 'A___B -> __B_C', 'number': 1,
+                                                         'length_ranges': [[1, 1],
+                                                                                                                [1, 1],
+                                                                                                                [5, 5],
                                                                                                                 [3, 3],
-                                                                                                                [4, 4]],
-                                                        'dispersion_ranges': [[1, 1], [5, 5], [3, 3]]})
+                                                                                                                [3, 3],
+                                                                                                                [4, 4]]})
     sv = set_maker.simulate_sv()
     assert sv.breakend_interval_lengths == [1, 1, 5, 3, 3]
     operations = get_operations(sv.operations)

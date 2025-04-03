@@ -13,6 +13,7 @@ from insilicosv import utils
 from insilicosv.utils import Region, as_list
 from insilicosv.sv_defs import Transform, TransformType, SV
 
+
 def is_overlapping(event_ranges, addition, called_from_helper=False, strictly_partial=False):
     # addition: tuple (start, end)
     # event_ranges: list containing tuples
@@ -27,6 +28,7 @@ def is_overlapping(event_ranges, addition, called_from_helper=False, strictly_pa
 
     return False
 
+
 def get_span(sv: SV) -> Region:
     assert sv.is_placed()
 
@@ -36,8 +38,8 @@ def get_span(sv: SV) -> Region:
     assert all(region.chrom == chrom for region in regions)
     return Region(chrom=chrom, start=regions[0].start, end=regions[-1].end)
 
-class TestObject():
 
+class TestObject():
     __test__ = False
 
     def __init__(self, ref, par, hap1, hap2, bed):
@@ -96,6 +98,7 @@ class TestObject():
             else:
                 return self.get_frag(fasta_out_1), self.get_frag(fasta_out_2)
 
+
 class TestSVSimulator(unittest.TestCase):
     def setUp(self):
 
@@ -128,10 +131,10 @@ class TestSVSimulator(unittest.TestCase):
             "chr21": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
                                                [self.par,
                                                 {"reference": self.ref_file,
-                                                                  "max_tries": 2000,
+                                                 "max_tries": 2000,
                                                  "blacklist_regions": [self.test_exclude_bed],
                                                  "variant_sets": [
-                                                     {"type": "delINVdup", "number": 1, 
+                                                     {"type": "delINVdup", "number": 1,
                                                       "length_ranges": [[5, 5], [5, 5], [5, 5]],
                                                       "blacklist_region_type": "AluSz6"}]}],
                                                self.hap1, self.hap2, self.bed),
@@ -140,9 +143,12 @@ class TestSVSimulator(unittest.TestCase):
                                                [self.par,
                                                 {"reference": self.ref_file,
                                                  "variant_sets": [
-                                                     {"type": "delINVdup", "number": 1, "length_ranges": [[5, 5], [5, 5], [5, 5]]},
-                                                     {"type": "delINVdel", "number": 1, "length_ranges": [[5, 5], [5, 5], [5, 5]]},
-                                                     {"type": "dupINVdup", "number": 1, "length_ranges": [[5, 5], [5, 5], [5, 5]]}
+                                                     {"type": "delINVdup", "number": 1,
+                                                      "length_ranges": [[5, 5], [5, 5], [5, 5]]},
+                                                     {"type": "delINVdel", "number": 1,
+                                                      "length_ranges": [[5, 5], [5, 5], [5, 5]]},
+                                                     {"type": "dupINVdup", "number": 1,
+                                                      "length_ranges": [[5, 5], [5, 5], [5, 5]]}
                                                  ]}],
                                                self.hap1, self.hap2, self.bed),
                                     TestObject([self.ref_file, {
@@ -150,7 +156,8 @@ class TestSVSimulator(unittest.TestCase):
                                                [self.par,
                                                 {"reference": self.ref_file,
                                                  "variant_sets": [
-                                                     {"type": "dupINVdel", "number": 1, "length_ranges": [[5, 5], [5, 5], [5, 5]]},
+                                                     {"type": "dupINVdel", "number": 1,
+                                                      "length_ranges": [[5, 5], [5, 5], [5, 5]]},
                                                      {"type": "delINV", "number": 1, "length_ranges": [[5, 5], [5, 5]]},
                                                      {"type": "INVdel", "number": 1, "length_ranges": [[5, 5], [5, 5]]}
                                                  ]}],
@@ -248,93 +255,81 @@ class TestSVSimulator(unittest.TestCase):
                                                                "variant_sets": [
                                                                    {"type": "nrTRA",
                                                                     "number": 1,
-                                                                    "dispersion_ranges": [[1, 1]],
-                                                                    "length_ranges": [[1, 1]]}]}],
+                                                                    "length_ranges": [[1, 1], [1, 1]]}]}],
                                                    self.hap1, self.hap2, self.bed),
                                         TestObject([self.ref_file, {"Chromosome19": "CT"}],
                                                    [self.par, {"reference": self.ref_file,
                                                                "variant_sets": [
                                                                    {"type": "dDUP",
                                                                     "number": 1,
-                                                                    "dispersion_ranges": [[1, 1]],
-                                                                    "length_ranges": [[1, 1]]}]}],
+                                                                    "length_ranges": [[1, 1], [1, 1]]}]}],
                                                    self.hap1, self.hap2, self.bed),
                                         TestObject([self.ref_file, {"Chromosome19": "CT"}],
                                                    [self.par, {"reference": self.ref_file,
                                                                "variant_sets": [
                                                                    {"type": "INV_dDUP",
                                                                     "number": 1,
-                                                                    "dispersion_ranges": [[1, 1]],
-                                                                    "length_ranges": [[1, 1]]}]}],
+                                                                    "length_ranges": [[1, 1], [1, 1]]}]}],
                                                    self.hap1, self.hap2, self.bed),
                                         TestObject([self.ref_file, {"Chromosome19": "CTG"}],
                                                    [self.par, {"reference": self.ref_file,
                                                                "variant_sets": [
                                                                    {"type": "dDUP_iDEL",
                                                                     "number": 1,
-                                                                    "dispersion_ranges": [[1, 1]],
-                                                                    "length_ranges": [[1, 1], [1, 1]]}]}],
+                                                                    "length_ranges": [[1, 1], [1, 1], [1, 1]]}]}],
                                                    self.hap1, self.hap2, self.bed),
                                         TestObject([self.ref_file, {"Chromosome19": "CTG"}],
                                                    [self.par, {"reference": self.ref_file,
                                                                "variant_sets": [
                                                                    {"type": "INS_iDEL",
                                                                     "number": 1,
-                                                                    "dispersion_ranges": [[1, 1]],
-                                                                    "length_ranges": [[1, 1], [1, 1]]}]}],
+                                                                    "length_ranges": [[1, 1], [1, 1], [1, 1]]}]}],
                                                    self.hap1, self.hap2, self.bed),
                                         TestObject([self.ref_file, {"Chromosome19": "CTTTA"}],
                                                    [self.par, {"reference": self.ref_file, "variant_sets": [
                                                        {"type": "rTRA",
                                                         "number": 1,
-                                                        "dispersion_ranges": [[3, 3]],
-                                                        "length_ranges": [[1, 1], [1, 1]]}]}],
+                                                        "length_ranges": [[1, 1], [1, 1], [3, 3]]}]}],
                                                    self.hap1, self.hap2, self.bed),
                                         TestObject([self.ref_file, {"Chromosome19": "CTTTA"}],
                                                    [self.par, {"reference": self.ref_file, "variant_sets": [
                                                        {"type": "rTRA",
                                                         "number": 1,
-                                                        "dispersion_ranges": [[3, None]],
-                                                        "length_ranges": [[1, 1], [1, 1]]}]}],
+                                                        "length_ranges": [[1, 1], [1, 1], [3, None]]}]}],
                                                    self.hap1, self.hap2, self.bed),
                                         TestObject([self.ref_file, {"Chromosome19": "CTTTA"}],
                                                    [self.par, {"reference": self.ref_file, "variant_sets": [
                                                        {"type": "rTRA",
                                                         "number": 1,
-                                                        "dispersion_ranges": [[3, None]],
-                                                        "length_ranges": [[2, 2], [2, 1]]}]}],
+                                                        "length_ranges": [[2, 2], [2, 1], [3, None]]}]}],
                                                    self.hap1, self.hap2, self.bed),
                                         TestObject([self.ref_file, {"Chromosome19": "CTTTA"}],
                                                    [self.par, {"reference": self.ref_file, "variant_sets": [
                                                        {"type": "rTRA",
                                                         "number": 1,
-                                                        "dispersion_ranges": [[1, None]],
-                                                        "length_ranges": [[2, 2], [2, 2]]}]}],
+                                                        "length_ranges": [[2, 2], [2, 2], [1, None]]}]}],
                                                    self.hap1, self.hap2, self.bed),
                                         TestObject([self.ref_file, {"Chromosome19": "CTTTA"}],
                                                    [self.par, {"reference": self.ref_file,
                                                                "variant_sets": [
                                                                    {"type": "rTRA",
                                                                     "number": 1,
-                                                                    "dispersion_ranges": [[None, None]],
-                                                                    "length_ranges": [[3, 3], [2, 2]]}]}],
+                                                                    "length_ranges": [[3, 3], [2, 2], [None, None]]}]}],
                                                    self.hap1, self.hap2, self.bed),
                                         TestObject([self.ref_file, {"Chromosome19": "CTTTA"}],
                                                    [self.par, {"reference": self.ref_file,
                                                                "variant_sets": [
                                                                    {"type": "rTRA",
                                                                     "number": 1,
-                                                                    "dispersion_ranges": [[None, None]],
-                                                                    "length_ranges": [[2, 2], [2, 2]]}]}],
+                                                                    "length_ranges": [[2, 2], [2, 2], [None, None]]}]}],
                                                    self.hap1, self.hap2, self.bed),
                                         TestObject([self.ref_file, {"ChromA": "CTTTA"}],
                                                    [self.par, {"reference": self.ref_file,
-                                                                                "homozygous_only": True,
+                                                               "homozygous_only": True,
                                                                "variant_sets": [
                                                                    {"type": "rTRA",
                                                                     "number": 1,
-                                                                    "dispersion_ranges": [[None, None]],
-                                                                    "length_ranges": [[2, 2], [2, 2]]}]}],
+                                                                    "length_ranges": [[2, 2], [2, 2], [None, None]]}]}],
                                                    self.hap1, self.hap2, self.bed),
                                         ]
         self.test_objects_ins = [TestObject([self.ref_file, {
@@ -397,7 +392,8 @@ class TestSVSimulator(unittest.TestCase):
                                                                    "overlap_regions": [self.test_overlap_bed],
                                                                    "variant_sets": [{"type": "DEL", "number": 1,
                                                                                      "length_ranges": [[None, None]],
-                                                                                     "overlap_region_length_range": [2, 2],
+                                                                                     "overlap_region_length_range": [2,
+                                                                                                                     2],
                                                                                      "overlap_mode": "exact"}]}],
                                                        self.hap1, self.hap2, self.bed),
                                             TestObject([self.ref_file, {"chr21": "CTCCGTCGTA"}],
@@ -405,7 +401,8 @@ class TestSVSimulator(unittest.TestCase):
                                                                    "overlap_regions": [self.test_overlap_bed],
                                                                    "variant_sets": [{"type": "DUP", "number": 1,
                                                                                      "length_ranges": [[None, None]],
-                                                                                     "overlap_region_length_range": [2, 2],
+                                                                                     "overlap_region_length_range": [2,
+                                                                                                                     2],
                                                                                      "overlap_mode": "exact"}
                                                                                     ]}],
                                                        self.hap1, self.hap2, self.bed),
@@ -415,42 +412,44 @@ class TestSVSimulator(unittest.TestCase):
                                                                    "overlap_regions": [self.test_overlap_bed,
                                                                                        self.test_overlap_bed_2],
                                                                    "variant_sets": [{"type": "DEL", "number": 1,
-                                                                                     "overlap_region_length_range": [2, 5],
+                                                                                     "overlap_region_length_range": [2,
+                                                                                                                     5],
                                                                                      "length_ranges": [[None, None]],
                                                                                      "overlap_mode": "exact",
-                                                                                     "overlap_region_type": ["L1PA15"]}]}],
+                                                                                     "overlap_region_type": [
+                                                                                         "L1PA15"]}]}],
                                                        self.hap1, self.hap2, self.bed),
                                             ]
         self.test_objects_overlap_cplx = [TestObject([self.ref_file, {"chr21": "CTGAT"}],
                                                      [self.par, {"reference": self.ref_file,
                                                                  "overlap_regions": [self.test_overlap_bed,
                                                                                      self.test_overlap_bed_2],
-                                                                 "variant_sets": [{"type": "dDUP", "number": 1,
-                                                                                   "dispersion_ranges": [[1, 1]],
-                                                                                   "length_ranges": [[None, None]],
-                                                                                   "overlap_region_length_range": [2, 2],
+                                                                 "variant_sets": [{"type": "(A)_->A_A", "number": 1,
+                                                                                   "length_ranges": [[None, None],
+                                                                                                     [1, 1]],
+                                                                                   "overlap_region_length_range": [2,
+                                                                                                                   2],
                                                                                    "overlap_mode": "exact",
-                                                                                   "overlap_region_type": ["L1HS"],
-                                                                                   "source": "(A)_"}]}],
+                                                                                   "overlap_region_type": ["L1HS"]}]}],
                                                      self.hap1, self.hap2, self.bed),
                                           TestObject([self.ref_file, {"chr21": "CTGATATGGAC"}],
                                                      [self.par, {"reference": self.ref_file,
                                                                  "overlap_regions": [self.test_overlap_bed,
                                                                                      self.test_overlap_bed_2],
-                                                                 "variant_sets": [{"type": "nrTRA", "number": 1,
-                                                                                   "dispersion_ranges": [[1, 1]],
-                                                                                   "length_ranges": [[None, None]],
+                                                                 "variant_sets": [{"type": "(A)_->_A", "number": 1,
+                                                                                   "length_ranges": [[None, None],
+                                                                                                     [1, 1]],
                                                                                    "overlap_mode": "exact",
-                                                                                   "overlap_region_length_range": [4, 6],
-                                                                                   "overlap_region_type": ["L1HS"],
-                                                                                   "source": "(A)_"},
-                                                                                  {"type": "INV_dDUP", "number": 1,
-                                                                                   "dispersion_ranges": [[1, 1]],
-                                                                                   "length_ranges": [[None, None]],
+                                                                                   "overlap_region_length_range": [4,
+                                                                                                                   6],
+                                                                                   "overlap_region_type": ["L1HS"]},
+                                                                                  {"type": "(A)_->A_a", "number": 1,
+                                                                                   "length_ranges": [[None, None],
+                                                                                                     [1, 1]],
                                                                                    "overlap_mode": "exact",
-                                                                                   "overlap_region_length_range": [1, 1],
-                                                                                   "overlap_region_type": ["AluSz6"],
-                                                                                   "source": "(A)_"
+                                                                                   "overlap_region_length_range": [1,
+                                                                                                                   1],
+                                                                                   "overlap_region_type": ["AluSz6"]
                                                                                    }]}],
                                                      self.hap1, self.hap2, self.bed),
                                           TestObject(
@@ -458,28 +457,25 @@ class TestSVSimulator(unittest.TestCase):
                                               [self.par,
                                                {"reference": self.ref_file,
                                                 "overlap_regions": [self.test_overlap_bed_2],
-                                                "variant_sets": [{"type": "delINVdel", "number": 1,
+                                                "variant_sets": [{"type": "(A)BC->b", "number": 1,
                                                                   "length_ranges": [[None, None], [3, 3], [3, 3]],
                                                                   "overlap_mode": "exact",
-                                                                  "overlap_region_length_range": [3, 3],
-                                                                  "source": "(A)BC"}]}],
+                                                                  "overlap_region_length_range": [3, 3]}]}],
                                               self.hap1, self.hap2, self.bed),
                                           TestObject(
                                               [self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
                                               [self.par,
                                                {"reference": self.ref_file,
                                                 "overlap_regions": [self.test_overlap_bed_10],
-                                                "variant_sets": [{"type": "delINV", "number": 1,
+                                                "variant_sets": [{"type": "(A)B->b", "number": 1,
                                                                   "length_ranges": [[None, None], [3, 3]],
                                                                   "overlap_mode": "exact",
                                                                   "overlap_region_length_range": [3, 3],
-                                                                  "overlap_region_type": ["ALR"],
-                                                                  "source": "(A)B"},
-                                                                 {"type": "INVdel", "number": 1,
+                                                                  "overlap_region_type": ["ALR"]},
+                                                                 {"type": "(A)B->a", "number": 1,
                                                                   "length_ranges": [[None, None], [2, 2]],
                                                                   "overlap_region_length_range": [2, 2],
-                                                                  "overlap_mode": "exact",
-                                                                  "source": "(A)B"}
+                                                                  "overlap_mode": "exact"}
                                                                  ]}],
                                               self.hap1, self.hap2, self.bed),
                                           TestObject(
@@ -487,68 +483,58 @@ class TestSVSimulator(unittest.TestCase):
                                               [self.par,
                                                {"reference": self.ref_file,
                                                 "overlap_regions": [self.test_overlap_bed_13],
-                                                "variant_sets": [{"type": "delINVdel", "number": 1,
+                                                "variant_sets": [{"type": "(A)BC->b", "number": 1,
                                                                   "length_ranges": [[3, 3], [3, 3], [3, 3]],
-                                                                  "overlap_mode": "partial",
-                                                                  "source": "(A)BC"}]}],
+                                                                  "overlap_mode": "partial"}]}],
                                               self.hap1, self.hap2, self.bed),
                                           TestObject([self.ref_file, {"chr21": "CCTGATCTGATCTGATCTGATCTGATTGAT"}],
                                                      [self.par, {"reference": self.ref_file,
                                                                  "overlap_regions": [self.test_overlap_bed,
                                                                                      self.test_overlap_bed_2],
-                                                                 "variant_sets": [{"type": "dDUP", "number": 1,
-                                                                                   "dispersion_ranges": [[1, 1]],
-                                                                                   "length_ranges": [[2, 2]],
+                                                                 "variant_sets": [{"type": "A_()->A_A", "number": 1,
+                                                                                   "length_ranges": [[2, 2], [1, 1]],
                                                                                    "overlap_region_type": ["L1PA15"],
-                                                                                   "overlap_mode": "contained",
-                                                                                   "source": ["A", "_", "(", ")"]
+                                                                                   "overlap_mode": "contained"
                                                                                    }]}],
                                                      self.hap1, self.hap2, self.bed),
                                           TestObject([self.ref_file, {"chr21": "CCTGATCTGATCTGATCTGATCTGATTGAT"}],
                                                      [self.par, {"reference": self.ref_file,
                                                                  "overlap_regions": [self.test_overlap_bed,
                                                                                      self.test_overlap_bed_2],
-                                                                 "variant_sets": [{"type": "INV_dDUP", "number": 1,
-                                                                                   "length_ranges": [[2, 2]],
-                                                                                   "dispersion_ranges": [[1, 1]],
+                                                                 "variant_sets": [{"type": "A_()->A_a", "number": 1,
+                                                                                   "length_ranges": [[2, 2], [1, 1]],
                                                                                    "overlap_region_type": ["L1PA15"],
-                                                                                   "overlap_mode": "contained",
-                                                                                   "source": ["A", "_", "(", ")"]
+                                                                                   "overlap_mode": "contained"
                                                                                    }]}],
                                                      self.hap1, self.hap2, self.bed),
                                           TestObject([self.ref_file, {"chr21": "CCTGATCTGATCTGATCTGATCTGATTGAT"}],
                                                      [self.par, {"reference": self.ref_file,
                                                                  "overlap_regions": [self.test_overlap_bed,
                                                                                      self.test_overlap_bed_2],
-                                                                 "variant_sets": [{"type": "nrTRA", "number": 1,
-                                                                                   "dispersion_ranges": [[1, 1]],
-                                                                                   "length_ranges": [[2, 2]],
+                                                                 "variant_sets": [{"type": "A(_)->_A", "number": 1,
+                                                                                   "length_ranges": [[2, 2], [1, 1]],
                                                                                    "overlap_region_type": ["L1PA15"],
-                                                                                   "overlap_mode": "contained",
-                                                                                   "source": "A(_)"
+                                                                                   "overlap_mode": "contained"
                                                                                    }]}],
                                                      self.hap1, self.hap2, self.bed),
                                           TestObject([self.ref_file, {"chr21": "CCTGATATGGACCTGATATGGACTGATATGGAC"}],
                                                      [self.par, {"reference": self.ref_file,
-                                                                                  "max_tries": 1000,
+                                                                 "max_tries": 1000,
                                                                  "overlap_regions": [self.test_overlap_bed,
                                                                                      self.test_overlap_bed_2],
-                                                                 "variant_sets": [{"type": "INV_dDUP", "number": 1,
-                                                                                   "dispersion_ranges": [[3, 3]],
-                                                                                   "length_ranges": [[2, 2]],
+                                                                 "variant_sets": [{"type": "A_()->A_a", "number": 1,
+                                                                                   "length_ranges": [[2, 2], [3, 3]],
                                                                                    "overlap_region_type": ["ALR"],
-                                                                                   "overlap_mode": "contained",
-                                                                                   "source": ["A", "_", "(", ")"]},
+                                                                                   "overlap_mode": "contained"},
                                                                                   {"type": "nrTRA", "number": 1,
-                                                                                   "dispersion_ranges": [[1, 1]],
-                                                                                   "length_ranges": [[4, 6]]}
+                                                                                   "length_ranges": [[4, 6], [1, 1]]}
                                                                                   ]}],
                                                      self.hap1, self.hap2, self.bed),
                                           TestObject(
                                               [self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
                                               [self.par,
                                                {"reference": self.ref_file,
-                                                                 "max_tries": 1000,
+                                                "max_tries": 1000,
                                                 "overlap_regions": [self.test_overlap_bed_11],
                                                 "variant_sets": [{"type": "delINVdel", "number": 1,
                                                                   "length_ranges": [[2, 2], [3, 3], [1, 1]],
@@ -562,7 +548,7 @@ class TestSVSimulator(unittest.TestCase):
                                               [self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
                                               [self.par,
                                                {"reference": self.ref_file,
-                                                                 "max_tries": 1000,
+                                                "max_tries": 1000,
                                                 "overlap_regions": [self.test_overlap_bed_11],
                                                 "variant_sets": [{"type": "delINV", "number": 1,
                                                                   "length_ranges": [[3, 3], [3, 3]],
@@ -584,10 +570,10 @@ class TestSVSimulator(unittest.TestCase):
                                               [self.par,
                                                {"reference": self.ref_file,
                                                 "overlap_regions": [self.test_overlap_bed_14],
-                                                "variant_sets": [{"type": "Custom", "number": 1,
-                                                                  "dispersion_ranges": [[1, 1], [1, 1]],
-                                                                  "length_ranges": [[1, 1], [2, 2], [1, 1]],
-                                                                  "overlap_mode": "partial", "source": "A(BC)__", "target": "A_C_B",
+                                                "variant_sets": [{"type": "A(BC)__ -> A_C_B", "number": 1,
+                                                                  "length_ranges": [[1, 1], [2, 2], [1, 1], [1, 1],
+                                                                                    [1, 1]],
+                                                                  "overlap_mode": "partial",
                                                                   "overlap_region_type": ["L1P"]}]}],
                                               self.hap1, self.hap2, self.bed), "GGTCAACTTAG"],
                                           [TestObject(
@@ -595,23 +581,22 @@ class TestSVSimulator(unittest.TestCase):
                                               [self.par,
                                                {"reference": self.ref_file,
                                                 "overlap_regions": [self.test_overlap_bed_14],
-                                                "variant_sets": [{"type": "Custom", "number": 1,
-                                                                  "dispersion_ranges": [[1, 1], [1, 1]],
-                                                                  "length_ranges": [[1, 1], [2, 2], [1, 1]],
-                                                                  "overlap_mode": "contained", "source": "()_ABC_",
-                                                                  "target": "A_C_B",
+                                                "variant_sets": [{"type": "()_ABC_ -> A_C_B", "number": 1,
+                                                                  "length_ranges": [[1, 1], [1, 1], [2, 2], [1, 1],
+                                                                                    [1, 1]],
+                                                                  "overlap_mode": "contained",
                                                                   "overlap_region_type": ["L1P"]}]}],
-                                              self.hap1, self.hap2, self.bed), ["GAGTACCTTAG", "GGCAATCTTAG", "GGACCTTTAAG"]],
+                                              self.hap1, self.hap2, self.bed),
+                                              ["GAGTACCTTAG", "GGCAATCTTAG", "GGACCTTTAAG"]],
                                           [TestObject(
                                               [self.ref_file, {"chr21": "GGACCTATTAG"}],
                                               [self.par,
                                                {"reference": self.ref_file,
                                                 "overlap_regions": [self.test_overlap_bed_14],
-                                                "variant_sets": [{"type": "Custom", "number": 1,
-                                                                  "dispersion_ranges": [[1, 1], [1, 1]],
-                                                                  "length_ranges": [[1, 1], [2, 2], [1, 1]],
-                                                                  "overlap_mode": "contained", "source": "(_)ABC_",
-                                                                  "target": "A_C_B",
+                                                "variant_sets": [{"type": "(_)ABC_ -> A_C_B", "number": 1,
+                                                                  "length_ranges": [[1, 1], [1, 1], [2, 2], [1, 1],
+                                                                                    [1, 1]],
+                                                                  "overlap_mode": "contained",
                                                                   "overlap_region_type": ["L1P"]}]}],
                                               self.hap1, self.hap2, self.bed), ["GAGTACCTTAG", "GGCAATCTTAG"]],
                                           [TestObject(
@@ -619,11 +604,10 @@ class TestSVSimulator(unittest.TestCase):
                                               [self.par,
                                                {"reference": self.ref_file,
                                                 "overlap_regions": [self.test_overlap_bed_14],
-                                                "variant_sets": [{"type": "Custom", "number": 1,
-                                                                  "dispersion_ranges": [[2, 2], [1, 1]],
-                                                                  "length_ranges": [[1, 1], [2, 2], [1, 1]],
-                                                                  "overlap_mode": "partial", "source": "(_)ABC_",
-                                                                  "target": "A_C_B",
+                                                "variant_sets": [{"type": "(_)ABC_ -> A_C_B", "number": 1,
+                                                                  "length_ranges": [[2, 2], [1, 1], [2, 2], [1, 1],
+                                                                                    [1, 1]],
+                                                                  "overlap_mode": "partial",
                                                                   "overlap_region_type": ["L1P"]}]}],
                                               self.hap1, self.hap2, self.bed), ["AGGTACCTTAG", "GGCACTTTAAG"]]
                                           ]
@@ -631,95 +615,77 @@ class TestSVSimulator(unittest.TestCase):
             TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed],
-                                   "variant_sets": [{"type": "dDUP", "number": 1,
-                                                     "dispersion_ranges": [[1, 1]],
-                                                     "length_ranges": [[None, None]],
+                                   "variant_sets": [{"type": "(A)_->A_A", "number": 1,
+                                                     "length_ranges": [[None, None], [1, 1]],
                                                      "overlap_region_length_range": [2, 2],
                                                      "overlap_mode": "exact",
-                                                     "source": ["(", "A", ")", "_"],
                                                      "overlap_region_type": ["L1HS"]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed],
-                                   "variant_sets": [{"type": "INV_dDUP", "number": 1,
-                                                     "dispersion_ranges": [[1, 1]],
-                                                     "length_ranges": [[None, None]],
+                                   "variant_sets": [{"type": "(A)_->A_a", "number": 1,
+                                                     "length_ranges": [[None, None], [1, 1]],
                                                      "overlap_region_length_range": [2, 2],
                                                      "overlap_mode": "exact",
-                                                     "source": ["(", "A", ")", "_"],
                                                      "overlap_region_type": ["L1HS"]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed],
-                                   "variant_sets": [{"type": "nrTRA", "number": 1,
-                                                     "dispersion_ranges": [[1, 1]],
-                                                     "length_ranges": [[None, None]],
+                                   "variant_sets": [{"type": "(A)_->_A", "number": 1,
+                                                     "length_ranges": [[None, None], [1, 1]],
                                                      "overlap_region_length_range": [2, 2],
                                                      "overlap_mode": "exact",
-                                                     "source": ["(", "A", ")", "_"],
                                                      "overlap_region_type": ["L1HS"]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr21": "CTTGATGATTGATTGATGAGATTGATGATA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed_2],
-                                   "variant_sets": [{"type": "dDUP_iDEL", "number": 1,
-                                                     "dispersion_ranges": [[2, 2]],
-                                                     "length_ranges": [[None, None], [2, 2]],
+                                   "variant_sets": [{"type": "(A)_B->A_A", "number": 1,
+                                                     "length_ranges": [[None, None], [2, 2], [2, 2]],
                                                      "overlap_region_length_range": [2, 2],
                                                      "overlap_mode": "exact",
-                                                     "source": ["(", "A", ")", "_", "B"],
                                                      "overlap_region_type": ["L1"]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATTGATTGATGAA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed_2],
-                                   "variant_sets": [{"type": "dDUP_iDEL", "number": 1,
-                                                     "dispersion_ranges": [[2, 2]],
-                                                     "length_ranges": [[2, 2], [None, None]],
+                                   "variant_sets": [{"type": "A_(B)->A_A", "number": 1,
+                                                     "length_ranges": [[2, 2], [2, 2], [None, None]],
                                                      "overlap_mode": "exact",
                                                      "overlap_region_length_range": [2, 2],
-                                                     "source": ["A", "_", "(", "B", ")"],
                                                      "overlap_region_type": ["L1"]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed],
-                                   "variant_sets": [{"type": "dDUP", "number": 1,
-                                                     "dispersion_ranges": [[1, 1]],
-                                                     "length_ranges": [[2, 2]],
+                                   "variant_sets": [{"type": "(A)_->A_A", "number": 1,
+                                                     "length_ranges": [[2, 2], [1, 1]],
                                                      "overlap_mode": "partial",
-                                                     "source": ["(", "A", ")", "_"],
                                                      "overlap_region_type": ["L1HS"]}]}],
                        self.hap1, self.hap2, self.bed),
-            TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],#6
+            TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],  # 6
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed],
-                                   "variant_sets": [{"type": "INV_dDUP", "number": 1,
-                                                     "dispersion_ranges": [[1, 1]],
-                                                     "length_ranges": [[2, 2]],
+                                   "variant_sets": [{"type": "(A)_->A_a", "number": 1,
+                                                     "length_ranges": [[2, 2], [1, 1]],
                                                      "overlap_mode": "partial",
-                                                     "source": ["(", "A", ")", "_"],
                                                      "overlap_region_type": ["L1HS"]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed],
-                                   "variant_sets": [{"type": "nrTRA", "number": 1,
-                                                     "length_ranges": [[2, 2]],
-                                                     "dispersion_ranges": [[1, 1]],
+                                   "variant_sets": [{"type": "(A)_->_A", "number": 1,
+                                                     "length_ranges": [[2, 2], [1, 1]],
                                                      "overlap_mode": "partial",
-                                                     "source": ["(", "A", ")", "_"],
                                                      "overlap_region_type": ["L1HS"]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed],
-                                   "variant_sets": [{"type": "dDUP", "number": 1,
-                                                     "dispersion_ranges": [[1, 1]],
-                                                     "length_ranges": [[2, 2]],
-                                                     "source": "A_()",
+                                   "variant_sets": [{"type": "A_()->A_A", "number": 1,
+                                                     "length_ranges": [[2, 2], [1, 1]],
                                                      "overlap_mode": "contained",
                                                      "overlap_region_type": ["L1HS"]
                                                      }]}],
@@ -727,71 +693,62 @@ class TestSVSimulator(unittest.TestCase):
             TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed],
-                                   "variant_sets": [{"type": "INV_dDUP", "number": 1,
-                                                     "dispersion_ranges": [[1, 1]],
-                                                     "length_ranges": [[2, 2]],
-                                                     "overlap_mode": "contained",
-                                                     "source": ["A", "_", "(", ")"],
-                                                     "overlap_region_type": ["L1HS"]}]}],
-                       self.hap1, self.hap2, self.bed),
-            TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
-                       [self.par, {"reference": self.ref_file,
-                                   "overlap_regions": [self.test_overlap_bed],
-                                   "variant_sets": [{"type": "nrTRA", "number": 1,
-                                                     "dispersion_ranges": [[1, 1]],
-                                                     "length_ranges": [[2, 2]],
-                                                     "source": ["(", "A", ")", "_"],
+                                   "variant_sets": [{"type": "A_()->A_a", "number": 1,
+                                                     "length_ranges": [[2, 2], [1, 1]],
                                                      "overlap_mode": "contained",
                                                      "overlap_region_type": ["L1HS"]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed],
-                                   "variant_sets": [{"type": "delINVdel", "number": 1,
+                                   "variant_sets": [{"type": "(A)_->_A", "number": 1,
+                                                     "length_ranges": [[2, 2], [1, 1]],
+                                                     "overlap_mode": "contained",
+                                                     "overlap_region_type": ["L1HS"]}]}],
+                       self.hap1, self.hap2, self.bed),
+            TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
+                       [self.par, {"reference": self.ref_file,
+                                   "overlap_regions": [self.test_overlap_bed],
+                                   "variant_sets": [{"type": "A(B)C->b", "number": 1,
                                                      "length_ranges": [[2, 2], [None, None], [2, 2]],
                                                      "overlap_region_length_range": [4, 6],
                                                      "overlap_mode": "exact",
-                                                     "source": ["A", "(", "B", ")", "C"],
                                                      "overlap_region_type": ["L1HS"]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed],
-                                   "variant_sets": [{"type": "delINVdel", "number": 1,
+                                   "variant_sets": [{"type": "(A)BC->b", "number": 1,
                                                      "length_ranges": [[None, None], [2, 2], [2, 2]],
                                                      "overlap_mode": "exact",
                                                      "overlap_region_length_range": [4, 6],
-                                                     "source": ["(", "A", ")", "B", "C"],
                                                      "overlap_region_type": ["L1HS"]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed],
-                                   "variant_sets": [{"type": "delINVdel", "number": 1,
+                                   "variant_sets": [{"type": "AB(C)->b", "number": 1,
                                                      "length_ranges": [[2, 2], [2, 2], [None, None]],
                                                      "overlap_mode": "exact",
                                                      "overlap_region_length_range": [4, 6],
-                                                     "source": ["A", "B", "(", "C", ")"],
                                                      "overlap_region_type": ["L1HS"]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed],
-                                   "variant_sets": [{"type": "delINV", "number": 1,
+                                   "variant_sets": [{"type": "(A)B->b", "number": 1,
                                                      "length_ranges": [[None, None], [2, 2]],
                                                      "overlap_mode": "exact",
                                                      "overlap_region_length_range": [4, 6],
-                                                     "source": ["(", "A", ")", "B"],
                                                      "overlap_region_type": ["L1HS"]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed],
-                                   "variant_sets": [{"type": "INVdel", "number": 1,
+                                   "variant_sets": [{"type": "A(B)->a", "number": 1,
                                                      "length_ranges": [[2, 2], [None, None]],
                                                      "overlap_mode": "exact",
                                                      "overlap_region_length_range": [4, 6],
-                                                     "source": ["A", "(", "B", ")"],
                                                      "overlap_region_type": ["L1HS"]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {
@@ -799,25 +756,23 @@ class TestSVSimulator(unittest.TestCase):
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": [self.test_overlap_bed],
                                    "variant_sets": [
-                                       {"type": "Custom", "source": ["A", "(", "B", ")", "_", "C", "_", "D"],
-                                        "target": ["b", "b", "_", "A", "E", "c", "_", "E", "D", "C"], "number": 1,
-                                        "dispersion_ranges": [[10, 15], [15, 20]],
-                                        "length_ranges": [[2, 3], [None, None], [7, 10], [8, 10], [10, 15]],
+                                       {"type": "A(B)_C_D -> bb_AEc_EDC", "number": 1,
+                                        "length_ranges": [[2, 3], [None, None], [10, 15], [7, 10], [15, 20], [8, 10],
+                                                          [10, 15]],
                                         "overlap_mode": "exact",
                                         "overlap_region_length_range": [4, 10],
                                         "overlap_region_type": ["L1HS"]},
                                    ]}],
                        self.hap1, self.hap2, self.bed),
 
-        TestObject([self.ref_file, {
-            "chr21": 'ACCTTGA'}],
-                   [self.par, {"reference": self.ref_file,
-                               "variant_sets": [
-                                   {"type": "Custom", "source": "ABC",
-                                    "target": "ACACaBC", "number": 1,
-                                    "length_ranges": [[2, 2], [3, 3], [2, 2]]},
-                               ]}],
-                   self.hap1, self.hap2, self.bed)
+            TestObject([self.ref_file, {
+                "chr21": 'ACCTTGA'}],
+                       [self.par, {"reference": self.ref_file,
+                                   "variant_sets": [
+                                       {"type": "ABC -> ACACaBC", "number": 1,
+                                        "length_ranges": [[2, 2], [3, 3], [2, 2]]},
+                                   ]}],
+                       self.hap1, self.hap2, self.bed)
         ]
 
         self.test_objects_frag_level_overlap_unbounded_disps = [
@@ -825,8 +780,7 @@ class TestSVSimulator(unittest.TestCase):
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": self.test_overlap_bed,
                                    "variant_sets": [{"type": "dDUP", "number": 1,
-                                                     "length_ranges": [[2, 2]],
-                                                     "dispersion_ranges": [[1, None]],
+                                                     "length_ranges": [[2, 2], [1, None]],
                                                      "overlap_mode": "exact",
                                                      # want exact overlap with source, and target landing in the other
                                                      "overlap_region_type": ["L1HS", "L1HS"]}]}],
@@ -834,10 +788,8 @@ class TestSVSimulator(unittest.TestCase):
             TestObject([self.ref_file, {"chr21": "CTTGATGATGATTGATGATA"}],
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": self.test_overlap_bed_2,
-                                   "variant_sets": [{"type": "dDUP", "number": 1,
-                                                     "length_ranges": [[None, None]],
-                                                     "source": "(A)_",
-                                                     "dispersion_ranges": [[1, None]],
+                                   "variant_sets": [{"type": "(A)_ -> _A", "number": 1,
+                                                     "length_ranges": [[None, None], [1, None]],
                                                      "overlap_mode": "exact",
                                                      # want exact overlap with source, and target landing in the other
                                                      "overlap_region_type": ["L1", "Alu"]}]}],
@@ -846,13 +798,12 @@ class TestSVSimulator(unittest.TestCase):
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": self.test_overlap_bed_2,
                                    "variant_sets": [{"type": "dDUP", "number": 1,
-                                                     "length_ranges": [[1, 5]],
-                                                     "dispersion_ranges": [[1, None]],
+                                                     "length_ranges": [[1, 5], [1, None]],
                                                      "overlap_mode": "exact",
                                                      # want exact overlap with source, and target landing in the other
                                                      "overlap_region_type": ["Alu", "L1"]}]}],
                        self.hap1, self.hap2, self.bed),
-            ]
+        ]
         self.test_objects_alu_mediated = [
             TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
                        [self.par, {"reference": self.ref_file,
@@ -885,7 +836,7 @@ class TestSVSimulator(unittest.TestCase):
                                                      "overlap_mode": "flanked",
                                                      "overlap_region_type": "Alu"}]}],
                        self.hap1, self.hap2, self.bed)
-            ]
+        ]
         self.test_objects_known_elt_mix = [
             TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA"}],
                        [self.par, {"reference": self.ref_file,
@@ -953,12 +904,11 @@ class TestSVSimulator(unittest.TestCase):
                                                      "overlap_mode": "flanked",
                                                      "overlap_region_type": "Alu"},
                                                     {"type": "dDUP", "number": 1,
-                                                     "dispersion_ranges": [[1, 1]],
-                                                     "length_ranges": [[2, 2]],
+                                                     "length_ranges": [[2, 2], [1, 1]],
                                                      "overlap_region_type": "L1PA15",
                                                      "overlap_component": "target"}]}],
                        self.hap1, self.hap2, self.bed)
-            ]
+        ]
         self.test_objects_partial_overlap = [TestObject([self.ref_file, {"chr21": "CTCCGTAGTA"}],
                                                         [self.par, {"reference": self.ref_file,
                                                                     "overlap_regions": [self.test_overlap_bed_12],
@@ -976,7 +926,8 @@ class TestSVSimulator(unittest.TestCase):
                                                                                       "overlap_mode": "partial"},
                                                                                      {"type": "DEL", "number": 1,
                                                                                       "length_ranges": [[None, None]],
-                                                                                      "overlap_region_length_range": [2, 6],
+                                                                                      "overlap_region_length_range": [2,
+                                                                                                                      6],
                                                                                       "overlap_region_type": 'L1HS',
                                                                                       "overlap_mode": "exact"}
                                                                                      ]}],
@@ -1011,23 +962,23 @@ class TestSVSimulator(unittest.TestCase):
             TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA",
                                         "chr20": "CTCCGT"}],
                        [self.par, {"reference": self.ref_file,
-                                                    "filter_small_chr": 10,
+                                   "filter_small_chr": 10,
                                    "variant_sets": [{"type": "DEL", "number": 1,
                                                      "length_ranges": [[3, 3]]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA",
                                         "chr20": "CTCCGT"}],
                        [self.par, {"reference": self.ref_file,
-                                                    "filter_small_chr": 50,
+                                   "filter_small_chr": 50,
                                    "variant_sets": [{"type": "DEL", "number": 1,
                                                      "length_ranges": [[3, 3]]}]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr1": "CTCCGT", "chr2": "CTCCGT", "chr3": "CTCCGT", "chrM": "C"}],
                        [self.par, {"reference": self.ref_file,
-                                                    "filter_small_chr": 4,
+                                   "filter_small_chr": 4,
                                    "variant_sets": [{"type": "DEL", "number": 1,
                                                      "length_ranges": [[3, 3]]}]}],
-                        self.hap1, self.hap2, self.bed)]
+                       self.hap1, self.hap2, self.bed)]
 
         self.test_objects_req_space = [TestObject([self.ref_file, {"chr21": "CTCCGT"}],
                                                   [self.par, {"reference": self.ref_file,
@@ -1095,25 +1046,23 @@ class TestSVSimulator(unittest.TestCase):
                        [self.par, {"reference": self.ref_file,
                                    "variant_sets": [
                                        {"type": "nrTRA", "number": 1,
-                                        "length_ranges": [[2, 2]],"dispersion_ranges": [[1, None]]},
-                                       {"type": "dDUP", "number": 1, "dispersion_ranges": [[1, None]],
-                                        "length_ranges": [[2, 2]]},
-                                       {"type": "INV_dDUP", "number": 1, "dispersion_ranges": [[1, None]],
-                                        "length_ranges": [[2, 2]]},
-                                       {"type": "dDUP_iDEL", "number": 1, "dispersion_ranges": [[1, None]],
-                                        "length_ranges": [[2, 2], [2, 2]]},
-                                       {"type": "INS_iDEL", "number": 1, "dispersion_ranges": [[1, None]],
-                                        "length_ranges": [[2, 2], [2, 2]]}
+                                        "length_ranges": [[2, 2], [1, None]]},
+                                       {"type": "dDUP", "number": 1,
+                                        "length_ranges": [[2, 2], [1, None]]},
+                                       {"type": "INV_dDUP", "number": 1,
+                                        "length_ranges": [[2, 2], [1, None]]},
+                                       {"type": "dDUP_iDEL", "number": 1,
+                                        "length_ranges": [[2, 2], [2, 2], [1, None]]},
+                                       {"type": "INS_iDEL", "number": 1,
+                                        "length_ranges": [[2, 2], [2, 2], [1, None]]}
                                    ]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {
                 "chr21": utils.generate_seq(1000)}],
                        [self.par, {"reference": self.ref_file,
                                    "variant_sets": [
-                                       {"type": "Custom", "source": ["A", "_", "B", "_", "C"],
-                                        "target": ["a", "_", "b", "b", "_", "C"], "number": 2,
-                                        "dispersion_ranges": [[2, None], [2, None]],
-                                        "length_ranges": [[2, 2], [2, 2], [2, 2]]},
+                                       {"type": "A_B_C -> a_bb_C", "number": 2,
+                                        "length_ranges": [[2, 2], [2, None], [2, 2], [2, None], [2, 2]]},
                                    ]}],
                        self.hap1, self.hap2, self.bed),
         ]
@@ -1122,7 +1071,7 @@ class TestSVSimulator(unittest.TestCase):
             TestObject([self.ref_file, {"chr21": "AGACT"}],
                        [self.par, {"reference": self.ref_file,
                                    "variant_sets": [
-                                       {"type": "Custom", "source": ["A"], "target": ["a", "B"],
+                                       {"type": "A -> aB",
                                         "number": 1, "length_ranges": [[5, 5], [5, 5]]}
                                    ]}],
                        self.hap1, self.hap2, self.bed),
@@ -1133,7 +1082,7 @@ class TestSVSimulator(unittest.TestCase):
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": self.test_overlap_bed,
                                    "variant_sets": [
-                                       {"type": "Custom", "source": ["A", "B"], "target": ["A", "A"], "number": 1,
+                                       {"type": "AB->AA", "number": 1,
                                         "length_ranges": [[5, 5], [5, 5]],
                                         "overlap_mode": "exact",
                                         "overlap_region_type": [None, "L1HS"]}
@@ -1143,7 +1092,7 @@ class TestSVSimulator(unittest.TestCase):
                        [self.par, {"reference": self.ref_file,
                                    "overlap_regions": self.test_overlap_bed,
                                    "variant_sets": [
-                                       {"type": "Custom", "source": ["A", "B"], "target": ["A", "A"], "number": 1,
+                                       {"type": "AB->AA", "number": 1,
                                         "length_ranges": [[6, 6], [5, 5]],
                                         "overlap_mode": "exact",
                                         "overlap_region_type": [None, "L1HS"]}
@@ -1177,7 +1126,7 @@ class TestSVSimulator(unittest.TestCase):
                          "variant_sets": [
                              {"type": "DUP", "number": 2, "length_ranges": [(5, 5)]}]}],
                        self.hap1, self.hap2, self.bed)
-            ]
+        ]
 
         self.test_objects_roi_placement_failure = [
             TestObject([self.ref_file, {"chr21": "CTCCGTCGTA"}],
@@ -1292,86 +1241,88 @@ class TestSVSimulator(unittest.TestCase):
              TestObject([self.ref_file, {"chr21": "TCGAGG"}],
                         [self.par, {"reference": self.ref_file,
                                     "random_seed": 2,
-                                    "variant_sets": [{"type": "Custom", "source": "ABC", "target": "aBBBc",
+                                    "variant_sets": [{"type": "ABC->aBBBc",
                                                       "number": 1,
                                                       "length_ranges": [[2, 2], [2, 2], [2, 2]]}]}],
-                                    self.hap1, self.hap2, self.bed),
+                        self.hap1, self.hap2, self.bed),
              ["GAGAGAGACC"]],
             [["TCGAGGTCAG", 'TCGAGGTCA'],
              TestObject([self.ref_file, {"chr21": "TCGAGGTCAG", 'chr20': 'TCGAGGTCA'}],
                         [self.par, {"reference": self.ref_file,
                                     "random_seed": 2, 'filter_small_chr': 10,
                                     "overlap_regions": [self.test_overlap_bed_15],
-                                    "variant_sets": [{"type": "Custom", "source": "A(BC)D", "target": "ADc",
+                                    "variant_sets": [{"type": "A(BC)D->ADc",
                                                       "number": 1,
                                                       "length_ranges": [[2, 2], [None, None], [None, None], [2, 2]],
                                                       "overlap_region_length_range": [2, 4],
                                                       "overlap_mode": "exact"}]}], self.hap1, self.hap2, self.bed),
              [("TCTCCCTAG", 'TCGAGGTCA'), ("TCTCCCAG", 'TCGAGGTCA'), ("TCTCCAG", 'TCGAGGTCA')]],
             ["TCGAGGTCAG",
-            TestObject([self.ref_file, {"chr21": "TCGAGGTCAG"}],
-                       [self.par, {"reference": self.ref_file,
-                                   "random_seed":2,
-                                   "overlap_regions": [self.test_overlap_bed_15],
-                                   "variant_sets": [{"type": "Custom", "source": "A(BC)D", "target": "ADc",
-                                                     "number": 1,
-                                                     "length_ranges": [[2, 2], [None, None], [None, None], [2, 2]],
-                                                     "overlap_region_length_range": [2, 4],
-                                                     "overlap_mode": "exact"}]}],self.hap1, self.hap2, self.bed), ["TCTCCCTAG", "TCTCCCAG", "TCTCCAG"]],
-            ["TCT", {"type": "Custom", "source": "AB", "target": "A+B+", "n_copies": [3, 5],
-                    "length_ranges": [[2, 2], [1, 1]]}, ["TCTCTCTTTTT"]],
-            ["TCTAGTCCTGGTAAT", {"type": "Custom", "source": "_AB_C_", "target": "c_AB_AC_B", "dispersion_ranges": [[2 ,2], [1, 1], [3, None]],
-                     "length_ranges": [[2, 2], [1, 1], [3, 3]]}, ["AGGTCTAGTTACCTGGTGAAT", "AGGTCTAGTTACCTGGTAGAT", "AGGTCTAGTTACCTGGTAAGT", "AGGTCTAGTTACCTGGTAATG",
-                                                                  "TCAGCTAGTCAGCTGGTATAT", "TCAGCTAGTCAGCTGGTAATT",
-                                                                  "TCCCATAGTCCGTTGGTAACT", "TCCCATAGTCCGTTGGTAATC",
-                                                                  "TCTACCAGTCCTTCGGTAATC"]],
-            ["TC", {"type": "Custom", "source": "A", "target": "A+", "n_copies": [3],
-                      "length_ranges": [[2, 2]]}, ["TCTCTC"]],
+             TestObject([self.ref_file, {"chr21": "TCGAGGTCAG"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    "overlap_regions": [self.test_overlap_bed_15],
+                                    "variant_sets": [{"type": "A(BC)D->ADc",
+                                                      "number": 1,
+                                                      "length_ranges": [[2, 2], [None, None], [None, None], [2, 2]],
+                                                      "overlap_region_length_range": [2, 4],
+                                                      "overlap_mode": "exact"}]}], self.hap1, self.hap2, self.bed),
+             ["TCTCCCTAG", "TCTCCCAG", "TCTCCAG"]],
+            ["TCT", {"type": "AB->A+B+", "n_copies": [3, 5],
+                     "length_ranges": [[2, 2], [1, 1]]}, ["TCTCTCTTTTT"]],
+            ["TCTAGTCCTGGTAAT", {"type": "_AB_C_->c_AB_AC_B",
+                                 "length_ranges": [[2, 2], [2, 2], [1, 1], [1, 1], [3, 3], [3, None]]},
+             ["AGGTCTAGTTACCTGGTGAAT", "AGGTCTAGTTACCTGGTAGAT", "AGGTCTAGTTACCTGGTAAGT", "AGGTCTAGTTACCTGGTAATG",
+              "TCAGCTAGTCAGCTGGTATAT", "TCAGCTAGTCAGCTGGTAATT",
+              "TCCCATAGTCCGTTGGTAACT", "TCCCATAGTCCGTTGGTAATC",
+              "TCTACCAGTCCTTCGGTAATC"]],
+            ["TC", {"type": "A->A+", "n_copies": [3],
+                    "length_ranges": [[2, 2]]}, ["TCTCTC"]],
             ["TC", {"type": "DIVERGENCE", "divergence_prob": [0.6],
                     "length_ranges": [[2, 2]]}, [i + j for i in ['A', 'T', 'C', 'G'] for j in ['A', 'T', 'C', 'G']]],
-            ["TC", {"type": "Custom", "source": "A", "target": "A+", "n_copies": [[2, 3]],
+            ["TC", {"type": "A->A+", "n_copies": [[2, 3]],
                     "length_ranges": [[2, 2]]}, ["TCTCTC", "TCTC"]],
-            ["TCGA", {"type": "Custom", "source": "AB", "target": "ABA+", "n_copies": [3],
-                    "length_ranges": [[2, 2], [2, 2]]}, ["TCGATCTCTC"]],
-            ["TCGA", {"type": "Custom", "source": "AB", "target": "A+BA", "n_copies": [3],
+            ["TCGA", {"type": "AB->ABA+", "n_copies": [3],
+                      "length_ranges": [[2, 2], [2, 2]]}, ["TCGATCTCTC"]],
+            ["TCGA", {"type": "AB->A+BA", "n_copies": [3],
                       "length_ranges": [[2, 2], [2, 2]]}, ["TCTCTCGATC"]],
-            ["TCGA", {"type": "Custom", "source": "AB", "target": "A+BAB+", "n_copies": [3, [1,2]],
+            ["TCGA", {"type": "AB->A+BAB+", "n_copies": [3, [1, 2]],
                       "length_ranges": [[2, 2], [2, 2]]}, ["TCTCTCGATCGA", "TCTCTCGATCGAGA"]],
             ["TC", {"type": "INS", "length_ranges": [[1, 1]]}, ["TTC", "TCC", "TGC", "TAC", 'ATC']],
-            ["TC", {"type": "Custom", "source": "A", "target": "b", 'novel_insertions': "test/inputs/novel_insertions.bed",
+            ["TC", {"type": "A->b", 'novel_insertions': "test/inputs/novel_insertions.bed",
                     "length_ranges": [[2, 2], [None, None]]}, ["CTC"]],
-            ["TC", {"type": "Custom", "source": "A", "target": "Bb", 'novel_insertions': "test/inputs/novel_insertions.bed",
+            ["TC", {"type": "A->Bb", 'novel_insertions': "test/inputs/novel_insertions.bed",
                     "length_ranges": [[2, 2], [None, None]]}, ["GAGCTC"]],
-            ["TC", {"type": "Custom", "source": "A", "target": "BAb", 'novel_insertions': "test/inputs/novel_insertions.bed",
+            ["TC", {"type": "A->BAb", 'novel_insertions': "test/inputs/novel_insertions.bed",
                     "length_ranges": [[2, 2], [3, 3]]}, ["GAGTCCTC"]],
-            ["TCGA", {"type": "Custom", "source": "A_", "target": "B_b", 'novel_insertions': "test/inputs/novel_insertions.bed",
-                    "length_ranges": [[2, 2], [3, 3]], "dispersion_ranges": [[2, 2]]}, ["GAGGACTC"]],
+            ["TCGA", {"type": "A_->B_b", 'novel_insertions': "test/inputs/novel_insertions.bed",
+                      "length_ranges": [[2, 2], [2, 2], [3, 3]]}, ["GAGGACTC"]],
             ["TCGA", {"type": "DEL", "length_ranges": [[2, 2]]}, ["TC", "TA", "GA"]],
             [["TCGA", "CTG"], {"type": "DEL", "length_ranges": [[2, 2]]},
              [("TC", "CTG"), ("TA", "CTG"), ("GA", "CTG"), ("TCGA", "C"), ("TCGA", "G")]],
             ["TCGA", {"type": "DEL", "length_ranges": [[3, 3]]}, ["T", "A"]],
 
-            ["TC",   {"type": "SNP", "length_ranges": [[1, 1]]}, ["TT", "TG", "TA", "AC", "GC", "CC"]],
-            ["T",    {"type": "SNP", "length_ranges": [[1, 1]]}, ["C", "G", "A"]],
+            ["TC", {"type": "SNP", "length_ranges": [[1, 1]]}, ["TT", "TG", "TA", "AC", "GC", "CC"]],
+            ["T", {"type": "SNP", "length_ranges": [[1, 1]]}, ["C", "G", "A"]],
 
             ["TCGA", {"type": "INV", "length_ranges": [[3, 4]]}, ["TCGA", "TTCG", "CGAA"]],
 
             ["TCGA", {"type": "DUP", "length_ranges": [[3, 4]]}, ["TCGTCGA", "TCGACGA", "TCGATCGA"]],
 
-            ["TCGA", {"type": "nrTRA",  "dispersion_ranges": [[1, None]], "length_ranges": [[2, 2]]},
+            ["TCGA", {"type": "nrTRA", "length_ranges": [[2, 2], [1, None]]},
              ["CGTA", "TACG", "GATC", "GTCA", 'TGAC']],
 
-            ["TCGA", {"type": "rTRA", "dispersion_ranges": [[None, None]], "length_ranges": [[2, 2], [2, 2]]},
+            ["TCGA", {"type": "rTRA", "length_ranges": [[2, 2], [2, 2], [None, None]]},
              ["GATC"]],
-            ["TCGA", {"type": "rTRA", "dispersion_ranges": [[None, None]], "length_ranges": [[2, 2], [1, 1]]},
+            ["TCGA", {"type": "rTRA", "length_ranges": [[2, 2], [1, 1], [None, None]]},
              ["AGTC", "CGTA", "TACG", "GACT", "TGAC"]],
-            ["TCGA", {"type": "rTRA", "dispersion_ranges": [[None, None]], "length_ranges": [[2, 2], ["A", "A"]]},
+            ["TCGA", {"type": "rTRA", "length_ranges": [[2, 2], ["A", "A"], [None, None]]},
              ["GATC"]],
-            ["TCGA", {"type": "rTRA", "dispersion_ranges": [[None, None]], "length_ranges": [["B", "B"], [2, 2]]},
+            ["TCGA", {"type": "rTRA", "length_ranges": [["B", "B"], [2, 2], [None, None]]},
              ["GATC"]],
-            ["TCGA", {"type": "rTRA", "dispersion_ranges": [[None, None]], "length_ranges": [[3, 3], ["A-2", "A-2"]]},
+            ["TCGA", {"type": "rTRA", "length_ranges": [[3, 3], ["A-2", "A-2"], [None, None]]},
              ["ATCG", "CGAT"]],
-            ["TCGA", {"type": "rTRA", "dispersion_ranges": [[2, None]], "length_ranges": [[1, 1], [1, 1]]},
+            ["TCGA", {"type": "rTRA", "length_ranges": [[1, 1], [1, 1], [2, None]]},
              ["ACGT"]],
 
             ["TCGA", {"type": "dupINVdup", "length_ranges": [[1, 1], [2, 2], [1, 1]]},
@@ -1397,7 +1348,7 @@ class TestSVSimulator(unittest.TestCase):
             ["TCGA", {"type": "INVdel", "length_ranges": [[2, 2], [2, 2]]},
              ["GA"]],
 
-            ["TCGA", {"type": "INS_iDEL", "dispersion_ranges": [[1, None]], "length_ranges": [[2, 2], [1, 1]]},
+            ["TCGA", {"type": "INS_iDEL", "length_ranges": [[2, 2], [1, 1], [1, None]]},
              ["GTC", "GAC"]],
 
             ["TCGA", {"type": "DUP_INV", "length_ranges": [[2, 2]]}, ["GAGAGA", "TCTCTC", "TCGCGA"]],
@@ -1408,68 +1359,66 @@ class TestSVSimulator(unittest.TestCase):
 
             ["TCGA", {"type": "INVdup", "length_ranges": [[2, 2], [2, 2]]}, ["TCGAGA"]],
 
-            [["TCGA", "CAT"], {"type": "dDUP", "dispersion_ranges": [[1, None]], "length_ranges": [[3, 3]]},
+            [["TCGA", "CAT"], {"type": "dDUP", "length_ranges": [[3, 3], [1, None]]},
              [("TCGATCG", "CAT"), ("CGATCGA", "CAT")]],
-            [["TCGA", "CAT"], {"type": "dDUP", "dispersion_ranges": [[None, None]], "length_ranges": [[3, 3]],
-                                "interchromosomal": True},
-             [("TCGA"[:i] + "CAT" + "TCGA"[i:], "CAT") for i in range(0, len("TCGA")+1)] +
-             [("TCGA", "CAT"[:j] + s + "CAT"[j:]) for j in range(0, len("CAT")+1) for s in ("TCG", "CGA")]],
+            [["TCGA", "CAT"], {"type": "dDUP", "length_ranges": [[3, 3], [None, None]],
+                               "interchromosomal": True},
+             [("TCGA"[:i] + "CAT" + "TCGA"[i:], "CAT") for i in range(0, len("TCGA") + 1)] +
+             [("TCGA", "CAT"[:j] + s + "CAT"[j:]) for j in range(0, len("CAT") + 1) for s in ("TCG", "CGA")]],
 
-            [["TCGA", "CAT"], {"type": "INV_dDUP", "dispersion_ranges": [[1, None]], "length_ranges": [[3, 3]]},
+            [["TCGA", "CAT"], {"type": "INV_dDUP", "length_ranges": [[3, 3], [1, None]]},
              [('TCGACGA', 'CAT'), ('TCGTCGA', 'CAT')]],
 
-            [["TCGA", "CAT"], {"type": "INV_dDUP", "dispersion_ranges": [[None, None]], "length_ranges": [[3, 3]]},
+            [["TCGA", "CAT"], {"type": "INV_dDUP", "length_ranges": [[3, 3], [None, None]]},
              [('TCGATCG', 'CAT'), ('TCGTCGA', 'CAT')]],
 
-            ["TCGA", {"type": "INV_nrTRA", "length_ranges": [[3, 3]], 'dispersion_ranges': [[1, 1]]}, ["ACGA", "TCGT"]],
+            ["TCGA", {"type": "INV_nrTRA", "length_ranges": [[3, 3], [1, 1]]}, ["ACGA", "TCGT"]],
 
-            [["GGTT", "CA"], {"type": "INV_rTRA", "dispersion_ranges": [[None, None]], "length_ranges": [[3, 3], [1, 1]], "interchromosomal": True},
+            [["GGTT", "CA"],
+             {"type": "INV_rTRA", "length_ranges": [[3, 3], [1, 1], [None, None]], "interchromosomal": True},
              [('GT', 'ACCA'), ('GT', 'CAAC'), ('GG', 'AACA'), ('TT', 'CACC')]],
 
-            ["T", {"type": "Custom", "source": "A", "target": "AA*", "length_ranges": [[1, 1]],
+            ["T", {"type": "A->AA*", "length_ranges": [[1, 1]],
                    "divergence_prob": [1.0]},
              ["TC", "TG", "TA"]],
 
-            [["GGCCTT", "CA"], [{"type": "Custom", "source": "ABC", "target": "AC",
-                               "length_ranges": [[2,2],[2,2],[2,2]]},],
+            [["GGCCTT", "CA"], [{"type": "ABC->AC",
+                                 "length_ranges": [[2, 2], [2, 2], [2, 2]]}, ],
              [("GGTT", "CA")]],
 
-            [["GGTT", "CA"], {"type": "rTRA", "interchromosomal": True, "dispersion_ranges": [[None, None]],
-                              "length_ranges": [[1, 4], [1, 2]]},
+            [["GGTT", "CA"], {"type": "rTRA", "interchromosomal": True,
+                              "length_ranges": [[1, 4], [1, 2], [None, None]]},
              [("CGTT", "GA"), ("CTT", "GGA"), ("GGTA", "CT"), ("GGCA", "TT"), ('CA', 'GGTT'), ('CAT', 'GGT')]],
 
-            #[["GGTT", "CA"], {"type": "nrTRA", "interchromosomal": True, "dispersion_ranges": [[None, None]],
+            # [["GGTT", "CA"], {"type": "nrTRA", "interchromosomal": True, "dispersion_ranges": [[None, None]],
             #                  "length_ranges": [[1, 4]]},
             # [("CGGTT", "A"), ("GCGTT", "A"), ("GGCTT", "A"), ("GGTCT", "A"), ("GGTTC", "A"), ("GTT", "GCA"),
             #  ("TT", "CGGA"), ("TT", "CAGG"), ("TT", "CAGG"),
             #  ("GGTAT", "C"), ("GGCATT", ""), ('CAGGTT', ''), ('', 'CAGGTT')
             #  ]],
 
-            [["GGCCTTG", "CA"], [{"type": "Custom", "source": "A_B_C", "target": "A__C",
-                               "length_ranges": [[1,1],[2,2],[1,1]],
-                                  "dispersion_ranges": [[1,1],[1,1]]},
-                                {"type": "rTRA", "interchromosomal": True, "dispersion_ranges": [[None, None]],
-                                 "length_ranges": [[1,1],[2,2]]}],
-             [('GCATTG', 'G'), ('CAGCTG', 'G'), ('GGCATG', 'T')]],
+            [["GGCCTTG", "CA"], [{"type": "A_B_C->A__C",
+                                  "length_ranges": [[1, 1], [1, 1], [1, 1], [2, 2], [1, 1]]},
+                                 {"type": "rTRA", "interchromosomal": True,
+                                  "length_ranges": [[1, 1], [2, 2], [None, None]]}],
+             [('GGCAG', 'CTT'), ('GGCCG', 'TTA'), ('CAGCTTG', 'G'), ('GGCTG', 'CTA'), ('GGCCATG', 'T'),
+              ('GGCTTCA', 'G'),
+              ('GGCTCAG', 'T'), ('GCACTTG', 'G'), ('GGCATTG', 'C'), ('GGATG', 'CCT')]],
 
-            ["TCGA", {"type": "Custom", "source": "ABCD", "target": "cbda", "length_ranges": [[1,1],[1,1],[1,1],[1,1]]},
+            ["TCGA", {"type": "ABCD->cbda", "length_ranges": [[1, 1], [1, 1], [1, 1], [1, 1]]},
              ["CGTA"]],
 
-            ["GGACCT", {"type": "Custom", "source": "ABC__", "target": "A_B_C",
-                        "dispersion_ranges": [[1, 1], [1, 1]],
-                                  "length_ranges": [[1, 1], [2, 2], [1, 1]]},
+            ["GGACCT", {"type": "ABC__->A_B_C",
+                        "length_ranges": [[1, 1], [2, 2], [1, 1], [1, 1], [1, 1]]},
              ['GCGATC']],
-            ["GGACCT", {"type": "Custom", "source": "__ABC", "target": "A_B_C",
-                        "dispersion_ranges": [[1, 1], [1, 1]],
-                        "length_ranges": [[1, 1], [2, 2], [1, 1]]},
+            ["GGACCT", {"type": "__ABC->A_B_C",
+                        "length_ranges": [[1, 1], [1, 1], [1, 1], [2, 2], [1, 1]]},
              ['AGCCGT']],
-            ["GGACCT", {"type": "Custom", "source": "__ABC", "target": "A_B_C",
-                        "dispersion_ranges": [[1, 1], [1, 1]],
-                        "length_ranges": [[1, 1], [2, 2], [1, 1]]},
+            ["GGACCT", {"type": "__ABC->A_B_C",
+                        "length_ranges": [[1, 1], [1, 1], [1, 1], [2, 2], [1, 1]]},
              ['AGCCGT']],
-            ["GGACCT", {"type": "Custom", "source": "_ABC_", "target": "A_B_C",
-                        "dispersion_ranges": [[1, 1], [1, 1]],
-                        "length_ranges": [[1, 1], [2, 2], [1, 1]]},
+            ["GGACCT", {"type": "_ABC_->A_B_C",
+                        "length_ranges": [[1, 1], [1, 1], [2, 2], [1, 1], [1, 1]]},
              ['GGACTC']],
         ]
 
@@ -1478,7 +1427,6 @@ class TestSVSimulator(unittest.TestCase):
             shutil.rmtree(self.test_dir)
         except Exception as exc:
             print(f'Error removing test dir {self.test_dir}: {exc}')
-
 
     # helper method for tests where the output will be in a known list of possibilities
     def helper_test_known_output_svs(self, config_event_obj, target_frags=None):
@@ -1501,7 +1449,8 @@ class TestSVSimulator(unittest.TestCase):
                     print('roi overlap', curr_sim.rois_overlap.chrom2itree,
                           'TRA')'''
                 if not changed_frag_1 in target_frags:
-                    print('The case', changed_frag_1, 'is not covered in the test case, check manually if it is correct given',
+                    print('The case', changed_frag_1,
+                          'is not covered in the test case, check manually if it is correct given',
                           config.par_content, 'targets', target_frags)
             else:
                 if not (changed_frag_1 in target_frags or changed_frag_2 in target_frags):
@@ -1511,7 +1460,7 @@ class TestSVSimulator(unittest.TestCase):
 
     def test_snps(self):
         self.helper_test_known_output_svs(self.test_objects_SNPs[0], ['AA', 'GA', 'TA', 'CC', 'CG', 'CT'])
-        changed_frag_1, changed_frag_2,_ = self.helper_test_known_output_svs(self.test_objects_SNPs[1])
+        changed_frag_1, changed_frag_2, _ = self.helper_test_known_output_svs(self.test_objects_SNPs[1])
         self.assertTrue(changed_frag_1 not in self.test_objects_SNPs[1].ref or
                         changed_frag_2 not in self.test_objects_SNPs[1].ref)
         self.assertTrue(len(changed_frag_1) == len(changed_frag_2) == 10)
@@ -1576,22 +1525,22 @@ class TestSVSimulator(unittest.TestCase):
                 print(changed_frag_1, changed_frag_2)
                 self.assertTrue('CTGTCGTA' in [changed_frag_1, changed_frag_2])
             elif i == 1:
-                #self.assertEqual(len(curr_sim.overlap_regions.roi_dict.values()), 1)
+                # self.assertEqual(len(curr_sim.overlap_regions.roi_dict.values()), 1)
                 self.assertTrue('CCCC' in changed_frag_1 or 'CCCC' in changed_frag_2)
             elif i == 2:
                 self.assertTrue('AA' not in changed_frag_1 or 'AA' not in changed_frag_2)
 
-
     def test_overlap_placement_complex(self):
         # complex events
         for i, config in enumerate(self.test_objects_overlap_cplx):
-            #if i != len(self.test_objects_overlap_cplx) - 1: continue
+            # if i != len(self.test_objects_overlap_cplx) - 1: continue
             if i > 11:
                 config, target = config
             config.initialize_files()
             curr_sim = SVSimulator(config.par)
             print(i, config.par)
             curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref)
+
             def sv_source_segments(sv):
                 return sorted([(operation.source_region.start, operation.source_region.end)
                                for operation in sv.operations])
@@ -1609,7 +1558,8 @@ class TestSVSimulator(unittest.TestCase):
                 # --> check for INV_dDUP in first four characters of output refs
                 self.assertTrue(changed_frag_1[:4] in ['CTGA', 'ACTG'] or changed_frag_2[:4] in ['CTGA', 'ACTG'])
                 # --> check for nrTRA in second half of refs
-                self.assertTrue(changed_frag_1[-7:] in ['TCATGGA', 'ATGGATC'] or changed_frag_2[-7:] in ['TCATGGA', 'ATGGATC'])
+                self.assertTrue(
+                    changed_frag_1[-7:] in ['TCATGGA', 'ATGGATC'] or changed_frag_2[-7:] in ['TCATGGA', 'ATGGATC'])
             elif i == 2:
                 for sv in curr_sim.svs:
                     self.assertIn(sv_source_segments(sv),
@@ -1648,7 +1598,9 @@ class TestSVSimulator(unittest.TestCase):
                 self.assertTrue((13 <= placement[0].pos <= 14) or 14 <= placement[-1].pos <= 15)
             elif i == 8:
                 print(curr_sim.svs)
-                inv_ddup = [sv for sv in curr_sim.svs if 'INV_dDUP' in sv.info['SVTYPE']][0]
+                print([sv.info['GRAMMAR'] for sv in curr_sim.svs])
+                inv_ddup = [sv for sv in curr_sim.svs if 'INV_dDUP' in sv.info['SVTYPE'] or
+                            "A_()->A_a" in sv.info['GRAMMAR']][0]
                 dispersion_target = [
                     operation.target_region
                     for operation in inv_ddup.operations
@@ -1657,23 +1609,23 @@ class TestSVSimulator(unittest.TestCase):
                                 16 <= dispersion_target.start <= 20)
             elif i == 9:
                 # flanked-INV with anchor = full SV
-                assert((sv_source_segments([sv for sv in curr_sim.svs
-                                                     if 'delINVdel' in sv.info['SVTYPE']][0]) ==
-                                 [(12, 14), (14, 17), (17, 18)]) or
-                       (sv_source_segments([sv for sv in curr_sim.svs
-                                           if 'delINVdel' in sv.info['SVTYPE']][0]) ==
-                       [(13, 15), (15, 18), (18, 19)]
-)                       )
+                assert ((sv_source_segments([sv for sv in curr_sim.svs
+                                             if 'delINVdel' in sv.info['SVTYPE']][0]) ==
+                         [(12, 14), (14, 17), (17, 18)]) or
+                        (sv_source_segments([sv for sv in curr_sim.svs
+                                             if 'delINVdel' in sv.info['SVTYPE']][0]) ==
+                         [(13, 15), (15, 18), (18, 19)]
+                         ))
             elif i == 10:
-                assert((sv_source_segments(curr_sim.svs[0]),
-                                 [(12, 15), (15, 18)]) or (sv_source_segments(curr_sim.svs[0]),
-                                 [(13, 16), (16, 19)]))
+                assert ((sv_source_segments(curr_sim.svs[0]),
+                         [(12, 15), (15, 18)]) or (sv_source_segments(curr_sim.svs[0]),
+                                                   [(13, 16), (16, 19)]))
             elif i == 11:
                 frag_bounds = sv_source_segments(sv)
                 self.assertTrue(is_overlapping([(12, 19)], (frag_bounds[0][0], frag_bounds[-1][1])))
             elif i > 11:
-                self.helper_test_known_output_svs(self.test_objects_overlap_cplx[i][0], self.test_objects_overlap_cplx[i][1])
-
+                self.helper_test_known_output_svs(self.test_objects_overlap_cplx[i][0],
+                                                  self.test_objects_overlap_cplx[i][1])
 
     def test_frag_level_overlap(self):
         for i, config in enumerate(self.test_objects_frag_level_overlap):
@@ -1689,7 +1641,7 @@ class TestSVSimulator(unittest.TestCase):
 
     def test_partial_overlap_placement(self):
         for i in range(len(self.test_objects_partial_overlap)):
-            #if i not in [0, 1]: continue
+            # if i not in [0, 1]: continue
             config = self.test_objects_partial_overlap[i]
             print('test', i, config.par_content)
             print(config.par_content, config.ref)
@@ -1707,24 +1659,29 @@ class TestSVSimulator(unittest.TestCase):
             if i == 1:
                 # check that between the two SVs one is a perfect match and is other overlaps
                 print(changed_frag_1, changed_frag_2, curr_sim.svs)
-                case_a = (get_span(curr_sim.svs[0]).start, get_span(curr_sim.svs[0]).end) == (2, 4) and is_overlapping([(15, 20)], (
-                get_span(curr_sim.svs[1]).start, get_span(curr_sim.svs[1]).end))
-                case_b = (get_span(curr_sim.svs[1]).start, get_span(curr_sim.svs[1]).end) == (15, 20) and is_overlapping([(2, 4)], (
-                get_span(curr_sim.svs[0]).start, get_span(curr_sim.svs[0]).end))
+                case_a = (get_span(curr_sim.svs[0]).start, get_span(curr_sim.svs[0]).end) == (2, 4) and is_overlapping(
+                    [(15, 20)], (
+                        get_span(curr_sim.svs[1]).start, get_span(curr_sim.svs[1]).end))
+                case_b = (get_span(curr_sim.svs[1]).start, get_span(curr_sim.svs[1]).end) == (
+                15, 20) and is_overlapping([(2, 4)], (
+                    get_span(curr_sim.svs[0]).start, get_span(curr_sim.svs[0]).end))
                 self.assertTrue(case_a or case_b)
             if i == 2:
-                case_a = (get_span(curr_sim.svs[0]).start, get_span(curr_sim.svs[0]).end) == (2, 4) and is_overlapping([(22, 25)], (
-                get_span(curr_sim.svs[2]).start, get_span(curr_sim.svs[2]).end))
-                case_b = (get_span(curr_sim.svs[2]).start, get_span(curr_sim.svs[2]).end) == (22, 25) and is_overlapping([(2, 4)], (
-                get_span(curr_sim.svs[0]).start, get_span(curr_sim.svs[0]).end))
+                case_a = (get_span(curr_sim.svs[0]).start, get_span(curr_sim.svs[0]).end) == (2, 4) and is_overlapping(
+                    [(22, 25)], (
+                        get_span(curr_sim.svs[2]).start, get_span(curr_sim.svs[2]).end))
+                case_b = (get_span(curr_sim.svs[2]).start, get_span(curr_sim.svs[2]).end) == (
+                22, 25) and is_overlapping([(2, 4)], (
+                    get_span(curr_sim.svs[0]).start, get_span(curr_sim.svs[0]).end))
                 self.assertTrue(case_a or case_b)
                 self.assertTrue((get_span(curr_sim.svs[1]).start, get_span(curr_sim.svs[1]).end) == (11, 15))
             if i == 3:
                 sv_intervals = [(get_span(sv).start, get_span(sv).end) for sv in curr_sim.svs]
                 self.assertTrue((11, 15) in sv_intervals)
                 partial_ovl_sv = curr_sim.svs[(sv_intervals.index((11, 15)) + 1) % 2]
-                self.assertTrue(is_overlapping([(2, 4)], (get_span(partial_ovl_sv).start, get_span(partial_ovl_sv).end)) or
-                                is_overlapping([(22, 25)], (get_span(partial_ovl_sv).start, get_span(partial_ovl_sv).end)))
+                self.assertTrue(
+                    is_overlapping([(2, 4)], (get_span(partial_ovl_sv).start, get_span(partial_ovl_sv).end)) or
+                    is_overlapping([(22, 25)], (get_span(partial_ovl_sv).start, get_span(partial_ovl_sv).end)))
 
     def test_divergence_events(self):
         # the divergence operator will mutate each base in an event interval with probability p
@@ -1783,9 +1740,8 @@ class TestSVSimulator(unittest.TestCase):
         for i, config in enumerate(self.test_objects_unbounded_disp):
             config.initialize_files()
             curr_sim = SVSimulator(config.par)
-            #curr_sim['max_tries'] = 2000
+            # curr_sim['max_tries'] = 2000
             curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref)
-
 
     def test_roi_placement_failure(self):
         for config in self.test_objects_roi_placement_failure:
@@ -1797,7 +1753,7 @@ class TestSVSimulator(unittest.TestCase):
     def test_simple_tests(self):
         for test_num, (ref, vs_config, expected_outputs) in enumerate(self.simple_test_data):
             print(ref, vs_config, expected_outputs)
-            #if test_num != 1: continue
+            # if test_num != 1: continue
             print('TEST', test_num, 'config', vs_config)
             sv_list = []
             if not isinstance(vs_config, TestObject):
@@ -1806,12 +1762,13 @@ class TestSVSimulator(unittest.TestCase):
                 test_object = TestObject([self.ref_file, {f"chrTest{ref_num}": ref_seq
                                                           for ref_num, ref_seq in enumerate(as_list(ref))}],
                                          [self.par, {"reference": self.ref_file,
-                                                                      "homozygous_only": True,
-                                                                      "min_intersv_dist": 0,
-                                                                      "random_seed": 88,
+                                                     "homozygous_only": True,
+                                                     "min_intersv_dist": 0,
+                                                     "random_seed": 88,
                                                      "variant_sets": [dict(number=1, **vs_conf)
                                                                       for vs_conf in vs_config]}],
-                                         '/data/enzo/insilicoSV/hap1.fna', '/data/enzo/insilicoSV/hap2.fna', '/data/enzo/insilicoSV/hap.bed')
+                                         '/data/enzo/insilicoSV/hap1.fna', '/data/enzo/insilicoSV/hap2.fna',
+                                         '/data/enzo/insilicoSV/hap.bed')
             else:
                 test_object = vs_config
 
@@ -1819,7 +1776,9 @@ class TestSVSimulator(unittest.TestCase):
             count_occ = defaultdict(int)
             attempt_num = 0
             expected_results = set(expected_outputs)
-            while any(expected_result not in results_seen for expected_result in expected_results) and attempt_num < len(expected_results) * 100:
+            while any(
+                    expected_result not in results_seen for expected_result in expected_results) and attempt_num < len(
+                    expected_results) * 100:
                 test_object.par_content["random_seed"] += 150
                 print("SEED", test_object.par_content["random_seed"])
 
@@ -1831,16 +1790,20 @@ class TestSVSimulator(unittest.TestCase):
                 sv_list.append(svs)
             if results_seen != expected_results:
                 print('config', vs_config, 'seen', results_seen, 'expected', expected_results, count_occ)
-                print('missing', [expected_result for expected_result in expected_results if expected_result not in results_seen])
+                print('missing',
+                      [expected_result for expected_result in expected_results if expected_result not in results_seen])
                 print('Unexpected',
-                      [unexpected_result for unexpected_result in results_seen if unexpected_result not in expected_results])
+                      [unexpected_result for unexpected_result in results_seen if
+                       unexpected_result not in expected_results])
             '''if any(expected_result not in results_seen for expected_result in expected_results):
                 for svs in sv_list:
                     for sv in svs:
                         print('sv lengths not target', sv.get_anchor_length(), 'breakends', sv.breakend_interval_lengths, 'anchors', sv.anchors,
                               'rois', sv.roi, 'placement', sv.placement)'''
             print('OCCURENCES', count_occ, test_num, 'config', vs_config, expected_results)
-            assert all(expected_result in results_seen for expected_result in expected_results), f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
+            assert all(expected_result in results_seen for expected_result in
+                       expected_results), f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
+
 
 def test_inv(tmp_path):
     d = tmp_path / "sub"
@@ -1861,10 +1824,11 @@ variant_sets:
     svs = simulator.svs
     assert len(svs) == 1
     assert len(svs[0].operations) == 1
-    assert (svs[0].operations[0].transform == 
+    assert (svs[0].operations[0].transform ==
             Transform(transform_type=TransformType.INV, is_in_place=True, divergence_prob=0))
-    assert (svs[0].operations[0].target_region.replace(order_key=()) == 
+    assert (svs[0].operations[0].target_region.replace(order_key=()) ==
             svs[0].operations[0].source_region)
+
 
 def test_inv_exact(tmp_path):
     d = tmp_path / "sub"
@@ -1893,16 +1857,15 @@ variant_sets:
     svs = simulator.svs
     assert len(svs) == 1
     assert len(svs[0].operations) == 1
-    assert (svs[0].operations[0].transform == 
+    assert (svs[0].operations[0].transform ==
             Transform(transform_type=TransformType.INV, is_in_place=True, divergence_prob=0))
-    assert (svs[0].operations[0].target_region.replace(order_key=()) == 
+    assert (svs[0].operations[0].target_region.replace(order_key=()) ==
             svs[0].operations[0].source_region)
 
     assert (svs[0].operations[0].target_region.replace(order_key=()) ==
             Region(chrom='chr19', start=0, end=3))
 
 
-    
 def test_inv_contained(tmp_path):
     d = tmp_path / "sub"
     d.mkdir()
@@ -1930,15 +1893,15 @@ variant_sets:
     svs = simulator.svs
     assert len(svs) == 1
     assert len(svs[0].operations) == 1
-    assert (svs[0].operations[0].transform == 
+    assert (svs[0].operations[0].transform ==
             Transform(transform_type=TransformType.INV, is_in_place=True, divergence_prob=0))
-    assert (svs[0].operations[0].target_region.replace(order_key=()) == 
+    assert (svs[0].operations[0].target_region.replace(order_key=()) ==
             svs[0].operations[0].source_region)
 
     assert (svs[0].operations[0].target_region.replace(order_key=()) in
             [Region(chrom='chr19', start=3, end=6), Region(chrom='chr19', start=4, end=7)])
 
-    
+
 def test_inv_partial(tmp_path):
     d = tmp_path / "sub"
     d.mkdir()
@@ -1966,9 +1929,9 @@ variant_sets:
     svs = simulator.svs
     assert len(svs) == 1
     assert len(svs[0].operations) == 1
-    assert (svs[0].operations[0].transform == 
+    assert (svs[0].operations[0].transform ==
             Transform(transform_type=TransformType.INV, is_in_place=True, divergence_prob=0))
-    assert (svs[0].operations[0].target_region.replace(order_key=()) == 
+    assert (svs[0].operations[0].target_region.replace(order_key=()) ==
             svs[0].operations[0].source_region)
 
     assert (svs[0].operations[0].target_region.replace(order_key=()) in
@@ -1976,7 +1939,8 @@ variant_sets:
              Region(chrom='chr19', start=1, end=4),
              Region(chrom='chr19', start=2, end=5),
              Region(chrom='chr19', start=5, end=8),
-             Region(chrom='chr19', start=6, end=9),])
+             Region(chrom='chr19', start=6, end=9), ])
+
 
 def test_trEXP(tmp_path):
     d = tmp_path / "sub"
@@ -2009,8 +1973,9 @@ variant_sets:
     assert len(svs) == 1
     with FastaFile(sim_fa) as fasta_file:
         hap = fasta_file.fetch(fasta_file.references[0])
+    print(hap)
     assert hap == 'AAAATCGTCGTCGTCGTCGTCGAAAA'
-    
+
 
 def test_trCON(tmp_path):
     d = tmp_path / "sub"
