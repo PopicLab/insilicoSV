@@ -74,8 +74,6 @@ class VariantSet(ABC):
             self.svtype = VariantType.Custom
             grammar = self.vset_config['type'].split('->')
         else:
-            chk(self.vset_config['type'] in VariantType, 'The type {} does not match the predefined types {}'.format(
-                self.vset_config['type'], [var.value for var in VariantType]))
             self.svtype = VariantType(self.vset_config['type'])
             grammar = SV_KEY[VariantType(self.vset_config['type'])]
         self.source = grammar[0]
