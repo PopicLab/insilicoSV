@@ -1,20 +1,18 @@
 # YAML CONFIG FILE
-reference: 'chr21_ref/chr21.fa'
-max_tries: 200
-random_seed: 42
+reference: 'demo/chr21.fa'
 variant_sets:
     - type: "DEL"
       number: 5
-      length_ranges: [[50, 1000]]
+      length_ranges: [[5000, 10000]]
     - type: "DUP"
       number: 5
-      length_ranges: [[50, 1000]]
+      length_ranges: [[5000, 10000]]
     - type: "INV"
       number: 5
-      length_ranges: [[50, 1000]]
-    - type: "dDUP"
+      length_ranges: [[5000, 10000]]
+    - type: "A->aa" # inverted duplication
       number: 5
-      length_ranges:
-        - [50, 1000]
-      dispersion_ranges:
-        - [100, 5000]
+      length_ranges: [[ 5000, 10000]]
+    - type: "AB->AbbA" # custom complex variant
+      number: 5
+      length_ranges: [[5000, 10000], [5000, 10000]]

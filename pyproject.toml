@@ -1,36 +1,32 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "insilicosv"
-version = "2.0.0"
+version = "0.1.0"
 authors = [
-  { name="Chris Rohlicek", email="crohlice@broadinstitute.org" },
   { name="Nick Jiang", email="nickj@berkeley.edu" },
+  { name="Chris Rohlicek", email="crohlice@broadinstitute.org" },
+  { name="Enzo Battistella", email="ebattist@broadinstitute.org" },
   { name="Ilya Shlyakhter", email="ilya@broadinstitute.org" },
   { name="Victoria Popic", email="vpopic@broadinstitute.org" },
 ]
-description = "Simulator of complex structural variants in genomes"
+description = "Grammar-based framework for structural variant simultation and placement"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
-        'cycler',
         'intervaltree',
-        'kiwisolver',
         'matplotlib',
         'numpy',
-        'Pillow',
         'pyparsing',
         'pysam',
-        'python-dateutil',
         'PyYAML',
-        'six',
         'sortedcontainers',
         'typing_extensions'
 ]
@@ -39,6 +35,9 @@ license = {text = "MIT"}
 [project.urls]
 Homepage = "https://github.com/PopicLab/insilicoSV"
 Issues = "https://github.com/PopicLab/insilicoSV/issues"
+
+[tool.setuptools]
+packages = ["insilicosv"]
 
 [project.scripts]
 insilicosv = "insilicosv.simulate:run_simulator"

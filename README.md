@@ -1,56 +1,94 @@
-# insilicoSV: a framework for structural variant simulation 
+# insilicoSV: grammar-based structural variant simulation and placement
 
+##### Table of Contents
+[Overview](#overview)  
+[Installation](#install)  
+[User Guide](#guide)  
+&nbsp;&nbsp; [Quick start](#start)  
+&nbsp;&nbsp; [Recommended workflows](#workflow)  
+&nbsp;&nbsp; [Detailed documentation](#docs)  
+
+<a name="overview"></a>
 ## Overview
 
-insilicoSV generates synthetic diploid genome sequences, given a reference genome and a configuration file.
+```insilicoSV``` is a versatile framework for structural variant (SV) simulation, 
+which models SVs using a simple and flexible grammar, allowing users to define standard and custom genome 
+rearrangements, as well as encode genome placement constraints.
 
-It supports the following functionality:
+Key features:
 
-* 24 types of structural variants (simple and complex), indels, and SNPs
-* a grammar to define custom structural rearrangement signatures
-* random, context-aware (e.g., in repeat regions), or fixed-mode genome placement
+* Built-in support for 26 types of structural variants (simple and complex), small indels, and SNPs
+* Custom SV simulation using grammatical SV notation (e.g. ```ABC -> aBBBc```)
+* Fine-grained genome placement control allowing SVs (or specific SV breakpoints) to be constrained to specific regions 
+of interest (with multiple placement modes available to specify how the SV should overlap with each region) or to avoid 
+specific regions (i.e. category-specific blacklists)
+* Integration of user-provided SVs
+* Fine-grained size simulation allowing independent configuration of inter-breakpoint distances in complex SVs
+* Modular SV definitions allowing any number of different SV categories to be defined and simulated in the same genome 
+by combining a variety of attributes (e.g, type, size, placement constraints)
+* Customizable WDL pipeline with support for genome simulation, read simulation, alignment, and visualization
 
+Illustration of SV classes predefined in ```insilicoSV``` and their grammatical notation (a), 
+supported SV placement constraints (b), Samplot visualization of short-read alignments at the site of a simulated 
+complex delINVdel event (c), Samplot visualization of short-read alignments at the site of a simulated 
+grammatically-specified custom SV event (d):
+
+![Illustration of insilicoSV features](docs/gallery/overview.png)
+
+<a name="install"></a>
 ## Installation
 
-Prerequisite: Python 3.9 and up - [Install](https://www.python.org/downloads/)
+Prerequisite: Python 3.9+ - [Install](https://www.python.org/downloads/)
 
-Installation using pip:
+* `$> pip install .`
 
-* `$ pip install insilicosv`
+<a name="guide"></a>
+## User guide
 
-<!-- Installation using conda:
+<a name="start"></a>
+### Quick start
 
-* Install and configure [bioconda](https://bioconda.github.io/)
-* Install insilicosv with `conda install insilicosv` -->
+To run ```insilicoSV```: ```$> insilicosv -c <path/to/config.yaml>```
 
-## To Run
-The recommended workflow for running insilicoSV is as follows:
+<a name="workflow"></a>
+### Recommended workflows 
+
 1. Create a new directory
-2. Populate a simulation config file and place it in the directory
-3. Run insilicoSV providing the config file as input:
-```
-insilicosv -c <config_yml>
-```
-4. Results will be produced in this directory
+2. Create a new YAML config file in this directory
+3. Populate the YAML config file with the parameters specific to this experiment (see [Input guidelines](docs/inputs.md) and 
+[Use Cases](docs/use_cases.md))
+4. Run ```insilicoSV``` providing the path to the config file as input. ```insilicoSV``` will automatically create 
+output files in the YAML file directory.
 
-The config file syntax is detailed in the [Input guidelines](docs/inputs) section of the
-documentation.
+A customizable WDL pipeline is also provided to automatically simulate reads and produce alignments for 
+downstream analysis from the simulated genome. The pipeline can be configured to (1) simulate the genome, 
+(2) simulate a single or multiple read datasets (currently supported platforms: Illumina, PacBio, and ONT) 
+from this genome, (4) align the reads, and (5) visualize the alignments at the simulated SV sites. 
+See [WDL](docs/wdl.md) for more information.
 
-## Documentation
-For documentation outlining the different features of insilicoSV along with usage examples and data resources, please refer to the following sections:
+
+<a name="docs"></a>
+### Documentation
+For detailed information about ```insilicoSV``` features, along with usage examples, 
+please refer to the following documentation sections:
 <!-- toc -->
-- [Input guidelines](docs/inputs)
-- [Example Use Cases](docs/use_cases)
 - [SV Grammar](docs/sv_grammar.md)
-- [Example SV Visualizations](docs/sv_gallery)
-- [Tutorial Jupyter notebook](docs/demo_notebook.md)
+- [Input guidelines](docs/inputs.md)
+- [Use Cases](docs/use_cases.md)
+- [Outputs](docs/outputs.md)
+- [SV gallery](docs/sv_gallery.md)
+- [WDL workflow](docs/wdl.md)
+- [Notebook tutorial](workflows/insilicosv_demo.ipynb)
 
 
 ## Authors
-Chris Rohlicek - crohlice@broadinstitute.org
 
 Nick Jiang - nickj@berkeley.edu
 
+Chris Rohlicek - crohlice@broadinstitute.org
+
 Ilya Shlyakhter - ilya@broadinstitute.org
+
+Enzo Battistella - ebattist@broadinstitute.org
 
 Victoria Popic - vpopic@broadinstitute.org

@@ -72,10 +72,10 @@ Examples of the full set of simulation options available through various config 
 insilicoSV offers the possibility to edit the reference with known SVs.
 An example of the syntax is shown in the config file above and [this example](use_cases.md#example-3---editing-reference-with-known-svs)
 
-insilicoSV currently supports importation of any VCF in insilico [VCF format](outputs.md#output-vcf-file) or 
+insilicoSV currently supports importation of any VCF in insilicoSV [VCF format](outputs.md#output-vcf-file) or 
 VCF files in [Gnomad](https://gnomad.broadinstitute.org/) format containing simple SVs only, meaning, all the ones
 not reported in the CPX_TYPE field and not reported as BND.
-Other types would have to be adapted to insilico [VCF format](outputs.md#output-vcf-file).
+Other types would have to be adapted to insilicoSV format [VCF format](outputs.md#output-vcf-file).
 
 When writing a VCF in insilico format for SV importation, the required fields are the CHROM, POS and ID fields as well as
 the INFO field with an END, SVTYPE, SVLEN, and, if applicable, TARGET, TARGET_CHROM, PARENT_SVID. 

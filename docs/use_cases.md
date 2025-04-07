@@ -1,12 +1,8 @@
-# Example Use Cases
+# Use Cases
 
 insilicoSV provides various simulation features that can be used together or separately to generate
-synthetic genomes with varying levels of control over SV placement. Examples of the different use cases with
-matching config file structure are provided below. For all of these cases, commandline usage is:
-
-```
-insilicosv -c <config.yaml>
-```
+synthetic genomes with varying levels of control over SV simulation and placement. Examples of the different 
+use cases with matching config files are provided below. 
 
 ### Example 1 - Predefined SV types
 
@@ -151,8 +147,8 @@ which can then be used to filter the blacklist intervals considered for a given 
 In this example, the three insertions will be placed randomly regardless of the blacklist regions as the blacklist_region_type
 is not specified.
 
-If blacklist entries are provided in VCF format, only the following parts of the record are used for the blacklist: CHROM, POS and
-the INFO fields END, SVLEN, TARGET and TARGET_CHROM.o
+If blacklist entries are provided in VCF format, only the following parts of the record are used for the blacklist: 
+CHROM, POS and the END INFO field.
 
 ### Example 4b - Specifying a minimum inter-variant distance
 Variant placement can also be constrained by enforcing that there be a minimum inter-variant distance between any two
@@ -171,14 +167,13 @@ variant_sets:
 ```
 
 
-### Example 5 - Placing SVs at known regions of interest (ROIs)
+### Example 5 - Placing SVs into specific regions of interest (ROIs)
 
-To augment a randomized simulation of SVs onto an input reference, the user can include in the
-simulation config file the path to a BED file (or multiple) containing known element intervals (e.g.,
-known repetitive elements taken from RepeatMasker).  If the `overlap_mode` field is given a value
-(`"exact"`, `"partial"`, `"containing"` or `"contained"`), then each variant of that set will be placed to have the corresponding overlap
-with a randomly selected interval from `overlap_regions`.  An example config with
-these inputs is:
+To constrain the placement of SVs to specific regions, the path to a single or multiple BED files containing these intervals (e.g.,
+known repetitive elements taken from RepeatMasker) can be provided.  Setting the `overlap_mode` field in a specific 
+variant set to either `"exact"`, `"partial"`, `"containing"` or `"contained"`, will enforce that each variant of that set 
+will be placed (with the corresponding overlap mode) into a randomly selected interval from `overlap_regions`.  
+An example config with these inputs is:
 
 ```yaml
 reference: "{path}/{to}/ref.fa"
@@ -197,13 +192,10 @@ partially (but not completely). In `"containing"` overlap mode, the SV must stri
 the ROI. In `"contained"` overlap mode, the SV must be strictly contained
 within the ROI.
 
-Multiple BED files can be given as input and their records will be combined and drawn 
-from during SV placement (in this
-case the user should provide a list of paths). Records from the `overlap_regions` BED file(s) will be 
-shuffled on input,
-and the file is required to have the first four columns of standard BED records (chrom, chromStart, chromEnd, name).  Files
-specifying known Tandem Repeat regions for expansion/contraction need to have a fifth column specifying the 
-motif of each repeat region.
+Multiple BED files (provided as a list of paths) can be given as input and their records will be combined and drawn 
+from during SV placement. Each file is required to have the first four columns of standard BED records 
+(chrom, chromStart, chromEnd, name).  Files specifying known Tandem Repeat regions for expansion/contraction 
+need to have a fifth column specifying the motif of each repeat region.
 
 ROIs relevant to placing variants from a given variant set can be filtered down by region type
 and length.  `overlap\_region\_type` specifies a list of identifiers; regions whose name (4th bed
@@ -213,7 +205,7 @@ be `null` to leave that side of the range open.  (Note that specifying an overla
 entirely separate from specifying length ranges for SV components.)
 
 The output VCF file will label which SVs were placed at specified intervals with the additional INFO field
-`OVLP={evt. name}', as in this example record:
+`OVLP={region name}', as in this example record:
 ```
 chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVLP=L1HS;VSET=0;IN_PLACE=in_place;GRAMMAR=A>AA;SOURCE_LETTER=A  GT  0/1
 ```
@@ -221,7 +213,7 @@ chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;O
 ### Example 5a - Placing specific SV components at regions of interest
 
 The portion of the SV which participates in overlap with an ROI is termed an _anchor_ 
-and is denoted with ().
+and is denoted with () in the supported SV grammar.
 For SVs without dispersions, the anchor defaults to the whole SV.  To constrain the placement of SVs with
 dispersions, or to specify an anchor other than the full SV, the anchor can be specified as part
 of the SV's source grammar definition.  For example:
@@ -241,7 +233,7 @@ variant_sets:
       overlap_region_type: ["L1HS"]
 ```
 
-Parentheses indicate the part(s) of the SV that are constrained to overlap with an ROI according
+Parentheses indicate which part(s) of the SV that are constrained to overlap with an ROI according
 to the overlap mode.  The anchor must be placed on the source, and can wrap
 any contiguous sub-sequence of source elements (including an empty one).
 For `"exact"` overlap mode, the length ranges of the constrained SV's part(s) must

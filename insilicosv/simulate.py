@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 
 """insilicoSV: simulator of structural variants.
-
-(redesigned version)
 """
 
 import argparse
@@ -716,22 +714,17 @@ class SVSimulator:
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-c', '--config', required=True, help='yaml config file')
+    parser.add_argument('-c', '--config', required=True, help='YAML config file')
     
     return parser.parse_args()
 
 
 def run_simulator():
     start_time = time.time()
-
     logger.info('insilicoSV version %s' % __version__)
-
     args = parse_args()
-
     simulator = SVSimulator(config_path=args.config)
-    
     simulator.run()
-
     logger.info(f'insilicoSV finished in {time.time()-start_time:.1f}s')
 
 if __name__ == '__main__':

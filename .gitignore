@@ -21,13 +21,7 @@ dist/
 
 # Outputs from the demo notebook
 .ipynb_checkpoints
-workflows/output/
-workflows/chr21_ref/
-
-# Workflow-related
-.snakemake/
-results/
-workflows/IGV_screenshots/
+workflows/demo/
 
 logs/
 notebooks/
