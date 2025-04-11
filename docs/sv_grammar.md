@@ -1,18 +1,37 @@
 # SV Grammar
 
-insilicoSV uses a grammatical notation to represent the various types of SVs that can be supported by the simulator. A graphical representation of the notation is given below:
+insilicoSV uses a grammatical notation to represent how SVs of a given type transform the reference genome.
+This notation can be used to simulate custom SV types involving arbitrary transformations.
+It is also used to give precise definitions for built-in SVs, as illustrated in the part **a** of the figure below:
 
-![Graphical representation of insilicoSV grammar](sample_imgs/fig.png)
+![Graphical illustration of insilicoSV grammar](gallery/overview.png)
 
-The grammar represents unaltered reference intervals with capital letters and includes symbols to represent transformations of those intervals that appear in the output genome (see table below). For example, a deletion-flanked inversion (delINV) is notated as AB $&#8594$ b, in which the left side of the expression indicates the two reference intervals involved in the delINV and the right side indicates the donor sequence that will appear in place of AB, that is the inverted interval b. Although SNPs are not considered to be a type of structural variant, we include them here as another valid event type for simulation (see [use cases](example_use_cases.md#example-1b---example-snp-specification) for usage examples). This grammar may be used to specify custom SVs, as shown in [this example](https://github.com/PopicLab/insilicoSV-dev/blob/develop/docs/example_use_cases.md#example-2---custom-svs).
+An SV type is represented by a single grammar rule, where the left-hand side (LHS) represents one or more
+reference intervals, while the right-hand side (RHS) represents their rearrangement and/or transformation.  In
+the LHS, capital letters represent reference intervals; letters adjacent in the LHS represent adjacent intervals
+in the reference.  Each letter on the LHS must appear there exactly once.
+In the RHS, a capital letter represents the sequence of the corresponding reference
+interval, while its lowercase version represents the reverse complement of that sequence.
+Letters present in the LHS but not in the
+RHS represent deletions, while letters present in the RHS but not in the LHS represent novel insertions.
+Thus, A $\rightarrow$ a represents a simple inversion, while AB $\rightarrow$ b represents an inversion
+flanked by a deletion.
 
-insilicoSV maps a random fragment of the reference to each of the symbols in the source and reconsiles the affected region with the target. For instance, AB $&#8594$ A would remove the fragment marked as symbol B. All symbols in the source sequence MUST be unique to create a one-to-one mapping between symbol and reference fragment.
+Each RHS letter present in the LHS represents either an in-place transform of a reference interval,
+or an insertion of the interval's sequence at a new location. Thus, AB $\rightarrow$ BA
+represents a swap of two adjacent intervals, effectuated by translocating the first interval immediately
+downstream of the second.   
 
-| Name | Symbol | Description |
-|------|--------|-------------|
-| Generic Event | Any uppercase alphabetical letter | The most fundamental organizing tool that maps to a reference fragment |
-| Inversion | Any lowercase alphabetical letter | Indicates an inversion. <br /> Ex. a transformation ABC $&#8594$ abc will invert A, B, and C and organize the new fragments as denoted in the target |
-| Duplication | Original symbol followed by single quotation (') | An original symbol refers to the initial character used in the source sequence. *There can only be ONE original symbol for every unique character - all other copies, including those that are inverted, must have a duplication marking (').* <br /> Ex. A transformation ABC $&#8594$ ABA'c would duplicate A after B and invert the fragment C.|
-| Dispersion | Underscore (_) | Indicates a gap between the symbols surrounding it. Note that events may be simulated within a dispersion but not within other events. |
-| Divergence | Asterisk (\*) | Indicates an interval in which some proportion of bases are changed. |
-| Insertions | Uppercase alphabetical letter | To add foreign, randomly-generated insertions, use a symbol not present in the source to the target sequence. <br /> Ex. A_B $&#8594$ A_BC inserts a randomly-generated sequence after the fragment indicated by symbol B|
+Duplications of a reference interval are represented by including
+the corresponding letter more than once in the RHS.  For example, A $\rightarrow$ AA represents
+a simple duplication, while AB $\rightarrow$ Aba represents a duplication-flanked inversion.
+
+Adding a + after a letter on the right-hand side represents a variable number
+of copies of the corresponding reference interval: for example, A $\rightarrow$ AA+ represents adding one or more
+copies of A.
+
+Dispersions can be represented using underscores.  Thus, a downstream dispersed duplication can be written
+as A_ $\rightarrow$ A_A, and a reciprocal translocation of two intervals as A_B $\rightarrow$ B_A.
+
+An illustration of using the grammar to specify custom SVs is given in
+[this example](use_cases#example-2---custom-svs).

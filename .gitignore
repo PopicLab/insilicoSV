@@ -16,18 +16,14 @@ __pycache__/
 build/
 insilicosv.egg-info/
 dist/
-
-# Files sometimes left after tests
-test/inputs/test.fa
-test/inputs/test.fa.fai
+*.py[cod]
+*$py.class
 
 # Outputs from the demo notebook
 .ipynb_checkpoints
-workflows/output/
-workflows/chr21_ref/
+workflows/demo/
 
-# Workflow-related
-.snakemake/
-results/
-workflows/IGV_screenshots/
+logs/
+notebooks/
+resources/
 
