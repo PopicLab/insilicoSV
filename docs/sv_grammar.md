@@ -34,4 +34,4 @@ Dispersions can be represented using underscores.  Thus, a downstream dispersed 
 as A_ $\rightarrow$ A_A, and a reciprocal translocation of two intervals as A_B $\rightarrow$ B_A.
 
 An illustration of using the grammar to specify custom SVs is given in
-[this example](use_cases#example-2---custom-svs).
+[this example](use_cases.md#example-2---custom-svs).
