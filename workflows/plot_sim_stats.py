@@ -70,9 +70,9 @@ def run_plot_sim_stats(args):
         for rec in vcf_file.fetch():
             svid = rec.id
             svtype = rec.info['SVTYPE']
-            if 'PARENT_SVID' in rec.info:
-                svid = rec.info['PARENT_SVID']
-                svtype = rec.info['PARENT_SVTYPE']
+            if 'SVID' in rec.info:
+                svid = rec.info['SVID']
+                svtype = rec.info['SVTYPE']
 
             if 'TARGET' in rec.info:
                 svid2source_regions[svid].append(Region(chrom=rec.info['TARGET_CHROM'],
@@ -84,9 +84,9 @@ def run_plot_sim_stats(args):
         for rec in vcf_file.fetch():
             svid = rec.id
             svtype = rec.info['SVTYPE']
-            if 'PARENT_SVID' in rec.info:
-                svid = rec.info['PARENT_SVID']
-                svtype = rec.info['PARENT_SVTYPE']
+            if 'SVID' in rec.info:
+                svid = rec.info['SVID']
+                svtype = rec.info['SVTYPE']
 
             if svid in svids_seen:
                 continue

@@ -8,8 +8,12 @@ variant_sets:
     - type: "DEL"  # "A" -> ""
       number: 3
       length_ranges: [[1000, 10000]]  # minimum, maximum size for A
-    - type: "DUP"  # "A" -> "AA+"
+    - type: "DUP"  # "A" -> "AA+" by default n_copies is [1] for DUP
       number: 3
+      length_ranges: [[1000, 10000]]
+    - type: "mCNV"  # "A" -> "A+"
+      number: 3
+      n_copies: [5]
       length_ranges: [[1000, 10000]]
     - type: "INV"  # "A" -> "a"
       number: 3
@@ -101,12 +105,8 @@ variant_sets:
       length_ranges:
         - [500, 1000]
         - [500, 1000]
-    - type: "SNP"  # "A" -> "A*" (for A of length 1)
+    - type: "SNP"  
       number: 3
-    - type: "DIVERGENCE"  # "A" -> "A*" (for A of arbitrary length)
-      number: 3
-      divergence_prob: 0.2  # optional parameter giving the probability that each base in the interval will be changed
-      length_ranges: [[500, 1000]]
   # ==== OVERLAP PLACEMENT EXAMPLES ====
   # 1) 'overlap_mode' will result in each of these DELs being placed to overlap with a randomly
   #    chosen interval from 'overlap_regions'.  If 'overlap_mode' is 'exact',

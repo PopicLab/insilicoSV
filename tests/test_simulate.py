@@ -1,3 +1,4 @@
+
 import shutil
 import sys
 import tempfile
@@ -331,6 +332,20 @@ class TestSVSimulator(unittest.TestCase):
                                                                     "number": 1,
                                                                     "length_ranges": [[2, 2], [2, 2], [None, None]]}]}],
                                                    self.hap1, self.hap2, self.bed),
+                                        TestObject([self.ref_file, {"ChromA": "A"}],
+                                                   [self.par, {"reference": self.ref_file,
+                                                               "homozygous_only": True,
+                                                               "variant_sets": [
+                                                                   {"type": "SNP",
+                                                                    "number": 1}]}],
+                                                   self.hap1, self.hap2, self.bed),
+                                        TestObject([self.ref_file, {"ChromA": "A"}],
+                                                   [self.par, {"reference": self.ref_file,
+                                                               "homozygous_only": False,
+                                                               "variant_sets": [
+                                                                   {"type": "SNP",
+                                                                    "number": 1}]}],
+                                                   self.hap1, self.hap2, self.bed)
                                         ]
         self.test_objects_ins = [TestObject([self.ref_file, {
             "Chromosome19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
@@ -1278,6 +1293,12 @@ class TestSVSimulator(unittest.TestCase):
               "TCTACCAGTCCTTCGGTAATC"]],
             ["TC", {"type": "A->A+", "n_copies": [3],
                     "length_ranges": [[2, 2]]}, ["TCTCTC"]],
+            ["TCA", {"type": "A->",
+                    "length_ranges": [[2, 2]]}, ["T", "A"]],
+            ["TCA", {"type": "A  ->  ",
+                    "length_ranges": [[2, 2]]}, ["T", "A"]],
+            ["TC", {"type": "mCNV", "n_copies": [3],
+                    "length_ranges": [[2, 2]]}, ["TCTCTC"]],
             ["TC", {"type": "DIVERGENCE", "divergence_prob": [0.6],
                     "length_ranges": [[2, 2]]}, [i + j for i in ['A', 'T', 'C', 'G'] for j in ['A', 'T', 'C', 'G']]],
             ["TC", {"type": "A->A+", "n_copies": [[2, 3]],
@@ -1429,7 +1450,7 @@ class TestSVSimulator(unittest.TestCase):
             print(f'Error removing test dir {self.test_dir}: {exc}')
 
     # helper method for tests where the output will be in a known list of possibilities
-    def helper_test_known_output_svs(self, config_event_obj, target_frags=None):
+    def helper_test_known_output_svs(self, config_event_obj, target_frags=None, heterozygous=True):
         # target_frags: optional input frags to be checked for match with output frags
         config = config_event_obj
         config.initialize_files()
@@ -1440,6 +1461,9 @@ class TestSVSimulator(unittest.TestCase):
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
         config.remove_test_files()
         if target_frags is not None:
+            statement = (changed_frag_1 in target_frags) or (changed_frag_2 in target_frags)
+            if not heterozygous:
+                statement = (changed_frag_1 in target_frags) and (changed_frag_2 in target_frags)
             if changed_frag_1 == changed_frag_2:
                 '''if not changed_frag_1 in target_frags:
                     print('TEST IN', changed_frag_1, target_frags, curr_sim.svs)
@@ -1453,9 +1477,35 @@ class TestSVSimulator(unittest.TestCase):
                           'is not covered in the test case, check manually if it is correct given',
                           config.par_content, 'targets', target_frags)
             else:
-                if not (changed_frag_1 in target_frags or changed_frag_2 in target_frags):
+                if not statement:
                     print(f'{changed_frag_1=} {changed_frag_2=} {target_frags=}', file=sys.stderr)
-                self.assertTrue(changed_frag_1 in target_frags or changed_frag_2 in target_frags)
+                self.assertTrue(statement)
+        return changed_frag_1, changed_frag_2, curr_sim.svs
+
+    def helper_test_known_output_svs_zygosity(self, config_event_obj, target_hap1, target_hap2, hetero=None):
+        # target_frags: optional input frags to be checked for match with output frags
+        config = config_event_obj
+        config.initialize_files()
+        print(config.par_content)
+        curr_sim = SVSimulator(config.par)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref)
+        print(curr_sim.config, config.hap1, config.hap2, config.ref, config.bed)
+        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        config.remove_test_files()
+
+        for pred_index in range(len(changed_frag_1)):
+            correct = False
+            sol1 = changed_frag_1[pred_index]
+            sol2 = changed_frag_2[pred_index]
+            if hetero is None:
+                for index in range(len(target_hap1)):
+                    correct = (correct or (target_hap1[index] == sol1 and sol2 == target_hap2[index])
+                               or (target_hap1[index] == sol2 and sol1 == target_hap2[index]))
+                    print(correct, 'SOLUTIONS', sol1, sol2, 'TARGETS', target_hap1[index], target_hap2[index])
+            else:
+                correct = (sol1 in target_hap1) and (sol2 in target_hap2) and (sol1 != hetero or sol2 != hetero)
+            if not correct: print('ERROR', sol1, sol2)
+            assert correct
         return changed_frag_1, changed_frag_2, curr_sim.svs
 
     def test_snps(self):
@@ -1512,6 +1562,9 @@ class TestSVSimulator(unittest.TestCase):
         self.helper_test_known_output_svs(self.test_dispersion_objects[10], ['TATCT', 'TTCTA', 'CTATT'])
 
         self.helper_test_known_output_svs(self.test_dispersion_objects[11], ['TATCT', 'TTCTA', 'CTATT'])
+        self.helper_test_known_output_svs_zygosity(self.test_dispersion_objects[12], ['C', 'T', 'G'], ['C', 'T', 'G'])
+        self.helper_test_known_output_svs_zygosity(self.test_dispersion_objects[13], ['A', 'C', 'T', 'G'],
+                                                                                     ['A', 'C', 'T', 'G'], hetero='A')
 
     def test_overlap_placement_simple(self):
         # simple events
@@ -1567,10 +1620,11 @@ class TestSVSimulator(unittest.TestCase):
                                    in range(3)])
             elif i == 3:
                 for sv in curr_sim.svs:
-                    if 'delINV' in sv.info['SVTYPE']:
+                    print('info', sv.info, 'SV', sv, sv.config_descr.split('type: ')[-1] )
+                    if sv.config_descr.split('type: ')[-1] == '(A)B->b':
                         self.assertIn(sv_source_segments(sv),
                                       [[(15 + i * 3, 18 + i * 3), (18 + i * 3, 21 + i * 3)] for i in range(3)])
-                    elif 'INVdel' in sv.info['SVTYPE']:
+                    elif sv.config_descr.split('type: ')[-1] == '(A)B->a':
                         self.assertIn(sv_source_segments(sv),
                                       [[(8 + i * 2, 10 + i * 2), (10 + i * 2, 12 + i * 2)] for i in range(3)])
             elif i == 4:
@@ -1599,8 +1653,7 @@ class TestSVSimulator(unittest.TestCase):
             elif i == 8:
                 print(curr_sim.svs)
                 print([sv.info['GRAMMAR'] for sv in curr_sim.svs])
-                inv_ddup = [sv for sv in curr_sim.svs if 'INV_dDUP' in sv.info['SVTYPE'] or
-                            "A_()->A_a" in sv.info['GRAMMAR']][0]
+                inv_ddup = [sv for sv in curr_sim.svs if "A_()->A_a" in sv.info['GRAMMAR']][0]
                 dispersion_target = [
                     operation.target_region
                     for operation in inv_ddup.operations
@@ -1609,11 +1662,12 @@ class TestSVSimulator(unittest.TestCase):
                                 16 <= dispersion_target.start <= 20)
             elif i == 9:
                 # flanked-INV with anchor = full SV
+                print([sv.info['GRAMMAR'] for sv in curr_sim.svs])
                 assert ((sv_source_segments([sv for sv in curr_sim.svs
-                                             if 'delINVdel' in sv.info['SVTYPE']][0]) ==
+                                             if "(ABC)->b" in sv.info['GRAMMAR']][0]) ==
                          [(12, 14), (14, 17), (17, 18)]) or
                         (sv_source_segments([sv for sv in curr_sim.svs
-                                             if 'delINVdel' in sv.info['SVTYPE']][0]) ==
+                                             if "(ABC)->b" in sv.info['GRAMMAR']][0]) ==
                          [(13, 15), (15, 18), (18, 19)]
                          ))
             elif i == 10:
@@ -1759,6 +1813,7 @@ class TestSVSimulator(unittest.TestCase):
             if not isinstance(vs_config, TestObject):
                 if not isinstance(vs_config, list):
                     vs_config = [vs_config]
+                heterozygous = False
                 test_object = TestObject([self.ref_file, {f"chrTest{ref_num}": ref_seq
                                                           for ref_num, ref_seq in enumerate(as_list(ref))}],
                                          [self.par, {"reference": self.ref_file,
@@ -1770,6 +1825,7 @@ class TestSVSimulator(unittest.TestCase):
                                          '/data/enzo/insilicoSV/hap1.fna', '/data/enzo/insilicoSV/hap2.fna',
                                          '/data/enzo/insilicoSV/hap.bed')
             else:
+                heterozygous = True
                 test_object = vs_config
 
             results_seen = set()
@@ -1783,7 +1839,8 @@ class TestSVSimulator(unittest.TestCase):
                 print("SEED", test_object.par_content["random_seed"])
 
                 attempt_num += 1
-                results, results2, svs = self.helper_test_known_output_svs(test_object, expected_results)
+                results, results2, svs = self.helper_test_known_output_svs(test_object, expected_results,
+                                                                           heterozygous=heterozygous)
                 print('RESUTLS', results)
                 count_occ[results] += 1
                 results_seen.update([results, results2])

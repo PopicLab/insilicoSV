@@ -3,10 +3,12 @@ from dataclasses import dataclass
 from copy import copy
 from enum import Enum
 from functools import cached_property
+
+from PIL.ImageOps import scale
 from typing_extensions import TypeAlias, Optional, Any, cast, override
 
 from insilicosv.utils import (
-    Locus, Region, OverlapMode, RegionFilter, chk)
+    Locus, Region, OverlapMode, RegionFilter, chk, if_not_none)
 
 class TransformType(Enum):
 
@@ -21,13 +23,13 @@ class Transform:
 
     n_copies: int = 1
     divergence_prob: float = 0
-    replacement_seq: Optional[str] = None
+    replacement_seq: Optional[list[str]] = None
+    orig_seq: Optional[str] = None
 
     def __post_init__(self):
         assert (self.transform_type != TransformType.DEL or
                 (self.is_in_place and self.divergence_prob == 0 and self.replacement_seq is None))
         assert 0 <= self.divergence_prob <= 1
-        assert self.divergence_prob == 0 or self.replacement_seq is None
 
 Breakend: TypeAlias = int
 
@@ -295,12 +297,13 @@ class BaseSV(SV):
 
     @override
     def to_vcf_records(self, config):
-        sv_type_str = self.info['SVTYPE']
+        sv_type_str = self.info['OP_TYPE']
+        sv_id = self.sv_id
         assert self.placement is not None
 
         sv_vcf_recs: list[dict] = []
         for op_idx, operation in enumerate(self.operations):
-
+            rec_id = self.sv_id
             dispersion_target = None
 
             if (not operation.is_in_place and
@@ -308,16 +311,16 @@ class BaseSV(SV):
                 # Identify operations giving the target of a dispersion
                 dispersion_target = operation.target_region
                 assert dispersion_target.is_empty()
-
+            sv_info = dict(self.info)
             op_type_str = operation.transform_type.value
             if (operation.transform_type == TransformType.IDENTITY) and operation.is_in_place:
                 if (operation.transform.divergence_prob == 1) and (self.breakend_interval_lengths[0] == 1):
-                    op_type_str = 'SNP'
+                    # SNP
+                    op_type_str = 'NA'
+                    rec_id = sv_id = 'snp' + self.sv_id.split('sv')[-1]
                 elif operation.transform.divergence_prob > 0:
                     op_type_str = 'DIVERGENCE'
 
-            sv_info = dict(self.info)
-            sv_info['IN_PLACE'] = "in_place" if operation.is_in_place else "paste"
             if operation.novel_insertion_seq is not None:
                 op_chrom = operation.target_region.chrom
                 op_start = operation.target_region.start
@@ -339,7 +342,7 @@ class BaseSV(SV):
             if operation.transform.n_copies > 1:
                 sv_info['NCOPIES'] = operation.transform.n_copies
 
-            sv_info['SVTYPE'] = op_type_str
+            sv_info['OP_TYPE'] = op_type_str
             if dispersion_target is not None:
                 sv_info['TARGET_CHROM'] = dispersion_target.chrom
                 sv_info['TARGET'] = dispersion_target.start + 1
@@ -349,6 +352,7 @@ class BaseSV(SV):
                 sv_info['INSORD'] = operation.target_insertion_order[1]
 
             if self.anchor is not None:
+                sv_info['OVLP_TYPE'] = self.overlap_mode.name
                 # If the operation breakend are within the anchor we give the overlap information.
                 if (operation.source_breakend_region is not None and
                         self.anchor.start_breakend <= operation.source_breakend_region.start_breakend <= self.anchor.end_breakend):
@@ -357,15 +361,30 @@ class BaseSV(SV):
                 if (operation.target_region is not None and
                         self.anchor.start_breakend <= operation.target_region.start <= self.anchor.end_breakend):
                     sv_info['OVLP_TARGET'] = self.roi.kind
-            sv_id = self.sv_id
-            alleles = ['N', '<%s>' % op_type_str]
+            alleles = ['N', '<%s>' % sv_type_str]
             if len(self.operations) > 1:
-                sv_id += f'_{op_idx}'
+                rec_id += f'_{op_idx}'
+                if sv_info['OP_TYPE'] == 'IDENTITY' and not operation.is_in_place:
+                    sv_info['OP_TYPE'] = 'COPY-PASTE'
+                if sv_info['OP_TYPE'] == 'INV' and not operation.is_in_place:
+                    sv_info['OP_TYPE'] = 'COPYinv-PASTE'
+                alleles[1] = '<%s>' % sv_info['OP_TYPE']
             else:
-                sv_info['SVTYPE'] = sv_type_str
-                alleles = ['N', '<%s>' % sv_type_str]
-            sv_info['PARENT_SVID'] = self.sv_id
-            sv_info['PARENT_SVTYPE'] = sv_type_str
+                if ((sv_type_str == 'SNP')
+                        and (operation.transform.orig_seq is not None)
+                        and (operation.transform.replacement_seq is not None)):
+                    # Find the original and altered bases.
+                    alts = str(if_not_none(operation.transform.replacement_seq[0], ''))
+                    if (operation.transform.replacement_seq[1] is not None and
+                            operation.transform.replacement_seq[1] != operation.transform.replacement_seq[0]):
+                        alts += ', '*(len(alts)) + str(if_not_none(operation.transform.replacement_seq[1], ''))
+                    alleles = [operation.transform.orig_seq, '%s' % alts]
+                else:
+                    sv_info['OP_TYPE'] = sv_type_str
+                    alleles = ['N', '<%s>' % sv_type_str]
+            sv_info['SVID'] = rec_id
+            sv_info['SVTYPE'] = sv_type_str
+
             for key, value in operation.op_info.items():
                 sv_info[key] = value
 
@@ -373,12 +392,61 @@ class BaseSV(SV):
             vcf_rec = dict(contig=op_chrom, start=op_start, stop=op_end,
                            qual=100, filter='PASS',
                            alleles=alleles,
-                           id=sv_id,
+                           id=rec_id,
                            samples=[{'GT': zygosity}],
                            info=sv_info)
             sv_vcf_recs.append(vcf_rec)
         # end: for op_idx, operation in enumerate(self.operations)
-        return sv_vcf_recs
+
+        # Combined operations for a clearer output
+        combined_recs = []
+        for record in sv_vcf_recs:
+            if record['info']['OP_TYPE'] not in ['DEL']:
+                combined_recs.append(record)
+                continue
+            start, stop = record['start'], record['stop']
+            combined = False
+            for record_compare in sv_vcf_recs:
+                if record_compare['info']['OP_TYPE'] not in ['COPYinv-PASTE', 'COPY-PASTE']: continue
+                if start != record_compare['start'] or stop != record_compare['stop']: continue
+                # We have found a record of a copy operation that is overlapping a DEL, so the operation is a CUT
+                record_compare['info']['OP_TYPE'] = 'CUT' + record_compare['info']['OP_TYPE'].split('COPY')[1]
+                record_compare['alleles'][1] = '<%s>' % record_compare['info']['OP_TYPE']
+                combined = True
+            if not combined:
+                if len(sv_vcf_recs) > 1:
+                    record['info']['OP_TYPE'] = 'CUT'
+                combined_recs.append(record)
+
+        # Check if a type provided as grammar is a predefined type
+        if combined_recs[0]['info']['SVTYPE'] == 'Custom':
+            lhs, rhs = combined_recs[0]['info']['GRAMMAR'].split('->')
+            lhs = tuple([letter for letter in lhs if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]])
+            rhs = tuple(rhs)
+            for key, grammar in SV_KEY.items():
+                # Test if the grammar or its symmetric match the grammar of the record
+                if (grammar[0] == lhs and grammar[1] == rhs) or (
+                        grammar[0] == lhs[::-1] and grammar[1] == rhs[::-1]):
+                    combined_recs[0]['info']['SVTYPE'] = key.name
+                    if len(combined_recs) == 1:
+                        combined_recs[0]['info']['OP_TYPE'] = key.name
+                        combined_recs[0]['alleles'][1] = '<%s>' % key.name
+                    break
+        # Update the records numbering if records have been combined
+        if len(combined_recs) == 1:
+            combined_recs[0]['id'] = sv_id
+            combined_recs[0]['info']['OP_TYPE'] = 'NA'
+        elif len(combined_recs) != len(sv_vcf_recs):
+            for idx, operation in enumerate(combined_recs):
+                operation['id'] = self.sv_id + f'_{idx}'
+        if sv_type_str == 'SNP':
+            del combined_recs[0]['info']['OP_TYPE']
+            del combined_recs[0]['info']['VSET']
+            del combined_recs[0]['info']['GRAMMAR']
+            del combined_recs[0]['info']['SVTYPE']
+            del combined_recs[0]['info']['SVID']
+            del combined_recs[0]['info']['SYMBOL']
+        return combined_recs
 # end: class BaseSV(SV)
 
 #############################################
@@ -398,10 +466,10 @@ class TandemRepeatExpansionContractionSV(BaseSV):
 
     @override
     def to_vcf_records(self, config):
-        sv_type_str = self.info['SVTYPE']
+        op_type_str = self.info['OP_TYPE']
         vcf_rec = super().to_vcf_records(config)[0]
-        vcf_rec['info']['SVTYPE'] = sv_type_str
-        vcf_rec['alleles'] = ['N', '<%s>' % sv_type_str]
+        vcf_rec['info']['OP_TYPE'] = op_type_str
+        vcf_rec['alleles'] = ['N', '<%s>' % op_type_str]
         assert self.roi is not None
         vcf_rec['info']['SVLEN'] = self.roi.length()
         vcf_rec['stop'] = self.roi.end

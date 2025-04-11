@@ -7,8 +7,8 @@ import re
 from pysam import VariantFile
 
 from insilicosv import utils
-from insilicosv.utils import Region, Locus
-from insilicosv.sv_defs import Operation, Transform, TransformType, BreakendRegion
+from insilicosv.utils import Region, Locus, if_not_none
+from insilicosv.sv_defs import Operation, Transform, TransformType, BreakendRegion, VariantType
 from insilicosv.variant_set import get_vcf_header_infos
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,9 @@ class StatsCollector:
             if (sv.roi is not None) and (sv.roi.kind != '_reference_'):
                 self.region_types[sv.roi.kind] += 1
             assert sv.genotype is not None
-            if sv.genotype[0] and sv.genotype[1]:
+            zygosity = sv.genotype[0] and sv.genotype[1] and (True if sv_type != VariantType.SNP else (
+                    sv.replacement_seq[0] == sv.replacement_seq[1]))
+            if zygosity:
                 self.num_homozygous += 1
             else:
                 self.num_heterozygous += 1
@@ -124,9 +126,9 @@ class OutputWriter:
             logger.warning('Skipping haps output')
             return
         for hap_index, hap_fa in enumerate(['sim.hapA.fa', 'sim.hapB.fa']):
-            self.output_hap(os.path.join(self.output_path, hap_fa), hap_index)
+            self.output_hap(os.path.join(self.output_path, hap_fa), hap_index, self.config.get('homozygous_only', False))
 
-    def output_hap(self, hap_fa, hap_index):
+    def output_hap(self, hap_fa, hap_index, homozygous):
         paf_records = []
         hap_chrom_lengths = {}
         with open(hap_fa, 'w') as sim_fa:
@@ -207,13 +209,24 @@ class OutputWriter:
                             if operation.transform_type == TransformType.INV:
                                 seq = utils.reverse_complement(seq)
                                 paf_rec = paf_rec._replace(strand='-')
-                            if (operation.transform.divergence_prob > 0 or
-                                operation.transform.replacement_seq is not None):
-                                seq_orig = seq
-                                seq = utils.if_not_none(
-                                    operation.transform.replacement_seq,
-                                    utils.divergence(seq, operation.transform.divergence_prob))
-                                assert len(seq) == len(seq_orig)
+                            if operation.transform.divergence_prob > 0:
+                                orig_seq = seq
+                                if operation.transform.replacement_seq is None or operation.transform.replacement_seq[hap_index] is None:
+                                    haplotypes = operation.transform.replacement_seq
+                                    if haplotypes is None:
+                                        haplotypes = [None, None]
+                                    if homozygous and hap_index == 1:
+                                        replacement_seq = haplotypes[0]
+                                    else:
+                                        replacement_seq = utils.divergence(seq, operation.transform.divergence_prob)
+                                    haplotypes[hap_index] = replacement_seq
+                                    operation.transform = Transform(operation.transform_type,
+                                                                    is_in_place=operation.transform.is_in_place,
+                                                                    n_copies=operation.transform.n_copies,
+                                                                    divergence_prob=operation.transform.divergence_prob,
+                                                                    replacement_seq=haplotypes, orig_seq=orig_seq)
+                                seq = operation.transform.replacement_seq[hap_index]
+                                assert len(seq) == len(orig_seq)
                         if seq is not None:
                             sim_fa.write(seq)
                             hap_chrom_pos += len(seq)
@@ -222,8 +235,8 @@ class OutputWriter:
 
                         assert paf_rec is not None
 
-                        if operation.op_info and operation.op_info.get('sv_id'):
-                            sv_id = operation.op_info['sv_id']
+                        if operation.op_info and operation.op_info.get('SVID'):
+                            sv_id = operation.op_info['SVID']
                             paf_rec = paf_rec._replace(tags=paf_rec.tags + f'\tsv:Z:{sv_id}')
                         paf_records.append(paf_rec)
                     # end: for _ in range(operation.transform.n_copies):
@@ -270,7 +283,7 @@ class OutputWriter:
 
                     if operation.op_info is None:
                         operation.op_info = dict()
-                    operation.op_info['sv_id'] = sv.sv_id
+                    operation.op_info['SVID'] = sv.sv_id
                     chrom2operations[operation.target_region.chrom].append(operation)
 
         for chrom, chrom_length in self.chrom_lengths.items():

@@ -687,10 +687,10 @@ class SVSimulator:
         logger.info('Writing outputs')
         output_writer = OutputWriter(self.svs, self.reference, self.chrom_lengths,
                                      self.output_path, self.config)
-        logger.info('Writing VCF file')
-        output_writer.output_vcf()
         logger.info('Writing new haplotypes')
         output_writer.output_haps()
+        logger.info('Writing VCF file')
+        output_writer.output_vcf()
         logger.info('Writing novel insertions file')
         output_writer.output_novel_insertions()
         output_writer.output_stats()

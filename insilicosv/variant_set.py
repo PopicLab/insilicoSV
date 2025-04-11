@@ -17,6 +17,7 @@ from insilicosv.sv_defs import (Transform, TransformType, BreakendRegion, Operat
 
 logger = logging.getLogger(__name__)
 
+
 class VariantSet(ABC):
 
     @classmethod
@@ -49,7 +50,8 @@ class VariantSet(ABC):
         self.overlap_mode = None
         if 'overlap_mode' in self.vset_config:
             chk(isinstance(self.vset_config['overlap_mode'], str) or
-                (isinstance(self.vset_config['overlap_mode'], list) and all(isinstance(ovlp, str) for ovlp in self.vset_config['overlap_mode'])),
+                (isinstance(self.vset_config['overlap_mode'], list) and all(
+                    isinstance(ovlp, str) for ovlp in self.vset_config['overlap_mode'])),
                 'overlap_mode not a string or list of strings')
             try:
                 self.overlap_mode = OverlapMode(self.vset_config['overlap_mode'])
@@ -68,16 +70,16 @@ class VariantSet(ABC):
         self.overlap_ranges = tuple(
             self.vset_config['overlap_region_length_range'] if 'overlap_region_length_range' in self.vset_config else
             [None, None])
-
-        self.vset_config['type'] = self.vset_config['type'].replace(" ", "")
-        if '->' in self.vset_config['type']:
-            self.svtype = VariantType.Custom
-            grammar = self.vset_config['type'].split('->')
-        else:
-            self.svtype = VariantType(self.vset_config['type'])
-            grammar = SV_KEY[VariantType(self.vset_config['type'])]
-        self.source = grammar[0]
-        self.target = grammar[1]
+        if 'type' in self.vset_config:
+            self.vset_config['type'] = self.vset_config['type'].replace(" ", "")
+            if '->' in self.vset_config['type']:
+                self.svtype = VariantType.Custom
+                grammar = self.vset_config['type'].split('->')
+            else:
+                self.svtype = VariantType(self.vset_config['type'])
+                grammar = SV_KEY[VariantType(self.vset_config['type'])]
+            self.source = grammar[0]
+            self.target = grammar[1]
 
     def get_sampled_int_value(self, value, locals_dict=
     None):
@@ -92,14 +94,15 @@ class VariantSet(ABC):
             try:
                 eval_dict = dict(
                     random=random, math=math
-                    )
+                )
                 if locals_dict is not None:
                     eval_dict.update(locals_dict)
                 return int(eval(value, eval_dict))
             except Exception as exc:
                 chk(False, f'Error valuating {value}: {exc}')
 
-    def grammar_to_variant_set(self, lhs_strs, rhs_strs, symbol_lengths, symbol_min_lengths, num_letters, novel_insertion_seqs,
+    def grammar_to_variant_set(self, lhs_strs, rhs_strs, symbol_lengths, symbol_min_lengths, num_letters,
+                               novel_insertion_seqs,
                                n_copies_list, divergence_prob_list, replacement_seq=None):
         #
         # Parse the LHS strings into Symbols, and RHS strings into RHSItems.
@@ -130,17 +133,19 @@ class VariantSet(ABC):
                 continue
 
             if lhs_str == Syntax.DISPERSION:
-                chk(len(symbol_lengths) >= num_letters + len(lhs_dispersion) + 1, f'Invalid dispersion ranges for {lhs_str}')
+                chk(len(symbol_lengths) >= num_letters + len(lhs_dispersion) + 1,
+                    f'Invalid dispersion ranges for {lhs_str}')
                 breakend_interval_lengths.append(symbol_lengths[num_letters + len(lhs_dispersion)])
                 breakend_interval_min_lengths.append(symbol_min_lengths[num_letters + len(lhs_dispersion)])
                 lhs_dispersion.append(len(lhs))
             else:
-                chk((len(lhs_str) == 1 and lhs_str[0].isupper()),f'Invalid LHS symbol for {lhs_str}')
-                chk(len(symbol_lengths) >= len(lhs)-len(lhs_dispersion), f'Missing length ranges {lhs_str}')
-                breakend_interval_lengths.append(symbol_lengths[len(lhs)-len(lhs_dispersion)])
-                breakend_interval_min_lengths.append(symbol_min_lengths[len(lhs)-len(lhs_dispersion)])
+                chk((len(lhs_str) == 1 and lhs_str[0].isupper()), f'Invalid LHS symbol for {lhs_str}')
+                chk(len(symbol_lengths) >= len(lhs) - len(lhs_dispersion), f'Missing length ranges {lhs_str}')
+                breakend_interval_lengths.append(symbol_lengths[len(lhs) - len(lhs_dispersion)])
+                breakend_interval_min_lengths.append(symbol_min_lengths[len(lhs) - len(lhs_dispersion)])
             lhs.append(Symbol(lhs_str))
-        chk((overlap_anchor_bounds[0] is None) or (overlap_anchor_bounds[1] is not None), f'Anchor opening without closing: {lhs_strs}')
+        chk((overlap_anchor_bounds[0] is None) or (overlap_anchor_bounds[1] is not None),
+            f'Anchor opening without closing: {lhs_strs}')
         overlap_anchor = None
         if overlap_anchor_bounds[0] is not None and overlap_anchor_bounds[1] is not None:
             overlap_anchor = BreakendRegion(overlap_anchor_bounds[0], overlap_anchor_bounds[1])
@@ -193,7 +198,7 @@ class VariantSet(ABC):
             n_copies = 1
             if Syntax.MULTIPLE_COPIES in rhs_str:
                 chk(n_multiple_copies < len(n_copies_list), f'A number of copies must be provided '
-                                                                              f'for each + symbol used.')
+                                                            f'for each + symbol used.')
                 n_copies = self.get_sampled_int_value(n_copies_list[n_multiple_copies])
                 chk(n_copies >= 1, f'The number of copies must be strictly positive, got {n_copies} for '
                                    f'the {n_multiple_copies + 1} \'+\' symbol {symbol}.')
@@ -203,12 +208,12 @@ class VariantSet(ABC):
             if Syntax.DIVERGENCE in rhs_str and replacement_seq is None:
                 # replacement_seq is used to provide the SNP when loading from vcf
                 chk(n_divergence_prob < len(divergence_prob_list), f'A number of copies must be provided '
-                                                            f'for each + symbol used.')
+                                                                   f'for each + symbol used.')
                 divergence_prob = self.get_sampled_int_value(divergence_prob_list[n_divergence_prob])
-                chk(0 < divergence_prob <= 1, f'The divergence probability must be between 0 (excluded) and 1 (included), got {divergence_prob} for '
-                                   f'the {n_divergence_prob + 1} \'*\' symbol {symbol}.')
+                chk(0 < divergence_prob <= 1,
+                    f'The divergence probability must be between 0 (excluded) and 1 (included), got {divergence_prob} for '
+                    f'the {n_divergence_prob + 1} \'*\' symbol {symbol}.')
                 n_divergence_prob += 1
-
 
             transform = Transform(
                 transform_type=transform_type,
@@ -218,11 +223,12 @@ class VariantSet(ABC):
                 replacement_seq=replacement_seq
             )
             # We do not add operations for inplace identity transformations without divergence (do not affect the sequence).
-            if (transform_type != TransformType.IDENTITY or not is_in_place or divergence_prob > 0 or replacement_seq is not None
+            if (
+                    transform_type != TransformType.IDENTITY or not is_in_place or divergence_prob > 0 or replacement_seq is not None
                     or n_copies > 1):
                 # The letter has been involved in an operation and is not a placeholder.
                 identities_to_add[symbol] = False
-                operation = Operation(transform=transform, op_info={'SOURCE_LETTER': symbol.name})
+                operation = Operation(transform=transform, op_info={'SYMBOL': symbol.name})
                 if is_in_place and not n_copies > 1:
                     operation.source_breakend_region = BreakendRegion(current_breakend - 1, current_breakend)
                 else:
@@ -236,16 +242,18 @@ class VariantSet(ABC):
                         if symbol not in novel_insertions:
                             # The position of the length of a new letter is after all the letters in the lhs (non dispersion)
                             # and in order of apparition in the rhs
-                            chk(len(symbol_lengths) >= len(lhs)-len(lhs_dispersion)+len(novel_insertions),
+                            chk(len(symbol_lengths) >= len(lhs) - len(lhs_dispersion) + len(novel_insertions),
                                 f'missing length_ranges for {symbol} in {lhs_strs}')
                             novel_insertion = None
                             if novel_insertion_seqs is not None:
-                                chk(len(novel_insertion_seqs) > len(novel_insertions), f'If a novel_insertions field is provided, it must '
-                                                                                        f'contain the sequences for each novel insertion or None.')
+                                chk(len(novel_insertion_seqs) > len(novel_insertions),
+                                    f'If a novel_insertions field is provided, it must '
+                                    f'contain the sequences for each novel insertion or None.')
                                 if novel_insertion_seqs[len(novel_insertions)] is not None:
                                     novel_insertion = novel_insertion_seqs[len(novel_insertions)]
                             if novel_insertion is None:
-                                novel_insertion = utils.generate_seq(length=symbol_lengths[len(lhs)-len(lhs_dispersion)+len(novel_insertions)])
+                                novel_insertion = utils.generate_seq(
+                                    length=symbol_lengths[len(lhs) - len(lhs_dispersion) + len(novel_insertions)])
                             novel_insertions[symbol] = novel_insertion
                         operation.novel_insertion_seq = novel_insertions[symbol]
                 operations.append(operation)
@@ -257,7 +265,7 @@ class VariantSet(ABC):
                 source_index = lhs.index(letter)
                 # The symbol was deleted, we add a DEL operation.
                 transform = Transform(transform_type=TransformType.DEL, is_in_place=True)
-                operation = Operation(transform=transform, op_info={'SOURCE_LETTER': letter.name})
+                operation = Operation(transform=transform, op_info={'SYMBOL': letter.name})
                 operation.source_breakend_region = BreakendRegion(source_index, source_index + 1)
                 operations.append(operation)
         # Add the identities for place holder letters
@@ -266,7 +274,7 @@ class VariantSet(ABC):
                 source_index = lhs.index(letter)
                 # The symbol was deleted, we add a DEL operation.
                 transform = Transform(transform_type=TransformType.IDENTITY, is_in_place=True)
-                operation = Operation(transform=transform, op_info={'SOURCE_LETTER': letter.name})
+                operation = Operation(transform=transform, op_info={'SYMBOL': letter.name})
                 operation.source_breakend_region = BreakendRegion(source_index, source_index + 1)
                 operations.append(operation)
         chk(len(lhs_dispersion) == n_dispersions_rhs, f'Dispersions cannot be altered, the same dispersions must '
@@ -274,7 +282,7 @@ class VariantSet(ABC):
                                                       f'rhs: {n_dispersions_rhs} dispersions.')
         # If overlap_anchor is not specified, infer "full SV" as the anchor if no dispersion
         if (overlap_anchor is None) and (self.overlap_mode is not None) and (not lhs_dispersion):
-            overlap_anchor = BreakendRegion(0, len(lhs)-1)
+            overlap_anchor = BreakendRegion(0, len(lhs) - 1)
         return operations, overlap_anchor, lhs_dispersion, breakend_interval_lengths, breakend_interval_min_lengths
 
     # end: def grammar_to_variant_set
@@ -298,12 +306,14 @@ class SimulatedVariantSet(VariantSet):
         if (self.svtype == VariantType.DUP) and ('n_copies' not in self.vset_config):
             self.vset_config['n_copies'] = [1]
         if 'n_copies' in self.vset_config:
-            chk(isinstance(self.vset_config['n_copies'], list), 'The number of copies must a list of integers or ranges.')
+            chk(isinstance(self.vset_config['n_copies'], list),
+                'The number of copies must a list of integers or ranges.')
         if self.svtype == "mCNV":
             chk(('n_copies' in self.vset_config) and (self.vset_config['n_copies'][0] > 1),
                 f'n_copies has to be provided and be above 1 for a mCNV.')
+
     # end: def preprocess_config(self)
-        
+
     @property
     def sv_type(self):
         return self.svtype
@@ -319,7 +329,6 @@ class SimulatedVariantSet(VariantSet):
             return None
         return RegionFilter(region_kinds=tuple(utils.as_list(self.vset_config['blacklist_region_type'])))
 
-
     def pick_genotype(self):
         if self.config.get('homozygous_only', False) or random.randint(0, 1):
             return True, True
@@ -334,6 +343,7 @@ class SimulatedVariantSet(VariantSet):
     def simulate_sv(self):
         raise NotImplementedError()
 
+
 #############################################
 # Constructing SVs from grammar definitions #
 #############################################
@@ -344,7 +354,8 @@ class FromGrammarVariantSet(SimulatedVariantSet):
     @override
     @classmethod
     def can_make_from(cls, vset_config):
-        return vset_config.get("type") in [k.value for k in SV_KEY.keys()] or '->' in vset_config.get("type")
+        return ((vset_config.get("type") is not None) and
+                (vset_config.get("type") in [k.value for k in SV_KEY.keys()] or '->' in vset_config.get("type")))
 
     @override
     def preprocess_config(self):
@@ -361,21 +372,11 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'n_copies',
                 'novel_insertions',
                 'interchromosomal',
-                'config_descr', 
+                'config_descr',
             ), f'invalid SV config key {vset_config_key}')
 
         vset_cfg = self.vset_config
 
-        if self.svtype not in (VariantType.SNP,):
-            chk('length_ranges' in vset_cfg, 'Please specify length ranges')
-            chk(isinstance(vset_cfg['length_ranges'], list), 'length_ranges must be a list')
-            for length_range in vset_cfg['length_ranges']:
-                chk(isinstance(length_range, str) or 
-                    (isinstance(length_range, list) and len(length_range) == 2 and
-                     isinstance(length_range[0], (type(None), int, str)) and
-                     isinstance(length_range[1], (type(None), int, str))),
-                    'invalid length_ranges')
-                
         if self.svtype == VariantType.SNP:
             chk(vset_cfg.get('length_ranges') in (None, [[1, 1]]),
                 'length range for SNP can only be [1, 1]')
@@ -383,13 +384,23 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'divergence prob for SNP can only be 1')
             vset_cfg['length_ranges'] = [[1, 1]]
             vset_cfg['divergence_prob'] = [1.0]
+        else:
+            chk('length_ranges' in vset_cfg, 'Please specify length ranges')
+            chk(isinstance(vset_cfg['length_ranges'], list), 'length_ranges must be a list')
+            for length_range in vset_cfg['length_ranges']:
+                chk(isinstance(length_range, str) or
+                    (isinstance(length_range, list) and len(length_range) == 2 and
+                     isinstance(length_range[0], (type(None), int, str)) and
+                     isinstance(length_range[1], (type(None), int, str))),
+                    'invalid length_ranges')
 
         if 'novel_insertions' in self.vset_config:
             try:
                 with open(self.vset_config['novel_insertions'], 'r') as sequences:
                     self.novel_insertion_seqs = [line.rstrip() for line in sequences]
-                    chk(all(bool(re.match('^[TCGA]+$', line)) for line in self.novel_insertion_seqs), f'The file novel_insertions'
-                                                                                  f'can only contains invalid characters. It must be a list of sequences.')
+                    chk(all(bool(re.match('^[TCGA]+$', line)) for line in self.novel_insertion_seqs),
+                        f'The file novel_insertions'
+                        f'can only contains invalid characters. It must be a list of sequences.')
             except:
                 chk(False, f'novel_insertion must be a readable file containing a sequence per line.')
         for src_trg in ('source', 'target'):
@@ -422,20 +433,21 @@ class FromGrammarVariantSet(SimulatedVariantSet):
     def symmetrize(self, lhs_strs, rhs_strs, letter_ranges):
         # Enforce the symmetry of the predefined SVs with duplications or dispersions.
         if (("DUP" in self.svtype.name or "TRA" in self.svtype.name or
-                 "iDEL" in self.svtype.name)
-                 and (not self.is_interchromosomal)
-                 and random.randint(0, 1)):
+             "iDEL" in self.svtype.name)
+                and (not self.is_interchromosomal)
+                and random.randint(0, 1)):
             def flip_anchor(val: str) -> str:
                 if val == Syntax.ANCHOR_START:
                     return Syntax.ANCHOR_END
                 if val == Syntax.ANCHOR_END:
                     return Syntax.ANCHOR_START
                 return val
+
             lhs_strs = tuple(map(flip_anchor, lhs_strs))[::-1]
             rhs_strs = tuple(map(flip_anchor, rhs_strs))[::-1]
             if "length_ranges" in self.vset_config:
                 letter_ranges = letter_ranges[::-1]
-        chk(all(len(rhs)<3 for rhs in rhs_strs), f'The operators + and * cannot be used at the same time {rhs_strs}.')
+        chk(all(len(rhs) < 3 for rhs in rhs_strs), f'The operators + and * cannot be used at the same time {rhs_strs}.')
         return lhs_strs, rhs_strs, letter_ranges
 
     # Randomly pick distances withing the ranges defined for each symbol
@@ -444,7 +456,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         ranges = length_ranges + dispersion_ranges
         remaining_symbols = [i for i in range(len(ranges))]
         chk(all(isinstance(length_range, str) or (isinstance(length_range, list) and (len(length_range) == 2))
-                for length_range in ranges),f'length_ranges must be a list of [min, max] pairs')
+                for length_range in ranges), f'length_ranges must be a list of [min, max] pairs')
         # Keep track of the dependencies between the symbols length ranges.
         # A dependency is the index of the letter the range is depending on (possibly a different letter for the min and max bounds)
         # and the offset to those letter lengths.
@@ -454,7 +466,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         while remaining_symbols:
             idx = remaining_symbols.pop(0)
             min_range, max_range = ranges[idx]
-            if(isinstance(min_range, int) or min_range is None) and (isinstance(max_range, int) or max_range is None):
+            if (isinstance(min_range, int) or min_range is None) and (isinstance(max_range, int) or max_range is None):
                 # Both bounds are independent to other letter lengths.
                 def assign_length(min_range, max_range, is_dispersion):
                     if max_range is None:
@@ -479,18 +491,22 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                         # The bound is dependent of another letter
                         no_space_bound = bound.strip()
                         format_bound = [int(char) if char.isdigit() else char for char in no_space_bound]
-                        letters_bound = [(idx, char) for idx, char in enumerate(format_bound) if isinstance(char, str) and char.isalpha()]
-                        chk(all(letter in letter_indexes for _, letter in letters_bound), f'The length of a symbol depends on {letters_bound}'
-                                                                                    f'one of which is not define in neither the source nor target.')
+                        letters_bound = [(idx, char) for idx, char in enumerate(format_bound) if
+                                         isinstance(char, str) and char.isalpha()]
+                        chk(all(letter in letter_indexes for _, letter in letters_bound),
+                            f'The length of a symbol depends on {letters_bound}'
+                            f'one of which is not define in neither the source nor target.')
                         computed_letter = 0
                         for idx_in_dependency, letter in letters_bound:
                             # Gets the index of the letter in the list of length ranges.
                             index = letter_indexes[letter]
                             if index in symbol_lengths:
-                                chk(symbol_lengths[index] is not None, f'A symbol length cannot depend on an unbounded symbol.')
+                                chk(symbol_lengths[index] is not None,
+                                    f'A symbol length cannot depend on an unbounded symbol.')
                                 ope = ''
-                                if (idx_in_dependency > 0) and (isinstance(format_bound[idx_in_dependency-1], int)
-                                                                or format_bound[idx_in_dependency-1] in letter_indexes):
+                                if (idx_in_dependency > 0) and (isinstance(format_bound[idx_in_dependency - 1], int)
+                                                                or format_bound[
+                                                                    idx_in_dependency - 1] in letter_indexes):
                                     # The previous character was an integer, so a multiplication symbol was omitted.
                                     ope = '*'
                                 format_bound[idx_in_dependency] = ope + str(symbol_lengths[index])
@@ -500,7 +516,8 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                                     dependencies[idx] = []
                                 dependencies[idx].append(index)
                                 if index in dependencies:
-                                    chk(not idx in dependencies[index], f'There is a cyclic dependency in the length definitions {letter}.')
+                                    chk(not idx in dependencies[index],
+                                        f'There is a cyclic dependency in the length definitions {letter}.')
                                     dependencies[idx] += dependencies[index]
                                 dependencies[idx] = list(set(dependencies[idx]))
                         if len(letters_bound) == computed_letter:
@@ -515,7 +532,8 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                                 ranges[idx][pos] = eval_bound
                             except:
                                 chk(False, f'The length of a symbol depends on an invalid operation {idx}.')
-                            chk(ranges[idx][pos] >= 0, f'The operation defining the {idx}th symbol length gives a negative bound.')
+                            chk(ranges[idx][pos] >= 0,
+                                f'The operation defining the {idx}th symbol length gives a negative bound.')
                 remaining_symbols.append(idx)
         lengths = sorted(symbol_lengths.items(), key=lambda x: x[0])
         min_lengths = sorted(symbol_min_lengths.items(), key=lambda x: x[0])
@@ -543,7 +561,8 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                                      idx in dispersions]
 
         lhs_strs, rhs_strs, letter_ranges = self.symmetrize(lhs_strs, rhs_strs, letter_ranges)
-        letters = [letter for letter in lhs_strs if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START, Syntax.DISPERSION]]
+        letters = [letter for letter in lhs_strs if
+                   letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START, Syntax.DISPERSION]]
         chk(len(letters) == len(set(letters)), f'Duplicate LHS symbol {letters}')
 
         # Add novel insertion letters only appearing in the rhs.
@@ -562,9 +581,11 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         divergence_prob_list = self.vset_config.get('divergence_prob', [])
 
         # Build the different operations and anchor, determine the breakends and the distance between them.
-        (operations, anchor, dispersions, breakend_interval_lengths, 
-         breakend_interval_min_lengths) = self.grammar_to_variant_set(lhs_strs, rhs_strs, symbol_lengths, symbol_min_lengths, len(letters),
-                                                                      novel_insertion_seqs, n_copies_list, divergence_prob_list)
+        (operations, anchor, dispersions, breakend_interval_lengths,
+         breakend_interval_min_lengths) = self.grammar_to_variant_set(lhs_strs, rhs_strs, symbol_lengths,
+                                                                      symbol_min_lengths, len(letters),
+                                                                      novel_insertion_seqs, n_copies_list,
+                                                                      divergence_prob_list)
         #
         # construct the SV object
         #
@@ -590,7 +611,8 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         source_str = ''.join(self.source)
         target_str = ''.join(self.target)
         grammar = f'{source_str}->{target_str}'
-        return {'SVTYPE': sv_type_str, 'GRAMMAR': grammar}
+        return {'OP_TYPE': sv_type_str, 'GRAMMAR': grammar}
+
 
 # end: class FromGrammarVariantSetMaker
 
@@ -639,7 +661,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                                     source_breakend_region=BreakendRegion(start_breakend=0, end_breakend=1),
                                     target_insertion_breakend=0,
                                     target_insertion_order=(0,),
-                                    op_info={'SOURCE_LETTER': 'A'})]
+                                    op_info={'SYMBOL': 'A'})]
             # We only need the repeat motif to be present once.
             roi_filter = TandemRepeatRegionFilter(min_num_repeats=1,
                                                   region_kinds=overlap_region_type)
@@ -664,7 +686,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
             operations = [Operation(transform=Transform(transform_type=TransformType.DEL,
                                                         is_in_place=True, n_copies=1),
                                     source_breakend_region=BreakendRegion(0, 1),
-                                    op_info={'SOURCE_LETTER': 'A'})]
+                                    op_info={'SYMBOL': 'A'})]
 
             # ensure there are enough existing repeats to delete.
             roi_filter = TandemRepeatRegionFilter(min_num_repeats=repeat_count_change,
@@ -693,10 +715,11 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
     @classmethod
     def get_vcf_header_infos(cls):
         return [dict(id='TR_INS_REP_SEQ', number=1, type='String',
-                            description="for tandem repeat insertions, the sequence of a single repeat"),
+                     description="for tandem repeat insertions, the sequence of a single repeat"),
                 dict(id='TR_CHANGE', number=1, type='Integer',
                      description="for tandem repeat insertions/expansions/deletions, number of "
-                     "repeats inserted or removed")]
+                                 "repeats inserted or removed")]
+
 
 #############################################
 
@@ -705,6 +728,8 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
 ###########################
 
 class ImportedVariantSet(VariantSet):
+    op_types = ['IDENTITY', 'COPY-PASTE', 'CUT-PASTE', 'COPYinv-PASTE', 'CUTinv-PASTE', 'NA', 'CUT']
+    can_import_types = [v.value for v in VariantType] + op_types
 
     @override
     @classmethod
@@ -732,8 +757,8 @@ class ImportedVariantSet(VariantSet):
                 with error_context(vcf_rec):
                     if vcf_rec.chrom not in self.chrom_lengths: continue
                     vcf_info = dict(vcf_rec.info)
-                    if 'PARENT_SVID' in vcf_info:
-                        recs[vcf_info['PARENT_SVID']].append(vcf_rec)
+                    if 'SVID' in vcf_info:
+                        recs[vcf_info['SVID']].append(vcf_rec)
                     else:
                         recs[str(num_simple_sv)].append(vcf_rec)
                         num_simple_sv += 1
@@ -751,26 +776,22 @@ class ImportedVariantSet(VariantSet):
         parsed_info = {}
         if vcf_rec.samples:
             sample = vcf_rec.samples[0]
-            if sample['GT'] == (1, 1):
-                parsed_info['GENOTYPE'] = (True, True)
-            else:
-                parsed_info['GENOTYPE'] = random.choice([(True, False), (False, True)])
+            parsed_info['GENOTYPE'] = (bool(sample['GT'][0]), bool(sample['GT'][1]))
         else:
             parsed_info['GENOTYPE'] = random.choice([(True, True), (True, False), (False, True)])
         vcf_info = dict(vcf_rec.info)
         if set(''.join(vcf_rec.alleles).upper()) <= set('TCGA'):
             if len(vcf_rec.alleles[0]) == 1 and len(vcf_rec.alleles[1]) == 1:
                 # SNP
-                vcf_info['SVTYPE'] = 'SNP'
-        chk('SVTYPE' in vcf_info, 'Need an SVTYPE to import from vcf records')
-        rec_type_str = vcf_info['SVTYPE']
-        can_import_types = [v.value for v in VariantType] + ['IDENTITY']
-        chk(rec_type_str in {variant_type for variant_type in can_import_types},
-            f'Currently only the following VCF types are supported: {can_import_types} but {rec_type_str} was provided')
-        if rec_type_str != 'IDENTITY':
-            parsed_info['SVTYPE'] = VariantType(rec_type_str)
+                vcf_info['OP_TYPE'] = 'SNP'
+        chk('OP_TYPE' in vcf_info, 'Need an SVTYPE to import from vcf records')
+        rec_type_str = vcf_info['OP_TYPE']
+        chk(rec_type_str in {variant_type for variant_type in self.can_import_types},
+            f'Currently only the following VCF types are supported: {self.can_import_types} but {rec_type_str} was provided')
+        if rec_type_str not in self.op_types:
+            parsed_info['OP_TYPE'] = VariantType(rec_type_str)
         else:
-            parsed_info['SVTYPE'] = 'IDENTITY'
+            parsed_info['OP_TYPE'] = rec_type_str
 
         chk(vcf_rec.start is not None, f'The Start position must not be None')
         rec_start = Locus(chrom=vcf_rec.chrom, pos=vcf_rec.start)
@@ -793,7 +814,7 @@ class ImportedVariantSet(VariantSet):
                 is_interchromosomal = True
             elif rec_end is not None:
                 # The target has to be outside of the source region
-                chk(rec_target.pos >= rec_end.pos or rec_target.pos <= rec_start.pos,"invalid dispersion target")
+                chk(rec_target.pos >= rec_end.pos or rec_target.pos <= rec_start.pos, "invalid dispersion target")
         parsed_info['TARGET'] = rec_target
         parsed_info['INTERCHROMOSOMAL'] = is_interchromosomal
 
@@ -802,7 +823,7 @@ class ImportedVariantSet(VariantSet):
             chk(isinstance(vcf_info['INSSEQ'], str) and all(bp in 'TCGA' for bp in vcf_info['INSSEQ']),
                 'INSSEQ has to be a valid sequence, {} was provided'.format(vcf_info['INSSEQ']))
             novel_insertion_seq = [vcf_info['INSSEQ']]
-        elif parsed_info['SVTYPE'] == VariantType.INS:
+        elif parsed_info['OP_TYPE'] == VariantType.INS:
             # It is a novel sequence insertion but the sequence to insert isn't provided, we generate a random sequence
             logger.warning(
                 'SV containing a novel sequence insertion but the sequence was not provided, a random sequence is used')
@@ -810,15 +831,19 @@ class ImportedVariantSet(VariantSet):
         parsed_info['INSSEQ'] = novel_insertion_seq
 
         parsed_info['NCOPIES'] = vcf_info.get('NCOPIES', 1)
-        parsed_info['IN_PLACE'] = vcf_info.get('IN_PLACE', 'in_place' if rec_target is None else 'paste') == 'in_place'
         parsed_info['INSORD'] = vcf_info.get('INSORD', None)
         parsed_info['DIVERGENCEPROB'] = [0]
         parsed_info['ALT'] = None
-        parsed_info['PARENT_SVTYPE'] = vcf_info.get('PARENT_SVTYPE', 'Custom')
-        if parsed_info['SVTYPE'] == VariantType.SNP:
-            parsed_info['DIVERGENCEPROB'] = [1]
-            if vcf_rec.alts is not None:
-                parsed_info['ALT'] = vcf_rec.alts[0]
+        parsed_info['REF'] = None
+        parsed_info['SVTYPE'] = vcf_info.get('SVTYPE', 'Custom')
+        if parsed_info['OP_TYPE'] == VariantType.SNP:
+            parsed_info['DIVERGENCEPROB'] = [1.0]
+            if vcf_rec.alts[0] != '<SNP>':
+                parsed_info['ALT'] = vcf_rec.alts
+                if len(vcf_rec.alts) == 1:
+                    parsed_info['ALT'] = [None]*parsed_info['GENOTYPE'][0] + [vcf_rec.alts[0]] + [None]*parsed_info['GENOTYPE'][1]
+            if vcf_rec.ref != 'N':
+                parsed_info['REF'] = vcf_rec.ref[0]
         additional_info = {}
         valid_info = [header for header_list in VCF_HEADER_INFOS for id, header in header_list.items() if id == 'id']
         for info, val in vcf_info.items():
@@ -837,7 +862,7 @@ class ImportedVariantSet(VariantSet):
         source_regions = []
         targets = []
         genotype = None
-        parent_info = {'PARENT_SVID': parent_id}
+        parent_info = {'SVID': parent_id}
         positions_per_rec = []
         current_insord = 0
 
@@ -846,33 +871,35 @@ class ImportedVariantSet(VariantSet):
             parsed_info, additional_info = self.parse_vcf_rec_info(vcf_rec)
             if genotype is None:
                 genotype = parsed_info['GENOTYPE']
-            else:
-                chk(genotype == parsed_info['GENOTYPE'], f'All the records of a same SV must have the same genotype, '
-                                                         f'found {vcf_rec}')
+
             if len(sv_recs) > 1:
-                parent_info['SVTYPE'] = parsed_info['PARENT_SVTYPE']
+                parent_info['OP_TYPE'] = parsed_info['SVTYPE']
             else:
-                parent_info['SVTYPE'] = str(parsed_info['SVTYPE'])
+                if parsed_info['SVTYPE'] != VariantType.SNP:
+                    parsed_info['OP_TYPE'] = VariantType(parsed_info['SVTYPE'])
+                parent_info['OP_TYPE'] = parsed_info['SVTYPE']
+            print('parent', parent_info)
             target_left = False
             source_regions.append([parsed_info['START'], parsed_info['END']])
             placement = [parsed_info['START'], parsed_info['END']]
             # Gather the length information to parse the grammar and get the operations associated to the record
             symbol_lengths = [parsed_info['END'].pos - parsed_info['START'].pos]
             symbol_min_lengths = [None]
-            insord = (0, )
+            insord = (0,)
             if parsed_info['TARGET'] is not None:
                 # We check the relative position of the target compared to start and end
-                if  not parsed_info['INTERCHROMOSOMAL'] and parsed_info['TARGET'] <= parsed_info['START']:
+                if not parsed_info['INTERCHROMOSOMAL'] and parsed_info['TARGET'] <= parsed_info['START']:
                     placement = [parsed_info['TARGET'], parsed_info['START'], parsed_info['END']]
                     target_left = True
                 else:
                     placement = [parsed_info['START'], parsed_info['END'], parsed_info['TARGET']]
-                    chk(parsed_info['TARGET'] >= parsed_info['END'], f'The position fo the target has to be outside of the source region,'
-                                                                     f'{vcf_rec} has a target between the start and end.')
+                    chk(parsed_info['TARGET'] >= parsed_info['END'],
+                        f'The position fo the target has to be outside of the source region,'
+                        f'{vcf_rec} has a target between the start and end.')
                 if not parsed_info['INTERCHROMOSOMAL']:
-                    #The target is an intrachromosomal dispersion
+                    # The target is an intrachromosomal dispersion
                     dispersion_dist = parsed_info['START'].pos - parsed_info['TARGET'].pos if target_left \
-                                                        else parsed_info['TARGET'].pos - parsed_info['END'].pos
+                        else parsed_info['TARGET'].pos - parsed_info['END'].pos
                     symbol_lengths = symbol_lengths + [dispersion_dist]
                     symbol_min_lengths.append(None)
                 else:
@@ -881,15 +908,20 @@ class ImportedVariantSet(VariantSet):
                     symbol_lengths.append([None, None])
                     symbol_min_lengths.append(None)
                 if parsed_info['TARGET'] in targets:
-                    chk(parsed_info['INSORD'] is not None, 'Two sequences inserted at the locus {}, the INSORD field must be provided for these records to prevent any ambiguity.'.format(parsed_info['INSORD']))
+                    chk(parsed_info['INSORD'] is not None,
+                        'Two sequences inserted at the locus {}, the INSORD field must be provided for these records to prevent any ambiguity.'.format(
+                            parsed_info['INSORD']))
                 insord = (parsed_info['INSORD'],) if parsed_info['INSORD'] is not None else (current_insord,)
                 current_insord = insord[0] + 1
             targets.append(parsed_info['TARGET'])
             positions_per_rec.append(placement)
-            is_in_place = parsed_info['IN_PLACE']
+            operations = []
+            is_in_place = parsed_info['TARGET'] is None
+
             # The SVTYPE of a record must be a predefined SV type or the identity operation.
-            if isinstance(parsed_info['SVTYPE'], VariantType) and parsed_info['SVTYPE'] not in [VariantType.DEL, VariantType.INV]:
-                lhs_strs, rhs_strs = SV_KEY[parsed_info['SVTYPE']]
+            if isinstance(parsed_info['OP_TYPE'], VariantType) and (
+                    parsed_info['OP_TYPE'] not in [VariantType.DEL, VariantType.INV]):
+                lhs_strs, rhs_strs = SV_KEY[parsed_info['OP_TYPE']]
                 if target_left:
                     # The symmetrical of the SV grammar has been used
                     lhs_strs = lhs_strs[::-1]
@@ -901,9 +933,11 @@ class ImportedVariantSet(VariantSet):
                     else:
                         rhs_strs_list.append(c)
                 # Get the operations record by record
-                operations, _, _, _, _ = self.grammar_to_variant_set(lhs_strs, rhs_strs_list, symbol_lengths, symbol_min_lengths, 1,
+                operations, _, _, _, _ = self.grammar_to_variant_set(lhs_strs, rhs_strs_list, symbol_lengths,
+                                                                     symbol_min_lengths, 1,
                                                                      parsed_info['INSSEQ'], [parsed_info['NCOPIES']],
-                                                                     parsed_info['DIVERGENCEPROB'], replacement_seq=parsed_info['ALT'])
+                                                                     parsed_info['DIVERGENCEPROB'],
+                                                                     replacement_seq=parsed_info['ALT'])
                 for operation in operations:
                     operation.op_info = additional_info
                     operation.target_insertion_order = insord
@@ -924,18 +958,33 @@ class ImportedVariantSet(VariantSet):
                 if parsed_info['TARGET'] is not None:
                     target_breakend = 0 if target_left else max_breakend
                 source_region = BreakendRegion(start_breakend, end_breakend)
-                transform =Transform(TransformType[vcf_rec.info['SVTYPE']], is_in_place=is_in_place, n_copies=parsed_info['NCOPIES'],
-                                     divergence_prob=parsed_info['DIVERGENCEPROB'][0], replacement_seq=parsed_info['ALT'])
-                operations =[Operation(transform, source_breakend_region=source_region, novel_insertion_seq=parsed_info['INSSEQ'],
-                                       target_insertion_breakend=target_breakend,
-                                       target_insertion_order=insord, op_info=additional_info)]
+                op_attributes = []
+                op_type = parsed_info['OP_TYPE']
+                if isinstance(parsed_info['OP_TYPE'], VariantType):
+                    op_type = parsed_info['OP_TYPE'].name
+                if ('inv' in op_type) or ('INV' in op_type):
+                    op_attributes.append(('INV', is_in_place, target_breakend))
+                elif ('COPY' in op_type) or ('CUT' in op_type) or ('IDENTITY' in op_type):
+                    op_attributes.append(('IDENTITY', is_in_place, target_breakend))
+                if ('DEL' in op_type) or ('CUT' in op_type):
+                    op_attributes.append(('DEL', True, None))
+                for op_type, op_is_in_place, op_target in op_attributes:
+                    transform = Transform(TransformType[op_type], is_in_place=op_is_in_place,
+                                          n_copies=parsed_info['NCOPIES'],
+                                          divergence_prob=parsed_info['DIVERGENCEPROB'][0],
+                                          replacement_seq=parsed_info['ALT'])
+                    operations.append(Operation(transform, source_breakend_region=source_region,
+                                                novel_insertion_seq=parsed_info['INSSEQ'],
+                                                target_insertion_breakend=op_target,
+                                                target_insertion_order=insord, op_info=additional_info))
             sv_operations.append(operations)
         # If we have more than one record we unify the breakends and their positions through the different operations
         if len(sv_recs) > 1:
             # Combine the information from the different records to determine the sets of breakends of the whole SV
             # Remove duplicate positions and insert the target positions in order to find the positions of all the breakends
-            placements = self.remove_duplicates([source[region_idx] for source in source_regions for region_idx in [0, 1]] +
-                                                [target for target in targets if target is not None])
+            placements = self.remove_duplicates(
+                [source[region_idx] for source in source_regions for region_idx in [0, 1]] +
+                [target for target in targets if target is not None])
             # Get the breakends ordered
             placements = sorted(placements, key=lambda x: x.pos)
             # Unify the breakend of the different operations to have a single SV with well-defined breakends.
@@ -946,10 +995,12 @@ class ImportedVariantSet(VariantSet):
                 for operation in operation_list:
                     # A single record might correspond ot multiple operations, they all share the same source but one might have a target and not the other
                     # for instance nrTRA is a DEL without a target and an Identity with a target
-                    ope_target = breakends[operation.target_insertion_breakend] if operation.target_insertion_breakend is not None else None
+                    ope_target = breakends[
+                        operation.target_insertion_breakend] if operation.target_insertion_breakend is not None else None
                     start_breakend = breakends[operation.source_breakend_region.start_breakend]
                     end_breakend = breakends[operation.source_breakend_region.end_breakend]
-                    operation.source_breakend_region = BreakendRegion(start_breakend=start_breakend, end_breakend=end_breakend)
+                    operation.source_breakend_region = BreakendRegion(start_breakend=start_breakend,
+                                                                      end_breakend=end_breakend)
                     operation.target_insertion_breakend = ope_target
             sv_operations = [sv_operation for operation_list in sv_operations for sv_operation in operation_list]
         else:
@@ -958,9 +1009,10 @@ class ImportedVariantSet(VariantSet):
             placements = positions_per_rec[0]
         sv_id = 'Imported_' + str(parent_id)
         return BaseSV(sv_id=sv_id,
-                      breakend_interval_lengths=[None]*(len(placements)-1), # Positions are known, the lengths are not needed
-                      breakend_interval_min_lengths=[None]*(len(placements)-1),
-                      is_interchromosomal=None, #The target chromosome is already known from the fixed_placement
+                      breakend_interval_lengths=[None] * (len(placements) - 1),
+                      # Positions are known, the lengths are not needed
+                      breakend_interval_min_lengths=[None] * (len(placements) - 1),
+                      is_interchromosomal=None,  # The target chromosome is already known from the fixed_placement
                       operations=sv_operations,
                       fixed_placement=placements,
                       overlap_mode=None,
@@ -974,6 +1026,7 @@ class ImportedVariantSet(VariantSet):
 
     # end: def import_sv_from_vcf_rec(self, vcf_rec, config) -> Optional[SV]
 
+
 # end: class ImportedVariantSetMaker(VariantSetMaker)
 
 VARIANT_SET_CLASSES: list[Type[VariantSet]] = [
@@ -981,6 +1034,7 @@ VARIANT_SET_CLASSES: list[Type[VariantSet]] = [
     TandemRepeatVariantSet,
     ImportedVariantSet
 ]
+
 
 def make_variant_set_from_config(vset_config, config) -> list[SV]:  # type: ignore
     with error_context(vset_config, config):
@@ -990,37 +1044,39 @@ def make_variant_set_from_config(vset_config, config) -> list[SV]:  # type: igno
                 return variant_set.make_variant_set(), variant_set.overlap_ranges, variant_set.overlap_kinds, variant_set.overlap_mode, variant_set.header
         chk(False, f"The format of the config or the sv_type is not supported {vset_config}")
 
-VCF_HEADER_INFOS=[dict(id='END', number=1, type='Integer', description="End position of the variant described in this record"),
-                  dict(id='INSSEQ', number=1, type='String', description="Novel insertion sequence"),
-                  dict(id='INSORD', number=1, type='Integer',
-                       description="Insertion order for insertions at given position"),
-                  dict(id='VSET', number=1, type='Integer',
-                       description="Variant set number (numbered from 0) from which this variant was created"),
-                  dict(id='SVTYPE', number=1, type='String',
-                       description="Type of structural variant"),
-                  dict(id='GRAMMAR', number=1, type='String',
-                       description="Grammar of the structural variant"),
-                  dict(id='SOURCE_LETTER', number=1, type='String',
-                       description="Source letter the record altered"),
-                  dict(id='IN_PLACE', number=1, type='String',
-                       description="If the operation was performed at the source location or pasted a modified source at a target location"),
-                  dict(id='SVLEN', number=1, type='Integer',
-                       description="Length of structural variant"),
-                  dict(id='NCOPIES', number=1, type='Integer',
-                       description="Number of sequence copies to insert at target"),
-                  dict(id='TARGET', number=1, type='Integer',
-                       description="Target location for a dispersed duplication or translocation"),
-                  dict(id='TARGET_CHROM', number=1, type='String',
-                       description="Target chromosome for a dispersed duplication or translocation"),
-                  dict(id='OVLP', number=1, type='String',
-                       description="Type of ROI on which the SV component was placed"),
-                    dict(id='OVLP_TARGET', number=1, type='String',
-                       description="Type of ROI on which the insertion target of an SV component was placed"),
-                  dict(id='PARENT_SVID', number=1, type='String',
-                       description="ID of parent SV of which this record is one part"),
-                  dict(id='PARENT_SVTYPE', number=1, type='String',
-                       description="type of parent SV of which this record is one part")
-                  ]
+
+VCF_HEADER_INFOS = [
+    dict(id='END', number=1, type='Integer', description="End position of the variant described in this record"),
+    dict(id='INSSEQ', number=1, type='String', description="Novel insertion sequence"),
+    dict(id='INSORD', number=1, type='Integer',
+         description="Insertion order for insertions at given position"),
+    dict(id='VSET', number=1, type='Integer',
+         description="Variant set number (numbered from 0) from which this variant was created"),
+    dict(id='OP_TYPE', number=1, type='String',
+         description="Type of operation performed for the corresponding record"),
+    dict(id='GRAMMAR', number=1, type='String',
+         description="Grammar of the structural variant"),
+    dict(id='SYMBOL', number=1, type='String',
+         description="Symbol the record considers"),
+    dict(id='SVLEN', number=1, type='Integer',
+         description="Length of structural variant"),
+    dict(id='NCOPIES', number=1, type='Integer',
+         description="Number of sequence copies to insert at target"),
+    dict(id='TARGET', number=1, type='Integer',
+         description="Target location for a dispersed duplication or translocation"),
+    dict(id='TARGET_CHROM', number=1, type='String',
+         description="Target chromosome for a dispersed duplication or translocation"),
+    dict(id='OVLP', number=1, type='String',
+         description="Type of ROI on which the SV component was placed"),
+    dict(id='OVLP_TARGET', number=1, type='String',
+         description="Type of ROI on which the insertion target of an SV component was placed"),
+    dict(id='OVLP_TYPE', number=1, type='String',
+         description="Type of overlap with the ROI"),
+    dict(id='SVID', number=1, type='String',
+         description="ID of parent SV of which this record is one part"),
+    dict(id='SVTYPE', number=1, type='String',
+         description="type of parent SV of which this record is one part")
+    ]
 
 
 def get_vcf_header_infos() -> list[dict]:

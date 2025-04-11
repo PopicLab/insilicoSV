@@ -18,9 +18,14 @@ A $\rightarrow \emptyset$
 ![DEL](gallery/DEL.png)
 
 ### DUP
-A $\rightarrow$ AA
+A $\rightarrow$ AA+
 
 ![DUP](gallery/DUP.png)
+
+### mCNV
+A $\rightarrow$ A+
+
+![mCNV](gallery/mCNV.png)
 
 ### INV\_DUP
 A $\rightarrow$ Aa

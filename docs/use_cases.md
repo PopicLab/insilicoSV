@@ -38,7 +38,7 @@ as well as examples of the various placement features that can be used to bias v
 SNPs and INDELs are supported by insilicoSV as well. Because SNPs are only a single base in length, they only need to be specified with `number` as in the example below:
 ```yaml
 variant_sets:
-  - type: "SNP"  # "A" -> "A*" (for A of length 1)
+  - type: "SNP" 
     number: 10
 ```
 INDELs are not given a unique type label but can be simulated by setting a sufficiently small min and max size for an SV of type DEL or INS.
@@ -63,19 +63,16 @@ in [SV grammar](sv_grammar.md). An example input config is given below:
 # YAML config file
 reference: "{path}/{to}/ref.fa"
 variant_sets:
-    - type: "Custom"
-      source: "AB_C_D"
-      target: "bb_AEc_EDC"
+    - type: "AB_C_D->bb_AEc_EDC"
       number: 1
       length_ranges: 
         - [5, 10]   # A
         - [6, 10]   # B
+        - [10, 15]  # first _
         - [7, 10]   # C
+        - [15, 20]  # second _
         - [8, 10]   # D
         - [10, 15]  # E
-      dispersion_ranges:
-        - [10, 15]  # first _
-        - [15, 20]  # second _
 ```
 
 The source and target must have the same numbers of dispersions, with the i'th dispersion in the source
@@ -84,15 +81,12 @@ corresponding to the i'th dispersion in the target.
 N.B. the grammar is not symmetrical, for instance, in the example below:
 ```yaml
 variant_sets:
-    - type: "Custom"
-      source: "A_B"
-      target: "B_A"
+    - type: "A_B->B_A"
       number: 1
       length_ranges: 
         - [5, 10]   # A
-        - [15, 20]   # B
-      dispersion_ranges:
         - [10, 15]  # _
+        - [15, 20]   # B
 ```
 The interval B, of size in the range [15, 20], will be after the interval A in the reference, of size in the range [5, 10].
 Thus, this custom event is not symmetrical.
@@ -222,8 +216,7 @@ of the SV's source grammar definition.  For example:
 reference: "{path}/{to}/ref.fa"
 overlap_regions: ["/{path_to}/{candidate_overlap_events_1}.bed"]
 variant_sets:
-    - type: "delINVdel"  # "ABC" -> "b"
-      source: "A(BC)"
+    - type: "A(BC) -> b"  # delINVdel
       number: 5
       length_ranges:
         - [500, 1000]

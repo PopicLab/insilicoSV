@@ -7,15 +7,19 @@ by a single record.
 More complex predefined variants: \
 dDUP\_INV, INS\_iDEL dDUP\_iDEL, INVdel, delINV, INVdup, dupINV, dupINVdel, rTRA, INV\_rTRA, dupINVdel, delINVdup,
 delINVdel, dupINVdup \
-and Custom defined variants will be represented by a combination of INV, DEL and IDENTITY
+and Custom defined variants will be represented by a combination of CUT, COPY-PASTE, CUT-PASTE, COPYinv_PASTE, CUTinv-PASTE, and INV 
 operations.
-Each operation can be in-place, meaning that the source region is modified or, pasted, in which case an insertion target has
-to be provided to indicate where the potentially modified source region sequence has to be inserted.
+Each operation can be cut-pasted, meaning that the source region is deleted or, copy-pasted, in which case the source region is conserved.
+In both cases, an insertion target is provided to indicate where the potentially modified source region sequence has to be inserted.
+An INV can modify a copy-paste or cut-paste operation to indicate that the pasted sequence is inverted or, INV can be an operation
+on its own.
+A CUT operation refers to a deletion of a sequence without it being pasted somewhere else.
+The operation a VCF record corresponds to is indicated in the OP_TYPE INFO field.
 
-VCF records relating to the same SV are connected by having the same value in the PARENT\_SVID INFO field, 
-the PARENT\_SVTYPE INFO field gives the type of the original SV.
-The original SV grammar is described in the GRAMMAR INFO field while the letter a record is affecting
-appears in the SOURCE\_LETTER.
+VCF records relating to the same SV are connected by having the same value in the SVID INFO field, 
+the SVTYPE INFO field gives the type of the SV.
+The SV grammar is described in the GRAMMAR INFO field while the letter a record is affecting
+appears in the SYMBOL INFO field.
 
 The details of the output representation for each built-in SV type are illustrated below.
 
@@ -26,14 +30,13 @@ The details of the output representation for each built-in SV type are illustrat
 POS gives the reference base before which the novel sequence is inserted.
 END is set equal to POS.   The inserted sequence is given in the INFO field INSSEQ.
 The length of the inserted sequence is given as SVLEN.
-The operation is marked paste in the IN\_PLACE field to indicate the affected letter does not 
-appear in the left-hand side of the grammar.
+The OP_TYPE is NA indicating it is a simple SV and does not need to be decomposed in different operations.
 
 Example:
 
 ```
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
-chr1	2	sv0	N	<INS>	100	PASS	END=2;SVTYPE=INS;VSET=0;IN_PLACE=paste;INSSEQ=GTTCGATGTACTCCCAGGCCGCTCATTCTCTCCAGTACTCAAAAGCAAGCTTTGC;SVLEN=55;INSORD=0;GRAMMAR=>A;SOURCE_LETTER=A 	GT	1|1
+chr1	2	sv0	N	<INS>	100	PASS	END=2;OP_TYPE=NA;GRAMMAR=->A;VSET=0;INSSEQ=GTTCGATGTACTCCCAGGCCGCTCATTCTCTCCAGTACTCAAAAGCAAGCTTTGC;SVLEN=55;INSORD=0;SVID=sv0;SVTYPE=INS;SYMBOL=A 	GT	1|1
 ```
 
 ### DEL: A -> ''
@@ -46,7 +49,7 @@ Example:
 
 ```
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
-chr1	6	sv0	N	<DEL>	100	PASS	END=60;SVTYPE=DEL;VSET=0;IN_PLACE=in_place;SVLEN=55;GRAMMAR=A>;SOURCE_LETTER=A 	GT	1|1
+chr1	6	sv0	N	<DEL>	100	PASS	END=60;OP_TYPE=NA;GRAMMAR=A->;VSET=0;SVLEN=55;SVID=sv0;SVTYPE=DEL;SYMBOL=A 	GT	1|1
 ```
 
 ### INV: A -> a
@@ -58,7 +61,7 @@ Example:
 
 ```
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
-chr1	6	sv0	N	<INV>	100	PASS	END=60;SVTYPE=INV;VSET=0;IN_PLACE=in_place;SVLEN=55;GRAMMAR=A>a;SOURCE_LETTER=A 	GT	1|1
+chr1	6	sv0	N	<INV>	100	PASS	END=60;OP_TYPE=NA;GRAMMAR=A->a;VSET=0;SVLEN=55;SVID=sv0;SVTYPE=INV;SYMBOL=A 	GT	1|1
 ```
 
 ### DUP: A -> AA
@@ -68,7 +71,7 @@ region.  SVLEN gives the length of the duplicated region.
 
 ```
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
-chr1	6	sv0	N	<INV>	100	PASS	END=60;SVTYPE=INV;VSET=0;IN_PLACE=in_place;SVLEN=55;GRAMMAR=A>AA;SOURCE_LETTER=A 	GT	1|1
+chr1	6	sv0	N	<DUP>	100	PASS	END=60;OP_TYPE=NA;GRAMMAR=A->AA+;VSET=0;TARGET_CHROM=chr1;TARGET=61;SVLEN=55;SVID=sv0;SVTYPE=DUP;SYMBOL=A 	GT	1|1
 ```
 ## SVs represented as multiple VCF records
 
@@ -78,14 +81,12 @@ A is pasted at B's starting base, this is represented by the first record of typ
 is given by the TARGET and TARGET\_CHROM fields. A is also deleted from its location in the reference,
 this operation is represented by the first record of type DEL.
 The two other records represent the symmetrical operations affecting B.
-All the records share the same GRAMMAR, PARENT_SVID and PARENT_SVTYPE.
+All the records share the same GRAMMAR, SVID and SVTYPE.
 
 ```
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
-chr1	1	sv0_0	N	<IDENTITY>	100	PASS	END=21;SVTYPE=IDENTITY;VSET=0;IN_PLACE=paste;SVLEN=20;GRAMMAR=A_B>B_A;TARGET_CHROM=chr1;TARGET=45;PARENT_SVID=sv0;PARENT_SVTYPE=rTRA;SOURCE_LETTER=A 	GT	1|1
-chr1	1	sv0_1	N	<DEL>	100	PASS	END=21;SVTYPE=DEL;VSET=0;IN_PLACE=in_place;SVLEN=20;GRAMMAR=A_B>B_A;PARENT_SVID=sv0;PARENT_SVTYPE=rTRA;SOURCE_LETTER=A 	GT	1|1
-chr1	45	sv0_2	N	<IDENTITY>	100	PASS	END=60;SVTYPE=IDENTITY;VSET=0;IN_PLACE=paste;SVLEN=15;GRAMMAR=A_B>B_A;TARGET_CHROM=chr1;TARGET=1;PARENT_SVID=sv0;PARENT_SVTYPE=rTRA;SOURCE_LETTER=B 	GT	1|1
-chr1	45	sv0_0	N	<DEL>	100	PASS	END=60;SVTYPE=DEL;VSET=0;IN_PLACE=in_place;SVLEN=15;GRAMMAR=A_B>B_A;PARENT_SVID=sv0;PARENT_SVTYPE=rTRA;SOURCE_LETTER=B 	GT	1|1
+chr1	1	sv0_0	N	<CUT-PASTE>	100	PASS	END=21;OP_TYPE=CUT-PASTE;GRAMMAR=A_B->B_A;VSET=0;TARGET_CHROM=chr1;TARGET=45;SVLEN=20;SVID=sv0;SVTYPE=rTRA;SYMBOL=A 	GT	1|1
+chr1	45	sv0_1	N	<CUT-PASTE>	100	PASS	END=60;OP_TYPE=CUT-PASTE;GRAMMAR=A_B->B_A;VSET=0;TARGET_CHROM=chr1;TARGET=1;SVLEN=15;SVID=sv0;SVTYPE=rTRA;SYMBOL=B 	GT	1|1
 ```
 
 ## Output PAF file
