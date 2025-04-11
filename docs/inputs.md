@@ -34,7 +34,7 @@ parameters must be given:
 3. *length_ranges*: list of breakend distance ranges  - provides the minimum and maximum length for each variant part.  
 SNPs, indels and simple SVs have a single part, while complex SVs
 may have multiple parts; e.g. INVdel variants have two.  The order of part lengths in the list must correspond to the order of apparition
-of part names used when defining the variant type; see [Example 2](use_cases#example-2---custom-svs) for an illustration. 
+of part names used when defining the variant type; see [Example 2](use_cases.md#example-2---custom-svs) for an illustration. 
 The values used for the ranges can be integers indicating a length in number of base pairs, or an expression relative to 
 other parts of the SV (e.g., for an `rTRA`, `A_B -> B_A`, we can have `[[500, 1000], [0.5*A, 1.5*A]]` to indicate that interval 
 B must be of length comprised between half and 1.5 times the length of A).
