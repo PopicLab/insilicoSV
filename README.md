@@ -33,7 +33,7 @@ supported SV placement constraints (b), Samplot visualization of short-read alig
 complex delINVdel event (c), Samplot visualization of short-read alignments at the site of a simulated 
 grammatically-specified custom SV event (d):
 
-![Illustration of insilicoSV features](docs/gallery/overview.png)
+<img src="docs/gallery/overview.png" alt="Graphical illustration of insilicoSV grammar" width="500"/>
 
 <a name="install"></a>
 ## Installation
