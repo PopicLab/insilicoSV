@@ -416,6 +416,7 @@ class BaseSV(SV):
             if not combined:
                 if len(sv_vcf_recs) > 1:
                     record['info']['OP_TYPE'] = 'CUT'
+                    record['alleles'][1] = '<CUT>'
                 combined_recs.append(record)
 
         # Check if a type provided as grammar is a predefined type
