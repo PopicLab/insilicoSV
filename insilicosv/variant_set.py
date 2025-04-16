@@ -589,7 +589,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         #
         # construct the SV object
         #
-        info = self.construct_info()
+        info = self.construct_info(lhs_strs, rhs_strs)
         roi_filter = self.get_roi_filter()
         return BaseSV(sv_id=self.make_sv_id(),
                       breakend_interval_lengths=breakend_interval_lengths,
@@ -606,10 +606,10 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                       genotype=self.pick_genotype(),
                       config_descr=self.vset_config['config_descr'])
 
-    def construct_info(self):
+    def construct_info(self, lhs_strs, rhs_strs):
         sv_type_str = self.svtype.value
-        source_str = ''.join(self.source)
-        target_str = ''.join(self.target)
+        source_str = ''.join(lhs_strs)
+        target_str = ''.join(rhs_strs)
         grammar = f'{source_str}->{target_str}'
         return {'OP_TYPE': sv_type_str, 'GRAMMAR': grammar}
 
