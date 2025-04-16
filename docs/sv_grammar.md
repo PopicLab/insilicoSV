@@ -4,7 +4,7 @@ insilicoSV uses a grammatical notation to represent how SVs of a given type tran
 This notation can be used to simulate custom SV types involving arbitrary transformations.
 It is also used to give precise definitions for built-in SVs, as illustrated in the part **a** of the figure below:
 
-![Graphical illustration of insilicoSV grammar](gallery/overview.png)
+<img src="gallery/overview.png" alt="Graphical illustration of insilicoSV grammar" width="500"/>
 
 An SV type is represented by a single grammar rule, where the left-hand side (LHS) represents one or more
 reference intervals, while the right-hand side (RHS) represents their rearrangement and/or transformation.  In

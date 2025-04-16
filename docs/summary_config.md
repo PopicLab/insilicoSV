@@ -35,14 +35,12 @@ variant_sets:
       number: 3
       length_ranges:
         - [500, 1000]
-      dispersion_ranges:
         - [5000, 10000]
     - type: "rTRA"  # "A_B" -> "B_A"
       number: 3
       length_ranges:
         - [500, 1000]  # minimum, maximum size for A
         - [500, 1000]  # minimum, maximum size for B
-      dispersion_ranges:
         - [5000, 10000]    # minimum, maximum size for _
     - type: "INVdel"  # "AB" -> "a"
       number: 3
@@ -83,14 +81,12 @@ variant_sets:
       length_ranges:
         - [500, 1000] # minimum, maximum size for A
         - [500, 1000] # minimum, maximum size for B
-      dispersion_ranges:
         - [5000, 10000] # minimum, maximum size for _
     - type: "INS_iDEL"  # "A_B" -> "_A"
       number: 3
       length_ranges:
         - [500, 1000]
         - [500, 1000]
-      dispersion_ranges:
         - [5000, 10000]
     - type: "DUP_INV"  # "A" -> "aa"
       number: 3
@@ -142,7 +138,6 @@ variant_sets:
       number: 5
       length_ranges:
         - [50, 100]
-      dispersion_ranges:
         - [500, 1000]
       overlap_mode: "contained"
 
@@ -151,7 +146,6 @@ variant_sets:
       number: 5
       length_ranges:
         - [50, 100]
-      dispersion_ranges:
         - [500, None]
       overlap_mode: "contained"
 

@@ -111,22 +111,22 @@ class TestSVSimulator(unittest.TestCase):
         self.hap2 = f"{self.test_dir}/test2.fna"
         self.bed = f"{self.test_dir}/out.bed"
 
-        self.test_overlap_bed = "test/inputs/example_overlap_events.bed"
-        self.test_overlap_bed_2 = "test/inputs/example_overlap_events_2.bed"
-        self.test_overlap_bed_4 = "test/inputs/example_overlap_events_4.bed"
-        self.test_overlap_bed_5 = "test/inputs/example_overlap_events_5.bed"
-        self.test_overlap_bed_6 = "test/inputs/example_overlap_events_6.bed"
-        self.test_overlap_bed_7 = "test/inputs/example_overlap_events_7.bed"
-        self.test_overlap_bed_8 = "test/inputs/example_overlap_events_8.bed"
-        self.test_overlap_bed_9 = "test/inputs/example_overlap_events_9.bed"
-        self.test_overlap_bed_10 = "test/inputs/example_overlap_events_10.bed"
-        self.test_overlap_bed_11 = "test/inputs/example_overlap_events_11.bed"
-        self.test_overlap_bed_12 = "test/inputs/example_overlap_events_12.bed"
-        self.test_overlap_bed_13 = "test/inputs/example_overlap_events_13.bed"
-        self.test_overlap_bed_14 = "test/inputs/example_overlap_events_14.bed"
-        self.test_overlap_bed_15 = "test/inputs/example_overlap_events_15.bed"
+        self.test_overlap_bed = "tests/inputs/example_overlap_events.bed"
+        self.test_overlap_bed_2 = "tests/inputs/example_overlap_events_2.bed"
+        self.test_overlap_bed_4 = "tests/inputs/example_overlap_events_4.bed"
+        self.test_overlap_bed_5 = "tests/inputs/example_overlap_events_5.bed"
+        self.test_overlap_bed_6 = "tests/inputs/example_overlap_events_6.bed"
+        self.test_overlap_bed_7 = "tests/inputs/example_overlap_events_7.bed"
+        self.test_overlap_bed_8 = "tests/inputs/example_overlap_events_8.bed"
+        self.test_overlap_bed_9 = "tests/inputs/example_overlap_events_9.bed"
+        self.test_overlap_bed_10 = "tests/inputs/example_overlap_events_10.bed"
+        self.test_overlap_bed_11 = "tests/inputs/example_overlap_events_11.bed"
+        self.test_overlap_bed_12 = "tests/inputs/example_overlap_events_12.bed"
+        self.test_overlap_bed_13 = "tests/inputs/example_overlap_events_13.bed"
+        self.test_overlap_bed_14 = "tests/inputs/example_overlap_events_14.bed"
+        self.test_overlap_bed_15 = "tests/inputs/example_overlap_events_15.bed"
 
-        self.test_exclude_bed = "test/inputs/exclude.bed"
+        self.test_exclude_bed = "tests/inputs/exclude.bed"
 
         self.test_objects_no_dis = [TestObject([self.ref_file, {
             "chr21": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
@@ -176,7 +176,7 @@ class TestSVSimulator(unittest.TestCase):
                                         "chr19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
                                                [self.par,
                                                 {"reference": self.ref_file,
-                                                 "blacklist_regions": "test/inputs/example_avoid_interval.vcf",
+                                                 "blacklist_regions": "tests/inputs/example_avoid_interval.vcf",
                                                  "variant_sets": [{"type": "delINVdup", "number": 1,
                                                                    "length_ranges": [[5, 5], [5, 5], [5, 5]],
                                                                    "blacklist_region_type": "all"}]}],
@@ -244,7 +244,7 @@ class TestSVSimulator(unittest.TestCase):
                                         "chr19": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
                                                [self.par,
                                                 {"reference": self.ref_file,
-                                                 "blacklist_regions": "test/inputs/example_avoid_interval.bed",
+                                                 "blacklist_regions": "tests/inputs/example_avoid_interval.bed",
                                                  "variant_sets": [{"type": "delINVdup", "number": 1,
                                                                    "length_ranges": [[5, 5], [5, 5], [5, 5]],
                                                                    "blacklist_region_type": "all"}]}],
@@ -1018,7 +1018,7 @@ class TestSVSimulator(unittest.TestCase):
                 "chr21": "ACTAATCTCTTCTCTCTTCTCTCTCCGT"}],
                        [self.par,
                         {"reference": self.ref_file,
-                         "blacklist_regions": "test/inputs/example_avoid_intervals_2.bed",
+                         "blacklist_regions": "tests/inputs/example_avoid_intervals_2.bed",
                          "variant_sets": [{"type": "DEL", "number": 1,
                                            "length_ranges": [[5, 5]],
                                            "blacklist_region_type": "ALR"}]}],
@@ -1027,9 +1027,9 @@ class TestSVSimulator(unittest.TestCase):
                 "chr21": "ACTAATCTCTTCTCTCTTCTCTCTCCGT"}],
                        [self.par,
                         {"reference": self.ref_file,
-                         "blacklist_regions": ["test/inputs/example_avoid_intervals_2.bed",
-                                               "test/inputs/example_avoid_intervals_3.bed",
-                                               "test/inputs/example_avoid_interval.vcf"],
+                         "blacklist_regions": ["tests/inputs/example_avoid_intervals_2.bed",
+                                               "tests/inputs/example_avoid_intervals_3.bed",
+                                               "tests/inputs/example_avoid_interval.vcf"],
                          "variant_sets": [{"type": "DEL", "number": 1,
                                            "length_ranges": [[5, 5]],
                                            "blacklist_region_type": "Alu"},
@@ -1043,8 +1043,8 @@ class TestSVSimulator(unittest.TestCase):
                        [self.par,
                         {"reference": self.ref_file,
                          # can specify same files for blacklist and ROIs
-                         "overlap_regions": ["test/inputs/example_avoid_intervals_2.bed"],
-                         "blacklist_regions": ["test/inputs/example_avoid_intervals_2.bed"],
+                         "overlap_regions": ["tests/inputs/example_avoid_intervals_2.bed"],
+                         "blacklist_regions": ["tests/inputs/example_avoid_intervals_2.bed"],
                          "variant_sets": [{"type": "DEL", "number": 1,
                                            "length_ranges": [[1, 5]],
                                            "overlap_mode": "exact",
@@ -1310,13 +1310,13 @@ class TestSVSimulator(unittest.TestCase):
             ["TCGA", {"type": "AB->A+BAB+", "n_copies": [3, [1, 2]],
                       "length_ranges": [[2, 2], [2, 2]]}, ["TCTCTCGATCGA", "TCTCTCGATCGAGA"]],
             ["TC", {"type": "INS", "length_ranges": [[1, 1]]}, ["TTC", "TCC", "TGC", "TAC", 'ATC']],
-            ["TC", {"type": "A->b", 'novel_insertions': "test/inputs/novel_insertions.bed",
+            ["TC", {"type": "A->b", 'novel_insertions': "tests/inputs/novel_insertions.bed",
                     "length_ranges": [[2, 2], [None, None]]}, ["CTC"]],
-            ["TC", {"type": "A->Bb", 'novel_insertions': "test/inputs/novel_insertions.bed",
+            ["TC", {"type": "A->Bb", 'novel_insertions': "tests/inputs/novel_insertions.bed",
                     "length_ranges": [[2, 2], [None, None]]}, ["GAGCTC"]],
-            ["TC", {"type": "A->BAb", 'novel_insertions': "test/inputs/novel_insertions.bed",
+            ["TC", {"type": "A->BAb", 'novel_insertions': "tests/inputs/novel_insertions.bed",
                     "length_ranges": [[2, 2], [3, 3]]}, ["GAGTCCTC"]],
-            ["TCGA", {"type": "A_->B_b", 'novel_insertions': "test/inputs/novel_insertions.bed",
+            ["TCGA", {"type": "A_->B_b", 'novel_insertions': "tests/inputs/novel_insertions.bed",
                       "length_ranges": [[2, 2], [2, 2], [3, 3]]}, ["GAGGACTC"]],
             ["TCGA", {"type": "DEL", "length_ranges": [[2, 2]]}, ["TC", "TA", "GA"]],
             [["TCGA", "CTG"], {"type": "DEL", "length_ranges": [[2, 2]]},
@@ -1867,7 +1867,7 @@ def test_inv(tmp_path):
     d.mkdir()
     p = d / "a.yaml"
     p.write_text("""
-reference: "test/inputs/test01.fa"
+reference: "tests/inputs/test01.fa"
 max_tries: 100
 variant_sets:
     - type: "INV"  # "A" -> ""
@@ -1897,7 +1897,7 @@ def test_inv_exact(tmp_path):
     """)
     cfg = d / "a.yaml"
     cfg.write_text(f"""
-reference: "test/inputs/test01.fa"
+reference: "tests/inputs/test01.fa"
 max_tries: 1
 overlap_regions: ["{a_bed}"]
 variant_sets:
@@ -1933,7 +1933,7 @@ def test_inv_contained(tmp_path):
     """)
     cfg = d / "a.yaml"
     cfg.write_text(f"""
-reference: "test/inputs/test01.fa"
+reference: "tests/inputs/test01.fa"
 max_tries: 1
 overlap_regions: ["{a_bed}"]
 variant_sets:
@@ -1969,7 +1969,7 @@ def test_inv_partial(tmp_path):
     """)
     cfg = d / "a.yaml"
     cfg.write_text(f"""
-reference: "test/inputs/test01.fa"
+reference: "tests/inputs/test01.fa"
 max_tries: 1
 overlap_regions: ["{a_bed}"]
 variant_sets:
@@ -2009,7 +2009,7 @@ def test_trEXP(tmp_path):
     """)
     cfg = d / "a.yaml"
     cfg.write_text(f"""
-reference: "test/inputs/test_tr.fa"
+reference: "tests/inputs/test_tr.fa"
 max_tries: 1
 homozygous_only: true
 overlap_regions: ["{a_bed}"]
@@ -2045,7 +2045,7 @@ def test_trCON(tmp_path):
     """)
     cfg = d / "a.yaml"
     cfg.write_text(f"""
-reference: "test/inputs/test_tr.fa"
+reference: "tests/inputs/test_tr.fa"
 max_tries: 1
 homozygous_only: true
 overlap_regions: ["{a_bed}"]
