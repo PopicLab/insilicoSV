@@ -96,6 +96,24 @@ To enable this, add the setting `output_paf: True`.   The alignment will
 be written to files named `sim.hapA.paf` and `sim.hapB.paf`, representing the alignment
 to the reference of `sim.hapA.fa` and `sim.hapB.fa`, respectively.
 
+## Output novel adjacencies file
+A BED file containing the adjacencies introduced in the sequence by the simulated SVs.
+To enable, add the setting `output_adjacencies: True`.
+The Columns of the BED file correspond to:
+```
+#CHROM_SOURCE	CHROM_TARGET	SOURCE_POS  TARGET_POS  SYMBOL  GRAMMAR SV_ID GENOTYPE
+```
+
+For instance, for a homozygous DEL (`A->''`) on `chr1` between positions `x` and `y`, the corresponding adjacency will be:
+```
+chr1    chr1    x-1 y+1 A   A->''   sv1    1/1
+```
+
+While, for an interchromosomal heterozygous dDUP (`A_->A_A`) from `chr1`, `[x, y]`, to `chr2` `z`, the corresponding adjacencies will be:
+```
+chr1    chr2    x z-1 A A_->A_A   sv1_1    0/1
+chr1    chr2    y z+1 A A_->A_A   sv1_2    0/1
+```
 
 
 

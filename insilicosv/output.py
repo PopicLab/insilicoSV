@@ -5,6 +5,7 @@ import os
 import os.path
 import re
 from pysam import VariantFile
+import copy
 
 from insilicosv import utils
 from insilicosv.utils import Region, Locus, if_not_none
@@ -262,6 +263,87 @@ class OutputWriter:
                     sim_paf.write('\t'.join(map(str, paf_rec)) + '\n')
 
     # end: def output_hap(self, hap_fa, hap_index)
+
+    def output_novel_adjacencies(self):
+        if not self.config.get('output_adjacencies', False):
+            logger.warning('Skipping adjacencies output')
+            return
+        adjacency_records = []
+        # to remove duplicates
+        added_adjacencies = []
+        for sv in self.svs:
+            op_idx = 0
+            for operation in sv.operations:
+                rec_id = sv.sv_id
+                if len(sv.operations) > 1:
+                    rec_id += f'_{op_idx}'
+                if operation.is_in_place and operation.transform_type == TransformType.IDENTITY: continue
+                adjacency = [operation.source_region.chrom,
+                             operation.source_region.chrom,
+                             operation.source_region.start,
+                             operation.source_region.end,
+                             operation.op_info["SYMBOL"],
+                             sv.info['GRAMMAR'],
+                             rec_id,
+                             str(int(sv.genotype[0])) + '|' + str(int(sv.genotype[1]))]
+                if operation.transform_type == TransformType.DEL:
+                    adjacency[3] += 1
+                    adjacency_records.append(adjacency)
+                    continue
+
+                target_end = operation.source_region.end + 1
+                target_start = operation.source_region.start
+                target_chrom = operation.source_region.chrom
+                if not operation.is_in_place:
+                    target_end = operation.target_region.end + 1
+                    target_start = operation.target_region.start
+                    target_chrom = operation.target_region.chrom
+
+                aux = copy.copy(adjacency)
+                aux[1] = target_chrom
+                aux[2] += 1
+
+                adjacency[0] = target_chrom
+
+                if operation.transform_type == TransformType.INV:
+                    if target_start != adjacency[3]:
+                        # Dispersed event
+                        # Start of the source adjacent to end of the target
+                        aux[3] = target_end
+                        # End of the source adjacent to start of the target
+                        adjacency[2] = target_start
+                    else:
+                        # A->Aa
+                        # Start of the source adjacent to end of the source +1
+                        aux[3] += 1
+                        # Start of the source adjacent to end of the source +1
+                        adjacency[2] += 1
+                elif operation.transform_type == TransformType.IDENTITY:
+                    if target_start != adjacency[3]:
+                        # Dispersed duplication
+                        # Start of the source adjacent to start of the target
+                        aux[3] = target_start
+
+                        # End of the source adjacent to end of the target
+                        adjacency[2] = target_end
+                    else:
+                        adjacency[2] += 1
+                if aux[:4] not in added_adjacencies:
+                    if adjacency[:4] not in added_adjacencies and adjacency[:4] != aux[:4]:
+                        aux[6] = rec_id + '_1'
+                    adjacency_records.append(aux)
+                    added_adjacencies.append(aux[:4])
+                    adjacency[6] = rec_id + '_2'
+                if adjacency[:4] not in added_adjacencies:
+                    adjacency_records.append(adjacency)
+                    added_adjacencies.append(adjacency[:4])
+                op_idx += 1
+        adjacency_path = os.path.join(self.output_path, 'adjacencies.bed')
+        with open(adjacency_path, 'w') as adjacency_file:
+            for adjacency in adjacency_records:
+                adjacency_file.write('\t'.join(map(str, adjacency)) + '\n')
+
+
 
     def get_chrom2operations(self, hap_index):
         """For each chromosome, make a list of operations targeting that chromosome,
