@@ -94,7 +94,7 @@ class SVSimulator:
 
         for k in config:
             chk(k in ('reference', 'max_tries', 'max_random_breakend_tries', 'homozygous_only', 'min_intersv_dist',
-                      'random_seed', 'output_no_haps', 'output_paf', 'output_svops_bed', 'th_proportion_N'
+                      'random_seed', 'output_no_haps', 'output_adjacencies', 'output_paf', 'output_svops_bed', 'th_proportion_N'
                       'output_paf_intersv', 'verbose', 'variant_sets', 'overlap_regions', 'blacklist_regions',
                       'filter_small_chr'),
                 f'invalid top-level config: {k}')
@@ -693,6 +693,8 @@ class SVSimulator:
         output_writer.output_vcf()
         logger.info('Writing novel insertions file')
         output_writer.output_novel_insertions()
+        logger.info('Writing novel adjacencies file')
+        output_writer.output_novel_adjacencies()
         output_writer.output_stats()
 
         # dev only
