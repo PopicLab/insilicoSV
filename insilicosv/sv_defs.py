@@ -332,7 +332,7 @@ class BaseSV(SV):
                 op_chrom = operation.source_region.chrom
                 op_start = operation.source_region.start
                 svlen = operation.source_region.end - operation.source_region.start
-                op_end = operation.source_region.start + svlen
+                op_end = operation.source_region.end + 1
             else:
                 op_chrom = operation.target_region.chrom
                 op_start = operation.target_region.start
@@ -442,7 +442,7 @@ class BaseSV(SV):
                 operation['id'] = self.sv_id + f'_{idx}'
         if sv_type_str == 'SNP':
             del combined_recs[0]['info']['OP_TYPE']
-            del combined_recs[0]['info']['VSET']
+            del combined_recs[0]['info']['SVLEN']
             del combined_recs[0]['info']['GRAMMAR']
             del combined_recs[0]['info']['SVTYPE']
             del combined_recs[0]['info']['SVID']

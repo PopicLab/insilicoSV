@@ -308,7 +308,7 @@ class SimulatedVariantSet(VariantSet):
         if 'n_copies' in self.vset_config:
             chk(isinstance(self.vset_config['n_copies'], list),
                 'The number of copies must a list of integers or ranges.')
-        if self.svtype == "mCNV":
+        if self.svtype == VariantType.mCNV:
             chk(('n_copies' in self.vset_config) and (self.vset_config['n_copies'][0] > 1),
                 f'n_copies has to be provided and be above 1 for a mCNV.')
 

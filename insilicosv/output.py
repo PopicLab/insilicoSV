@@ -9,7 +9,7 @@ import copy
 
 from insilicosv import utils
 from insilicosv.utils import Region, Locus, if_not_none
-from insilicosv.sv_defs import Operation, Transform, TransformType, BreakendRegion, VariantType
+from insilicosv.sv_defs import Operation, Transform, TransformType, BreakendRegion, VariantType, Syntax
 from insilicosv.variant_set import get_vcf_header_infos
 
 logger = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ class StatsCollector:
             write_item(fout, "Min length of impacted reference region", self.min_region_len)
             write_item(fout, "Max length of impacted reference region", self.max_region_len)
             if self.region_types:
-                write_item(fout, "NUmber of SVs per ROI types", self.region_types)
+                write_item(fout, "Number of SVs per ROI types", self.region_types)
             for chrom, chrom_length in zip(self.chroms, self.chrom_lengths):
                 fout.write(f"\n===== {chrom} =====\n")
                 write_item(fout, "Length of sequence", chrom_length)
@@ -268,82 +268,90 @@ class OutputWriter:
         if not self.config.get('output_adjacencies', False):
             logger.warning('Skipping adjacencies output')
             return
-        adjacency_records = []
-        # to remove duplicates
-        added_adjacencies = []
+        novel_adjacencies = []
         for sv in self.svs:
-            op_idx = 0
-            for operation in sv.operations:
-                rec_id = sv.sv_id
-                if len(sv.operations) > 1:
-                    rec_id += f'_{op_idx}'
-                if operation.is_in_place and operation.transform_type == TransformType.IDENTITY: continue
-                adjacency = [operation.source_region.chrom,
-                             operation.source_region.chrom,
-                             operation.source_region.start,
-                             operation.source_region.end,
-                             operation.op_info["SYMBOL"],
-                             sv.info['GRAMMAR'],
-                             rec_id,
-                             str(int(sv.genotype[0])) + '|' + str(int(sv.genotype[1]))]
-                if operation.transform_type == TransformType.DEL:
-                    adjacency[3] += 1
-                    adjacency_records.append(adjacency)
-                    continue
+            # Prevent duplicate adjacencies
+            adjacency_grammar = []
+            if sv.info['OP_TYPE'] in ['SNP', 'trEXP', 'trCON']: continue
+            lhs, rhs = sv.info['GRAMMAR'].split('->')
+            # Add symbols to represent the bases before and after the SV.
+            lhs = ['PREV'] + [symbol for symbol in lhs.strip() if
+                            symbol not in [Syntax.ANCHOR_START, Syntax.ANCHOR_END, Syntax.DIVERGENCE]] + ['NEXT']
+            rhs = ['PREV'] + [symbol for symbol in rhs.strip() if
+                            symbol not in [Syntax.ANCHOR_START, Syntax.ANCHOR_END, Syntax.DIVERGENCE]] + ['NEXT']
 
-                target_end = operation.source_region.end + 1
-                target_start = operation.source_region.start
-                target_chrom = operation.source_region.chrom
-                if not operation.is_in_place:
-                    target_end = operation.target_region.end + 1
-                    target_start = operation.target_region.start
-                    target_chrom = operation.target_region.chrom
+            # Get the original adjacencies and symbols
+            breakends = {'PREV': ['NA', sv.placement[0]], 'NEXT': [sv.placement[-1], 'NA']}
+            lhs_adjacencies = []
+            num_dispersion = 0
+            prev_symbol = 'PREV'
+            for idx, symbol in enumerate(lhs[1:]):
+                if symbol == Syntax.DISPERSION:
+                    #to distinguish the different dispersions
+                    symbol += str(num_dispersion)
+                    num_dispersion += 1
+                if symbol != 'NEXT':
+                    breakends[symbol] = [sv.placement[idx], sv.placement[idx+1]]
+                # Adjacency between the end of the last symbol and the beginning of the current one.
+                lhs_adjacencies.append([prev_symbol + '+', symbol + '-'])
+                prev_symbol = symbol
 
-                aux = copy.copy(adjacency)
-                aux[1] = target_chrom
-                aux[2] += 1
+            # Get the novel adjacencies after the SV placement
+            prev_symbol = 'PREV'
+            num_dispersion = 0
+            for  symbol in rhs[1:]:
+                if symbol == Syntax.DISPERSION:
+                    #to distinguish the different dispersions
+                    symbol += str(num_dispersion)
+                    num_dispersion += 1
+                elif symbol == Syntax.MULTIPLE_COPIES:
+                    symbol = prev_symbol
+                prev_orientation = '+'
+                prev_position = 1
+                curr_position = 0
+                curr_orientation = '-'
+                curr_symbol = symbol
+                if prev_symbol.islower():
+                    # Inversion
+                    prev_orientation = '-'
+                    prev_symbol = prev_symbol.upper()
+                    prev_position = 0
+                if curr_symbol.islower():
+                    curr_orientation = '+'
+                    curr_symbol = curr_symbol.upper()
+                    curr_position = 1
+                adjacency = [prev_symbol + prev_orientation, curr_symbol + curr_orientation]
+                if adjacency not in lhs_adjacencies and adjacency not in adjacency_grammar:
+                    # Novel adjacency
+                    locus_start = 'INS'
+                    locus_end = 'INS'
+                    if prev_symbol in breakends:
+                        # Not a novel insertion
+                        locus_start = breakends[prev_symbol][prev_position]
+                    if curr_symbol in breakends:
+                        # Not a novel insertion
+                        locus_end = breakends[curr_symbol][curr_position]
+                    genotype = str(int(sv.genotype[0])) + '|' + str(int(sv.genotype[1]))
+                    novel_adjacencies.append([sv.info["GRAMMAR"], sv.sv_id, adjacency, locus_start, locus_end, genotype])
+                    adjacency_grammar.append(adjacency)
+                prev_symbol = symbol
 
-                adjacency[0] = target_chrom
-
-                if operation.transform_type == TransformType.INV:
-                    if target_start != adjacency[3]:
-                        # Dispersed event
-                        # Start of the source adjacent to end of the target
-                        aux[3] = target_end
-                        # End of the source adjacent to start of the target
-                        adjacency[2] = target_start
-                    else:
-                        # A->Aa
-                        # Start of the source adjacent to end of the source +1
-                        aux[3] += 1
-                        # Start of the source adjacent to end of the source +1
-                        adjacency[2] += 1
-                elif operation.transform_type == TransformType.IDENTITY:
-                    if target_start != adjacency[3]:
-                        # Dispersed duplication
-                        # Start of the source adjacent to start of the target
-                        aux[3] = target_start
-
-                        # End of the source adjacent to end of the target
-                        adjacency[2] = target_end
-                    else:
-                        adjacency[2] += 1
-                if aux[:4] not in added_adjacencies:
-                    if adjacency[:4] not in added_adjacencies and adjacency[:4] != aux[:4]:
-                        aux[6] = rec_id + '_1'
-                    adjacency_records.append(aux)
-                    added_adjacencies.append(aux[:4])
-                    adjacency[6] = rec_id + '_2'
-                if adjacency[:4] not in added_adjacencies:
-                    adjacency_records.append(adjacency)
-                    added_adjacencies.append(adjacency[:4])
-                op_idx += 1
         adjacency_path = os.path.join(self.output_path, 'adjacencies.bed')
         with open(adjacency_path, 'w') as adjacency_file:
-            for adjacency in adjacency_records:
+            for sv_grammar, sv_id, grammar, left_locus, right_locus, genotype  in novel_adjacencies:
+                chrom_start = pos_start = chrom_end = pos_end = 'INS'
+                if left_locus != 'INS':
+                    chrom_start = left_locus.chrom
+                    pos_start = left_locus.pos
+                    if '+' in grammar[0]:
+                        pos_start -= 1
+                if right_locus != 'INS':
+                    chrom_end = right_locus.chrom
+                    pos_end = right_locus.pos
+                    if '+' in grammar[1]:
+                        pos_end -= 1
+                adjacency = [chrom_start, chrom_end, pos_start, pos_end, ''.join(grammar), sv_grammar, genotype, sv_id]
                 adjacency_file.write('\t'.join(map(str, adjacency)) + '\n')
-
-
 
     def get_chrom2operations(self, hap_index):
         """For each chromosome, make a list of operations targeting that chromosome,
