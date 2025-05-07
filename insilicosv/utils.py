@@ -18,9 +18,11 @@ logger = logging.getLogger(__name__)
 def if_not_none(a, b):
     return a if a is not None else b
 
-def chk(cond, msg="Error"):
+def chk(cond, msg="Error", error_type='runtime'):
+    errors = {'runtime': RuntimeError, 'value': ValueError, 'type': TypeError,
+              'index': IndexError, 'syntax': SyntaxError, 'file not found': FileNotFoundError}
     if not cond:
-        raise RuntimeError(f"insilicoSV error: {msg}")
+        raise errors[error_type](f"insilicoSV error: {msg}")
 
 def generate_seq(length):
     base_map = {1: "A", 2: "T", 3: "G", 4: "C"}
@@ -47,7 +49,6 @@ def remove_file(path):
 def divergence(seq, divergence_prob):
     # apply random base flips to input sequence
     p = float(divergence_prob)
-    assert 0 <= p <= 1
     if p == 0:
         return seq
     def mutate_base(b):
@@ -213,16 +214,16 @@ class RegionSet:
                         continue
                     fields = line.strip().split()
                     chk(len(fields) >= 4,
-                        f'{loc}: too few fields in line')
+                        f'{loc}: too few fields in line', error_type='value')
                     chrom, start_str, end_str, kind = fields[:4]
                     chk(all((chrom, start_str, end_str, kind)),
-                        f'{loc}: empty value in first four columns')
+                        f'{loc}: empty value in first four columns', error_type='value')
                     try:
                         start, end = int(start_str), int(end_str)
                     except ValueError:
-                        chk(False, f'{loc}: invalid start or end of region')
-                    chk(start < end, f'{loc}: region start must be less than end')
-                    chk(0 <= start, f'{loc}: region start must be non-negative')
+                        chk(False, f'{loc}: invalid start or end of region', error_type='value')
+                    chk(start < end, f'{loc}: region start must be less than end', error_type='value')
+                    chk(0 <= start, f'{loc}: region start must be non-negative', error_type='value')
                     motif = fields[4] if len(fields) >= 5 else ''
                     data = len(motif)
                     regions.append(Region(chrom=chrom, start=start,

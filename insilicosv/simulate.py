@@ -56,7 +56,7 @@ class SVSimulator:
             with open(config_path) as config_yaml:
                 self.config = yaml.safe_load(config_yaml)
         except Exception as exception:
-            chk(False, f'Error reading config file {config_path}: {exception}')
+            chk(False, f'Error reading config file {config_path}: {exception}', error_type='file not found')
 
         self.pre_check_config()
 
@@ -67,7 +67,7 @@ class SVSimulator:
                 a_logger.setLevel(logging.DEBUG)
         if 'random_seed' in self.config:
             random_seed = self.config['random_seed']
-            chk(isinstance(random_seed, (type(None), int, float, str)),'invalid random_seed')
+            chk(isinstance(random_seed, (type(None), int, float, str)),'invalid random_seed', error_type='value')
             if random_seed == 'time':
                 random_seed = time.time_ns() % 1000000000
             logger.info(f'random seed: {random_seed}')
@@ -90,30 +90,32 @@ class SVSimulator:
     def pre_check_config(self):
         config = self.config
 
-        chk(isinstance(config, dict), 'Config must be a dict')
+        chk(isinstance(config, dict), 'Config must be a dict', error_type='type')
 
         for k in config:
             chk(k in ('reference', 'max_tries', 'max_random_breakend_tries', 'homozygous_only', 'min_intersv_dist',
                       'random_seed', 'output_no_haps', 'output_adjacencies', 'output_paf', 'output_svops_bed', 'th_proportion_N'
                       'output_paf_intersv', 'verbose', 'variant_sets', 'overlap_regions', 'blacklist_regions',
                       'filter_small_chr'),
-                f'invalid top-level config: {k}')
+                f'invalid top-level config: {k}', error_type='value')
 
-        chk(utils.is_readable_file(config['reference']), f'reference must be a readable file')
-        chk(isinstance(config.get('variant_sets'), list),'variant_sets must specify a list')
+        chk(utils.is_readable_file(config['reference']), 'Reference %s must be a readable file'.format(config['reference']),
+            error_type='file not found')
+        chk(isinstance(config.get('variant_sets'), list),'variant_sets must specify a list', error_type='type')
 
         if 'overlap_regions' in config:
             config['overlap_regions'] = utils.as_list(config['overlap_regions'])
             chk(isinstance(config['overlap_regions'], list),
-                'overlap_regions must be a list')
+                'overlap_regions must be a list', error_type='type')
             chk(all(utils.is_readable_file(overlap_spec) for overlap_spec in config['overlap_regions']),
-                'Each item in overlap_regions must be a readable file')
+                'Each item in overlap_regions must be a readable file', error_type='file not found')
         else:
             for variant_set in config['variant_sets']:
-                chk(isinstance(variant_set, dict), f'variant set must be a dict: {variant_set}')
+                chk(isinstance(variant_set, dict), f'Variant set must be a dict: {variant_set}', error_type='type')
                 for key in variant_set.keys():
                     chk(not key.startswith('overlap_'),
-                        f'Using {key} in {variant_set} requires specifying overlap_regions in global config')
+                        f'Using {key} in {variant_set} requires specifying overlap_regions in global config',
+                        error_type='syntax')
 
     def load_rois(self):
         self.reference_regions = RegionSet.from_fasta(self.config['reference'], self.config.get('filter_small_chr', 0), region_kind='_reference_')
@@ -161,10 +163,12 @@ class SVSimulator:
                     self.overlap_ranges[sv_category], sv_category, self.num_svs[sv_category])
 
                 if self.overlap_modes[sv_category] in [OverlapMode.CONTAINING, OverlapMode.EXACT]:
-                    chk(len(self.rois_overlap[sv_category])>=self.num_svs[sv_category], error_message_num_rois)
+                    chk(len(self.rois_overlap[sv_category])>=self.num_svs[sv_category], error_message_num_rois,
+                        error_type='index')
                 elif self.overlap_modes[sv_category] == OverlapMode.PARTIAL:
                     # We can have two partial SVs per ROI.
-                    chk(self.num_svs[sv_category] <= 2*len(self.rois_overlap[sv_category]), error_message_num_rois)
+                    chk(self.num_svs[sv_category] <= 2*len(self.rois_overlap[sv_category]), error_message_num_rois,
+                        error_type='index')
                 # Shuffle the ROIs so the selection is not biased on their positions in the input bed file
                 random.shuffle(self.rois_overlap[sv_category])
             logger.info(f'{n_removed_rois} ROIs filtered')
@@ -177,7 +181,7 @@ class SVSimulator:
                 self.blacklist_regions.add_region_set(RegionSet.from_vcf(blacklist_region_file))
             else:
                 chk(f'Cannot import blacklist regions from {blacklist_region_file}: '
-                    f'unsupported file type')
+                    f'unsupported file type', error_type='file not found')
             logger.info(f'Blacklist region file {blacklist_region_file} processed.')
 
 
@@ -451,7 +455,7 @@ class SVSimulator:
                 return None, None
             return region, ref_interval
         else:
-            chk(False, f'Invalip overlap_mode {overlap_mode}')
+            chk(False, f'Invalid overlap_mode {overlap_mode}', error_type='error')
 
     def get_reference_interval(self, roi):
         #Get the reference interval overlapping a ROI if any.
@@ -595,7 +599,7 @@ class SVSimulator:
         assert not sv.is_placed()
         if sv.fixed_placement:
             chk(self.is_placement_valid(sv, sv.fixed_placement),
-                f'cannot place imported SV')
+                f'Cannot place imported SV {sv}', error_type='value')
             sv.set_placement(placement=sv.fixed_placement, roi=None)
             return
         n_placement_attempts = 0
@@ -622,7 +626,7 @@ class SVSimulator:
                                                                   init_roi=init_roi)
                 if roi is None or ref_roi is None:
                     chk(False, f'No available ROI satisfying the constraints for {sv}' +
-                        f'of anchor length {sv.get_anchor_length()}'*(sv.get_anchor_length() is not None))
+                        f'of anchor length {sv.get_anchor_length()}'*(sv.get_anchor_length() is not None), error_type='index')
                 anchor_start = sv.anchor.start_breakend
                 anchor_end = sv.anchor.end_breakend
                 roi, ref_roi = (
@@ -633,7 +637,7 @@ class SVSimulator:
                         overlap_mode=sv.overlap_mode,
                         region_length_range=sv.roi_filter.region_length_range))
                 if (roi is None) or (ref_roi is None):
-                    chk(False, f'No suitable ROI for {sv} of anchor length {sv.get_anchor_length()}')
+                    chk(False, f'No suitable ROI for {sv} of anchor length {sv.get_anchor_length()}', error_type='index')
             else:
                 # Compute the length needed in the ROI to fit the breakends not seperated by dispersions
                 total_length= contiguous_length = self.sum_lengths(breakend_interval_lengths, range(len(breakend_interval_lengths)),
@@ -675,7 +679,7 @@ class SVSimulator:
             sv.set_placement(placement=placement, roi=roi, operation=sv.operations[0])
         # end: while not sv.is_placed() and (n_placement_attempts < max_tries):
         if not sv.is_placed():
-            raise RuntimeError(f'Could not place SV within {max_tries=}')
+            chk(True, f'Could not place SV within {max_tries=}', error_type='runtime')
 
         if sv.is_placed():
             logger.debug(f'Placed {sv=} within {n_placement_attempts=}')

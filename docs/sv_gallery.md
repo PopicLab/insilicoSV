@@ -125,17 +125,13 @@ The motif is expanded, 'repeat_count_change_range' repetitions are added.
 ### Context Aware Examples
 Provides examples of the impact of the different placement options on the SV signatures.
 ### Contained Overlap
-The DEL is contained in an Alu region.
-![DEL_contained](gallery/DEL_contained.png)
-
-### Containing Overlap
-The DEL contains a L1 region.
-![DEL_containing](gallery/DEL_containing.png)
+The DUP is contained in an L1 region.
+![DUP_contained](gallery/DUP_contained.png)
 
 ### Partial Overlap
 One and only one of the DEL breakends is in an L1HS region.
-![DEL_partial](gallery/del_partial.png)
+![DUP_partial](gallery/DUP_partial.png)
 
 ### Exact Overlap
-The DEL breakends delimit an Alu region.
-![DEL_exact](gallery/DEL_exact.png)
+The DEL breakends delimit an L1 region.
+![DUP_exact](gallery/DUP_exact.png)

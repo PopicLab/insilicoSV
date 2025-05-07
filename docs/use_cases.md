@@ -224,6 +224,7 @@ variant_sets:
         - [null, null]
       overlap_mode: "exact"
       overlap_region_type: ["L1HS"]
+      overlap_region_length_range: [500, 1000]
 ```
 
 Parentheses indicate which part(s) of the SV that are constrained to overlap with an ROI according
@@ -232,6 +233,8 @@ any contiguous sub-sequence of source elements (including an empty one).
 For `"exact"` overlap mode, the length ranges of the constrained SV's part(s) must
 be left unspecified.  An empty anchor is only compatible with the overlap mode `"contained"` and
 can be used to constrain an insertion target for instance.
+Additionally, the optional parameter `overlap_region_length_range` can be provided to specify a minimum and maximum overlap
+length.
 
 If an anchor constrains a dispersion, the dispersion will be intrachromosomal even if the SV is set as interchromosomal 
 (In this case, other unconstrained dispersions of the SV will then be interchromosomal). 

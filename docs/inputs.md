@@ -54,6 +54,13 @@ For trEXP and trCON variants, a BED file of existing repeats must be specified i
 *overlap_regions* global setting, and *overlap_region_type* for the existing repeat regions must
 be specified in the variant set. The BED file columns must contain in order the chromosome, the start position, the end position, the region type, and the motif of the repeat.
 
+Overlap region constraints can be provided when using a list of BED files with `overlap_regions`. In this case, 
+the following variant set parameters can be provided:
+7. *overlap_mode [optional]*: str - type of overlap among `exact`, `partial`, `contained` and `containing`. If not specified, there is no overlap constraint.
+8. *overlap_region_type [optional]*: list[str] - list of names of regions to overlap with, the chosen region name has to be contained in one 
+of the names of the list, e.g. `L1HS` would be acceptable for a constraint `[L1]`. Default is `[all]` to allow any region name.
+9. *overlap_region_length_range [optional]*: list[int] - a minimum and maximum overlap length, one or both can be `null` to leave unconstrained.
+Default is `[null, null]`.
 
 The following parameters can be set on the top level of the config file and provide higher-order controls over SV placement:
 1. *reference*: str - path to input reference used as template for simulation.
@@ -64,6 +71,8 @@ The following parameters can be set on the top level of the config file and prov
 5. *overlap_regions*: list[str] - list of paths to BED files containing genome elements to be used for overlapping SV placement (see [example config](use_cases#example-5---placing-svs-at-known-repetitive-element-intervals)).
 6. *filter_small_chr [optional]*: int - filter out chromosomes of length less than the given integer (if no value is provided then no filtering will occur).
 7. *th_proportion_N=0.05 [optional]*: The proportion of N and n base pairs an SV is allowed to cover.
+
+
 
 Examples of the full set of simulation options available through various config inputs can be found in the [use cases](use_cases) page.
 

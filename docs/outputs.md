@@ -114,7 +114,10 @@ chr1	45	sv0_1	N	<CUT-PASTE>	100	PASS	END=60;OP_TYPE=CUT-PASTE;GRAMMAR=A_B->B_A;V
 8. *INSORD*: Order in which the sequence corresponding to the record has been inserted. Used to disambiguate cases like A_ -> _AA, the first A on the right hand side will have INSORD=0 the second 1, not reported for SNP.
 9. *SVID*: Unique identifier of the SV, not reported for SNP.
 10. *SVTYPE*: Type of the SV, not reported for SNP.
-11. *SYMBOL*: The letter from the grammar affected by this record, not reported for SNP. 
+11. *SYMBOL*: The letter from the grammar affected by this record, not reported for SNP.
+12. *OVLP_TYPE*: Only for SVs with overlap constraints, specifies the type of constraint (`EXACT`, 
+`PARTIAL`, `CONTAINED` or `CONTAINING`).
+13. *OVLP*: Only for SVs with overlap constraints, specifies the name of the overlapped region.
 
 ## Output PAF file
 The correct whole-genome alignment of the simulated sample haplotypes to the reference can optionally be

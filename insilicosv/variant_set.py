@@ -42,6 +42,8 @@ class VariantSet(ABC):
         return sv_id
 
     def __init__(self, vset_config, config):
+        chk(isinstance(self.vset_config, dict), f'Each variant set must be a dict, {vset_config} provided',
+            error_type='value')
         self.vset_config = copy.deepcopy(vset_config)
         self.config = config
         self.overlap_kinds = utils.as_list(self.vset_config.get('overlap_region_type', 'all'))
@@ -52,16 +54,14 @@ class VariantSet(ABC):
             chk(isinstance(self.vset_config['overlap_mode'], str) or
                 (isinstance(self.vset_config['overlap_mode'], list) and all(
                     isinstance(ovlp, str) for ovlp in self.vset_config['overlap_mode'])),
-                'overlap_mode not a string or list of strings')
+                'overlap_mode not a string or list of strings', error_type='syntax')
             try:
                 self.overlap_mode = OverlapMode(self.vset_config['overlap_mode'])
             except ValueError:
-                chk(False, 'Invalid overlap_mode')
+                chk(False, 'Invalid overlap_mode', error_type='value')
         self.novel_insertion_seqs = None
 
         self.vset_config['config_descr'] = ', '.join("%s: %s" % item for item in self.vset_config.items())
-
-        chk(isinstance(self.vset_config, dict), f'Each variant set must be a dict')
 
         self.vset_config['overlap_region_type'] = (tuple(utils.as_list(self.vset_config['overlap_region_type']))
                                                    if 'overlap_region_type' in self.vset_config else ('all',))
@@ -86,9 +86,9 @@ class VariantSet(ABC):
         if isinstance(value, (int, float)):
             return value
         elif isinstance(value, list):
-            chk(len(value) == 2, f'Expected [min, max] pair: {value}')
+            chk(len(value) == 2, f'Expected [min, max] pair: {value}', error_type='value')
             chk(isinstance(value[0], int) and isinstance(value[1], int) and
-                int(value[0]) <= int(value[1]), f'Invalid [min, max] pair: {value}')
+                int(value[0]) <= int(value[1]), f'Invalid [min, max] pair: {value}', error_type='value')
             return random.randint(value[0], value[1])
         elif isinstance(value, str):
             try:
@@ -99,7 +99,7 @@ class VariantSet(ABC):
                     eval_dict.update(locals_dict)
                 return int(eval(value, eval_dict))
             except Exception as exc:
-                chk(False, f'Error valuating {value}: {exc}')
+                chk(False, f'Error valuating the expression {value}: {exc}', error_type='value')
 
     def grammar_to_variant_set(self, lhs_strs, rhs_strs, symbol_lengths, symbol_min_lengths, num_letters,
                                novel_insertion_seqs,
@@ -134,18 +134,20 @@ class VariantSet(ABC):
 
             if lhs_str == Syntax.DISPERSION:
                 chk(len(symbol_lengths) >= num_letters + len(lhs_dispersion) + 1,
-                    f'Invalid dispersion ranges for {lhs_str}')
+                    'Not enough dispersion ranges for %s, expected %d'.format(lhs_strs, len(symbol_lengths) - num_letters),
+                    error_type='syntax')
                 breakend_interval_lengths.append(symbol_lengths[num_letters + len(lhs_dispersion)])
                 breakend_interval_min_lengths.append(symbol_min_lengths[num_letters + len(lhs_dispersion)])
                 lhs_dispersion.append(len(lhs))
             else:
-                chk((len(lhs_str) == 1 and lhs_str[0].isupper()), f'Invalid LHS symbol for {lhs_str}')
-                chk(len(symbol_lengths) >= len(lhs) - len(lhs_dispersion), f'Missing length ranges {lhs_str}')
+                chk((len(lhs_str) == 1 and lhs_str[0].isupper()), f'Invalid LHS symbol {lhs_str} in {lhs_strs}')
+                chk(len(symbol_lengths) >= len(lhs) - len(lhs_dispersion), f'Not enough length ranges for {lhs_strs}')
                 breakend_interval_lengths.append(symbol_lengths[len(lhs) - len(lhs_dispersion)])
                 breakend_interval_min_lengths.append(symbol_min_lengths[len(lhs) - len(lhs_dispersion)])
             lhs.append(Symbol(lhs_str))
-        chk((overlap_anchor_bounds[0] is None) or (overlap_anchor_bounds[1] is not None),
-            f'Anchor opening without closing: {lhs_strs}')
+        chk(((overlap_anchor_bounds[0] is None) and (overlap_anchor_bounds[1] is None)) or
+            ((overlap_anchor_bounds[0] is not None) and (overlap_anchor_bounds[1] is not None)),
+            f'Misformed anchor: {lhs_strs}', error_type='syntax')
         overlap_anchor = None
         if overlap_anchor_bounds[0] is not None and overlap_anchor_bounds[1] is not None:
             overlap_anchor = BreakendRegion(overlap_anchor_bounds[0], overlap_anchor_bounds[1])
@@ -164,11 +166,12 @@ class VariantSet(ABC):
             chk(rhs_str not in [Syntax.ANCHOR_START, Syntax.ANCHOR_END], f'The anchor can only be specified in the '
                                                                          f'source. If for instance, you want to constrain '
                                                                          f'the insertion target of a dDUP, '
-                                                                         f'write A_(). {rhs_strs}')
+                                                                         f'write A_(). {rhs_strs}', error_type='syntax')
             if rhs_str == Syntax.DISPERSION:
                 n_dispersions_rhs += 1
                 chk(n_dispersions_rhs - 1 < len(lhs_dispersion),
-                    f'The number of dispersions needs to be the same in the left and right hand sides. {lhs_strs} -> {rhs_strs}')
+                    f'The number of dispersions needs to be the same in the left and right hand sides. {lhs_strs} -> {rhs_strs}',
+                    error_type='syntax')
                 # The dispersions are in place and used to determine what moved.
                 # When finding a dispersion in the rhs we move the current breakend
                 # after the right breakend of the dispersion.
@@ -198,21 +201,21 @@ class VariantSet(ABC):
             n_copies = 1
             if Syntax.MULTIPLE_COPIES in rhs_str:
                 chk(n_multiple_copies < len(n_copies_list), f'A number of copies must be provided '
-                                                            f'for each + symbol used.')
+                                                            f'for each + symbol used.', error_type='syntax')
                 n_copies = self.get_sampled_int_value(n_copies_list[n_multiple_copies])
                 chk(n_copies >= 1, f'The number of copies must be strictly positive, got {n_copies} for '
-                                   f'the {n_multiple_copies + 1} \'+\' symbol {symbol}.')
+                                   f'the {n_multiple_copies + 1} \'+\' symbol {symbol}.', error_type='syntax')
                 n_multiple_copies += 1
 
             divergence_prob = 0
             if Syntax.DIVERGENCE in rhs_str and replacement_seq is None:
                 # replacement_seq is used to provide the SNP when loading from vcf
                 chk(n_divergence_prob < len(divergence_prob_list), f'A number of copies must be provided '
-                                                                   f'for each + symbol used.')
+                                                                   f'for each + symbol used.', error_type='syntax')
                 divergence_prob = self.get_sampled_int_value(divergence_prob_list[n_divergence_prob])
                 chk(0 < divergence_prob <= 1,
                     f'The divergence probability must be between 0 (excluded) and 1 (included), got {divergence_prob} for '
-                    f'the {n_divergence_prob + 1} \'*\' symbol {symbol}.')
+                    f'the {n_divergence_prob + 1} \'*\' symbol {symbol}.', error_type='syntax')
                 n_divergence_prob += 1
 
             transform = Transform(
@@ -243,12 +246,12 @@ class VariantSet(ABC):
                             # The position of the length of a new letter is after all the letters in the lhs (non dispersion)
                             # and in order of apparition in the rhs
                             chk(len(symbol_lengths) >= len(lhs) - len(lhs_dispersion) + len(novel_insertions),
-                                f'missing length_ranges for {symbol} in {lhs_strs}')
+                                f'Missing length_ranges for {symbol} in {lhs_strs}', error_type='syntax')
                             novel_insertion = None
                             if novel_insertion_seqs is not None:
                                 chk(len(novel_insertion_seqs) > len(novel_insertions),
                                     f'If a novel_insertions field is provided, it must '
-                                    f'contain the sequences for each novel insertion or None.')
+                                    f'contain the sequences for each novel insertion or None.', error_type='syntax')
                                 if novel_insertion_seqs[len(novel_insertions)] is not None:
                                     novel_insertion = novel_insertion_seqs[len(novel_insertions)]
                             if novel_insertion is None:
@@ -279,7 +282,7 @@ class VariantSet(ABC):
                 operations.append(operation)
         chk(len(lhs_dispersion) == n_dispersions_rhs, f'Dispersions cannot be altered, the same dispersions must '
                                                       f'be present on the left and right sides. lhs: {len(lhs_dispersion)} dispersions,'
-                                                      f'rhs: {n_dispersions_rhs} dispersions.')
+                                                      f'rhs: {n_dispersions_rhs} dispersions.', error_type='syntax')
         # If overlap_anchor is not specified, infer "full SV" as the anchor if no dispersion
         if (overlap_anchor is None) and (self.overlap_mode is not None) and (not lhs_dispersion):
             overlap_anchor = BreakendRegion(0, len(lhs) - 1)
@@ -293,24 +296,24 @@ class SimulatedVariantSet(VariantSet):
     def __init__(self, vset_config, config):
         super().__init__(vset_config, config)
 
-        chk(isinstance(vset_config.get('type'), str), f'Missing or bad variant type')
+        chk(isinstance(vset_config.get('type'), str), f'Missing or bad variant type', error_type='syntax')
         chk(isinstance(vset_config.get('number'), int) and vset_config['number'] >= 0,
-            f'Missing or bad "number" of variants to generate')
+            f'Missing or bad "number" of variants to generate', error_type='value')
 
         self.preprocess_config()
 
     def preprocess_config(self):
         chk('divergence_prob' not in self.vset_config or isinstance(self.vset_config['divergence_prob'], list),
-            'divergence_prob must be a list of floats in ]0, 1] or ranges')
+            'divergence_prob must be a list of floats in ]0, 1] or ranges', error_type='value')
 
         if (self.svtype == VariantType.DUP) and ('n_copies' not in self.vset_config):
             self.vset_config['n_copies'] = [1]
         if 'n_copies' in self.vset_config:
             chk(isinstance(self.vset_config['n_copies'], list),
-                'The number of copies must a list of integers or ranges.')
+                'The number of copies must be a list of integers or ranges.', error_type='value')
         if self.svtype == VariantType.mCNV:
             chk(('n_copies' in self.vset_config) and (self.vset_config['n_copies'][0] > 1),
-                f'n_copies has to be provided and be above 1 for a mCNV.')
+                f'n_copies has to be provided and be above 1 for a mCNV.', error_type='value')
 
     # end: def preprocess_config(self)
 
@@ -379,14 +382,15 @@ class FromGrammarVariantSet(SimulatedVariantSet):
 
         if self.svtype == VariantType.SNP:
             chk(vset_cfg.get('length_ranges') in (None, [[1, 1]]),
-                'length range for SNP can only be [1, 1]')
+                'length range for SNP can only be [1, 1]', error_type='value')
             chk('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] == [1],
-                'divergence prob for SNP can only be 1')
+                'divergence prob for SNP can only be 1', error_type='value')
             vset_cfg['length_ranges'] = [[1, 1]]
             vset_cfg['divergence_prob'] = [1.0]
         else:
-            chk('length_ranges' in vset_cfg, 'Please specify length ranges')
-            chk(isinstance(vset_cfg['length_ranges'], list), 'length_ranges must be a list')
+            chk('length_ranges' in vset_cfg, f'Please specify length ranges for {vset_cfg}', error_type='syntax')
+            chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list for {vset_cfg}',
+                error_type='syntax')
             for length_range in vset_cfg['length_ranges']:
                 chk(isinstance(length_range, str) or
                     (isinstance(length_range, list) and len(length_range) == 2 and
@@ -400,21 +404,18 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                     self.novel_insertion_seqs = [line.rstrip() for line in sequences]
                     chk(all(bool(re.match('^[TCGA]+$', line)) for line in self.novel_insertion_seqs),
                         f'The file novel_insertions'
-                        f'can only contains invalid characters. It must be a list of sequences.')
+                        f' contains invalid characters. It must be a list of sequences.', error_type='value')
             except:
-                chk(False, f'novel_insertion must be a readable file containing a sequence per line.')
-        for src_trg in ('source', 'target'):
-            chk(isinstance(self.vset_config.get(src_trg), (type(None), list, str, tuple)),
-                f'{src_trg} must be a string or list of strings')
-            chk(not isinstance(self.vset_config.get(src_trg), list) or
-                utils.is_list_of(str, self.vset_config.get(src_trg)),
-                f'elements of {src_trg} must be strings')
+                chk(False, f'novel_insertion must be a readable file containing a sequence per line.', error_type='file not found')
+        chk(isinstance(self.vset_config.get('type'), (type(None), list, str, tuple)),
+            f'{src_trg} must be a string or list of strings', error_type='syntax')
+
 
         rhs_strs_list: list[str] = []
         for c in self.target:
             if c in (Syntax.DIVERGENCE, Syntax.MULTIPLE_COPIES):
                 chk(rhs_strs_list and rhs_strs_list[-1] and rhs_strs_list[-1][0].isalpha(),
-                    f'{c} must modify a symbol')
+                    f'{c} must modify a letter {rhs_strs_list}.', error_type='syntax')
                 rhs_strs_list[-1] += c
             else:
                 rhs_strs_list.append(c)
@@ -447,7 +448,9 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             rhs_strs = tuple(map(flip_anchor, rhs_strs))[::-1]
             if "length_ranges" in self.vset_config:
                 letter_ranges = letter_ranges[::-1]
-        chk(all(len(rhs) < 3 for rhs in rhs_strs), f'The operators + and * cannot be used at the same time {rhs_strs}.')
+        chk(all(len(rhs) < 3 for rhs in rhs_strs),
+            f'The operators + and * cannot be used at the same time {rhs_strs}.',
+            error_type='syntax')
         return lhs_strs, rhs_strs, letter_ranges
 
     # Randomly pick distances withing the ranges defined for each symbol
@@ -456,7 +459,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         ranges = length_ranges + dispersion_ranges
         remaining_symbols = [i for i in range(len(ranges))]
         chk(all(isinstance(length_range, str) or (isinstance(length_range, list) and (len(length_range) == 2))
-                for length_range in ranges), f'length_ranges must be a list of [min, max] pairs')
+                for length_range in ranges), f'length_ranges must be a list of [min, max] pairs {ranges}', error_type='syntax')
         # Keep track of the dependencies between the symbols length ranges.
         # A dependency is the index of the letter the range is depending on (possibly a different letter for the min and max bounds)
         # and the offset to those letter lengths.
@@ -472,12 +475,12 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                     if max_range is None:
                         length = None
                         if min_range is not None:
-                            chk(is_dispersion, f'Only dispersions can have min but not max length')
+                            chk(is_dispersion, f'Only dispersions can have min but not max length {ranges}', error_type='syntax')
                         min_length = min_range
                     else:
-                        chk(min_range is not None, f'max_length given but not min_length')
-                        chk(min_range <= max_range, f'max bound less than min bound')
-                        chk(min_range >= 0, 'min length cannot be negative')
+                        chk(min_range is not None, f'max_length given but not min_length {ranges}', error_type='syntax')
+                        chk(min_range <= max_range, f'max bound less than min bound {ranges}', error_type='syntax')
+                        chk(min_range >= 0, f'min length cannot be negative {ranges}', error_type='value')
                         length = random.randint(min_range, max_range)
                         min_length = None
                     return length, min_length
@@ -495,14 +498,14 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                                          isinstance(char, str) and char.isalpha()]
                         chk(all(letter in letter_indexes for _, letter in letters_bound),
                             f'The length of a symbol depends on {letters_bound}'
-                            f'one of which is not define in neither the source nor target.')
+                            f'one of which is not define in neither the source nor target.', error_type='value')
                         computed_letter = 0
                         for idx_in_dependency, letter in letters_bound:
                             # Gets the index of the letter in the list of length ranges.
                             index = letter_indexes[letter]
                             if index in symbol_lengths:
                                 chk(symbol_lengths[index] is not None,
-                                    f'A symbol length cannot depend on an unbounded symbol.')
+                                    f'A symbol length cannot depend on an unbounded symbol.', error_type='syntax')
                                 ope = ''
                                 if (idx_in_dependency > 0) and (isinstance(format_bound[idx_in_dependency - 1], int)
                                                                 or format_bound[
@@ -517,7 +520,8 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                                 dependencies[idx].append(index)
                                 if index in dependencies:
                                     chk(not idx in dependencies[index],
-                                        f'There is a cyclic dependency in the length definitions {letter}.')
+                                        f'There is a cyclic dependency in the length definitions {letter}.',
+                                        error_type='syntax')
                                     dependencies[idx] += dependencies[index]
                                 dependencies[idx] = list(set(dependencies[idx]))
                         if len(letters_bound) == computed_letter:
@@ -531,9 +535,11 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                                     eval_bound = math.floor(eval_bound)
                                 ranges[idx][pos] = eval_bound
                             except:
-                                chk(False, f'The length of a symbol depends on an invalid operation {idx}.')
+                                chk(False, f'The length of a symbol depends on an invalid operation {idx}.',
+                                    error_type='syntax')
                             chk(ranges[idx][pos] >= 0,
-                                f'The operation defining the {idx}th symbol length gives a negative bound.')
+                                f'The operation defining the {idx}th symbol length gives a negative bound.',
+                                error_type='value')
                 remaining_symbols.append(idx)
         lengths = sorted(symbol_lengths.items(), key=lambda x: x[0])
         min_lengths = sorted(symbol_min_lengths.items(), key=lambda x: x[0])
@@ -563,14 +569,15 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         lhs_strs, rhs_strs, letter_ranges = self.symmetrize(lhs_strs, rhs_strs, letter_ranges)
         letters = [letter for letter in lhs_strs if
                    letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START, Syntax.DISPERSION]]
-        chk(len(letters) == len(set(letters)), f'Duplicate LHS symbol {letters}')
+        chk(len(letters) == len(set(letters)), f'Duplicate LHS symbol {letters} in {lhs_strs}', error_type='syntax')
 
         # Add novel insertion letters only appearing in the rhs.
         for letter in rhs_strs:
             if letter[0].upper() not in letters + [Syntax.ANCHOR_END, Syntax.ANCHOR_START, Syntax.DISPERSION]:
                 letters.append(letter[0].upper())
         chk(len(length_ranges) == len(letters) + len(dispersions),
-            f'Mismatched length ranges, expected {len(letters) + len(dispersions)} provided {len(length_ranges)}')
+            f'Mismatched length ranges, expected {len(letters) + len(dispersions)} provided {len(length_ranges)}',
+            error_type='syntax')
         letter_indexes = {letter: index for index, letter in enumerate(letters)}
 
         # Compute the lengths of the different symbols and dispersions from the length ranges.
@@ -626,9 +633,9 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
     def __init__(self, vset_config, config):
         super().__init__(vset_config, config)
         chk('repeat_count_change_range' in self.vset_config,
-            'Please specify repeat_count_change_range')
+            'Please specify repeat_count_change_range for tandem repeat SVs.', error_type='syntax')
         chk(utils.is_valid_closed_int_range(self.vset_config['repeat_count_change_range']),
-            'Invalid repeat_count_change_range')
+            'Invalid repeat_count_change_range', error_type='value')
 
     @override
     def preprocess_config(self):
@@ -652,7 +659,8 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
         anchor = BreakendRegion(0, 1)
         self.overlap_mode = OverlapMode.EXACT
 
-        chk(self.overlap_mode in [None, OverlapMode.EXACT], 'overlap_mode must be "exact" for Tandem Repeat')
+        chk(self.overlap_mode in [None, OverlapMode.EXACT], 'overlap_mode must be "exact" for Tandem Repeat',
+            error_type='syntax')
         if self.svtype == VariantType.trEXP:
             breakend_interval_lengths = [None]
             operations = [Operation(transform=Transform(transform_type=TransformType.IDENTITY,
@@ -739,8 +747,8 @@ class ImportedVariantSet(VariantSet):
     def __init__(self, vset_config, config):
         super().__init__(vset_config, config)
         chk(utils.is_readable_file(vset_config['import']),
-            '{path} vcf must name a readable file'.format(path=vset_config['import']))
-        chk(set(vset_config.keys()) <= {'import'}, 'invalid config key')
+            '{path} vcf must name a readable file'.format(path=vset_config['import']), error_type='file not found')
+        chk(set(vset_config.keys()) <= {'import'}, 'invalid config key', error_type='syntax')
 
         with FastaFile(config['reference']) as reference:
             self.chrom_lengths = {chrom: chrom_length
@@ -770,9 +778,9 @@ class ImportedVariantSet(VariantSet):
         return svs
 
     def parse_vcf_rec_info(self, vcf_rec):
-        chk(vcf_rec.chrom in self.chrom_lengths, f'unknown contig {vcf_rec.chrom}')
-        chk(len(vcf_rec.alleles) == 2, 'Can only import bi-allelic variants from VCF')
-        chk(len(vcf_rec.samples) <= 1, 'Can only import VCFs with one sample')
+        chk(vcf_rec.chrom in self.chrom_lengths, f'unknown contig {vcf_rec.chrom}', error_type='value')
+        chk(len(vcf_rec.alleles) == 2, 'Can only import bi-allelic variants from VCF', error_type='value')
+        chk(len(vcf_rec.samples) <= 1, 'Can only import VCFs with one sample', error_type='value')
         parsed_info = {}
         if vcf_rec.samples:
             sample = vcf_rec.samples[0]
@@ -784,16 +792,17 @@ class ImportedVariantSet(VariantSet):
             if len(vcf_rec.alleles[0]) == 1 and len(vcf_rec.alleles[1]) == 1:
                 # SNP
                 vcf_info['OP_TYPE'] = 'SNP'
-        chk('OP_TYPE' in vcf_info, 'Need an SVTYPE to import from vcf records')
+        chk('OP_TYPE' in vcf_info, 'Need an SVTYPE to import from vcf records', error_type='syntax')
         rec_type_str = vcf_info['OP_TYPE']
         chk(rec_type_str in {variant_type for variant_type in self.can_import_types},
-            f'Currently only the following VCF types are supported: {self.can_import_types} but {rec_type_str} was provided')
+            f'Currently only the following VCF types are supported: {self.can_import_types} but {rec_type_str} was provided',
+            error_type='syntax')
         if rec_type_str not in self.op_types:
             parsed_info['OP_TYPE'] = VariantType(rec_type_str)
         else:
             parsed_info['OP_TYPE'] = rec_type_str
 
-        chk(vcf_rec.start is not None, f'The Start position must not be None')
+        chk(vcf_rec.start is not None, f'The Start position must not be None {vcf_rec}', error_type='value')
         rec_start = Locus(chrom=vcf_rec.chrom, pos=vcf_rec.start)
         parsed_info['START'] = rec_start
         rec_end = Locus(chrom=vcf_rec.chrom, pos=vcf_rec.stop)
@@ -808,20 +817,22 @@ class ImportedVariantSet(VariantSet):
         rec_target = None
         is_interchromosomal = False
         if 'TARGET' in vcf_info:
-            chk(isinstance(vcf_info.get('TARGET'), int), 'TARGET has to be an int representing a position')
+            chk(isinstance(vcf_info.get('TARGET'), int), f'TARGET has to be an int representing a position {vcf_info}',
+                error_type='value')
             rec_target = Locus(chrom=vcf_info.get('TARGET_CHROM', vcf_rec.chrom), pos=vcf_info['TARGET'] - 1)
             if rec_target.chrom != vcf_rec.chrom:
                 is_interchromosomal = True
             elif rec_end is not None:
                 # The target has to be outside of the source region
-                chk(rec_target.pos >= rec_end.pos or rec_target.pos <= rec_start.pos, "invalid dispersion target")
+                chk(rec_target.pos >= rec_end.pos or rec_target.pos <= rec_start.pos,
+                    f"Invalid dispersion target {vcf_rec}", error_type='value')
         parsed_info['TARGET'] = rec_target
         parsed_info['INTERCHROMOSOMAL'] = is_interchromosomal
 
         novel_insertion_seq = None
         if 'INSSEQ' in vcf_info:
             chk(isinstance(vcf_info['INSSEQ'], str) and all(bp in 'TCGA' for bp in vcf_info['INSSEQ']),
-                'INSSEQ has to be a valid sequence, {} was provided'.format(vcf_info['INSSEQ']))
+                'INSSEQ has to be a valid sequence, {} was provided'.format(vcf_info['INSSEQ']), error_type='value')
             novel_insertion_seq = [vcf_info['INSSEQ']]
         elif parsed_info['OP_TYPE'] == VariantType.INS:
             # It is a novel sequence insertion but the sequence to insert isn't provided, we generate a random sequence
@@ -878,7 +889,6 @@ class ImportedVariantSet(VariantSet):
                 if parsed_info['SVTYPE'] != VariantType.SNP:
                     parsed_info['OP_TYPE'] = VariantType(parsed_info['SVTYPE'])
                 parent_info['OP_TYPE'] = parsed_info['SVTYPE']
-            print('parent', parent_info)
             target_left = False
             source_regions.append([parsed_info['START'], parsed_info['END']])
             placement = [parsed_info['START'], parsed_info['END']]
@@ -894,8 +904,8 @@ class ImportedVariantSet(VariantSet):
                 else:
                     placement = [parsed_info['START'], parsed_info['END'], parsed_info['TARGET']]
                     chk(parsed_info['TARGET'] >= parsed_info['END'],
-                        f'The position fo the target has to be outside of the source region,'
-                        f'{vcf_rec} has a target between the start and end.')
+                        f'The position of the target has to be outside of the source region,'
+                        f'{vcf_rec} has a target between the start and end.', error_type='value')
                 if not parsed_info['INTERCHROMOSOMAL']:
                     # The target is an intrachromosomal dispersion
                     dispersion_dist = parsed_info['START'].pos - parsed_info['TARGET'].pos if target_left \
@@ -910,7 +920,7 @@ class ImportedVariantSet(VariantSet):
                 if parsed_info['TARGET'] in targets:
                     chk(parsed_info['INSORD'] is not None,
                         'Two sequences inserted at the locus {}, the INSORD field must be provided for these records to prevent any ambiguity.'.format(
-                            parsed_info['INSORD']))
+                            parsed_info['INSORD']), error_type='value')
                 insord = (parsed_info['INSORD'],) if parsed_info['INSORD'] is not None else (current_insord,)
                 current_insord = insord[0] + 1
             targets.append(parsed_info['TARGET'])

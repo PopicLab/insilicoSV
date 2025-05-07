@@ -29,7 +29,8 @@ class Transform:
     def __post_init__(self):
         assert (self.transform_type != TransformType.DEL or
                 (self.is_in_place and self.divergence_prob == 0 and self.replacement_seq is None))
-        assert 0 <= self.divergence_prob <= 1
+        chk(0 <= self.divergence_prob <= 1, f'Invalid divergence probability, please specify a value between 0 and 1 {divergence_pro} provided.',
+            error_type='value')
 
 Breakend: TypeAlias = int
 
@@ -160,23 +161,25 @@ class SV(ABC):
     num_valid_placements: int = 0
 
     def __post_init__(self):
-        assert self.sv_id
-        assert len(self.breakend_interval_min_lengths) == len(self.breakend_interval_lengths)
-        assert all(bi_min_len is None or bi_len is None
+        chk(len(self.breakend_interval_min_lengths) == len(self.breakend_interval_lengths),
+            'breakend_interval_min_lengths and breakend_interval_lengths should have the same length.',
+            error_type='value')
+        chk(all(bi_min_len is None or bi_len is None
                    for bi_len, bi_min_len in zip(self.breakend_interval_lengths,
-                                                 self.breakend_interval_min_lengths))
-
+                                                 self.breakend_interval_min_lengths)),
+            'A breakend_interval_min_lengths range should only be provided if the corresponding breakend_interval_lengths is None.',
+            error_type='value')
         if self.overlap_mode == OverlapMode.CONTAINED:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() > self.roi_filter.region_length_range[0]),
-                f'The anchor length is smaller than the minimum overlap for a contained overlap.')
-            chk((self.roi_filter.region_length_range[1] is None) or (self.anchor.length() < self.roi_filter.region_length_range[1]),
-                f'The anchor length is larger than the maximum overlap for a contained overlap.')
+            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() > self.roi_filter.region_length_range[0]),
+                f'The anchor length is smaller than the minimum overlap for a contained overlap.', error_type='value')
+            chk((self.roi_filter.region_length_range[1] is None) or (self.get_anchor_length() < self.roi_filter.region_length_range[1]),
+                f'The anchor length is larger than the maximum overlap for a contained overlap.', error_type='value')
         if self.overlap_mode == OverlapMode.CONTAINING:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() > self.roi_filter.region_length_range[0]),
-                f'The anchor length is smaller than the minimum overlap for a containing overlap.')
-        if self.overlap_mode == OverlapMode.CONTAINING:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() >= self.roi_filter.region_length_range[0]),
-                f'The anchor length is smaller than the minimum overlap for a partial overlap.')
+            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() > self.roi_filter.region_length_range[0]),
+                f'The anchor length is smaller than the minimum overlap for a containing overlap.', error_type='value')
+        if self.overlap_mode == OverlapMode.PARTIAL:
+            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() >= self.roi_filter.region_length_range[0]),
+                f'The anchor length is smaller than the minimum overlap for a partial overlap.', error_type='value')
 
         if self.anchor is not None:
             chk(all(
@@ -184,19 +187,21 @@ class SV(ABC):
                 (idx not in self.dispersions) and
                 ((self.overlap_mode != OverlapMode.EXACT) or not (
                             self.anchor.start_breakend <= idx < self.anchor.end_breakend))),
-                f'A length range can onl be [null, null] for dispersions or the anchor for an exact overlap.')
+                f'A length range can onl be [null, null] for dispersions or the anchor for an exact overlap.', error_type='value')
             chk(all([breakend not in self.dispersions for breakend in range(self.anchor.start_breakend, self.anchor.end_breakend-1)]),
-                f'anchors cannot contain a dispersion: {self.config_descr}')
+                f'anchors cannot contain a dispersion: {self.config_descr}', error_type='value')
             chk((self.overlap_mode != OverlapMode.EXACT) or
                 all((self.breakend_interval_lengths[breakend] is None and
                  self.breakend_interval_min_lengths[breakend] is None) for breakend in range(self.anchor.start_breakend, self.anchor.end_breakend)),
-                f'overlap_mode "exact" requires leaving the length of the anchor symbols unspecified: {self}')
+                f'overlap_mode "exact" requires leaving the length of the anchor symbols unspecified: {self}', error_type='value')
             chk((self.overlap_mode != OverlapMode.PARTIAL and self.overlap_mode != OverlapMode.CONTAINING)
                 or self.anchor.end_breakend != self.anchor.start_breakend ,
-                f'overlap_mode "partial" and "containing" require non-empty anchor: {self}')
+                f'overlap_mode "partial" and "containing" require non-empty anchor: {self}', error_type='value')
 
-        assert self.fixed_placement is None or self.overlap_mode is None
-        assert self.genotype and sum(self.genotype)
+        chk(self.fixed_placement is None or self.overlap_mode is None, 'Overlap constraints cannot be specified for imported SVs',
+            error_type='syntax')
+        chk(self.genotype and sum(self.genotype), 'The format of the imported genotype is invalid. At least one of the haplotype should be 1, but 0|0 found.',
+            error_type='syntax')
         for operation in self.operations:
             if operation.target_insertion_order is not None:
                 operation.target_insertion_order = (self.sv_id,) + operation.target_insertion_order
