@@ -439,7 +439,8 @@ class BaseSV(SV):
         if len(combined_recs) == 1:
             combined_recs[0]['id'] = sv_id
             combined_recs[0]['info']['OP_TYPE'] = 'NA'
-            combined_recs[0]['alleles'][1] = '<%s>' % combined_recs[0]['info']['SVTYPE']
+            if not combined_recs[0]['info']['SVTYPE'] == 'SNP':
+                combined_recs[0]['alleles'][1] = '<%s>' % combined_recs[0]['info']['SVTYPE']
         elif len(combined_recs) != len(sv_vcf_recs):
             for idx, operation in enumerate(combined_recs):
                 operation['id'] = self.sv_id + f'_{idx}'
