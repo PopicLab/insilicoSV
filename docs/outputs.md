@@ -99,20 +99,25 @@ to the reference of `sim.hapA.fa` and `sim.hapB.fa`, respectively.
 ## Output novel adjacencies file
 A BED file containing the adjacencies introduced in the sequence by the simulated SVs.
 To enable, add the setting `output_adjacencies: True`.
+To connect the novel adjacencies to the grammar, we use the symbols of the grammar with a `+` if the novel adjacency 
+affects the end of the sequence, `-` for the beginning.
+Dispersions are disambiguated with a number representing their position.
+A novel adjacency with the end of the sequence just before the SV is denoted with PREV+ and NEXT- for the beginning 
+of the sequence right after the SV.
 The Columns of the BED file correspond to:
 ```
-#CHROM_SOURCE	CHROM_TARGET	SOURCE_POS  TARGET_POS  SYMBOL  GRAMMAR SV_ID GENOTYPE
+#CHROM_SOURCE   SOURCE_POS  SOURCE_POS+1	CHROM_TARGET	TARGET_POS  TARGET_POS+1  Adjacency  GRAMMAR SV_ID GENOTYPE
 ```
 
 For instance, for a homozygous DEL (`A->''`) on `chr1` between positions `x` and `y`, the corresponding adjacency will be:
 ```
-chr1    chr1    x-1 y+1 A   A->''   sv1    1/1
+chr1    chr1    x-1 y+1 PREFIX+SUFFIX-   A->''   sv1    1/1
 ```
 
 While, for an interchromosomal heterozygous dDUP (`A_->A_A`) from `chr1`, `[x, y]`, to `chr2` `z`, the corresponding adjacencies will be:
 ```
-chr1    chr2    x z-1 A A_->A_A   sv1_1    0/1
-chr1    chr2    y z+1 A A_->A_A   sv1_2    0/1
+chr1    x   x+1    chr2    z-1 z _1+A- A_->A_A   sv1_1    0/1
+chr1    y   y+1    chr2    z+1 z+2 A+SUFFIX- A_->A_A   sv1_2    0/1
 ```
 
 
