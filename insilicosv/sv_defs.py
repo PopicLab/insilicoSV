@@ -29,7 +29,7 @@ class Transform:
     def __post_init__(self):
         assert (self.transform_type != TransformType.DEL or
                 (self.is_in_place and self.divergence_prob == 0 and self.replacement_seq is None))
-        chk(0 <= self.divergence_prob <= 1, f'Invalid divergence probability, please specify a value between 0 and 1 {divergence_pro} provided.',
+        chk(0 <= self.divergence_prob <= 1, f'Invalid divergence probability, please specify a value between 0 and 1 {self.divergence_prob} provided.',
             error_type='value')
 
 Breakend: TypeAlias = int
@@ -438,20 +438,25 @@ class BaseSV(SV):
                         combined_recs[0]['info']['OP_TYPE'] = key.name
                         combined_recs[0]['alleles'][1] = '<%s>' % key.name
                     break
+
         # Update the records numbering if records have been combined
         if len(combined_recs) == 1:
             combined_recs[0]['id'] = sv_id
             combined_recs[0]['info']['OP_TYPE'] = 'NA'
+            combined_recs[0]['alleles'][1] = '<%s>' % combined_recs[0]['info']['SVTYPE']
         elif len(combined_recs) != len(sv_vcf_recs):
             for idx, operation in enumerate(combined_recs):
                 operation['id'] = self.sv_id + f'_{idx}'
         if sv_type_str == 'SNP':
-            del combined_recs[0]['info']['OP_TYPE']
-            del combined_recs[0]['info']['SVLEN']
-            del combined_recs[0]['info']['GRAMMAR']
-            del combined_recs[0]['info']['SVTYPE']
-            del combined_recs[0]['info']['SVID']
-            del combined_recs[0]['info']['SYMBOL']
+            try:
+                del combined_recs[0]['info']['OP_TYPE']
+                del combined_recs[0]['info']['SVLEN']
+                del combined_recs[0]['info']['GRAMMAR']
+                del combined_recs[0]['info']['SVTYPE']
+                del combined_recs[0]['info']['SVID']
+                del combined_recs[0]['info']['SYMBOL']
+            except:
+                pass
         return combined_recs
 # end: class BaseSV(SV)
 

@@ -195,6 +195,7 @@ class SVSimulator:
         self.svs = []
         logger.info('Constructing SVs from {} categories'.format(len(self.config['variant_sets'])))
         for vset_num, variant_set_config in enumerate(self.config['variant_sets']):
+            variant_set_config['VSET'] = vset_num
             vset_svs, ranges, kinds, mode, header = make_variant_set_from_config(variant_set_config, self.config)
             for sv in vset_svs:
                 sv.info['VSET'] = vset_num
