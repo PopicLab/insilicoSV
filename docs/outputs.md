@@ -20,6 +20,8 @@ VCF records relating to the same SV are connected by having the same value in th
 the SVTYPE INFO field gives the type of the SV.
 The SV grammar is described in the GRAMMAR INFO field while the letter a record is affecting
 appears in the SYMBOL INFO field.
+In addition, for SVs represented by multiple records, the OP_TYPE field characterizes the type of 
+transformation operated on the source.
 
 The details of the output representation for each built-in SV type are illustrated below.
 
@@ -88,6 +90,30 @@ All the records share the same GRAMMAR, SVID and SVTYPE.
 chr1	1	sv0_0	N	<CUT-PASTE>	100	PASS	END=21;OP_TYPE=CUT-PASTE;GRAMMAR=A_B->B_A;VSET=0;TARGET_CHROM=chr1;TARGET=45;SVLEN=20;SVID=sv0;SVTYPE=rTRA;SYMBOL=A 	GT	1|1
 chr1	45	sv0_1	N	<CUT-PASTE>	100	PASS	END=60;OP_TYPE=CUT-PASTE;GRAMMAR=A_B->B_A;VSET=0;TARGET_CHROM=chr1;TARGET=1;SVLEN=15;SVID=sv0;SVTYPE=rTRA;SYMBOL=B 	GT	1|1
 ```
+## VCF fields
+1. *CHROM*: Chromosome of the source region.
+2. *POS*: Start position of the source region, 0 indexed.
+3. *ID*: Unique identifier of the record, it contains the identifier of the corresponding vcf and a potential additional number for SVs represented by multiple records.
+4. *REF*: Reference allele for SNPs, N otherwise.
+5. *ALT*: List of the alternative alleles for SNPs, SV type for SVs represented by a single record, operation type for SVs represented by multiple records.
+6. *QUAL*: 100.
+7. *FILTER*: PASS
+8. *INFO*: Info fields described below.
+9. *FORMAT*: GT
+10. *SAMPLE*: Genotype 1|1 for homozygous variants, 1|0 or 0|1 for heterozygous ones.
+
+### INFO fields
+1. *END*: End of the source region, 1 indexed, not reported for SNP.
+2. *OP_TYPE*: NA for SVs represented on a single record, the type of operation otherwise, not reported for SNP.
+3. *GRAMMAR*: The corresponding grammar of the SV except for SNPs and tandem repeats, not reported for SNP.
+4. *VSET*: The variant set the SV has been defined from. The number corresponds to the position of the variant set in the config file.
+5. *TARGET_CHROM*: Chromosome of the target point if the SV is not in place, not reported for SNP.
+6. *TARGET*: Position of the target if the SV is not in place, not reported for SNP.
+7. *SVLEN*: Length of the SV, corresponds to END - POS, not reported for SNP.
+8. *INSORD*: Order in which the sequence corresponding to the record has been inserted. Used to disambiguate cases like A_ -> _AA, the first A on the right hand side will have INSORD=0 the second 1, not reported for SNP.
+9. *SVID*: Unique identifier of the SV, not reported for SNP.
+10. *SVTYPE*: Type of the SV, not reported for SNP.
+11. *SYMBOL*: The letter from the grammar affected by this record, not reported for SNP. 
 
 ## Output PAF file
 The correct whole-genome alignment of the simulated sample haplotypes to the reference can optionally be

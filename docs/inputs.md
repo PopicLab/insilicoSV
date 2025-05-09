@@ -48,7 +48,7 @@ Each element of the list can be a positive number or a range of positive numbers
 The default number of copies for a DUP is [1] and does not need to be specified.
 
 For tandem repeat variants, the following parameters is needed:
-6. *repeat_count_change_range*: the range from which to sample the number of repeats added or removed
+6. *repeat_count_change_range*: the range from which to sample the number of repeats added (trEXP) or removed (trEXP).
 
 For trEXP and trCON variants, a BED file of existing repeats must be specified in the 
 *overlap_regions* global setting, and *overlap_region_type* for the existing repeat regions must
