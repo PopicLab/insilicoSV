@@ -142,9 +142,6 @@ class VariantSet(ABC):
                 continue
 
             if lhs_str == Syntax.DISPERSION:
-                chk(len(symbol_lengths) >= num_letters + len(lhs_dispersion) + 1,
-                    'Not enough dispersion ranges for %s, expected %d in %s'.format(lhs_strs,
-                    len(symbol_lengths) - num_letters, vset_config), error_type='syntax')
                 breakend_interval_lengths.append(symbol_lengths[num_letters + len(lhs_dispersion)])
                 breakend_interval_min_lengths.append(symbol_min_lengths[num_letters + len(lhs_dispersion)])
                 lhs_dispersion.append(len(lhs))
