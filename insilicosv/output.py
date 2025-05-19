@@ -5,10 +5,11 @@ import os
 import os.path
 import re
 from pysam import VariantFile
+import copy
 
 from insilicosv import utils
 from insilicosv.utils import Region, Locus, if_not_none
-from insilicosv.sv_defs import Operation, Transform, TransformType, BreakendRegion, VariantType
+from insilicosv.sv_defs import Operation, Transform, TransformType, BreakendRegion, VariantType, Syntax
 from insilicosv.variant_set import get_vcf_header_infos
 
 logger = logging.getLogger(__name__)
@@ -262,6 +263,94 @@ class OutputWriter:
                     sim_paf.write('\t'.join(map(str, paf_rec)) + '\n')
 
     # end: def output_hap(self, hap_fa, hap_index)
+
+    def output_novel_adjacencies(self):
+        if not self.config.get('output_adjacencies', False):
+            logger.warning('Skipping adjacencies output')
+            return
+        novel_adjacencies = []
+        for sv in self.svs:
+            # Prevent duplicate adjacencies
+            adjacency_grammar = []
+            if sv.info['OP_TYPE'] in ['SNP', 'trEXP', 'trCON']: continue
+            lhs, rhs = sv.info['GRAMMAR'].split('->')
+            # Add symbols to represent the bases before and after the SV.
+            lhs = ['PREFIX'] + [symbol for symbol in lhs.strip() if
+                              symbol not in [Syntax.ANCHOR_START, Syntax.ANCHOR_END, Syntax.DIVERGENCE]] + ['SUFFIX']
+            rhs = ['PREFIX'] + [symbol for symbol in rhs.strip() if
+                              symbol not in [Syntax.ANCHOR_START, Syntax.ANCHOR_END, Syntax.DIVERGENCE]] + ['SUFFIX']
+
+            # Get the original adjacencies and symbols
+            breakends = {'PREFIX': ['NA', sv.placement[0]], 'SUFFIX': [sv.placement[-1], 'NA']}
+            lhs_adjacencies = []
+            num_dispersion = 0
+            prev_symbol = 'PREFIX'
+            for idx, symbol in enumerate(lhs[1:]):
+                if symbol == Syntax.DISPERSION:
+                    # to distinguish the different dispersions
+                    symbol += str(num_dispersion)
+                    num_dispersion += 1
+                if symbol != 'SUFFIX':
+                    breakends[symbol] = [sv.placement[idx], sv.placement[idx + 1]]
+                # Adjacency between the end of the last symbol and the beginning of the current one.
+                lhs_adjacencies.append([prev_symbol + '+', symbol + '-'])
+                prev_symbol = symbol
+
+        # Get the novel adjacencies after the SV placement
+        prev_symbol = 'PREV'
+        num_dispersion = 0
+        for symbol in rhs[1:]:
+            if symbol == Syntax.DISPERSION:
+                # to distinguish the different dispersions
+                symbol += str(num_dispersion)
+                num_dispersion += 1
+            elif symbol == Syntax.MULTIPLE_COPIES:
+                symbol = prev_symbol
+            prev_orientation = '+'
+            prev_position = 1
+            curr_position = 0
+            curr_orientation = '-'
+            curr_symbol = symbol
+            if prev_symbol.islower():
+                # Inversion
+                prev_orientation = '-'
+                prev_symbol = prev_symbol.upper()
+                prev_position = 0
+            if curr_symbol.islower():
+                curr_orientation = '+'
+                curr_symbol = curr_symbol.upper()
+                curr_position = 1
+            adjacency = [prev_symbol + prev_orientation, curr_symbol + curr_orientation]
+            if adjacency not in lhs_adjacencies and adjacency not in adjacency_grammar:
+                # Novel adjacency
+                locus_start = 'INS'
+                locus_end = 'INS'
+                if prev_symbol in breakends:
+                    # Not a novel insertion
+                    locus_start = breakends[prev_symbol][prev_position]
+                if curr_symbol in breakends:
+                    # Not a novel insertion
+                    locus_end = breakends[curr_symbol][curr_position]
+                genotype = str(int(sv.genotype[0])) + '|' + str(int(sv.genotype[1]))
+                novel_adjacencies.append([sv.info["GRAMMAR"], sv.sv_id, adjacency, locus_start, locus_end, genotype])
+                adjacency_grammar.append(adjacency)
+            prev_symbol = symbol
+        adjacency_path = os.path.join(self.output_path, 'adjacencies.bed')
+        with open(adjacency_path, 'w') as adjacency_file:
+            for sv_grammar, sv_id, grammar, left_locus, right_locus, genotype in novel_adjacencies:
+                chrom_start = pos_start = chrom_end = pos_end = 'INS'
+                if left_locus != 'INS':
+                    chrom_start = left_locus.chrom
+                    pos_start = left_locus.pos
+                    if '+' in grammar[0]:
+                        pos_start -= 1
+                if right_locus != 'INS':
+                    chrom_end = right_locus.chrom
+                    pos_end = right_locus.pos
+                    if '+' in grammar[1]:
+                        pos_end -= 1
+                adjacency = [chrom_start, pos_start, pos_start+1, chrom_end, pos_end, pos_end+1, ''.join(grammar), sv_grammar, genotype, sv_id]
+                adjacency_file.write('\t'.join(map(str, adjacency)) + '\n')
 
     def get_chrom2operations(self, hap_index):
         """For each chromosome, make a list of operations targeting that chromosome,
