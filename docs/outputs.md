@@ -106,18 +106,22 @@ A novel adjacency with the end of the prefix sequence before the SV is denoted w
 of the suffix sequence right after the SV.
 The Columns of the BED file correspond to:
 ```
-#CHROM_SOURCE   SOURCE_POS  SOURCE_POS+1	CHROM_TARGET	TARGET_POS  TARGET_POS+1  Adjacency  GRAMMAR SV_ID GENOTYPE
+#SOURCE_CHROM   SOURCE_POS  SOURCE_POS+1    SOURCE_STRAND	TARGET_CHROM	TARGET_POS  TARGET_POS+1    TARGET_STRAND   ORDER  Adjacency  GRAMMAR SV_ID GENOTYPE
 ```
+The SOURCE describes the sequence on the left side of the adjacency, and TARGET the right side. The STRAND fields 
+characterize a change of strand. ORDER is `ord1_2` if the source and target follow the order of the grammar and
+`ord2_1` otherwise.
+
 
 For instance, for a homozygous DEL (`A->''`) on `chr1` between positions `x` and `y`, the corresponding adjacency will be:
 ```
-chr1    chr1    x-1 y+1 PR^t/SU^h   A->''   sv1    1|1
+chr1    chr1    x-1 y+1 PR^t/SU^h   A->''   sv0    1|1
 ```
 
 While, for an interchromosomal heterozygous dDUP (`A_->A_A`) from `chr1`, `[x, y]`, to `chr2` `z`, the corresponding adjacencies will be:
 ```
-chr1    x   x+1    chr2    z-1 z _1^t/A^h A_->A_A   sv1_1    0|1
-chr1    y   y+1    chr2    z+1 z+2 A^t/SU^h A_->A_A   sv1_2    0|1
+chr1    x   x+1 False    chr2    z-1 z  False   ord1_2   _1^t/A^h A_->A_A   sv0    0|1
+chr1    y   y+1 False    chr2    z+1 z+2  False   ord1_2 A^t/SU^h A_->A_A   sv0    0|1
 ```
 
 
