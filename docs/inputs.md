@@ -40,15 +40,17 @@ other parts of the SV (e.g., for an `rTRA`, `A_B -> B_A`, we can have `[[500, 10
 B must be of length comprised between half and 1.5 times the length of A).
 For predefined types with a dispersion, the length range of the dispersion will be in last position.
 For Custom types, the length ranges are in order of apparition of the letters and the dispersions.
+4. *overlap_mode [optional]*: str - enforce the SV to overlap a region defined in the files provided in `overlap_regions`. Must be `partial`, `contained`, `containing` or `exact` (see [example config](use_cases#example-5---placing-svs-at-known-repetitive-element-intervals)).
+5. *overlap_region_type [optional]*: list of str - only if an overlap mode is specified. Characterizes the regions to overlap, the name of the region has to contain one of the strings of the list. 
 
-4. *is_interchromosomal=False [for SVs containing dispersions]*: Enable interchromosomal SVs. If True, each dispersion in the SV will be
-be between two different chromosomes. All dispersions must be unbounded i.e. the dispersion range must be [null, null].
-5. *n_copies=[] [for SVs containing '+' grammar notation]*: specifies the number of copies for each sequence affected by a '+' in order of apparition in the grammar.
+6. *is_interchromosomal=False [for SVs containing dispersions]*: Enable interchromosomal SVs. If True, each dispersion in the SV will be 
+between two different chromosomes. All dispersions must be unbounded i.e. the dispersion range must be [null, null].
+7. *n_copies=[] [for SVs containing '+' grammar notation]*: specifies the number of copies for each sequence affected by a '+' in order of apparition in the grammar.
 Each element of the list can be a positive number or a range of positive numbers. If a range is provided, a random number of copies included in the range will be used.
 The default number of copies for a DUP is [1] and does not need to be specified.
 
 For tandem repeat variants, the following parameters is needed:
-6. *repeat_count_change_range*: the range from which to sample the number of repeats added (trEXP) or removed (trEXP).
+8. *repeat_count_change_range*: the range from which to sample the number of repeats added (trEXP) or removed (trEXP).
 
 For trEXP and trCON variants, a BED file of existing repeats must be specified in the 
 *overlap_regions* global setting, and *overlap_region_type* for the existing repeat regions must
@@ -79,4 +81,8 @@ Other types would have to be adapted to insilicoSV format [VCF format](outputs.m
 When writing a VCF in insilico format for SV importation, the required fields are the CHROM, POS and ID fields as well as
 the INFO field with an END, SVTYPE, SVLEN, and, if applicable, TARGET, TARGET_CHROM, SVID. 
 
-
+### BED files format
+The BED files must contain the following columns in order: Chromosome, Start Position,
+End Position, Region Name.
+BED files for tandem repeat regions must additionally contain a fifth column with the Motif of the region.
+Additional columns can appear after those required columns.

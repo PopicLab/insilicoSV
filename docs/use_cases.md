@@ -8,7 +8,7 @@ use cases with matching config files are provided below.
 
 To incorporate SVs from the built-in library of types, a configuration file of the following form can be
 provided with parameters provided for the count and length ranges for each set of SVs to be included in the
-output genome.
+output genome. Note that the length of the dispersion must always be provided as the last length_ranges.
 
 ```yaml
 # YAML config file
@@ -28,6 +28,12 @@ variant_sets:
         - [5, 10]  # min/max length for first DEL
         - [10, 15]  # min/max length for INV
         - [5, 10]  # min/max length for second DEL
+    - type: "rTRA"  # "A_B" -> "B_A"
+      number: 1
+      length_ranges:
+        - [5, 10]  # A
+        - [10, 15]  # NOTE: B
+        - [5, 10]  # NOTE: _
 ```
 
 ### *Example 1a* - Example config with entire insilicoSV vocabulary
@@ -44,7 +50,7 @@ variant_sets:
 INDELs are not given a unique type label but can be simulated by setting a sufficiently small min and max size for an SV of type DEL or INS.
 
 ### Example 1c - Unbounded dispersions
-When specifying length ranges for dispersion intervals, `None` can be provided as an upper bound and this will result in
+When specifying length ranges for dispersion intervals, `null` can be provided as an upper bound and this will result in
 the dispersion target locus being placed at any position on the same chromosome as the source event. For example:`
 ```yaml
 variant_sets:
@@ -52,13 +58,16 @@ variant_sets:
     number: 2
     length_ranges:
       - [500, 1000]  # min/max length for source
-      - [500, None]  # unbounded dispersion: target locus may be placed arbitrarily far
+      - [500, null]  # unbounded dispersion: target locus may be placed arbitrarily far
 ```
 Unbounded dispersions can be used with predefined or custom SVs.
 
 ### Example 2 - Custom SVs
 Custom SVs can be specified by manually describing the desired variant with the grammatical notation described 
-in [SV grammar](sv_grammar.md). An example input config is given below:
+in [SV grammar](sv_grammar.md). Note that for custom SVs the length_ranges of the letters AND the dispersions must be provided
+in their order of apparition from left to right.
+Note that the same number of dispersions must appear in the lhs and the rhs.
+An example input config is given below:
 ```yaml
 # YAML config file
 reference: "{path}/{to}/ref.fa"
@@ -173,7 +182,7 @@ An example config with these inputs is:
 reference: "{path}/{to}/ref.fa"
 overlap_regions: ["/{path_to}/{candidate_overlap_events}.bed"]
 variant_sets:
-    - type: "DEL"  # "A" -> ""
+    - type: "DEL"  # "(A)" -> ""
       number: 5
       length_ranges: [[null, null]]
       overlap_mode: "exact"  # <- or "partial" or "contained"

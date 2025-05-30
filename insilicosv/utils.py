@@ -215,16 +215,16 @@ class RegionSet:
                         continue
                     fields = line.strip().split()
                     chk(len(fields) >= 4,
-                        f'{loc}: too few fields in line', error_type='value')
+                        f'{loc}: too few fields in line for the BED file {bed_path}', error_type='value')
                     chrom, start_str, end_str, kind = fields[:4]
                     chk(all((chrom, start_str, end_str, kind)),
-                        f'{loc}: empty value in first four columns', error_type='value')
+                        f'{loc}: empty value in first four columns for the BED file {bed_path}', error_type='value')
                     try:
                         start, end = int(start_str), int(end_str)
                     except ValueError:
-                        chk(False, f'{loc}: invalid start or end of region', error_type='value')
-                    chk(start < end, f'{loc}: region start must be less than end', error_type='value')
-                    chk(0 <= start, f'{loc}: region start must be non-negative', error_type='value')
+                        chk(False, f'{loc}: invalid start or end of region for the BED file {bed_path}', error_type='value')
+                    chk(start < end, f'{loc}: region start must be less than end for the BED file {bed_path}', error_type='value')
+                    chk(0 <= start, f'{loc}: region start must be non-negative for the BED file {bed_path}', error_type='value')
                     motif = fields[4] if len(fields) >= 5 else ''
                     data = len(motif)
                     regions.append(Region(chrom=chrom, start=start,
