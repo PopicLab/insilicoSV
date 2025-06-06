@@ -8,7 +8,7 @@ use cases with matching config files are provided below.
 
 To incorporate SVs from the built-in library of types, a configuration file of the following form can be
 provided with parameters provided for the count and length ranges for each set of SVs to be included in the
-output genome. Note that the length of the dispersion must always be provided as the last length_ranges.
+output genome. Note that the length of the dispersion must always be the last entry in length_ranges.
 
 ```yaml
 # YAML config file
@@ -65,7 +65,7 @@ Unbounded dispersions can be used with predefined or custom SVs.
 ### Example 2 - Custom SVs
 Custom SVs can be specified by manually describing the desired variant with the grammatical notation described 
 in [SV grammar](sv_grammar.md). Note that for custom SVs the length_ranges of the letters AND the dispersions must be provided
-in their order of apparition from left to right.
+in their order of appearance from left to right.
 Note that the same number of dispersions must appear in the lhs and the rhs.
 An example input config is given below:
 ```yaml

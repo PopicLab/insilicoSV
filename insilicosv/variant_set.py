@@ -248,7 +248,7 @@ class VariantSet(ABC):
                     else:
                         if symbol not in novel_insertions:
                             # The position of the length of a new letter is after all the letters in the lhs (non dispersion)
-                            # and in order of apparition in the rhs
+                            # and in order of appearance in the rhs
                             chk(len(symbol_lengths) >= len(lhs) - len(lhs_dispersion) + len(novel_insertions),
                                 f'Missing length_ranges for {symbol} in {lhs_strs}', error_type='syntax')
                             novel_insertion = None
