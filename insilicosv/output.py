@@ -310,16 +310,12 @@ class OutputWriter:
                 curr_position = 0
                 curr_orientation = '^h'
                 curr_symbol = symbol
-                strand_flip = [False, False]
-                order = 'ord1_2'
                 if prev_symbol.islower():
                     # Inversion
-                    strand_flip[0] = True
                     prev_orientation = '^h'
                     prev_symbol = prev_symbol.upper()
                     prev_position = 0
                 if curr_symbol.islower():
-                    strand_flip[1] = True
                     curr_orientation = '^t'
                     curr_symbol = curr_symbol.upper()
                     curr_position = 1
@@ -334,16 +330,14 @@ class OutputWriter:
                     if curr_symbol in breakends:
                         # Not a novel insertion
                         locus_end = breakends[curr_symbol][curr_position]
-                    if locus_start != 'INS' and locus_end != 'INS' and locus_start > locus_end:
-                        order = 'ord2_1'
                     genotype = str(int(sv.genotype[0])) + '|' + str(int(sv.genotype[1]))
-                    record = [sv.info["GRAMMAR"], sv.sv_id, adjacency, locus_start, locus_end, order, strand_flip, genotype]
+                    record = [sv.info["GRAMMAR"], sv.sv_id, adjacency, locus_start, locus_end, genotype]
                     if record not in novel_adjacencies:
                         novel_adjacencies.append(record)
                 prev_symbol = symbol
         adjacency_path = os.path.join(self.output_path, 'adjacencies.bed')
         with open(adjacency_path, 'w') as adjacency_file:
-            for sv_grammar, sv_id, grammar, left_locus, right_locus, order, strand_flip, genotype in novel_adjacencies:
+            for sv_grammar, sv_id, grammar, left_locus, right_locus, genotype in novel_adjacencies:
                 chrom_start = pos_start = chrom_end = pos_end = pos_next_end = pos_next_start = 'INS'
                 if left_locus != 'INS':
                     chrom_start = left_locus.chrom
@@ -357,8 +351,8 @@ class OutputWriter:
                     if '^t' in grammar[1]:
                         pos_end -= 1
                     pos_next_end = pos_end + 1
-                record = [chrom_start, pos_start, pos_next_start, strand_flip[0], chrom_end, pos_end, pos_next_end,
-                             strand_flip[1], order, '/'.join(grammar), sv_grammar, genotype, sv_id]
+                record = [chrom_start, pos_start, pos_next_start, chrom_end, pos_end, pos_next_end,
+                             '/'.join(grammar), sv_grammar, genotype, sv_id]
                 adjacency_file.write('\t'.join(map(str, record)) + '\n')
 
     def get_chrom2operations(self, hap_index):
