@@ -103,6 +103,14 @@ variant_sets:
         - [500, 1000]
     - type: "SNP"  
       number: 3
+    # If null given as dispersion max length, target can be placed anywhere on the chromosome 
+    # null is only allowed for dispersions and if the min length is null then the max_length has to null as well. 
+    - type: "dDUP"  # "A_" -> "A_A"
+      number: 5
+      length_ranges:
+        - [50, 100]
+        - [500, null]
+        
   # ==== OVERLAP PLACEMENT EXAMPLES ====
   # 1) 'overlap_mode' will result in each of these DELs being placed to overlap with a randomly
   #    chosen interval from 'overlap_regions'.  If 'overlap_mode' is 'exact',
@@ -116,41 +124,33 @@ variant_sets:
   #    type begins with that string; the string "ALL" will match all region types.
   #
     - type: "DEL"  # "A" -> ""
-    - number: 5
-    - length_ranges: [[50, 100]]
-    - overlap_mode: "partial"  # or "contained" or "exact"
-    - overlap_region_type: ["L1HS"]  # optional filter on the type of intervals selected for overlap
-  # 2b) The SV part involved in the overlap is termed the overlap anchor.  For SVs without dispersions,
+      number: 5
+      length_ranges: [[50, 100]]
+      overlap_mode: "partial"  # or "contained" or "exact"
+      overlap_region_type: ["L1HS"]  # optional filter on the type of intervals selected for overlap
+  # 2) The SV part involved in the overlap is termed the overlap anchor.  For SVs without dispersions,
   # the specification of the overlap anchor can be omitted, in which case the anchor will default
   # to the full SV.
-    - type: "delINVdel"  # "ABC" -> "b"
+    - type: "delINVdel"  # "(ABC)" -> "b"
       number: 5
       length_ranges:
         - [50, 100]
         - [50, 100]
         - [50, 100]
       overlap_mode: "partial"
-      overlap_region_type: ["L1HS"]
+      overlap_region_type: ["L1"]
   # 3) The overlap anchor can be specified on either the source or target of the SV's grammar
   # definition, by putting in parentheses the part of the SV constituting the anchor.
-    - type: "dDUP"  # "A_" -> "A_A"
-      source: "(A)_"  # or "A_()"
+    - type: "(A)_ -> A_A"   # Also allowed: "A_()" "(A_)" 
       number: 5
       length_ranges:
         - [50, 100]
         - [500, 1000]
       overlap_mode: "contained"
 
-  # 4) If None given as dispersion max length, target can be placed anywhere on the chromosome 
-    - type: "dDUP"  # "A_" -> "A_A"
-      number: 5
-      length_ranges:
-        - [50, 100]
-        - [500, None]
-      overlap_mode: "contained"
 
   # ==== BLACKLIST EXAMPLE ====
-    - type: "DEL"  # "A" -> ""
+    - type: "DEL"  # "(A)" -> ""
       number: 5
       length_ranges: [[50, 100]]
       blacklist_region_type: ["all"]  # DEL placement will avoid all intervals listed in `blacklist_regions`
