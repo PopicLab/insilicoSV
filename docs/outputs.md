@@ -108,7 +108,7 @@ The Columns of the BED file correspond to:
 ```
 #START_CHROM   START_POS  START_POS+1	END_CHROM	END_POS  END_POS+1  Adjacency  GRAMMAR SV_ID GENOTYPE
 ```
-The START describes the sequence on the left side of the adjacency, and END the right side. 
+The START describes the position on the left side of the adjacency, and END the right side. 
 
 For instance, for a homozygous DEL (`A->''`) on `chr1` between positions `x` and `y`, the corresponding adjacency will be:
 ```
@@ -120,11 +120,4 @@ the corresponding adjacencies will be:
 ```
 chr1    x   x+1    chr2    z-1 z   _1^t/A^h A_->A_A   sv0    0|1
 chr1    y   y+1    chr2    z+1 z+2 A^t/SU^h A_->A_A   sv0    0|1
-```
-
-For adjacency with a novel insertion, the fields of adjacencies involving the novel insertion
-will be denoted `INS`. For instance, `A->AB`, will be described as:
-```
-chr1    y   y+1    INS  INS INS   A^t/B^h A->AB   sv0    0|1
-INS    INS   INS    chr1    y+1 y+2 B^t/SU^h A->AB   sv0    0|1
 ```

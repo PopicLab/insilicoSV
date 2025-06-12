@@ -351,6 +351,8 @@ class OutputWriter:
                     if '^t' in grammar[1]:
                         pos_end -= 1
                     pos_next_end = pos_end + 1
+                # Novel insertions are disregarded as they are not in the reference.
+                if left_locus == 'INS' or right_locus == 'INS': continue
                 record = [chrom_start, pos_start, pos_next_start, chrom_end, pos_end, pos_next_end,
                              '/'.join(grammar), sv_grammar, genotype, sv_id]
                 adjacency_file.write('\t'.join(map(str, record)) + '\n')
