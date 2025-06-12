@@ -191,6 +191,7 @@ class SVSimulator:
         self.svs = []
         logger.info('Constructing SVs from {} categories'.format(len(self.config['variant_sets'])))
         for vset_num, variant_set_config in enumerate(self.config['variant_sets']):
+            variant_set_config['VSET'] = vset_num
             vset_svs, ranges, kinds, mode, header = make_variant_set_from_config(variant_set_config, self.config)
             for sv in vset_svs:
                 sv.info['VSET'] = vset_num
@@ -294,6 +295,7 @@ class SVSimulator:
                                                     blacklist_regions=blacklist_regions, roi_length=roi_length, total_length=total_length)
             num_tries += 1
         if breakend is None:
+            # The breakend failed to be assign by random sampling, the actual available region has to be checked.
             return self.get_breakend_from_regions(containing_region=containing_region, avoid_chrom=avoid_chrom,
                                              blacklist_regions=blacklist_regions, roi_length=roi_length, total_length=total_length)
         return breakend, ref_roi
@@ -331,7 +333,11 @@ class SVSimulator:
                 ref_intervals = []
                 overlaps = tree.overlap(containing_region.start, containing_region.end)
                 for overlap in overlaps:
-                    ref_intervals.append(overlap.chop(containing_region.start, containing_region.end))
+                    # Chop the intervals overlapping the containing region
+                    min_interval = min(overlap.begin, containing_region.start)
+                    max_interval = max(overlap.end, containing_region.end)
+                    ref_intervals.append(Interval(begin=min_interval, end=max_interval,
+                                                  data=overlap.data.replace(start=min_interval, end=max_interval)))
             for interval in ref_intervals:
                 # Remove the intervals that are too small or too close to the end of the chromosome
                 if interval.length() < roi_length: continue
@@ -557,7 +563,7 @@ class SVSimulator:
                         avoid_chrom = None
                         bound = if_not_none(min_dist[pos], 0)
                         if in_anchor:
-                            # we add a brakend position between the last breakend placed and the end of the anchor roi
+                            # we add a breakend position between the last breakend placed from th same SV, and the end of the anchor roi
                             # +1 to ensure the previous symbol in the anchor doesn't have a length of 0
                             left_bound = roi.start +1
                             # -1 to ensure the current symbol doesn't have a length of 0

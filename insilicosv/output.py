@@ -89,7 +89,7 @@ class StatsCollector:
             write_item(fout, "Min length of impacted reference region", self.min_region_len)
             write_item(fout, "Max length of impacted reference region", self.max_region_len)
             if self.region_types:
-                write_item(fout, "NUmber of SVs per ROI types", self.region_types)
+                write_item(fout, "Number of SVs per ROI types", self.region_types)
             for chrom, chrom_length in zip(self.chroms, self.chrom_lengths):
                 fout.write(f"\n===== {chrom} =====\n")
                 write_item(fout, "Length of sequence", chrom_length)
