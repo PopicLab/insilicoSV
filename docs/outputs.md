@@ -125,13 +125,28 @@ To enable this, add the setting `output_paf: True`.   The alignment will
 be written to files named `sim.hapA.paf` and `sim.hapB.paf`, representing the alignment
 to the reference of `sim.hapA.fa` and `sim.hapB.fa`, respectively.
 
+## Output novel adjacencies file
+A BEDPE file containing the adjacencies introduced in the sequence by the simulated SVs.
+To enable, add the setting `output_adjacencies: True`.
+To connect the novel adjacencies to the grammar, we use the symbols of the grammar with a `^t` for tail if the novel adjacency 
+affects the end of the sequence, `^h` for head, the beginning of the sequence.
+Dispersions are disambiguated with a number representing their position.
+A novel adjacency with the end of the prefix sequence before the SV is denoted with PR^t and SU^h for the beginning 
+of the suffix sequence right after the SV.
+The Columns of the BED file correspond to:
+```
+#START_CHROM   START_POS  START_POS+1	END_CHROM	END_POS  END_POS+1  Adjacency  GRAMMAR SV_ID GENOTYPE
+```
+The START describes the position on the left side of the adjacency, and END the right side. 
 
+For instance, for a homozygous DEL (`A->''`) on `chr1` between positions `x` and `y`, the corresponding adjacency will be:
+```
+chr1    x-1 x    chr1 y+1   y+2  PR^t/SU^h   A->''   sv0    1|1
+```
 
-
-
-
-
-
-
-
-
+In the case of an interchromosomal heterozygous dDUP (`A_->A_A`) from `chr1`, `[x, y]`, to `chr2` `z`, 
+the corresponding adjacencies will be:
+```
+chr1    x   x+1    chr2    z-1 z   _1^t/A^h A_->A_A   sv0    0|1
+chr1    y   y+1    chr2    z+1 z+2 A^t/SU^h A_->A_A   sv0    0|1
+```
