@@ -49,7 +49,7 @@ class StatsCollector:
             if (sv.roi is not None) and (sv.roi.kind != '_reference_'):
                 self.region_types[sv.roi.kind] += 1
             assert sv.genotype is not None
-            zygosity = sv.genotype[0] and sv.genotype[1] and (True if sv_type != VariantType.SNP else (
+            zygosity = sv.genotype[0] and sv.genotype[1] and (True if sv_type not in [VariantType.SNP] else (
                     sv.replacement_seq[0] == sv.replacement_seq[1]))
             if zygosity:
                 self.num_homozygous += 1
@@ -148,19 +148,29 @@ class OutputWriter:
                         # In the trEXP case the number of copies is encoded in the motif
                         n_copies = 1
                     for _ in range(n_copies):
-                        seq = None
                         if operation.transform_type == TransformType.DEL:
                             assert operation.source_region is not None
                             target_end = operation.source_region.end
                             length = operation.source_region.length()
+                            seq = None
                             if operation.motif is not None:
                                 length = len(operation.motif)
                                 target_end = operation.source_region.start + length
                                 # the rest of the tandem repeat region is kept
                                 seq = self.reference.fetch(
-                                        reference=operation.source_region.chrom,
-                                        start=target_end,
-                                        end=operation.source_region.end)
+                                            reference=operation.source_region.chrom,
+                                            start=target_end,
+                                            end=operation.source_region.end)
+                            elif length <= 50:
+                                orig_seq = self.reference.fetch(
+                                    reference=operation.source_region.chrom,
+                                    start=operation.source_region.start,
+                                    end=target_end)
+                                operation.transform = Transform(operation.transform_type,
+                                                            is_in_place=operation.transform.is_in_place,
+                                                            n_copies=operation.transform.n_copies,
+                                                            divergence_prob=operation.transform.divergence_prob,
+                                                            orig_seq=orig_seq)
                             paf_rec = PafRecord(
                                 query_name=hap_chrom, query_length=None,
                                 query_start=hap_chrom_pos, query_end=hap_chrom_pos,

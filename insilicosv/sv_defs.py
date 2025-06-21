@@ -168,15 +168,15 @@ class SV(ABC):
                                                  self.breakend_interval_min_lengths))
 
         if self.overlap_mode == OverlapMode.CONTAINED:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() > self.roi_filter.region_length_range[0]),
+            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() > self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a contained overlap.')
-            chk((self.roi_filter.region_length_range[1] is None) or (self.anchor.length() < self.roi_filter.region_length_range[1]),
+            chk((self.roi_filter.region_length_range[1] is None) or (self.get_anchor_length() < self.roi_filter.region_length_range[1]),
                 f'The anchor length is larger than the maximum overlap for a contained overlap.')
         if self.overlap_mode == OverlapMode.CONTAINING:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() > self.roi_filter.region_length_range[0]),
+            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() > self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a containing overlap.')
-        if self.overlap_mode == OverlapMode.CONTAINING:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() >= self.roi_filter.region_length_range[0]),
+        if self.overlap_mode == OverlapMode.PARTIAL:
+            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() >= self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a partial overlap.')
 
         if self.anchor is not None:
@@ -287,6 +287,7 @@ class VariantType(Enum):
 
     SNP = "SNP"
     DIVERGENCE = "DIVERGENCE"
+    INDEL = 'INDEL'
 
     Custom = "Custom"
 
@@ -315,7 +316,7 @@ class BaseSV(SV):
             sv_info = dict(self.info)
             op_type_str = operation.transform_type.value
             if (operation.transform_type == TransformType.IDENTITY) and operation.is_in_place:
-                if (operation.transform.divergence_prob == 1) and (self.breakend_interval_lengths[0] == 1):
+                if sv_type_str == 'SNP':
                     # SNP
                     op_type_str = 'NA'
                     rec_id = sv_id = 'snp' + self.sv_id.split('sv')[-1]
@@ -371,15 +372,17 @@ class BaseSV(SV):
                     sv_info['OP_TYPE'] = 'COPYinv-PASTE'
                 alleles[1] = '<%s>' % sv_info['OP_TYPE']
             else:
-                if ((sv_type_str == 'SNP')
-                        and (operation.transform.orig_seq is not None)
-                        and (operation.transform.replacement_seq is not None)):
+                if sv_type_str == 'SNP':
+                    alleles = operation.transform.replacement_seq
                     # Find the original and altered bases.
-                    alts = str(if_not_none(operation.transform.replacement_seq[0], ''))
-                    if (operation.transform.replacement_seq[1] is not None and
-                            operation.transform.replacement_seq[1] != operation.transform.replacement_seq[0]):
-                        alts += ', '*(len(alts)) + str(if_not_none(operation.transform.replacement_seq[1], ''))
+                    alts = str(if_not_none(alleles[0], ''))
+                    if (alleles[1] is not None) and (alleles[1] != alleles[0]):
+                        alts += ', '*(len(alts)) + str(if_not_none(alleles[1], ''))
                     alleles = [operation.transform.orig_seq, '%s' % alts]
+                elif sv_type_str == 'INDEL':
+                    alleles = ['<INS>', operation.novel_insertion_seq]
+                    if sv_info['OP_TYPE'] == 'DEL':
+                        alleles = [operation.transform.orig_seq, '<DEL>']
                 else:
                     sv_info['OP_TYPE'] = sv_type_str
                     alleles = ['N', '<%s>' % sv_type_str]
@@ -421,11 +424,12 @@ class BaseSV(SV):
                 combined_recs.append(record)
 
         # Check if a type provided as grammar is a predefined type
-        if combined_recs[0]['info']['SVTYPE'] == 'Custom':
+        if '->' in combined_recs[0]['info']['SVTYPE']:
             lhs, rhs = combined_recs[0]['info']['GRAMMAR'].split('->')
             lhs = tuple([letter for letter in lhs if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]])
             rhs = tuple(rhs)
             for key, grammar in SV_KEY.items():
+                if key.value == 'INDEL': continue
                 # Test if the grammar or its symmetric match the grammar of the record
                 if (grammar[0] == lhs and grammar[1] == rhs) or (
                         grammar[0] == lhs[::-1] and grammar[1] == rhs[::-1]):
@@ -439,7 +443,7 @@ class BaseSV(SV):
         if len(combined_recs) == 1:
             combined_recs[0]['id'] = sv_id
             combined_recs[0]['info']['OP_TYPE'] = 'NA'
-            if not combined_recs[0]['info']['SVTYPE'] == 'SNP':
+            if not combined_recs[0]['info']['SVTYPE'] in ['SNP', 'INDEL']:
                 combined_recs[0]['alleles'][1] = '<%s>' % combined_recs[0]['info']['SVTYPE']
         elif len(combined_recs) != len(sv_vcf_recs):
             for idx, operation in enumerate(combined_recs):
@@ -528,6 +532,7 @@ SV_KEY = {
 
     VariantType.DIVERGENCE: (("A",), ("A*",)),
     VariantType.SNP: (("A",), ("A*",)),
+    VariantType.INDEL: (),
 }
 
 

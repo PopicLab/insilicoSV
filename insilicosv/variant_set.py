@@ -11,7 +11,7 @@ import re
 from pysam import FastaFile, VariantFile
 
 from insilicosv import utils
-from insilicosv.utils import RegionFilter, OverlapMode, Locus, error_context, chk, TandemRepeatRegionFilter
+from insilicosv.utils import RegionFilter, OverlapMode, Locus, error_context, chk, TandemRepeatRegionFilter, if_not_none
 from insilicosv.sv_defs import (Transform, TransformType, BreakendRegion, Operation, SV, VariantType, BaseSV,
                                 Syntax, Symbol, SV_KEY, TandemRepeatExpansionContractionSV)
 
@@ -77,7 +77,10 @@ class VariantSet(ABC):
                 grammar = self.vset_config['type'].split('->')
             else:
                 self.svtype = VariantType(self.vset_config['type'])
-                grammar = SV_KEY[VariantType(self.vset_config['type'])]
+                if self.vset_config['type'] == 'INDEL':
+                    # INDELs are either DELs or INSs with a 50% probability.
+                    self.svtype = VariantType('INS')
+                grammar = SV_KEY[self.svtype]
 
             self.source = grammar[0]
             chk(not Syntax.DIVERGENCE in self.source and not Syntax.MULTIPLE_COPIES in self.source,
@@ -385,12 +388,28 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         vset_cfg = self.vset_config
 
         if self.svtype == VariantType.SNP:
+            # SNPs are of size 1.
             chk(vset_cfg.get('length_ranges') in (None, [[1, 1]]),
-                f'length_ranges for SNP can only be [[1, 1]]. Error in for {vset_cfg['config_descr']}', error_type='value')
+                f'length_ranges for SNP can only be [[1, 1]]. Error in {vset_cfg['config_descr']}', error_type='value')
             chk('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] == [1],
                 f'divergence prob for SNP can only be 1. Error in {vset_cfg['config_descr']}', error_type='value')
+            chk(vset_cfg.get('overlap_mode') in (None, 'contained'), 'The type of overlap for a SNP can only be'
+                                                                     'contained. Error in %s' % vset_cfg['config_descr'],
+                                                                     error_type='value')
             vset_cfg['length_ranges'] = [[1, 1]]
             vset_cfg['divergence_prob'] = [1.0]
+        elif vset_cfg['type'] == 'INDEL':
+            # INDELS have to be of size <= 50
+            chk(not vset_cfg.get('length_ranges') or (if_not_none(vset_cfg['length_ranges'][0][0], 0) <= 50 and
+                                                          if_not_none(vset_cfg['length_ranges'][0][1], 0) <= 50 ),
+                f'length_ranges for INDEL must be included in [0, 50]. Error in %s' % vset_cfg['config_descr'],
+                error_type='value')
+            chk(not vset_cfg.get('overlap_range') or (if_not_none(vset_cfg['overlap_range'][0], 0) <= 50 and
+                                                          if_not_none(vset_cfg['overlap_range'][1], 0) <= 50 ),
+                f'overlap_range for INDEL must be included in [0, 50]. Error in %s' % vset_cfg['config_descr'],
+                error_type='value')
+            if not vset_cfg.get('length_ranges'):
+                vset_cfg['length_ranges'] = [[1, 50]]
         else:
             chk('length_ranges' in vset_cfg, f'Please specify length ranges for {vset_cfg['config_descr']}', error_type='syntax')
             chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list for {vset_cfg['config_descr']}',
@@ -556,6 +575,12 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         lhs_strs = self.source
         rhs_strs = self.target
         svtype = self.svtype
+        if self.vset_config['type'] == 'INDEL':
+            anchor = Syntax.ANCHOR_START in lhs_strs
+            svtype = VariantType('DEL' if random.randint(0, 1) else 'INS')
+            lhs_strs, rhs_strs = SV_KEY[svtype]
+            if anchor:
+                lhs_strs = [Syntax.ANCHOR_START, lhs_strs[0], Syntax.ANCHOR_END]
         length_ranges = self.vset_config['length_ranges'] if 'length_ranges' in self.vset_config else []
         letter_ranges = length_ranges
         dispersion_ranges = []
@@ -620,7 +645,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                       config_descr=self.vset_config['config_descr'])
 
     def construct_info(self, lhs_strs, rhs_strs):
-        sv_type_str = self.svtype.value
+        sv_type_str = self.vset_config['type']
         source_str = ''.join(lhs_strs)
         target_str = ''.join(rhs_strs)
         grammar = f'{source_str}->{target_str}'
@@ -796,9 +821,10 @@ class ImportedVariantSet(VariantSet):
         vcf_info = dict(vcf_rec.info)
         if set(''.join(vcf_rec.alleles).upper().replace(' ', '')) <= set('TCGA'):
             if len(vcf_rec.alleles[0]) == 1 and 1 <= len(vcf_rec.alleles[1]) <= 2:
-                # SNP
-                vcf_info['OP_TYPE'] = 'SNP'
-                vcf_info['SVTYPE'] = 'SNP'
+                if not vcf_info['SVTYPE']:
+                    # SNP
+                    vcf_info['OP_TYPE'] = 'SNP'
+                    vcf_info['SVTYPE'] = 'SNP'
         chk('OP_TYPE' in vcf_info, f'Need an SVTYPE to import from vcf records for {vcf_rec}', error_type='syntax')
         rec_type_str = vcf_info['OP_TYPE']
         chk(rec_type_str in {variant_type for variant_type in self.can_import_types},
