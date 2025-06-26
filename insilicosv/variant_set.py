@@ -49,6 +49,14 @@ class VariantSet(ABC):
         self.overlap_kinds = utils.as_list(self.vset_config.get('overlap_region_type', 'all'))
         self.overlap_ranges = []
         self.header = []
+        self.vset_config['config_descr'] = ', '.join("%s: %s" % item for item in self.vset_config.items())
+        self.novel_insertion_seqs = None
+
+        # Overlap and recurrence information for SNPs and INDELs only
+        self.overlap_sv = False
+        self.recurrence_freq = None
+        self.recurrence_num = None
+
         self.overlap_mode = None
         if 'overlap_mode' in self.vset_config:
             chk(isinstance(self.vset_config['overlap_mode'], str) or
@@ -59,10 +67,6 @@ class VariantSet(ABC):
                 self.overlap_mode = OverlapMode(self.vset_config['overlap_mode'])
             except ValueError:
                 chk(False, f'Invalid overlap_mode in {vset_config}', error_type='value')
-        self.novel_insertion_seqs = None
-
-        self.vset_config['config_descr'] = ', '.join("%s: %s" % item for item in self.vset_config.items())
-
         self.vset_config['overlap_region_type'] = (tuple(utils.as_list(self.vset_config['overlap_region_type']))
                                                    if 'overlap_region_type' in self.vset_config else ('all',))
         if self.overlap_mode is not None and 'overlap_region_type' not in self.vset_config:
@@ -70,6 +74,7 @@ class VariantSet(ABC):
         self.overlap_ranges = tuple(
             self.vset_config['overlap_region_length_range'] if 'overlap_region_length_range' in self.vset_config else
             [None, None])
+
         if 'type' in self.vset_config:
             self.vset_config['type'] = self.vset_config['type'].replace(" ", "")
             if '->' in self.vset_config['type']:
@@ -379,6 +384,9 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'n_copies',
                 'novel_insertions',
                 'interchromosomal',
+                'overlap_sv',
+                'recurrence_freq',
+                'recurrence_num',
                 'config_descr', 'VSET'
             ), f'invalid SV config key {vset_config_key}', error_type='syntax')
 
@@ -391,6 +399,12 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 f'divergence prob for SNP can only be 1. Error in {vset_cfg['config_descr']}', error_type='value')
             vset_cfg['length_ranges'] = [[1, 1]]
             vset_cfg['divergence_prob'] = [1.0]
+            self.overlap_sv = vset_cfg.get('overlap_sv', False)
+            self.recurrence_freq = vset_cfg.get('recurence_freq', -1)
+            self.recurrence_num = vset_cfg.get('recurence_num', vset_cfg['number'] / 100)
+            if not self.overlap_sv and self.recurrence_freq > 0:
+                logger.warning('WARNING: overlap_sv False but recurrence_freq > 0, recurrence_freq will be ignored and the SNPs placed last.')
+                self.recurrence_freq = -1
         else:
             chk('length_ranges' in vset_cfg, f'Please specify length ranges for {vset_cfg['config_descr']}', error_type='syntax')
             chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list for {vset_cfg['config_descr']}',
@@ -612,6 +626,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                       anchor=anchor,
                       dispersions=dispersions,
                       overlap_mode=self.overlap_mode,
+                      overlap_sv=self.overlap_sv,
                       roi_filter=roi_filter,
                       blacklist_filter=self.get_blacklist_filter(),
                       fixed_placement=None,
@@ -799,8 +814,10 @@ class ImportedVariantSet(VariantSet):
                 # SNP
                 vcf_info['OP_TYPE'] = 'SNP'
                 vcf_info['SVTYPE'] = 'SNP'
-        chk('OP_TYPE' in vcf_info, f'Need an SVTYPE to import from vcf records for {vcf_rec}', error_type='syntax')
-        rec_type_str = vcf_info['OP_TYPE']
+
+        chk('OP_TYPE' in vcf_info or 'SVTYPE' in vcf_info, f'Need an SVTYPE or OP_TYPE to import from vcf records for {vcf_rec}', error_type='syntax')
+        rec_type_str = vcf_info.get('OP_TYPE', 'NA')
+
         chk(rec_type_str in {variant_type for variant_type in self.can_import_types},
             f'Currently only the following VCF types are supported: {self.can_import_types} but {rec_type_str} was provided',
             error_type='syntax')
@@ -1056,7 +1073,9 @@ def make_variant_set_from_config(vset_config, config) -> list[SV]:  # type: igno
         for variant_set_class in VARIANT_SET_CLASSES:
             if variant_set_class.can_make_from(vset_config):
                 variant_set = variant_set_class(vset_config, config)
-                return variant_set.make_variant_set(), variant_set.overlap_ranges, variant_set.overlap_kinds, variant_set.overlap_mode, variant_set.header
+                return variant_set.make_variant_set(), variant_set.overlap_ranges, variant_set.overlap_kinds, \
+                       variant_set.overlap_mode, variant_set.overlap_sv, variant_set.recurrence_freq,\
+                       variant_set.recurrence_num, variant_set.header
         chk(False, f"The format of the config or the sv_type is not supported {vset_config}")
 
 

@@ -125,6 +125,10 @@ class TestSVSimulator(unittest.TestCase):
         self.test_overlap_bed_13 = "tests/inputs/example_overlap_events_13.bed"
         self.test_overlap_bed_14 = "tests/inputs/example_overlap_events_14.bed"
         self.test_overlap_bed_15 = "tests/inputs/example_overlap_events_15.bed"
+        
+        self.import_del = "tests/inputs/import_del.vcf"
+        self.import_inv = "tests/inputs/import_inv.vcf"
+        self.overlap_region_snps_overlap = "tests/inputs/overlap_region_snps_overlap.bed"
 
         self.test_exclude_bed = "tests/inputs/exclude.bed"
 
@@ -1251,6 +1255,94 @@ class TestSVSimulator(unittest.TestCase):
                        self.hap1, self.hap2, self.bed)
         ]
 
+        self.test_snp_overlap = [
+            ["TC",
+             TestObject([self.ref_file, {"chr21": "TC"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    "variant_sets": [{"type": "SNP",
+                                                      "number": 1,
+                                                      "overlap_sv": True
+                                                     },
+                                                     {"import": self.import_del}]}],
+                        self.hap1, self.hap2, self.bed),
+             [""]],
+            ["TC",
+             TestObject([self.ref_file, {"chr21": "TC"}],
+                        [self.par, {"reference": self.ref_file,"random_seed": 2,
+                                    "variant_sets": [{"type": "SNP",
+                                                      "number": 1,
+                                                      "overlap_sv": True
+                                                      },
+                                                     {"import": self.import_inv}]}],
+                        self.hap1, self.hap2, self.bed),
+             ["GC", "GT", "GG", "AA", "CA", "TA"]],
+            ["TC",
+             TestObject([self.ref_file, {"chr21": "TC"}],
+                        [self.par, {"reference": self.ref_file,"random_seed": 2,
+                                    "variant_sets": [{"type": "SNP",
+                                                      "number": 1,
+                                                      "overlap_sv": True,
+                                                      "recurrent_freq": 0
+                                                      },
+                                                     {"type": 'DUP',
+                                                      "number": 1,
+                                                      'length_ranges': [[2, 2]]}]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TATA", "TGTG", "TTTT", "ACAC", "GCGC", "CCCC"]],
+            ["TC",
+             TestObject([self.ref_file, {"chr21": "TC"}],
+                        [self.par, {"reference": self.ref_file,"random_seed": 2,
+                                    "variant_sets": [{"type": "SNP",
+                                                      "number": 1,
+                                                      "overlap_sv": True,
+                                                      "recurrence_freq": -1
+                                                      },
+                                                     {"type": 'DUP',
+                                                      "number": 1,
+                                                      'length_ranges': [[2, 2]]}]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TCTA", "TCTG", "TCTT", "TCAC", "TCGC", "TCCC",
+              "TACC", "TGTC", "TTTC", "ACTC", "GCTC", "CCTC"]],
+            ["TC",
+             TestObject([self.ref_file, {"chr21": "T"}],
+                        [self.par, {"reference": self.ref_file,"random_seed": 2,
+                                    "variant_sets": [{"type": "SNP",
+                                                      "number": 2,
+                                                      "overlap_sv": True,
+                                                      "recurrence_freq": 1,
+                                                      "recurrence_num": 1
+                                                      },
+                                                     {"type": 'DUP',
+                                                      "number": 1,
+                                                      'length_ranges': [[2, 2]]}]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TA", "TC", "TT", "TG", "AT", "CT", "GT", "AA", "AC", "AG", "CC", "CG", "GG", "GA", "CA", "GC"]],
+            ["TC",
+             TestObject([self.ref_file, {"chr21": "TCGA"}],
+                        [self.par, {"reference": self.ref_file,"random_seed": 2,
+                                    "overlap_regions": self.overlap_region_snps_overlap,
+                                    "variant_sets": [{"type": "SNP",
+                                                      "number": 2,
+                                                      "overlap_sv": True,
+                                                      "recurrence_freq": 1,
+                                                      "recurrence_num": 1,
+                                                      'overlap_mode': 'contained'
+                                                      },
+                                                     {"type": 'DUP',
+                                                      "number": 2,
+                                                      'length_ranges': [[2, 2]]}]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TCT" + x + y + "AGA" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C']] + ['TCTCGAGA'] +
+              ["T"+x+"TC"+ y + "AGA" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C'] ] +
+             ["T"+x+"TCGA"+ y + "A" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C'] ] +
+             ["TCT"+x+"GA"+ y + "A" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C'] ] +
+             ["T"+x+"T" + x + y + "AGA" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C']] +
+             ["TCT" + x + y + "A"+ y + "A" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C']] +
+             ["T"+x+"T"+x+"GA"+ y + "A" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C'] ] +
+             ["T"+x+"TC"+ y + "AA"+ y + "A" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C'] ] ],
+            ]
+
         self.simple_test_data = [
             ["TCGAGG",
              TestObject([self.ref_file, {"chr21": "TCGAGG"}],
@@ -1803,6 +1895,63 @@ class TestSVSimulator(unittest.TestCase):
             curr_sim = SVSimulator(config.par)
             with self.assertRaises(Exception):
                 curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref)
+
+    def test_snp_overlaps(self):
+        for test_num, (ref, vs_config, expected_outputs) in enumerate(self.test_snp_overlap):
+            print(ref, vs_config, expected_outputs)
+            # if test_num != 1: continue
+            print('TEST', test_num, 'config', vs_config)
+            sv_list = []
+            if not isinstance(vs_config, TestObject):
+                if not isinstance(vs_config, list):
+                    vs_config = [vs_config]
+                heterozygous = False
+                test_object = TestObject([self.ref_file, {f"chrTest{ref_num}": ref_seq
+                                                          for ref_num, ref_seq in enumerate(as_list(ref))}],
+                                         [self.par, {"reference": self.ref_file,
+                                                     "homozygous_only": True,
+                                                     "min_intersv_dist": 0,
+                                                     "random_seed": 88,
+                                                     "variant_sets": [dict(number=1, **vs_conf)
+                                                                      for vs_conf in vs_config]}],
+                                         '/data/enzo/insilicoSV/hap1.fna', '/data/enzo/insilicoSV/hap2.fna',
+                                         '/data/enzo/insilicoSV/hap.bed')
+            else:
+                heterozygous = True
+                test_object = vs_config
+
+            results_seen = set()
+            count_occ = defaultdict(int)
+            attempt_num = 0
+            expected_results = set(expected_outputs)
+            while any(
+                    expected_result not in results_seen for expected_result in expected_results) and attempt_num < len(
+                    expected_results) * 100:
+                test_object.par_content["random_seed"] += 150
+                print("SEED", test_object.par_content["random_seed"])
+
+                attempt_num += 1
+                results, results2, svs = self.helper_test_known_output_svs(test_object, expected_results,
+                                                                           heterozygous=heterozygous)
+                print('RESUTLS', results)
+                count_occ[results] += 1
+                results_seen.update([results, results2])
+                sv_list.append(svs)
+            if results_seen != expected_results:
+                print('config', vs_config, 'seen', results_seen, 'expected', expected_results, count_occ)
+                print('missing',
+                      [expected_result for expected_result in expected_results if expected_result not in results_seen])
+                print('Unexpected',
+                      [unexpected_result for unexpected_result in results_seen if
+                       unexpected_result not in expected_results])
+            '''if any(expected_result not in results_seen for expected_result in expected_results):
+                for svs in sv_list:
+                    for sv in svs:
+                        print('sv lengths not target', sv.get_anchor_length(), 'breakends', sv.breakend_interval_lengths, 'anchors', sv.anchors,
+                              'rois', sv.roi, 'placement', sv.placement)'''
+            print('OCCURENCES', count_occ, test_num, 'config', vs_config, expected_results)
+            assert all(expected_result in results_seen for expected_result in
+                       expected_results), f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
 
     def test_simple_tests(self):
         for test_num, (ref, vs_config, expected_outputs) in enumerate(self.simple_test_data):

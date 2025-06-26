@@ -160,6 +160,12 @@ class SV(ABC):
     # Fields used while finding a placement
     num_valid_placements: int = 0
 
+    # Step at which the SV was placed
+    time_point: Optional[tuple[int, int]] = None
+
+    # If the SV can overlap other SVs
+    overlap_sv: Optional[bool] = False
+
     def __post_init__(self):
         assert self.sv_id
         assert len(self.breakend_interval_min_lengths) == len(self.breakend_interval_lengths)

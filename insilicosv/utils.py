@@ -310,6 +310,18 @@ class RegionSet:
 def percent_N(seq):
     return 0 if len(seq) == 0 else (seq.count('N') + seq.count('n')) / len(seq)
 
+def get_transformed_regions(chrom2operations):
+    # Find a set of disjoint modified regions.
+    transformed_regions = defaultdict(list)
+    for chrom, operations in chrom2operations.items():
+        region_start = region_end = None
+        for operation in operations:
+            if not region_start or operation.target_region.start < region_start:
+                region_start = operation.target_region.start
+            if not region_end or operation.target_region.end > region_end:
+                region_end = operation.target_region.end
+        transformed_regions[chrom].append(Region(start=region_start, end=region_end, chrom=chrom))
+
 def pairwise(iterable):
     # pairwise('ABCD') → [('A', 'B'), ('B', 'C'), ('C', 'D')]
     iterator = iter(iterable)
