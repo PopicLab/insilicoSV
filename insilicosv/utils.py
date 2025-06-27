@@ -313,14 +313,13 @@ def percent_N(seq):
 def get_transformed_regions(chrom2operations):
     # Find a set of disjoint modified regions.
     transformed_regions = defaultdict(list)
+    source_regions = defaultdict(list)
     for chrom, operations in chrom2operations.items():
-        region_start = region_end = None
         for operation in operations:
-            if not region_start or operation.target_region.start < region_start:
-                region_start = operation.target_region.start
-            if not region_end or operation.target_region.end > region_end:
-                region_end = operation.target_region.end
-        transformed_regions[chrom].append(Region(start=region_start, end=region_end, chrom=chrom))
+            if not operation.op_info['recurrent']:
+                transformed_regions[chrom].append(operation.target_region)
+                source_regions[chrom].append(operation.source_region)
+    return transformed_regions, source_regions
 
 def pairwise(iterable):
     # pairwise('ABCD') → [('A', 'B'), ('B', 'C'), ('C', 'D')]
@@ -329,6 +328,29 @@ def pairwise(iterable):
     for b in iterator:
         yield a, b
         a = b
+
+def update_operation_groups(orig_operation, inside_start, inside_end, outside_start, outside_end, merged_lookup,
+                            target_region2transform, lookup_idx):
+    # Split a recurrent operation into two operations, one inside and one outside the target interval, update the tree and lists of operations
+    operation_inside = Operation(transform=orig_operation.transform,
+                                 source_breakend_region=BreakendRegion(0, 1),
+                                 placement=[Locus(chrom, inside_start),
+                                            Locus(chrom, inside_end)])
+    operation_outside = Operation(transform=orig_operation.transform,
+                                  source_breakend_region=BreakendRegion(0, 1),
+                                  placement=[Locus(chrom, outside_start),
+                                             Locus(chrom, outside_end)])
+    chrom2operations[chrom][merged_lookup[orig_operation]].remove(orig_operation)
+    del merged_lookup[orig_operation]
+    chrom2operations[chrom][lookup_idx].append(operation_inside)
+    merged_lookup[operation_inside] = lookup_idx
+
+    target_region2transform[chrom].add(
+        Interval(begin=outside_start, end=outside_end, data=operation_outside))
+    target_region2transform[chrom].add(
+        Interval(begin=inside_start, end=inside_end, data=operaoperation_insidetion_left))
+    return operation_outside
+
 
 def has_duplicates(it):
     items = set()

@@ -116,8 +116,10 @@ PafRecord = namedtuple('PafRecord', [
 
 class OutputWriter:
 
-    def __init__(self, svs, reference, chrom_lengths, output_path, config):
+    def __init__(self, svs, recurrent_svs, reference, chrom_lengths, output_path, config):
         self.svs = svs
+        self.svs = sorted(self.svs, key=operator.attrgetter('time_point'))
+        self.recurrent_svs = recurrent_svs
         self.reference = reference
         self.chrom_lengths = chrom_lengths
         self.output_path = output_path
@@ -134,18 +136,20 @@ class OutputWriter:
         paf_records = []
         hap_chrom_lengths = {}
         with open(hap_fa, 'w') as sim_fa:
-            chrom2operations, target_regions = self.get_chrom2operations(hap_index)
+            chrom2operations, target_regions, source_regions = self.get_chrom2operations(hap_index)
             for chrom, chrom_length in zip(self.reference.references, self.reference.lengths):
                 hap_str = ['hapA', 'hapB'][hap_index]
                 hap_chrom = f'{chrom}_{hap_str}'
                 sim_fa.write(f'>{hap_chrom}\n')
-                mapping_intervals = IntervalTree([Interval(begin=0, end=chrom_length[chrom])])
                 hap_chrom_pos = 0
-                for overlapping_operations, target_region in zip(chrom2operations[chrom], target_regions[chrom]):
+                for overlapping_operations, sv_target, sv_source in zip(chrom2operations[chrom], target_regions[chrom], sv_sources[chrom]):
                     orig_seq = self.reference.fetch(
                                             reference=chrom,
-                                            start=target_region.start,
-                                            end=target_region.end)
+                                            start=sv_source.start,
+                                            end=sv_source.end)
+                    # Tree used to keep track of the operations and different paf records
+                    operation_tree = IntervalTree()
+
                     for operation in overlapping_operations:
                         # paf format: https://cran.r-project.org/web/packages/pafr/vignettes/Introduction_to_pafr.html
                         paf_mapq = 60
@@ -156,8 +160,42 @@ class OutputWriter:
 
                         for _ in range(n_copies):
                             if operation.transform_type == TransformType.DEL:
-                                overlapping_interval = mapping_intervals.overlap(operation.source_region.start, operation.source_region.end)
+                                operation_start = operation.source_region.start
+                                operation_end = operation.source_region.end
+                                if 'side' in operation.op_info:
+                                    # The recurrent operation was crossing over the target insertion point
+                                    operation_length = operation_end - operation_start
+                                    if operation.op_info['side'] == 0:
+                                        operation_start = sv_source.start
+                                        operation_end = operation_start + operation_length
+                                    else:
+                                        operation_end = sv_source.end
+                                        operation_start = operation_end - operation_length
+                                overlaps = operation_tree.overlap(operation_start, operation_end)
+                                for overlap in overlaps:
+                                    # This operation is included in a DEL so deleted
+                                    operation_tree.remove(overlap)
+                                    if overlap.begin < operation_start or overlap.end > operation_end:
+                                        # We trim the interval and the associated PAF record to add them back to the tree
+                                        if operation_start > overlap.begin:
+                                            paf_trim = copy(overlap.data)
+                                            if paf_trim.query_start == overlap.begin:
+                                                paf_trim.query_start = overlap.begin
+                                                paf_trim.query_length = operation_start - overlap.begin
+                                            else:
+                                                paf_trim.target_start = overlap.begin
+                                                paf_trim.target_length = operation_start - overlap.begin
+                                            operation_tree.add(Interval(begin=overlap.begin, end=operation_start, data=paf_trim))
 
+                                        if operation_end < overlap.end:
+                                            paf_trim = copy(overlap.data)
+                                            if paf_trim.query_start == overlap.begin:
+                                                paf_trim.query_start = operation_end
+                                                paf_trim.query_length = overlap.end - operation_end
+                                            else:
+                                                paf_trim.target_start = operation_end
+                                                paf_trim.target_end = overlap.end
+                                            operation_tree.add(Interval(begin=operation_end, end=overlap.end, data=paf_trim))
 
                             if operation.transform_type == TransformType.DEL:
                                 target_end = operation.source_region.end
@@ -279,7 +317,7 @@ class OutputWriter:
             logger.warning('Skipping adjacencies output')
             return
         novel_adjacencies = []
-        for sv in self.svs:
+        for sv in self.recurrent_svs + self.svs:
             # Prevent duplicate adjacencies
             if sv.info['OP_TYPE'] in ['SNP', 'trEXP', 'trCON']: continue
             lhs, rhs = sv.info['GRAMMAR'].split('->')
@@ -374,17 +412,25 @@ class OutputWriter:
         merged_lookup = dict()
         chrom2operations = defaultdict(list)
         target_region2transform = dict(IntervalTree)
-        source_region2transform = dict(IntervalTree)
-        for sv in self.svs:
+        for sv in recurrent_svs + self.svs:
+            # start with recurrent SVs, regular SVs are ordered by time point
             assert sv.genotype is not None
             if sv.genotype[hap_index]:
+                operations = []
                 for operation in sv.operations:
+                    operation.op_info['SVID'] = sv.sv_id
+                    operation.op_info['recurrent'] = not sv.recurrent_freq is None
+                    operation.op_info['time_point'] = sv.time_point
+                    operations.append(operation)
+
+                while operations:
+                    operation = operations.pop()
                     assert operation.target_region is not None
                     chrom = operation.target_region.chrom
-                    target_interval = Interval(operation.target_region.start, operation.end, data=[sv.overlap_sv, operation])
+                    target_interval = Interval(operation.target_region.start, operation.end, data=operation)
                     overlap = target_region2transform[chrom].overlap(target_interval.begin, target_interval.end)
                     if operation.is_in_place:
-                        if not sv.overlap_sv and any(not interval.data[0] for interval in overlap):
+                        if not operation.op_info['recurrent'] and any(not interval.data.op_info['recurrent'] for interval  in overlap):
                             # Check if there is already an inplace operation there, in which case they have to be the same
                             assert (operation.transform == target_region2transform[operation.target_region])
                             print(operation.transform, target_region2transform[operation.target_region])
@@ -392,42 +438,79 @@ class OutputWriter:
 
                     if operation.op_info is None:
                         operation.op_info = dict()
-                    operation.op_info['SVID'] = sv.sv_id
-                    operation.op_info['time_point'] = sv.time_point
                     lookup_idx = len(chrom2operations[chrom])
                     merged_lookup[operation] = lookup_idx
                     chrom2operations[chrom].append([operation])
-                    # Overlapping regions are stored in the same list
+
+                    # Overlapping operations are stored in the same list to be applied together
                     for interval in overlap:
-                        overlap_operation = interval.data[1]
-                        chrom2operations[chrom][lookup_idx].extend(chrom2operations[chrom][merged_lookup[overlap_operation]])
-                        merged_lookup[overlap_operation] = lookup_idx
-                        chrom2operations[chrom][merged_lookup[overlap_operation]] = []
+                        overlap_operation = interval.data
+                        if not overlap_operation.op_info['recurrent'] or not overlap_operation in merged_lookup: continue
+                        inter_start = max(interval.begin, target_interval.begin)
+                        inter_end = min(interval.end, target_interval.end)
+
+                        # Cut the recurrent operations to fit the target region
+                        side = None
+                        if target_interval.begin == target_interval.end:
+                            # The recurrent operation is containing an insertion target, we decide if the right or left side will be included in the target.
+                            side = np.argmin([target_interval.start - inter_start, inter_end - target_interval.end])
+
+                        if not operation.op_info['recurrent'] and ((inter_start < interval.begin and inter_end == interval.end) or (side and side == 0)):
+                            # the recurrent operation is on the right side, the operation outside the target region is added again to the operations to merge
+                            outside_operation = utils.update_operation_groups(operation, interval.begin, target_interval.end,
+                                                               target_interval.end, interval.end, merged_lookup,
+                                                               target_region2transform, lookup_idx)
+                            if side:
+                                # The target is an insertion point and the recurrent operation is overlapping it
+                                outside_operation.op_info['source_region'] = (operation_outside.source_region.start, operation_outside.source_region.end)
+                                outside_operation.op_info['side'] = 1
+                                operation.source_region.start = operation.source_region.end = target_interval.end
+                            else:
+                                operations.append(outside_operation)
+
+                        elif not operation.op_info['recurrent'] and ((inter_start == interval.begin and inter_end < interval.end) or (side and side == 1)):
+                            # the recurrent operation is on the left side, the operation outside the target region is added again to the operations to merge
+                            outside_operation = utils.update_operation_groups(operation, target_interval.begin, interval.end,
+                                                    interval.begin, target_interval.begin, merged_lookup,
+                                                    target_region2transform, lookup_idx)
+                            if side:
+                                # The target is an insertion point and the recurrent operation is overlapping it
+                                outside_operation.op_info['source_region'] = (operation_outside.source_region.start, operation_outside.source_region.end)
+                                outside_operation.op_info['side'] = 0
+                                operation.source_region.start = operation.source_region.end = target_interval.end
+                            else:
+                                operations.append(outside_operation)
+
+                        else:
+                            # The recurrent operation is included in the target
+                            chrom2operations[chrom][lookup_idx].extend(chrom2operations[chrom][merged_lookup[overlap_operation]])
+                            merged_lookup[overlap_operation] = lookup_idx
+                            chrom2operations[chrom][merged_lookup[overlap_operation]] = []
 
                     target_region2transform[chrom].add(target_interval)
-                    if operation.target_region != operation.source_region:
+                    if not operation.is_in_place:
                         # The SV is not in place, reference the source region to keep track of past and future modifications
                         source_interval = Interval(operation.source_region.start, operation.source_region.end)
-                        source_region2transform[chrom].add(source_interval)
-                        overlap_source.overlap(source_interval.begin, source_interval.end)
+                        target_region2transform[chrom].overlap(source_interval.begin, source_interval.end)
                         for operation_overlap in overlap_source:
-                            # All operation overlapping with the source and happening before have to impact the target
+                            if not operation_overlap.op_info['recurrent']: continue
+                            # All recurrent operations overlapping with the source and happening before have to impact the target
                             # If an operation happened on the source afterwards and is fully contained in the source, 50% chance to be on the target instead.
-                            if sv.time_point > operation_overlap.op_info['time_point']:
+                            if operation.op_info['time_point']> operation_overlap.op_info['time_point']:
                                 inter_start = max(operation_overlap.begin, source_interval.begin)
                                 inter_end = min(operation_overlap.end, source_interval.end)
                                 past_operation = Operation(transform=operation_overlap.transform,
-                                                           source_breakend_region=BreakendRegion(0,1),
+                                                           source_breakend_region=BreakendRegion(0, 1),
                                                            placement=[Locus(chrom, inter_start),
                                                                       Locus(chrom, inter_end)])
                                 chrom2operations[chrom][lookup_idx].append(past_operation)
-                            elif source_interval.begin < operation_overlap.begin < operation_overlap.end < source_interval.end:
-                                # Ulterior operation fully contained in the source
+                            elif (operation_overlap in merged_lookup) and (source_interval.begin < operation_overlap.begin < operation_overlap.end < source_interval.end):
+                                # Ulterior operation unclaimed by an inplace operation and fully contained in the source
                                 if random.randint(0, 1):
-                                    chrom2operations[chrom][lookup_idx].append(chrom2operations[chrom][merged_lookup[operation_overlap]])
+                                    chrom2operations[chrom][lookup_idx].append(
+                                        chrom2operations[chrom][merged_lookup[operation_overlap]])
                                     # The overlap_operation is fully contained so keeping track of operation overlaps is enough.
                                     del merged_lookup[operation_overlap]
-
 
 
         # Clean up and order the operations by time point.
@@ -438,7 +521,7 @@ class OutputWriter:
             chrom2operations[chrom] = [sorted(operations, key=operator.attrgetter('time_point')) for operations in chrom2operations[chrom]]
 
         # Find the disjoint regions affected  by at least one operation.
-        transformed_regions = utils.get_transformed_regions(chrom2operations)
+        transformed_regions, source_regions = utils.get_transformed_regions(chrom2operations)
         for chrom, chrom_length in self.chrom_lengths.items():
             target_regions = sorted([Region(chrom=chrom, start=0, end=0)] + 
                                     [region for region in transformed_regions[chrome]] +
@@ -460,7 +543,7 @@ class OutputWriter:
             regions_order_idx = np.argsort(transformed_regions[chrom])
             transformed_regions[chrom] = sorted(transformed_regions[chrom])
             chrom2operations[chrom] = [chrom2operations[chrom][idx] for idx in regions_order_idx]
-        return chrom2operations, transformed_regions
+        return chrom2operations, transformed_regions, source_regions
 
     def output_novel_insertions(self):
         with open(os.path.join(self.output_path, 'sim.novel_insertions.fa'), 'w') as (

@@ -375,9 +375,11 @@ class FromGrammarVariantSet(SimulatedVariantSet):
 
         for vset_config_key in self.vset_config:
             chk(vset_config_key in (
-                'type', 'number',
+                'type',
+                'number',
                 'length_ranges',
-                'overlap_region_type', 'overlap_region_length_range',
+                'overlap_region_type',
+                'overlap_region_length_range',
                 'overlap_mode',
                 'blacklist_region_type',
                 'divergence_prob',
@@ -387,7 +389,8 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'overlap_sv',
                 'recurrence_freq',
                 'recurrence_num',
-                'config_descr', 'VSET'
+                'config_descr',
+                'VSET'
             ), f'invalid SV config key {vset_config_key}', error_type='syntax')
 
         vset_cfg = self.vset_config
@@ -400,12 +403,16 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             vset_cfg['length_ranges'] = [[1, 1]]
             vset_cfg['divergence_prob'] = [1.0]
             self.overlap_sv = vset_cfg.get('overlap_sv', False)
-            self.recurrence_freq = vset_cfg.get('recurence_freq', -1)
-            self.recurrence_num = vset_cfg.get('recurence_num', vset_cfg['number'] / 100)
-            if not self.overlap_sv and self.recurrence_freq > 0:
-                logger.warning('WARNING: overlap_sv False but recurrence_freq > 0, recurrence_freq will be ignored and the SNPs placed last.')
-                self.recurrence_freq = -1
+            if self.overlap_sv:
+                self.recurrence_freq = vset_cfg.get('recurrence_freq', -1)
+                self.recurrence_num = vset_cfg.get('recurrence_num', vset_cfg['number'] / 100)
+                chk(not self.overlap_sv and self.recurrence_freq, f'overlap_sv False but recurrence_freq True in {vset_cfg['config_descr']}')
+                if self.recurrence_freq in [0, -1]:
+                    # All SVs are place at the beginnning or the ned
+                    self.recurrence_num = vset_cfg['number']
         else:
+            chk(not ('overlap_sv' in vset_cfg or 'recurrence_freq' in vset_cfg or 'recurrence_num' in vset_cfg),
+                f'overlap_sv, recurrence_freq and recurrence_num are only available for SNPs and INDELs, but {vset_cfg['config_descr']}')
             chk('length_ranges' in vset_cfg, f'Please specify length ranges for {vset_cfg['config_descr']}', error_type='syntax')
             chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list for {vset_cfg['config_descr']}',
                 error_type='syntax')

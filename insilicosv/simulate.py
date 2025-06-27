@@ -40,8 +40,6 @@ class SVSimulator:
 
     config: dict[str, Any]
     svs: list[SV]
-    # Keep track of the SNPs and INDELS that have to be added at different time points.
-    recurrent_svs: dict[SV]
     # Region set containing ROI regions to enforce overlapping constraints
     rois_overlap: list[Region]
     # Region set defined by the reference updated to keep track of the available regions.
@@ -81,10 +79,8 @@ class SVSimulator:
         self.overlap_modes = {}
         self.rois_overlap = {}
 
-        # To keep track of the properties of recurrent variant sets.
-        self.recurrence_freqs = {}
-        self.recurrence_nums = {}
-        self.enable_overlap_sv = {}
+        # Keep track of the SNPs and INDELS that have to be added at different time points.
+        self.recurrent_svs = dict()
         self.orig_rois_overlap = {}
         self.placed_recurrent_svs = []
 
@@ -201,7 +197,6 @@ class SVSimulator:
 
     def construct_svs(self):
         self.svs = []
-        self.recurrent_svs = []
         logger.info('Constructing SVs from {} categories'.format(len(self.config['variant_sets'])))
         for vset_num, variant_set_config in enumerate(self.config['variant_sets']):
             variant_set_config['VSET'] = vset_num
@@ -214,11 +209,7 @@ class SVSimulator:
             self.overlap_modes[vset_num] = mode
 
             if recurrence_freq:
-                self.recurrence_freqs[vset_num] = recurrence_freq
-                self.enable_overlap_sv[vset_num] = overlap_sv
-                if recurrence_freq > 0:
-                    self.recurrent_svs[vset_num] = vset_svs
-                    self.recurrence_nums[vset_num] = recurrence_num
+                self.recurrent_svs[vset_num] = (vset_svs, recurrence_freq, recurrence_num)
             else:
                 self.svs.extend(vset_svs)
             self.num_svs[vset_num] = len(vset_svs)
@@ -242,18 +233,23 @@ class SVSimulator:
     def place_recurrent_sv(self, current_svnum, roi_indexes, place_all=False):
         if self.recurrent_svs:
             counter_recurrent = 0
-            for sv_set, recurrence in self.recurrence_freqs.items():
-                if current_svnum % recurrence == 0:
-                    num_iterations = self.recurrence_nums[sv_set]
-                    if place_all:
-                        # Places potential remaining recurrent SVs.
-                        num_iterations = len(self.recurrent_svs[sv_set])
-                        if num_iterations > self.recurrence_nums[sv_set]:
-                            logger.warning(f'WARNING: for recurrent SVs {sv_set}, place {num_iterations} SVs at the last step instead of the requested number {self.recurrence_nums[sv_set]}. '
-                                           f'If this is not wanted, adapt the field \'recurrence_num\' to the total number of non-recurent SVs.')
+            for sv_set, svs, recurrence, recurrence_num in self.recurrent_svs.items():
+                if not svs: continue
+                num_iterations = recurrence_num
+                to_place = (current_svnum % recurrence == 0)
+                if place_all or recurrence == 0:
+                    # Places potential remaining recurrent SVs.
+                    to_place = True
+                    num_iterations = len(self.recurrent_svs[sv_set])
+                    if num_iterations > recurrence_num:
+                        logger.warning(
+                            f'WARNING: for recurrent SVs {sv_set}, place {num_iterations} SVs at the last step instead of the requested number {self.recurrence_nums[sv_set]}. '
+                            f'If this is not wanted, adapt the field \'recurrence_num\' to the total number of non-recurent SVs.')
+
+                if to_place:
                     for _ in range(num_iterations):
-                        if not self.recurrent_svs[recurrent_num]: break
-                        sv = self.recurrent_svs.pop()
+                        if not self.recurrent_svs[sv_set]: break
+                        sv = svs.pop()
                         call_place_sv(sv, (current_svnum-1, counter_recurrent), sv_set, roi_indexes)
                         self.placed_recurrent_svs.append(sv)
                         counter_recurrent +=1
@@ -282,16 +278,11 @@ class SVSimulator:
     def determine_sv_placement_order(self) -> None:
         # place most constrained SVs first
         logger.info(f'Deciding placement order for {len(self.svs)} SVs')
-        types_order = ['Anterior', OverlapMode.EXACT,  OverlapMode.PARTIAL, OverlapMode.CONTAINING, OverlapMode.CONTAINED, None, 'Posterior']
+        types_order = [OverlapMode.EXACT,  OverlapMode.PARTIAL, OverlapMode.CONTAINING, OverlapMode.CONTAINED, None]
         for sv in self.svs:
-            svset = sv.info['SVSET']
             with error_context(sv.config_descr):
                 if sv.fixed_placement:
                     sv.priority = 0
-                elif svset in self.recurrence_freqs:
-                    sv.priority = 1
-                    if self.recurrence_freqs[svset] == -1:
-                        sv.priority = len(types_order)
                 else:
                     distance = sum([dist for dist in sv.breakend_interval_lengths if dist is not None]) + 2
                     sv.priority = (types_order.index(sv.overlap_mode) + 1) + 1/distance
@@ -760,7 +751,7 @@ class SVSimulator:
 
     def output_results(self) -> None:
         logger.info('Writing outputs')
-        output_writer = OutputWriter(self.svs+self.placed_recurrent_svs, self.reference, self.chrom_lengths,
+        output_writer = OutputWriter(self.svs, self.placed_recurrent_svs, self.reference, self.chrom_lengths,
                                      self.output_path, self.config)
         logger.info('Writing new haplotypes')
         output_writer.output_haps()
