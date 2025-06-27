@@ -391,6 +391,8 @@ class BaseSV(SV):
                     alleles = ['N', '<%s>' % sv_type_str]
             sv_info['SVID'] = rec_id
             sv_info['SVTYPE'] = sv_type_str
+            sv_info['ENABLE_OVERLAP_SV'] = sv.overlap_sv
+            sv_info['TIME_POINT'] = sv.time_point
 
             for key, value in operation.op_info.items():
                 sv_info[key] = value

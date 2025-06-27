@@ -1113,6 +1113,11 @@ VCF_HEADER_INFOS = [
          description="Type of ROI on which the insertion target of an SV component was placed"),
     dict(id='OVLP_TYPE', number=1, type='String',
          description="Type of overlap with the ROI"),
+    dict(id='ENABLE_OVERLAP_SV', number=1, type='String',
+         description="If this record was allowed to overlap with other SVs."),
+    dict(id='TIME_POINT', number=1, type='Tuple',
+         description="Represent the order of appearance of the SVs. Overlapping SVs will have a pair of integer, "
+                     "the first representing when the burst happened. The second is the order of appearance within the burst."),
     dict(id='SVID', number=1, type='String',
          description="ID of parent SV of which this record is one part"),
     dict(id='SVTYPE', number=1, type='String',

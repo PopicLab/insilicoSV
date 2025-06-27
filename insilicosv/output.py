@@ -133,26 +133,20 @@ class OutputWriter:
             self.output_hap(os.path.join(self.output_path, hap_fa), hap_index, self.config.get('homozygous_only', False))
 
     def output_hap(self, hap_fa, hap_index, homozygous):
-        paf_records = []
-        hap_chrom_lengths = {}
         with open(hap_fa, 'w') as sim_fa:
             chrom2operations, target_regions, source_regions = self.get_chrom2operations(hap_index)
             for chrom, chrom_length in zip(self.reference.references, self.reference.lengths):
                 hap_str = ['hapA', 'hapB'][hap_index]
                 hap_chrom = f'{chrom}_{hap_str}'
                 sim_fa.write(f'>{hap_chrom}\n')
-                hap_chrom_pos = 0
                 for overlapping_operations, sv_target, sv_source in zip(chrom2operations[chrom], target_regions[chrom], sv_sources[chrom]):
-                    orig_seq = self.reference.fetch(
+                    seq = self.reference.fetch(
                                             reference=chrom,
                                             start=sv_source.start,
                                             end=sv_source.end)
-                    # Tree used to keep track of the operations and different paf records
-                    operation_tree = IntervalTree()
+                    position_shifts = []
 
                     for operation in overlapping_operations:
-                        # paf format: https://cran.r-project.org/web/packages/pafr/vignettes/Introduction_to_pafr.html
-                        paf_mapq = 60
                         n_copies = operation.transform.n_copies
                         if operation.motif is not None:
                             # In the trEXP case the number of copies is encoded in the motif
@@ -161,105 +155,84 @@ class OutputWriter:
                         for _ in range(n_copies):
                             if operation.transform_type == TransformType.DEL:
                                 operation_start = operation.source_region.start
+                                # Represents the end of the operation for position_shifts
                                 operation_end = operation.source_region.end
+                                # Represents the length of the sequence affected by the operation
+                                operation_length = operation_end - operation_start
                                 if 'side' in operation.op_info:
                                     # The recurrent operation was crossing over the target insertion point
-                                    operation_length = operation_end - operation_start
                                     if operation.op_info['side'] == 0:
                                         operation_start = sv_source.start
                                         operation_end = operation_start + operation_length
                                     else:
                                         operation_end = sv_source.end
                                         operation_start = operation_end - operation_length
-                                overlaps = operation_tree.overlap(operation_start, operation_end)
-                                for overlap in overlaps:
-                                    # This operation is included in a DEL so deleted
-                                    operation_tree.remove(overlap)
-                                    if overlap.begin < operation_start or overlap.end > operation_end:
-                                        # We trim the interval and the associated PAF record to add them back to the tree
-                                        if operation_start > overlap.begin:
-                                            paf_trim = copy(overlap.data)
-                                            if paf_trim.query_start == overlap.begin:
-                                                paf_trim.query_start = overlap.begin
-                                                paf_trim.query_length = operation_start - overlap.begin
-                                            else:
-                                                paf_trim.target_start = overlap.begin
-                                                paf_trim.target_length = operation_start - overlap.begin
-                                            operation_tree.add(Interval(begin=overlap.begin, end=operation_start, data=paf_trim))
 
-                                        if operation_end < overlap.end:
-                                            paf_trim = copy(overlap.data)
-                                            if paf_trim.query_start == overlap.begin:
-                                                paf_trim.query_start = operation_end
-                                                paf_trim.query_length = overlap.end - operation_end
+                                # Get the current position of the SV adapted after INS and DEL
+                                total_shift = 0
+                                if position_shifts:
+                                    idx = 0
+                                    while position_shifts:
+                                        shift_type, shift_start, shift_length = position_shifts[idx]
+                                        if shift_start <= operation_start <= shift_start + shift_length:
+                                            # Overlapping DELs
+                                            if operation_end <= shift_start + shift_length:
+                                                # The new DEL is included
+                                                break
+                                            operation_start = shift_start + shift_length
+                                            operation_length -= shift_length
+                                        elif shift_start + shift_length < operation_start:
+                                            # the current operation starts after, shift accordingly
+                                            current_shift = shift_length
+                                            if shift_type == 'DEL':
+                                                current_shift = -shift_length
+                                            total_shift += current_shift
+                                        elif shift_start <= operation_end:
+                                            if shift_type == 'DEL':
+                                                # The rest has already been deleted, if INS we remove part of the INS sequence.
+                                                operation_length -= min(shift_length, operation_end - shift_start)
+                                                shift_length -= operation_end - shift_start
                                             else:
-                                                paf_trim.target_start = operation_end
-                                                paf_trim.target_end = overlap.end
-                                            operation_tree.add(Interval(begin=operation_end, end=overlap.end, data=paf_trim))
-
-                            if operation.transform_type == TransformType.DEL:
-                                target_end = operation.source_region.end
-                                length = operation.source_region.length()
-                                if operation.motif is not None:
-                                    length = len(operation.motif)
-                                    target_end = operation.source_region.start + length
-                                    # the rest of the tandem repeat region is kept
-                                    seq = self.reference.fetch(
-                                            reference=operation.source_region.chrom,
-                                            start=target_end,
-                                            end=operation.source_region.end)
-                                paf_rec = PafRecord(
-                                    query_name=hap_chrom, query_length=None,
-                                    query_start=hap_chrom_pos, query_end=hap_chrom_pos,
-                                    strand='+',
-                                    target_name=operation.source_region.chrom,
-                                    target_length=self.chrom_lengths[operation.source_region.chrom],
-                                    target_start=operation.source_region.start,
-                                    target_end=target_end,
-                                    residue_matches=0, alignment_block_length=length,
-                                    mapping_quality=paf_mapq,
-                                    tags=f'cg:Z:{operation.source_region.length()}D')
+                                                if operation_end > shift_start + shift_length:
+                                                    operation_end -= shift_length
+                                                    shift_length = 0
+                                                else:
+                                                    shift_length -= operation_end - shift_start
+                                                    operation_start = shift_start
+                                            if shift_start + shift_length > operation_end:
+                                                # The shift operation has been truncated
+                                                position_shifts.insert(idx, (shift_type, operation_end, shift_length))
+                                            else:
+                                                idx -= 1
+                                        else:
+                                            break
+                                        idx += 1
+                                        # The remaining shift intervals are after the current operation
+                                position_shifts.insert(idx, ('DEL', operation_start, operation_end - operation_start))
+                                seq = seq[:operation_start+total_shift] + seq[operation_start+operation_length+total_shift:]
                             else:
-                                if operation.source_region is not None:
-                                    if operation.motif is None:
-                                        seq = self.reference.fetch(
-                                            reference=operation.source_region.chrom,
-                                            start=operation.source_region.start,
-                                            end=operation.source_region.end)
+                                for idx, shift_type, shift_start, shift_end, shift_length in enumerate(position_shifts):
+                                    multiplier = -(shift_type == 'DEL')
+                                    if shift_start <= operation_start:
+                                        if operation_end <= shift_start + shift_length:
+                                            total_shift += multiplier * (operation_end - shift_start)
+                                        else:
+                                            total_shift += multiplier * shift_length
                                     else:
-                                        seq = operation.motif
-                                    paf_rec = PafRecord(
-                                        query_name=hap_chrom, query_length=None,
-                                        query_start=hap_chrom_pos, query_end=hap_chrom_pos + len(seq),
-                                        strand='+',
-                                        target_name=operation.source_region.chrom,
-                                        target_length=self.chrom_lengths[operation.source_region.chrom],
-                                        target_start=operation.source_region.start,
-                                        target_end=operation.source_region.end,
-                                        residue_matches=len(seq), alignment_block_length=len(seq),
-                                        mapping_quality=paf_mapq,
-                                        tags=f'cg:Z:{len(seq)}M')
-                                else:
-                                    assert operation.novel_insertion_seq is not None
-                                    seq = operation.novel_insertion_seq
-                                    paf_rec = PafRecord(
-                                        query_name=hap_chrom, query_length=None,
-                                        query_start=hap_chrom_pos, query_end=hap_chrom_pos + len(seq),
-                                        strand='+',
-                                        target_name=operation.target_region.chrom,
-                                        target_length=self.chrom_lengths[operation.target_region.chrom],
-                                        target_start=operation.target_region.start,
-                                        target_end=operation.target_region.end,
-                                        residue_matches=0, alignment_block_length=len(seq),
-                                        mapping_quality=paf_mapq,
-                                        tags=f'cg:Z:{len(seq)}I')
+                                        break
+                                if operation.novel_insertion_seq:
+                                    # If insertion, it will cause a shift
+                                    position_shifts.insert(idx, ('INS', operation_start, len(operation.novel_insertion_seq)))
 
+                                # Modify the sequence
+                                operation_start = operation_start + total_shift
+                                modified_seq = seq[operation_start:operation_start+operation_length]
                                 if operation.transform_type == TransformType.INV:
-                                    seq = utils.reverse_complement(seq)
-                                    paf_rec = paf_rec._replace(strand='-')
+                                    seq = seq[:operation_start] + utils.reverse_complement(modified_seq) + seq[operation_start+operation_length:]
                                 if operation.transform.divergence_prob > 0:
-                                    orig_seq = seq
+                                    # There is a SNP
                                     if operation.transform.replacement_seq is None or operation.transform.replacement_seq[hap_index] is None:
+                                        # Insure the haplotypes respect the genotype specified and store it for writing in the VCF
                                         haplotypes = operation.transform.replacement_seq
                                         if haplotypes is None:
                                             haplotypes = [None, None]
@@ -272,45 +245,12 @@ class OutputWriter:
                                                                         is_in_place=operation.transform.is_in_place,
                                                                         n_copies=operation.transform.n_copies,
                                                                         divergence_prob=operation.transform.divergence_prob,
-                                                                        replacement_seq=haplotypes, orig_seq=orig_seq)
-                                    seq = operation.transform.replacement_seq[hap_index]
-                                    assert len(seq) == len(orig_seq)
-                            if seq is not None:
-                                sim_fa.write(seq)
-                                hap_chrom_pos += len(seq)
-
-                            # end: if operation.transform_type == TransformType.DEL:
-
-                            assert paf_rec is not None
-
-                            if operation.op_info and operation.op_info.get('SVID'):
-                                sv_id = operation.op_info['SVID']
-                                paf_rec = paf_rec._replace(tags=paf_rec.tags + f'\tsv:Z:{sv_id}')
-                            paf_records.append(paf_rec)
-                        # end: for _ in range(operation.transform.n_copies):
-                    # end: for operation in overlapping_operations
-                # end: for overlapping_operations in chrom2operations[chrom]
-
-                hap_chrom_lengths[hap_chrom] = hap_chrom_pos
+                                                                        replacement_seq=haplotypes, orig_seq=seq)
+                                    seq = seq[:operation_start] + operation.transform.replacement_seq[hap_index] + seq[operation_start+operation_length:]
+                    if seq is not None:
+                        sim_fa.write(seq)
                 sim_fa.write('\n')
-            # end: for chrom, chrom_length in zip(...)
-        # end: with open(hap_fa, 'w') as sim_fa
-        if self.config.get('output_paf', False):
-            hap_paf = hap_fa.replace('.fa', '.paf')
 
-            new_paf_records = []
-            for paf_rec_num, paf_rec in enumerate(paf_records):
-                if (paf_rec.target_start == paf_rec.target_end and
-                    paf_rec.query_start == paf_rec.query_end):
-                    continue
-                new_paf_records.append(paf_rec)
-
-            with open(hap_paf, 'w') as sim_paf:
-                for paf_rec in new_paf_records:
-                    paf_rec = paf_rec._replace(query_length=hap_chrom_lengths[paf_rec.query_name])
-                    sim_paf.write('\t'.join(map(str, paf_rec)) + '\n')
-
-    # end: def output_hap(self, hap_fa, hap_index)
 
     def output_novel_adjacencies(self):
         if not self.config.get('output_adjacencies', False):
