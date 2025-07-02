@@ -62,6 +62,7 @@ class Operation:
     op_id: Optional[str] = None
     recurrent: Optional[bool] = None
     time_point: Optional[tuple] = None
+    overlap_operation: Optional[Operation] = None
 
     motif: Optional[str] = None
 

@@ -13,6 +13,8 @@ import pysam
 from sortedcontainers import SortedSet  # type: ignore
 from copy import deepcopy
 
+from insilicosv.sv_defs import Operation
+
 logger = logging.getLogger(__name__)
 
 def if_not_none(a, b):
@@ -117,6 +119,10 @@ class Region:
     # if this region is derived from an ROI, start/end of the original ROI
     orig_start: int = -1
     orig_end: int = -1
+
+    # Operation the Region stems from (for overlapping with SNPs and INDELs)
+    origin_operation: Optional[Operation] = None
+    overlap_position: Optional[int] = None
 
     def __post_init__(self):
         assert self.chrom
