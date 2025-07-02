@@ -406,7 +406,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             if self.overlap_sv:
                 self.recurrence_freq = vset_cfg.get('recurrence_freq', -1)
                 self.recurrence_num = vset_cfg.get('recurrence_num', vset_cfg['number'] / 100)
-                chk(not self.overlap_sv and self.recurrence_freq, f'overlap_sv False but recurrence_freq True in {vset_cfg['config_descr']}')
+                chk(self.overlap_sv or (not self.recurrence_freq), f'overlap_sv False but recurrence_freq True in {vset_cfg['config_descr']}')
                 if self.recurrence_freq in [0, -1]:
                     # All SVs are place at the beginnning or the ned
                     self.recurrence_num = vset_cfg['number']
@@ -836,7 +836,7 @@ class ImportedVariantSet(VariantSet):
         chk(vcf_rec.start is not None, f'The Start position must not be None for {vcf_rec}', error_type='value')
         rec_start = Locus(chrom=vcf_rec.chrom, pos=vcf_rec.start)
         parsed_info['START'] = rec_start
-        rec_end = Locus(chrom=vcf_rec.chrom, pos=vcf_rec.stop - 1)
+        rec_end = Locus(chrom=vcf_rec.chrom, pos=vcf_rec.stop)
 
         if 'SVLEN' in vcf_info:
             rec_len = vcf_info['SVLEN']
@@ -1115,8 +1115,8 @@ VCF_HEADER_INFOS = [
          description="Type of overlap with the ROI"),
     dict(id='ENABLE_OVERLAP_SV', number=1, type='String',
          description="If this record was allowed to overlap with other SVs."),
-    dict(id='TIME_POINT', number=1, type='Tuple',
-         description="Represent the order of appearance of the SVs. Overlapping SVs will have a pair of integer, "
+    dict(id='TIME_POINT', number=1, type='String',
+         description="Represent the order of appearance of the SVs. Overlapping SVs will have a pair of integers separated by \',\', "
                      "the first representing when the burst happened. The second is the order of appearance within the burst."),
     dict(id='SVID', number=1, type='String',
          description="ID of parent SV of which this record is one part"),

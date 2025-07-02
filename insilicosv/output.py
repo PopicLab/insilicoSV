@@ -7,6 +7,9 @@ import re
 from pysam import VariantFile
 import copy
 from intervaltree import IntervalTree, Interval
+import operator
+import numpy as np
+import random
 
 from insilicosv import utils
 from insilicosv.utils import Region, Locus, if_not_none
@@ -134,120 +137,134 @@ class OutputWriter:
 
     def output_hap(self, hap_fa, hap_index, homozygous):
         with open(hap_fa, 'w') as sim_fa:
-            chrom2operations, target_regions, source_regions = self.get_chrom2operations(hap_index)
+            chrom2operations, source_regions = self.get_chrom2operations(hap_index)
             for chrom, chrom_length in zip(self.reference.references, self.reference.lengths):
                 hap_str = ['hapA', 'hapB'][hap_index]
                 hap_chrom = f'{chrom}_{hap_str}'
                 sim_fa.write(f'>{hap_chrom}\n')
-                for overlapping_operations, sv_target, sv_source in zip(chrom2operations[chrom], target_regions[chrom], sv_sources[chrom]):
+                for overlapping_operations, sv_source in zip(chrom2operations[chrom], source_regions[chrom]):
+                    print(overlapping_operations)
                     seq = self.reference.fetch(
-                                            reference=chrom,
+                                            reference=sv_source.chrom,
                                             start=sv_source.start,
                                             end=sv_source.end)
                     position_shifts = []
-
                     for operation in overlapping_operations:
                         n_copies = operation.transform.n_copies
                         if operation.motif is not None:
                             # In the trEXP case the number of copies is encoded in the motif
                             n_copies = 1
+                        operation_start = operation_end = operation.target_region.start
+                        if operation.source_region:
+                            operation_start = operation.source_region.start
+                            # Represents the end of the operation for position_shifts
+                            operation_end = operation.source_region.end
+                        # Represents the length of the sequence affected by the operation
+                        operation_length = operation_end - operation_start + 1
 
-                        for _ in range(n_copies):
-                            if operation.transform_type == TransformType.DEL:
-                                operation_start = operation.source_region.start
-                                # Represents the end of the operation for position_shifts
-                                operation_end = operation.source_region.end
-                                # Represents the length of the sequence affected by the operation
-                                operation_length = operation_end - operation_start
-                                if 'side' in operation.op_info:
-                                    # The recurrent operation was crossing over the target insertion point
-                                    if operation.op_info['side'] == 0:
-                                        operation_start = sv_source.start
-                                        operation_end = operation_start + operation_length
-                                    else:
-                                        operation_end = sv_source.end
-                                        operation_start = operation_end - operation_length
+                        total_shift = 0
 
-                                # Get the current position of the SV adapted after INS and DEL
-                                total_shift = 0
-                                if position_shifts:
-                                    idx = 0
-                                    while position_shifts:
-                                        shift_type, shift_start, shift_length = position_shifts[idx]
-                                        if shift_start <= operation_start <= shift_start + shift_length:
-                                            # Overlapping DELs
-                                            if operation_end <= shift_start + shift_length:
-                                                # The new DEL is included
-                                                break
-                                            operation_start = shift_start + shift_length
-                                            operation_length -= shift_length
-                                        elif shift_start + shift_length < operation_start:
-                                            # the current operation starts after, shift accordingly
-                                            current_shift = shift_length
-                                            if shift_type == 'DEL':
-                                                current_shift = -shift_length
-                                            total_shift += current_shift
-                                        elif shift_start <= operation_end:
-                                            if shift_type == 'DEL':
-                                                # The rest has already been deleted, if INS we remove part of the INS sequence.
-                                                operation_length -= min(shift_length, operation_end - shift_start)
-                                                shift_length -= operation_end - shift_start
-                                            else:
-                                                if operation_end > shift_start + shift_length:
-                                                    operation_end -= shift_length
-                                                    shift_length = 0
-                                                else:
-                                                    shift_length -= operation_end - shift_start
-                                                    operation_start = shift_start
-                                            if shift_start + shift_length > operation_end:
-                                                # The shift operation has been truncated
-                                                position_shifts.insert(idx, (shift_type, operation_end, shift_length))
-                                            else:
-                                                idx -= 1
-                                        else:
+                        if operation.transform_type == TransformType.DEL:
+                            if 'side' in operation.op_info:
+                                # The recurrent operation was crossing over the target insertion point
+                                if operation.op_info['side'] == 0:
+                                    operation_start = sv_source.start
+                                    operation_end = operation_start + operation_length - 1
+                                else:
+                                    operation_end = sv_source.end
+                                    operation_start = operation_end - operation_length + 1
+
+                            # Get the current position of the SV adapted after INS and DEL
+                            idx = 0
+                            if position_shifts:
+                                while position_shifts:
+                                    shift_type, shift_start, shift_length = position_shifts[idx]
+                                    if shift_start <= operation_start <= shift_start + shift_length - 1:
+                                        # Overlapping DELs
+                                        if operation_end <= shift_start + shift_length - 1:
+                                            # The new DEL is included
                                             break
-                                        idx += 1
-                                        # The remaining shift intervals are after the current operation
-                                position_shifts.insert(idx, ('DEL', operation_start, operation_end - operation_start))
-                                seq = seq[:operation_start+total_shift] + seq[operation_start+operation_length+total_shift:]
-                            else:
-                                for idx, shift_type, shift_start, shift_end, shift_length in enumerate(position_shifts):
-                                    multiplier = -(shift_type == 'DEL')
-                                    if shift_start <= operation_start:
-                                        if operation_end <= shift_start + shift_length:
-                                            total_shift += multiplier * (operation_end - shift_start)
+                                        operation_start = shift_start + shift_length - 1
+                                        operation_length -= shift_length
+                                    elif shift_start + shift_length - 1 < operation_start:
+                                        # the current operation starts after, shift accordingly
+                                        current_shift = shift_length
+                                        if shift_type == 'DEL':
+                                            current_shift = -shift_length
+                                        total_shift += current_shift
+                                    elif shift_start <= operation_end:
+                                        if shift_type == 'DEL':
+                                            # The rest has already been deleted, if INS we remove part of the INS sequence.
+                                            operation_length -= min(shift_length, operation_end - shift_start + 1)
+                                            shift_length -= operation_end - shift_start
                                         else:
-                                            total_shift += multiplier * shift_length
+                                            if operation_end > shift_start + shift_length:
+                                                operation_end -= shift_length
+                                                shift_length = 0
+                                            else:
+                                                shift_length -= operation_end - shift_start
+                                                operation_start = shift_start
+                                        if shift_start + shift_length > operation_end:
+                                            # The shift operation has been truncated
+                                            position_shifts.insert(idx, (shift_type, operation_end, shift_length))
+                                        else:
+                                            idx -= 1
                                     else:
                                         break
-                                if operation.novel_insertion_seq:
-                                    # If insertion, it will cause a shift
-                                    position_shifts.insert(idx, ('INS', operation_start, len(operation.novel_insertion_seq)))
+                                    idx += 1
 
-                                # Modify the sequence
-                                operation_start = operation_start + total_shift
-                                modified_seq = seq[operation_start:operation_start+operation_length]
-                                if operation.transform_type == TransformType.INV:
-                                    seq = seq[:operation_start] + utils.reverse_complement(modified_seq) + seq[operation_start+operation_length:]
-                                if operation.transform.divergence_prob > 0:
-                                    # There is a SNP
-                                    if operation.transform.replacement_seq is None or operation.transform.replacement_seq[hap_index] is None:
-                                        # Insure the haplotypes respect the genotype specified and store it for writing in the VCF
-                                        haplotypes = operation.transform.replacement_seq
-                                        if haplotypes is None:
-                                            haplotypes = [None, None]
-                                        if homozygous and hap_index == 1:
-                                            replacement_seq = haplotypes[0]
-                                        else:
-                                            replacement_seq = utils.divergence(seq, operation.transform.divergence_prob)
+                            # The remaining shift intervals are after the current operation
+                            position_shifts.insert(idx, ('DEL', operation_start, operation_end - operation_start))
+                            start_in_region = operation_start - sv_source.start
+                            seq = seq[:start_in_region+total_shift] + seq[start_in_region+operation_length+total_shift:]
+                        else:
+                            # The operation is not a DEL
+                            idx = 0
+                            for shift_type, shift_start, shift_end, shift_length in position_shifts:
+                                multiplier = -(shift_type == 'DEL')
+                                idx += 1
+                                if shift_start <= operation_start:
+                                    if operation_end <= shift_start + shift_length - 1:
+                                        total_shift += multiplier * (operation_end - shift_start + 1)
+                                    else:
+                                        total_shift += multiplier * shift_length
+                                else:
+                                    break
+                            if operation.novel_insertion_seq:
+                                # If insertion, it will cause a shift
+                                position_shifts.insert(idx, ('INS', operation_start, len(operation.novel_insertion_seq)))
+
+                            # Modify the sequence
+                            operation_start = operation_start + total_shift - sv_source.start
+                            modified_seq = seq[operation_start:operation_start+operation_length - 1]
+
+                            if operation.novel_insertion_seq:
+                                modified_seq = operation.novel_insertion_seq
+                            if operation.transform_type == TransformType.INV:
+                                modified_seq = utils.reverse_complement(modified_seq)
+                            if n_copies > 1:
+                                modified_seq = modified_seq * n_copies
+
+                            if operation.transform.divergence_prob > 0:
+                                # There is a SNP
+                                if operation.transform.replacement_seq is None:
+                                    # Insure the haplotypes respect the genotype specified and store it for writing in the VCF
+                                    replacement_seq = utils.divergence(modified_seq, operation.transform.divergence_prob)
+                                    if homozygous:
+                                        haplotypes = [replacement_seq, replacement_seq]
+                                    else:
+                                        haplotypes = [modified_seq, modified_seq]
                                         haplotypes[hap_index] = replacement_seq
-                                        operation.transform = Transform(operation.transform_type,
-                                                                        is_in_place=operation.transform.is_in_place,
-                                                                        n_copies=operation.transform.n_copies,
-                                                                        divergence_prob=operation.transform.divergence_prob,
-                                                                        replacement_seq=haplotypes, orig_seq=seq)
-                                    seq = seq[:operation_start] + operation.transform.replacement_seq[hap_index] + seq[operation_start+operation_length:]
-                    if seq is not None:
+                                    operation.transform = Transform(operation.transform_type,
+                                                                is_in_place=operation.transform.is_in_place,
+                                                                n_copies=operation.transform.n_copies,
+                                                                divergence_prob=operation.transform.divergence_prob,
+                                                                replacement_seq=haplotypes, orig_seq=seq)
+                                modified_seq = operation.transform.replacement_seq[hap_index]
+
+                            seq = seq[:operation_start] + modified_seq + seq[operation_start + operation_length:]
+                    print('SEQ', seq)
+                    if seq:
                         sim_fa.write(seq)
                 sim_fa.write('\n')
 
@@ -345,145 +362,183 @@ class OutputWriter:
                              '/'.join(grammar), sv_grammar, genotype, sv_id]
                 adjacency_file.write('\t'.join(map(str, record)) + '\n')
 
+    @staticmethod
+    def update_operation_groups(orig_operation, inside_start, inside_end, outside_start, outside_end, merged_lookup,
+                                target_region2transform, chrom2operations, lookup_idx):
+        # Split a recurrent operation into two operations, one inside and one outside the target interval, update the tree and lists of operations
+        chrom = orig_operation.target_region.chrom
+        operation_inside = Operation(transform=orig_operation.transform,
+                                     source_breakend_region=BreakendRegion(0, 1),
+                                     placement=[Locus(chrom, inside_start),
+                                                Locus(chrom, inside_end)],
+                                     op_id=orig_operation.op_id + 'in',
+                                     recurrent=True)
+        operation_outside = Operation(transform=orig_operation.transform,
+                                      source_breakend_region=BreakendRegion(0, 1),
+                                      placement=[Locus(chrom, outside_start),
+                                                 Locus(chrom, outside_end)],
+                                      op_id=orig_operation.op_id + 'out',
+                                     recurrent=True)
+        chrom2operations[chrom][merged_lookup[orig_operation.op_id]].remove(orig_operation)
+        del merged_lookup[orig_operation.op_id]
+        chrom2operations[chrom][lookup_idx].append(operation_inside)
+        merged_lookup[operation_inside.op_id] = lookup_idx
+
+        target_region2transform[chrom].add(
+            Interval(begin=outside_start+0.1, end=outside_end-0.1, data=operation_outside))
+        target_region2transform[chrom].add(
+            Interval(begin=inside_start+0.1, end=inside_end-0.1, data=operation_inside))
+        return operation_outside
+
     def get_chrom2operations(self, hap_index):
         """For each chromosome, make a list of operations targeting that chromosome,
         sorted along the chromosome.  Add identity operations for regions not touched
         by SVs."""
         merged_lookup = dict()
         chrom2operations = defaultdict(list)
-        target_region2transform = dict(IntervalTree)
-        for sv in recurrent_svs + self.svs:
+        target_region2transform = defaultdict(IntervalTree)
+        for sv in self.recurrent_svs + self.svs:
             # start with recurrent SVs, regular SVs are ordered by time point
-            assert sv.genotype is not None
+            print('SV', sv, sv.genotype[hap_index])
             if sv.genotype[hap_index]:
                 operations = []
-                for operation in sv.operations:
+                for op_id, operation in enumerate(sv.operations):
                     operation.op_info['SVID'] = sv.sv_id
-                    operation.op_info['recurrent'] = not sv.recurrent_freq is None
-                    operation.op_info['time_point'] = sv.time_point
+                    operation.recurrent = sv.overlap_sv
+                    operation.time_point = sv.time_point
+                    operation.op_id = str(sv.sv_id) + '_' + str(op_id)
                     operations.append(operation)
-
+                print('OPERATIONS', operations)
                 while operations:
                     operation = operations.pop()
-                    assert operation.target_region is not None
                     chrom = operation.target_region.chrom
-                    target_interval = Interval(operation.target_region.start, operation.end, data=operation)
+                    target_start = operation.target_region.start
+                    target_end = operation.target_region.end
+                    # Padding of the interval to be able to include points as intervals.
+                    target_interval = Interval(begin=target_start-0.1, end=target_end+0.1, data=operation)
+
                     overlap = target_region2transform[chrom].overlap(target_interval.begin, target_interval.end)
                     if operation.is_in_place:
-                        if not operation.op_info['recurrent'] and any(not interval.data.op_info['recurrent'] for interval  in overlap):
+                        if target_region2transform[operation.target_region] and (not operation.recurrent and any(not interval.data.recurrent for interval  in overlap)):
                             # Check if there is already an inplace operation there, in which case they have to be the same
-                            assert (operation.transform == target_region2transform[operation.target_region])
-                            print(operation.transform, target_region2transform[operation.target_region])
+                            assert (operation.transform in target_region2transform[operation.target_region])
                             continue
 
                     if operation.op_info is None:
                         operation.op_info = dict()
                     lookup_idx = len(chrom2operations[chrom])
-                    merged_lookup[operation] = lookup_idx
+                    merged_lookup[operation.op_id] = lookup_idx
                     chrom2operations[chrom].append([operation])
 
                     # Overlapping operations are stored in the same list to be applied together
-                    for interval in overlap:
-                        overlap_operation = interval.data
-                        if not overlap_operation.op_info['recurrent'] or not overlap_operation in merged_lookup: continue
-                        inter_start = max(interval.begin, target_interval.begin)
-                        inter_end = min(interval.end, target_interval.end)
+                    for overlap_interval in overlap:
+                        overlap_operation = overlap_interval.data
+                        overlap_start = overlap_interval.data.target_region.start
+                        overlap_end = overlap_interval.data.target_region.end
+                        # The overlap operation is not recurrent or has been merged with a non-recurrent SV
+                        if not overlap_operation.recurrent or not overlap_operation.op_id in merged_lookup: continue
+
+                        inside_start = max(overlap_start, target_start)
+                        inside_end = min(overlap_end, target_end)
 
                         # Cut the recurrent operations to fit the target region
-                        side = None
                         if target_interval.begin == target_interval.end:
                             # The recurrent operation is containing an insertion target, we decide if the right or left side will be included in the target.
-                            side = np.argmin([target_interval.start - inter_start, inter_end - target_interval.end])
+                            # 0 if left side is included, 1 if right
+                            side = np.argmin([target_start - inside_start, inside_end - target_end])
 
-                        if not operation.op_info['recurrent'] and ((inter_start < interval.begin and inter_end == interval.end) or (side and side == 0)):
+                            if side:
+                                operation_outside.op_info['source_region'] = (
+                                operation_outside.source_region.start, operation_outside.source_region.end)
+                                operation_outside.op_info['side'] = 0
+                                operation.source_region.start = operation.source_region.end = target_interval.end
+                            else:
+                                operation_outside.op_info['source_region'] = (operation_outside.source_region.start, operation_outside.source_region.end)
+                                operation_outside.op_info['side'] = 1
+                                operation.source_region.start = operation.source_region.end = target_interval.end
+
+                        if not operation.recurrent and inside_start < overlap_start and inside_end == overlap_end:
                             # the recurrent operation is on the right side, the operation outside the target region is added again to the operations to merge
-                            outside_operation = utils.update_operation_groups(operation, interval.begin, target_interval.end,
-                                                               target_interval.end, interval.end, merged_lookup,
-                                                               target_region2transform, lookup_idx)
-                            if side:
-                                # The target is an insertion point and the recurrent operation is overlapping it
-                                outside_operation.op_info['source_region'] = (operation_outside.source_region.start, operation_outside.source_region.end)
-                                outside_operation.op_info['side'] = 1
-                                operation.source_region.start = operation.source_region.end = target_interval.end
-                            else:
-                                operations.append(outside_operation)
+                            operation_outside = self.update_operation_groups(overlap_operation, inside_start, inside_end,
+                                                               inside_end+1, target_end, merged_lookup,
+                                                               target_region2transform, chrom2operations, lookup_idx)
+                            operations.append(operation_outside)
 
-                        elif not operation.op_info['recurrent'] and ((inter_start == interval.begin and inter_end < interval.end) or (side and side == 1)):
+                        elif not operation.recurrent and inside_start == overlap_start and inside_end < overlap_end:
                             # the recurrent operation is on the left side, the operation outside the target region is added again to the operations to merge
-                            outside_operation = utils.update_operation_groups(operation, target_interval.begin, interval.end,
-                                                    interval.begin, target_interval.begin, merged_lookup,
-                                                    target_region2transform, lookup_idx)
-                            if side:
-                                # The target is an insertion point and the recurrent operation is overlapping it
-                                outside_operation.op_info['source_region'] = (operation_outside.source_region.start, operation_outside.source_region.end)
-                                outside_operation.op_info['side'] = 0
-                                operation.source_region.start = operation.source_region.end = target_interval.end
-                            else:
-                                operations.append(outside_operation)
+                            operation_outside = self.update_operation_groups(overlap_operation, inside_start, inside_end,
+                                                    target_start, inside_start-1, merged_lookup,
+                                                    target_region2transform, chrom2operations, lookup_idx)
+                            operations.append(operation_outside)
 
                         else:
-                            # The recurrent operation is included in the target
-                            chrom2operations[chrom][lookup_idx].extend(chrom2operations[chrom][merged_lookup[overlap_operation]])
-                            merged_lookup[overlap_operation] = lookup_idx
-                            chrom2operations[chrom][merged_lookup[overlap_operation]] = []
+                            # The recurrent operation is included in the target (recurrent or not)
+                            op_idx = overlap_operation.op_id
+                            chrom2operations[chrom][lookup_idx].extend(chrom2operations[chrom][merged_lookup[op_idx]])
+                            print('merging', operation, lookup_idx, op_idx, merged_lookup[op_idx], merged_lookup[operation.op_id])
+                            chrom2operations[chrom][merged_lookup[op_idx]] = []
+                            merged_lookup[op_idx] = lookup_idx
 
                     target_region2transform[chrom].add(target_interval)
-                    if not operation.is_in_place:
-                        # The SV is not in place, reference the source region to keep track of past and future modifications
+                    if not operation.is_in_place and operation.source_region:
+                        # The SV is not in place and not a novel insertion, reference the source region to keep track of past and future modifications
                         source_interval = Interval(operation.source_region.start, operation.source_region.end)
-                        target_region2transform[chrom].overlap(source_interval.begin, source_interval.end)
-                        for operation_overlap in overlap_source:
-                            if not operation_overlap.op_info['recurrent']: continue
+                        overlap_source = target_region2transform[chrom].overlap(source_interval.begin, source_interval.end)
+                        for interval_overlap in overlap_source:
+                            operation_overlap = interval_overlap.data
+                            if not operation_overlap.recurrent: continue
                             # All recurrent operations overlapping with the source and happening before have to impact the target
                             # If an operation happened on the source afterwards and is fully contained in the source, 50% chance to be on the target instead.
-                            if operation.op_info['time_point']> operation_overlap.op_info['time_point']:
-                                inter_start = max(operation_overlap.begin, source_interval.begin)
-                                inter_end = min(operation_overlap.end, source_interval.end)
-                                past_operation = Operation(transform=operation_overlap.transform,
+                            if operation.time_point> interval_overlap.time_point:
+                                inside_start = max(interval_overlap.begin, source_interval.begin)
+                                inside_end = min(interval_overlap.end, source_interval.end)
+                                past_operation = Operation(transform=interval_overlap.transform,
                                                            source_breakend_region=BreakendRegion(0, 1),
-                                                           placement=[Locus(chrom, inter_start),
-                                                                      Locus(chrom, inter_end)])
+                                                           placement=[Locus(chrom, inside_start),
+                                                                      Locus(chrom, inside_end)])
                                 chrom2operations[chrom][lookup_idx].append(past_operation)
-                            elif (operation_overlap in merged_lookup) and (source_interval.begin < operation_overlap.begin < operation_overlap.end < source_interval.end):
+                            elif (operation_overlap in merged_lookup) and (source_interval.begin < interval_overlap.begin < interval_overlap.end < source_interval.end):
                                 # Ulterior operation unclaimed by an inplace operation and fully contained in the source
                                 if random.randint(0, 1):
+                                    # 50% probability for the modification to only affect the source or the target
                                     chrom2operations[chrom][lookup_idx].append(
-                                        chrom2operations[chrom][merged_lookup[operation_overlap]])
+                                        chrom2operations[chrom][merged_lookup[operation_overlap.op_id]])
                                     # The overlap_operation is fully contained so keeping track of operation overlaps is enough.
-                                    del merged_lookup[operation_overlap]
+                                    del merged_lookup[operation_overlap.op_id]
 
 
         # Clean up and order the operations by time point.
         for chrom in chrom2operations:
             chrom2operations[chrom] = [overlapping_operations for overlapping_operations in chrom2operations[chrom]
                                        if overlapping_operations]
-
-            chrom2operations[chrom] = [sorted(operations, key=operator.attrgetter('time_point')) for operations in chrom2operations[chrom]]
+            chrom2operations[chrom] = [sorted(operations, key=lambda ope: ope.time_point) for operations in chrom2operations[chrom]]
 
         # Find the disjoint regions affected  by at least one operation.
         transformed_regions, source_regions = utils.get_transformed_regions(chrom2operations)
         for chrom, chrom_length in self.chrom_lengths.items():
             target_regions = sorted([Region(chrom=chrom, start=0, end=0)] + 
-                                    [region for region in transformed_regions[chrome]] +
+                                    [region for region in transformed_regions[chrom]] +
                                     [Region(chrom=chrom, start=chrom_length, end=chrom_length)])
 
             # Add identity operation between transformed regions to reconstruct the haplotype
             unchanged_regions = [Region(start=target_region1.end, end=target_region2.start, chrom=chrom) for target_region1, target_region2 in utils.pairwise(target_regions)
                 if target_region2.start > target_region1.end]
-            intersv_ops = [Operation(
+            intersv_ops = [[Operation(
                 transform=Transform(transform_type=TransformType.IDENTITY,
                                     is_in_place=True),
                 source_breakend_region=BreakendRegion(0,1),
                 placement=[Locus(chrom, target_region.start),
-                           Locus(chrom, target_region.end)])
+                           Locus(chrom, target_region.end)])]
                 for target_region in unchanged_regions]
 
             transformed_regions[chrom].extend(unchanged_regions)
+            source_regions[chrom].extend(unchanged_regions)
             chrom2operations[chrom].extend(intersv_ops)
+            # The operations are directly written in the order of the target locations
             regions_order_idx = np.argsort(transformed_regions[chrom])
-            transformed_regions[chrom] = sorted(transformed_regions[chrom])
             chrom2operations[chrom] = [chrom2operations[chrom][idx] for idx in regions_order_idx]
-        return chrom2operations, transformed_regions, source_regions
+            source_regions[chrom] = [source_regions[chrom][idx] for idx in regions_order_idx]
+        return chrom2operations, source_regions
 
     def output_novel_insertions(self):
         with open(os.path.join(self.output_path, 'sim.novel_insertions.fa'), 'w') as (

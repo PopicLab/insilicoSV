@@ -123,6 +123,8 @@ class SVSimulator:
 
     def load_rois(self):
         self.reference_regions = RegionSet.from_fasta(self.config['reference'], self.config.get('filter_small_chr', 0), region_kind='_reference_')
+        overlap_sv_and_region = False
+
         # Get the ROIs for overlap constraints
         if any(mode is not None for mode in self.overlap_modes.values()):
             rois_overlap = RegionSet.from_beds(utils.as_list(self.config.get('overlap_regions', [])), to_region_set=False)
@@ -132,6 +134,7 @@ class SVSimulator:
             if None not in min_bounds:
                 global_min_bound = min(min_bounds)
                 rois_overlap = sorted(rois_overlap, key=lambda x: x.length(), reverse=True)
+
             # Get the reference regions
             n_removed_rois = 0
             for roi_index, roi in enumerate(rois_overlap):
@@ -143,8 +146,10 @@ class SVSimulator:
                     n_removed_rois += 1
                     continue
                 added_roi = False
-                for sv_idx, sv_category in enumerate(self.overlap_ranges):
-                    if self.overlap_modes[sv_idx] is None: continue
+                for sv_vset, sv_category in enumerate(self.overlap_ranges):
+                    if self.overlap_modes[sv_vset] is None: continue
+                    if self.recurrent_svs and sv_set in self.recurrent_svs:
+                        overlap_sv_and_region = True
                     if roi.length() < if_not_none(self.overlap_ranges[sv_category][0], 0): continue
                     if (self.overlap_modes[sv_category] in [OverlapMode.CONTAINING, OverlapMode.EXACT] and
                             roi.length() > if_not_none(self.overlap_ranges[sv_category][1], roi.length()+1)):
@@ -159,6 +164,7 @@ class SVSimulator:
                     added_roi = True
                     self.rois_overlap[sv_category].append(roi)
                 if not added_roi: n_removed_rois += 1
+
             for sv_category in self.rois_overlap:
                 # Check if there is enough ROIs to fit all the SVs of one category independently
                 error_message_num_rois= ("Only {} ROIs satisfying the constraints "
@@ -174,8 +180,9 @@ class SVSimulator:
                 # Shuffle the ROIs so the selection is not biased on their positions in the input bed file
                 random.shuffle(self.rois_overlap[sv_category])
             logger.info(f'{n_removed_rois} ROIs filtered')
-            if any(enable_sv for enable_sv in self.enable_overlap_sv.values()):
+            if overlap_sv_and_region:
                 self.orig_rois_overlap = copy.deepcopy(self.rois_overlap)
+
         self.blacklist_regions = RegionSet()
         for blacklist_region_file in utils.as_list(self.config.get('blacklist_regions', [])):
             logger.info(f'Processing blacklist region file {blacklist_region_file}')
@@ -223,9 +230,9 @@ class SVSimulator:
         with error_context(sv.config_descr):
             roi_indexes[sv_set] = self.place_sv(sv, roi_indexes[sv_set])
         logger.debug(f'Placed {sv_num=} {sv=} in {time.time() - t_start_placing_sv}s')
-        assert sv.is_placed()
-        if not self.enable_overlap_sv[sv_set]:
-            sv.time_point = sv_num
+
+        sv.time_point = sv_num
+        if (not self.recurrent_svs) or (not sv_set in self.recurrent_svs):
             for region in sv.get_regions():
                 region_padded = region.padded(self.config.get('min_intersv_dist', 1))
                 self.reference_regions.chop(region_padded)
@@ -233,7 +240,7 @@ class SVSimulator:
     def place_recurrent_sv(self, current_svnum, roi_indexes, place_all=False):
         if self.recurrent_svs:
             counter_recurrent = 0
-            for sv_set, svs, recurrence, recurrence_num in self.recurrent_svs.items():
+            for sv_set, (svs, recurrence, recurrence_num) in self.recurrent_svs.items():
                 if not svs: continue
                 num_iterations = recurrence_num
                 to_place = (current_svnum % recurrence == 0)
@@ -244,13 +251,13 @@ class SVSimulator:
                     if num_iterations > recurrence_num:
                         logger.warning(
                             f'WARNING: for recurrent SVs {sv_set}, place {num_iterations} SVs at the last step instead of the requested number {self.recurrence_nums[sv_set]}. '
-                            f'If this is not wanted, adapt the field \'recurrence_num\' to the total number of non-recurent SVs.')
+                            f'If this is not wanted, adapt the field \'recurrence_num\' to the total number of non-recurrent SVs.')
 
                 if to_place:
                     for _ in range(num_iterations):
                         if not self.recurrent_svs[sv_set]: break
                         sv = svs.pop()
-                        call_place_sv(sv, (current_svnum-1, counter_recurrent), sv_set, roi_indexes)
+                        self.call_place_sv(sv, (current_svnum-1, counter_recurrent), sv_set, roi_indexes)
                         self.placed_recurrent_svs.append(sv)
                         counter_recurrent +=1
 
@@ -660,12 +667,13 @@ class SVSimulator:
             chk(self.is_placement_valid(sv, sv.fixed_placement),
                 f'cannot place imported SV')
             sv.set_placement(placement=sv.fixed_placement, roi=None)
+            print('PLACED', sv)
             return
         n_placement_attempts = 0
         max_tries = self.config.get("max_tries", DEFAULT_MAX_TRIES)
         blacklist_regions = self.get_relevant_blacklist_regions(sv.blacklist_filter)
         sv_set = sv.info['VSET']
-        enable_overlap = self.enable_overlap_sv[sv_set]
+        enable_overlap = self.recurrent_svs and sv_set in self.recurrent_svs
         init_roi = 0
         if sv.overlap_mode in [OverlapMode.CONTAINED, OverlapMode.PARTIAL]:
             # Where to start checking the ROIs, prevent the bias of checking the first ROIs over and over

@@ -310,15 +310,41 @@ class RegionSet:
 def percent_N(seq):
     return 0 if len(seq) == 0 else (seq.count('N') + seq.count('n')) / len(seq)
 
+def merge_regions(region_list):
+    start = end = None
+    for region in region_list:
+        if not start or region.start < start:
+            start = region.start
+        if not end or region.end > end:
+            end = region.end
+    return Region(start=start, end=end, chrom=region_list[0].chrom)
+
 def get_transformed_regions(chrom2operations):
     # Find a set of disjoint modified regions.
     transformed_regions = defaultdict(list)
     source_regions = defaultdict(list)
-    for chrom, operations in chrom2operations.items():
-        for operation in operations:
-            if not operation.op_info['recurrent']:
-                transformed_regions[chrom].append(operation.target_region)
-                source_regions[chrom].append(operation.source_region)
+    for chrom, operation_lists in chrom2operations.items():
+        for overlapping_operations in operation_lists:
+            # If there is a non-recurrent operation, its target and source regions are used, otherwise we merge the regions of the non-recurrent operations.
+            source_no_recurrent = []
+            target_no_recurrent = []
+            recurrent = False
+            for operation in overlapping_operations:
+                if not operation.recurrent:
+                    source_region = operation.source_region
+                    if  not source_region:
+                        # For a novel insertion, there is no source region, we consider arbitrarily the target region
+                        source_region = operation.target_region
+                    source_regions[chrom].append(source_region)
+                    transformed_regions[chrom].append(operation.target_region)
+                    recurrent = True
+                    break
+                else:
+                    source_no_recurrent.append(operation.source_region)
+                    target_no_recurrent.append(operation.target_region)
+            if not recurrent:
+                source_regions[chrom].append(merge_regions(source_no_recurrent))
+                transformed_regions[chrom].append(merge_regions(target_no_recurrent))
     return transformed_regions, source_regions
 
 def pairwise(iterable):
@@ -328,29 +354,6 @@ def pairwise(iterable):
     for b in iterator:
         yield a, b
         a = b
-
-def update_operation_groups(orig_operation, inside_start, inside_end, outside_start, outside_end, merged_lookup,
-                            target_region2transform, lookup_idx):
-    # Split a recurrent operation into two operations, one inside and one outside the target interval, update the tree and lists of operations
-    operation_inside = Operation(transform=orig_operation.transform,
-                                 source_breakend_region=BreakendRegion(0, 1),
-                                 placement=[Locus(chrom, inside_start),
-                                            Locus(chrom, inside_end)])
-    operation_outside = Operation(transform=orig_operation.transform,
-                                  source_breakend_region=BreakendRegion(0, 1),
-                                  placement=[Locus(chrom, outside_start),
-                                             Locus(chrom, outside_end)])
-    chrom2operations[chrom][merged_lookup[orig_operation]].remove(orig_operation)
-    del merged_lookup[orig_operation]
-    chrom2operations[chrom][lookup_idx].append(operation_inside)
-    merged_lookup[operation_inside] = lookup_idx
-
-    target_region2transform[chrom].add(
-        Interval(begin=outside_start, end=outside_end, data=operation_outside))
-    target_region2transform[chrom].add(
-        Interval(begin=inside_start, end=inside_end, data=operaoperation_insidetion_left))
-    return operation_outside
-
 
 def has_duplicates(it):
     items = set()
