@@ -61,6 +61,8 @@ class Operation:
 
     motif: Optional[str] = None
 
+    genotype: Optional[tuple] = None
+
     @property
     def transform_type(self):
         return self.transform.transform_type
@@ -288,7 +290,7 @@ class VariantType(Enum):
     SNP = "SNP"
     DIVERGENCE = "DIVERGENCE"
 
-    Custom = "Custom"
+    CUSTOM = "Custom"
 
     trEXP = "trEXP"
     trCON = "trCON"
@@ -420,21 +422,6 @@ class BaseSV(SV):
                     record['alleles'][1] = '<CUT>'
                 combined_recs.append(record)
 
-        # Check if a type provided as grammar is a predefined type
-        if combined_recs[0]['info']['SVTYPE'] == 'Custom':
-            lhs, rhs = combined_recs[0]['info']['GRAMMAR'].split('->')
-            lhs = tuple([letter for letter in lhs if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]])
-            rhs = tuple(rhs)
-            for key, grammar in SV_KEY.items():
-                # Test if the grammar or its symmetric match the grammar of the record
-                if (grammar[0] == lhs and grammar[1] == rhs) or (
-                        grammar[0] == lhs[::-1] and grammar[1] == rhs[::-1]):
-                    combined_recs[0]['info']['SVTYPE'] = key.name
-                    if len(combined_recs) == 1:
-                        combined_recs[0]['info']['OP_TYPE'] = key.name
-                        combined_recs[0]['alleles'][1] = '<%s>' % key.name
-                    break
-
         # Update the records numbering if records have been combined
         if len(combined_recs) == 1:
             combined_recs[0]['id'] = sv_id
@@ -445,15 +432,10 @@ class BaseSV(SV):
             for idx, operation in enumerate(combined_recs):
                 operation['id'] = self.sv_id + f'_{idx}'
         if sv_type_str == 'SNP':
-            try:
-                del combined_recs[0]['info']['OP_TYPE']
-                del combined_recs[0]['info']['SVLEN']
-                del combined_recs[0]['info']['GRAMMAR']
-                del combined_recs[0]['info']['SVTYPE']
-                del combined_recs[0]['info']['SVID']
-                del combined_recs[0]['info']['SYMBOL']
-            except:
-                pass
+            info_to_remove = ['SVTYPE', 'SVID', 'INSORD', 'OP_TYPE', 'SVLEN', 'GRAMMAR', 'SYMBOL']
+            for field in info_to_remove:
+                if field in combined_recs[0]['info']:
+                    del combined_recs[0]['info'][field]
         return combined_recs
 # end: class BaseSV(SV)
 

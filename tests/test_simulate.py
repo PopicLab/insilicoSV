@@ -127,6 +127,8 @@ class TestSVSimulator(unittest.TestCase):
         self.test_overlap_bed_15 = "tests/inputs/example_overlap_events_15.bed"
 
         self.test_exclude_bed = "tests/inputs/exclude.bed"
+        self.import_snp = "tests/inputs/import_snp.vcf"
+        self.import_test = "tests/inputs/import_test.vcf"
 
         self.test_objects_no_dis = [TestObject([self.ref_file, {
             "chr21": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
@@ -1441,6 +1443,18 @@ class TestSVSimulator(unittest.TestCase):
             ["GGACCT", {"type": "_ABC_->A_B_C",
                         "length_ranges": [[1, 1], [1, 1], [2, 2], [1, 1], [1, 1]]},
              ['GGACTC']],
+
+            ['TCGA', TestObject([self.ref_file, {"chr21": "TCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    "variant_sets": [{'import': self.import_snp}]}],
+                        self.hap1, self.hap2, self.bed), ['ACTA', 'ACGC']],
+
+            ['TCGATCGA', TestObject([self.ref_file, {"chr1": "TCGATCGA"}],
+                                    [self.par, {"reference": self.ref_file,
+                                            "random_seed": 2,
+                                            "variant_sets": [{'import': self.import_test}]}],
+                                    self.hap1, self.hap2, self.bed), ['TCGAGACGTTCG', 'TCGATCCGA']],
         ]
 
     def tearDown(self):

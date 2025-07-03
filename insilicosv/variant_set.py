@@ -49,6 +49,8 @@ class VariantSet(ABC):
         self.overlap_kinds = utils.as_list(self.vset_config.get('overlap_region_type', 'all'))
         self.overlap_ranges = []
         self.header = []
+        # For predefined types given as custom in the config file, to keep track they have to be treated as custom
+        self.input_type = None
         self.overlap_mode = None
         if 'overlap_mode' in self.vset_config:
             chk(isinstance(self.vset_config['overlap_mode'], str) or
@@ -73,7 +75,7 @@ class VariantSet(ABC):
         if 'type' in self.vset_config:
             self.vset_config['type'] = self.vset_config['type'].replace(" ", "")
             if '->' in self.vset_config['type']:
-                self.svtype = VariantType.Custom
+                self.svtype = VariantType.CUSTOM
                 grammar = self.vset_config['type'].split('->')
             else:
                 self.svtype = VariantType(self.vset_config['type'])
@@ -111,8 +113,8 @@ class VariantSet(ABC):
                 chk(False, f'Error valuating the expression {value}: {exc}', error_type='value')
 
     def grammar_to_variant_set(self, lhs_strs, rhs_strs, symbol_lengths, symbol_min_lengths, num_letters,
-                               novel_insertion_seqs,
-                               n_copies_list, divergence_prob_list, replacement_seq=None, vset_config=None,):
+                               novel_insertion_seqs, n_copies_list, divergence_prob_list, replacement_seq=None, orig_seq=None,
+                               vset_config=None,):
         #
         # Parse the LHS strings into Symbols, and RHS strings into RHSItems.
         # Create unique Symbols for dispersions.
@@ -212,14 +214,17 @@ class VariantSet(ABC):
                 n_multiple_copies += 1
 
             divergence_prob = 0
-            if Syntax.DIVERGENCE in rhs_str and replacement_seq is None:
-                # replacement_seq is used to provide the SNP when loading from vcf
-                chk(n_divergence_prob < len(divergence_prob_list), f'A number of copies must be provided '
-                                                                   f'for each + symbol used.', error_type='syntax')
-                divergence_prob = self.get_sampled_int_value(divergence_prob_list[n_divergence_prob])
-                chk(0 < divergence_prob <= 1,
-                    f'The divergence probability must be between 0 (excluded) and 1 (included), got {divergence_prob} for '
-                    f'the {n_divergence_prob + 1}-th \'*\' symbol {symbol}. Error in {vset_config}', error_type='syntax')
+            if Syntax.DIVERGENCE in rhs_str:
+                divergence_prob = 1.
+
+                if not replacement_seq:
+                    # replacement_seq is used to provide the SNP when loading from vcf
+                    chk(n_divergence_prob < len(divergence_prob_list), f'A number of copies must be provided '
+                                                                       f'for each + symbol used.', error_type='syntax')
+                    divergence_prob = self.get_sampled_int_value(divergence_prob_list[n_divergence_prob])
+                    chk(0 < divergence_prob <= 1,
+                        f'The divergence probability must be between 0 (excluded) and 1 (included), got {divergence_prob} for '
+                        f'the {n_divergence_prob + 1}-th \'*\' symbol {symbol}. Error in {vset_config}', error_type='syntax')
                 n_divergence_prob += 1
 
             transform = Transform(
@@ -227,7 +232,8 @@ class VariantSet(ABC):
                 is_in_place=is_in_place,
                 divergence_prob=divergence_prob,
                 n_copies=n_copies,
-                replacement_seq=replacement_seq
+                replacement_seq=replacement_seq,
+                orig_seq=orig_seq
             )
             # We do not add operations for inplace identity transformations without divergence (do not affect the sequence).
             if (
@@ -307,8 +313,8 @@ class SimulatedVariantSet(VariantSet):
         self.preprocess_config()
 
     def preprocess_config(self):
-        chk('divergence_prob' not in self.vset_config or isinstance(self.vset_config['divergence_prob'], list),
-            f'divergence_prob must be a list of floats in ]0, 1] or ranges in {self.vset_config}', error_type='value')
+        chk('divergence_prob' not in self.vset_config or isinstance(self.vset_config['divergence_prob'], (list, int, float)),
+            f'divergence_prob must be a float, a list of floats in ]0, 1] or ranges in {self.vset_config}', error_type='value')
 
         if (self.svtype == VariantType.DUP) and ('n_copies' not in self.vset_config):
             self.vset_config['n_copies'] = [1]
@@ -383,11 +389,46 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             ), f'invalid SV config key {vset_config_key}', error_type='syntax')
 
         vset_cfg = self.vset_config
+        rhs_strs_list: list[str] = []
+        for c in self.target:
+            if c in (Syntax.DIVERGENCE, Syntax.MULTIPLE_COPIES):
+                chk(rhs_strs_list and rhs_strs_list[-1] and rhs_strs_list[-1][0].isalpha(),
+                    f'{c} must modify a letter {rhs_strs_list}.', error_type='syntax')
+                rhs_strs_list[-1] += c
+            else:
+                rhs_strs_list.append(c)
+
+        self.target = rhs_strs_list
+
+        # Anchor the whole SV if overlap mode is specified, no anchor is provided and there is no dispersion.
+        if ((self.overlap_mode is not None) and (Syntax.DISPERSION not in self.source) and
+                (Syntax.ANCHOR_START not in self.source)):
+            self.source = tuple([Syntax.ANCHOR_START, *self.source, Syntax.ANCHOR_END])
+
+        # Check if a type provided as grammar is a predefined type
+        if self.svtype == VariantType.CUSTOM:
+            lhs = tuple([letter for letter in self.source if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]])
+            rhs = tuple(self.target)
+            for key, grammar in SV_KEY.items():
+                # Test if the grammar or its symmetric match the grammar of the record
+                if (grammar[0] == lhs and grammar[1] == rhs) or (
+                        grammar[0] == lhs[::-1] and grammar[1] == rhs[::-1]):
+                    # we found a match and update the types
+                    self.svtype = key
+
+                    # Distinguish between SNP and DIVERGENCE
+                    if key in [VariantType.DIVERGENCE, VariantType.SNP]:
+                        if ((vset_cfg.get('length_ranges') in (None, [[1, 1]])) and
+                            ('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] in [[1], 1])):
+                            self.svtype = VariantType.SNP
+                        else:
+                            self.svtype = VariantType.DIVERGENCE
+                    self.input_type = VariantType.CUSTOM
 
         if self.svtype == VariantType.SNP:
             chk(vset_cfg.get('length_ranges') in (None, [[1, 1]]),
                 f'length_ranges for SNP can only be [[1, 1]]. Error in for {vset_cfg['config_descr']}', error_type='value')
-            chk('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] == [1],
+            chk('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] in [[1], 1],
                 f'divergence prob for SNP can only be 1. Error in {vset_cfg['config_descr']}', error_type='value')
             vset_cfg['length_ranges'] = [[1, 1]]
             vset_cfg['divergence_prob'] = [1.0]
@@ -417,22 +458,6 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             '%s must be a string or list of strings'.format(self.vset_config.get('type')), error_type='syntax')
 
 
-        rhs_strs_list: list[str] = []
-        for c in self.target:
-            if c in (Syntax.DIVERGENCE, Syntax.MULTIPLE_COPIES):
-                chk(rhs_strs_list and rhs_strs_list[-1] and rhs_strs_list[-1][0].isalpha(),
-                    f'{c} must modify a letter {rhs_strs_list}.', error_type='syntax')
-                rhs_strs_list[-1] += c
-            else:
-                rhs_strs_list.append(c)
-
-        self.target = rhs_strs_list
-
-        # Anchor the whole SV if overlap mode is specified, no anchor is provided and there is no dispersion.
-        if ((self.overlap_mode is not None) and (Syntax.DISPERSION not in self.source) and
-                (Syntax.ANCHOR_START not in self.source)):
-            self.source = tuple([Syntax.ANCHOR_START, *self.source, Syntax.ANCHOR_END])
-
     @property
     def is_interchromosomal(self):
         return self.vset_config.get('interchromosomal', False)
@@ -442,6 +467,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         if (("DUP" in self.svtype.name or "TRA" in self.svtype.name or
              "iDEL" in self.svtype.name)
                 and (not self.is_interchromosomal)
+                and (not self.input_type)
                 and random.randint(0, 1)):
             def flip_anchor(val: str) -> str:
                 if val == Syntax.ANCHOR_START:
@@ -559,14 +585,17 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         length_ranges = self.vset_config['length_ranges'] if 'length_ranges' in self.vset_config else []
         letter_ranges = length_ranges
         dispersion_ranges = []
-        # Find the length ranges corresponding to dispersions and those corresponding to letters
         lhs_strs_no_anchor = [letter for letter in lhs_strs if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]]
+
+        # Find the length ranges corresponding to dispersions and those corresponding to letters
         dispersions = [idx for idx, letter in enumerate(lhs_strs_no_anchor) if letter == Syntax.DISPERSION]
         if dispersions:
-            if svtype != VariantType.Custom:
+            if svtype != VariantType.CUSTOM and not self.input_type:
+                # The SV was provided from a predefined type, the dispersion lengths are last
                 letter_ranges = length_ranges[:-1]
                 dispersion_ranges = [length_ranges[-1]]
             else:
+                # The SV was provided from the grammar, the dispersion lengths are at they position in the source
                 letter_ranges = [length_range for idx, length_range in enumerate(length_ranges) if
                                  idx not in dispersions]
                 dispersion_ranges = [length_range for idx, length_range in enumerate(length_ranges) if
@@ -591,7 +620,10 @@ class FromGrammarVariantSet(SimulatedVariantSet):
 
         novel_insertion_seqs = self.novel_insertion_seqs
         n_copies_list = self.vset_config.get('n_copies', [])
+
         divergence_prob_list = self.vset_config.get('divergence_prob', [])
+        if isinstance(divergence_prob_list, (int, float)):
+            divergence_prob_list = [divergence_prob_list]
 
         # Build the different operations and anchor, determine the breakends and the distance between them.
         (operations, anchor, dispersions, breakend_interval_lengths,
@@ -812,7 +844,7 @@ class ImportedVariantSet(VariantSet):
         chk(vcf_rec.start is not None, f'The Start position must not be None for {vcf_rec}', error_type='value')
         rec_start = Locus(chrom=vcf_rec.chrom, pos=vcf_rec.start)
         parsed_info['START'] = rec_start
-        rec_end = Locus(chrom=vcf_rec.chrom, pos=vcf_rec.stop - 1)
+        rec_end = Locus(chrom=vcf_rec.chrom, pos=vcf_rec.stop)
 
         if 'SVLEN' in vcf_info:
             rec_len = vcf_info['SVLEN']
@@ -821,17 +853,20 @@ class ImportedVariantSet(VariantSet):
         parsed_info['END'] = rec_end
         parsed_info['SVLEN'] = rec_len
 
+        if 'GRAMMAR' in vcf_info:
+            parsed_info['GRAMMAR'] = vcf_info['GRAMMAR']
+
         rec_target = None
         is_interchromosomal = False
         if 'TARGET' in vcf_info:
             chk(isinstance(vcf_info.get('TARGET'), int), f'TARGET has to be an int representing a position {vcf_info}',
                 error_type='value')
-            rec_target = Locus(chrom=vcf_info.get('TARGET_CHROM', vcf_rec.chrom), pos=vcf_info['TARGET'] - 1)
+            rec_target = Locus(chrom=vcf_info.get('TARGET_CHROM', vcf_rec.chrom), pos=vcf_info['TARGET'])
             if rec_target.chrom != vcf_rec.chrom:
                 is_interchromosomal = True
             elif rec_end is not None:
                 # The target has to be outside of the source region
-                chk(rec_target.pos >= rec_end.pos or rec_target.pos <= rec_start.pos,
+                chk(rec_target.chrom != rec_start.chrom or rec_target.pos >= rec_end.pos or rec_target.pos <= rec_start.pos,
                     f"Invalid dispersion target {vcf_rec}", error_type='value')
         parsed_info['TARGET'] = rec_target
         parsed_info['INTERCHROMOSOMAL'] = is_interchromosomal
@@ -858,8 +893,8 @@ class ImportedVariantSet(VariantSet):
             parsed_info['DIVERGENCEPROB'] = [1.0]
             if vcf_rec.alts[0] != '<SNP>':
                 parsed_info['ALT'] = vcf_rec.alts
-                if len(vcf_rec.alts) == 1:
-                    parsed_info['ALT'] = [None]*parsed_info['GENOTYPE'][0] + [vcf_rec.alts[0]] + [None]*parsed_info['GENOTYPE'][1]
+                chk(len(vcf_rec.alts) == 1, f'Error in the ALT field, biallelic SNPs are not supported {vcf_rec}')
+                parsed_info['ALT'] =[vcf_rec.alts[0] if parsed_info['GENOTYPE'][hap_index] else None for hap_index in [0, 1]]
             if vcf_rec.ref != 'N':
                 parsed_info['REF'] = vcf_rec.ref[0]
         additional_info = {}
@@ -887,14 +922,18 @@ class ImportedVariantSet(VariantSet):
         # Extract the info of all the records of the SV to determine the breakends and placement.
         for vcf_rec in sv_recs:
             parsed_info, additional_info = self.parse_vcf_rec_info(vcf_rec)
+
             if genotype is None:
                 genotype = parsed_info['GENOTYPE']
+            assert genotype == parsed_info['GENOTYPE']
+
             if len(sv_recs) > 1:
                 parent_info['OP_TYPE'] = parsed_info['SVTYPE']
             else:
-                if parsed_info['SVTYPE'] not in [VariantType.SNP, VariantType.Custom]:
+                if parsed_info['SVTYPE'] not in [VariantType.SNP, VariantType.CUSTOM]:
                     parsed_info['OP_TYPE'] = VariantType(parsed_info['SVTYPE'])
                 parent_info['OP_TYPE'] = parsed_info['SVTYPE']
+
             target_left = False
             source_regions.append([parsed_info['START'], parsed_info['END']])
             placement = [parsed_info['START'], parsed_info['END']]
@@ -934,9 +973,13 @@ class ImportedVariantSet(VariantSet):
             operations = []
             is_in_place = parsed_info['TARGET'] is None
             # The SVTYPE of a record must be a predefined SV type or the identity operation.
-            if isinstance(parsed_info['OP_TYPE'], VariantType) and (
-                    parsed_info['OP_TYPE'] not in [VariantType.DEL, VariantType.INV]):
-                lhs_strs, rhs_strs = SV_KEY[parsed_info['OP_TYPE']]
+            if ('GRAMMAR' in parsed_info and len(sv_recs) == 1) or (isinstance(parsed_info['OP_TYPE'], VariantType) and (
+                    parsed_info['OP_TYPE'] not in [VariantType.DEL, VariantType.INV, VariantType.CUSTOM])):
+                if 'GRAMMAR' in parsed_info:
+                    chk(len(parsed_info['GRAMMAR'].split('->')) == 2, f'Unsupported GRAMMAR format {vcf_rec}.')
+                    lhs_strs, rhs_strs =  parsed_info['GRAMMAR'].split('->')
+                else:
+                    lhs_strs, rhs_strs = SV_KEY[parsed_info['OP_TYPE']]
                 if target_left:
                     # The symmetrical of the SV grammar has been used
                     lhs_strs = lhs_strs[::-1]
@@ -952,7 +995,9 @@ class ImportedVariantSet(VariantSet):
                                                                      symbol_min_lengths, 1,
                                                                      parsed_info['INSSEQ'], [parsed_info['NCOPIES']],
                                                                      parsed_info['DIVERGENCEPROB'],
-                                                                     replacement_seq=parsed_info['ALT'], vset_config=vcf_rec)
+                                                                     replacement_seq=parsed_info['ALT'],
+                                                                     orig_seq=parsed_info['REF'],
+                                                                     vset_config=vcf_rec)
                 for operation in operations:
                     operation.op_info = additional_info
                     operation.target_insertion_order = insord
@@ -973,8 +1018,10 @@ class ImportedVariantSet(VariantSet):
                 if parsed_info['TARGET'] is not None:
                     target_breakend = 0 if target_left else max_breakend
                 source_region = BreakendRegion(start_breakend, end_breakend)
+
                 op_attributes = []
                 op_type = parsed_info['OP_TYPE']
+                chk(op_type != 'NA', f'A custom type has been provided without OP_TYPE {vcf_rec}')
                 if isinstance(parsed_info['OP_TYPE'], VariantType):
                     op_type = parsed_info['OP_TYPE'].name
                 if ('inv' in op_type) or ('INV' in op_type):
