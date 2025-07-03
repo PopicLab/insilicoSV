@@ -189,11 +189,15 @@ class RegionSet:
         for region in regions:
             chrom2regions[region.chrom].append(region)
 
-        self.chrom2itree = defaultdict(IntervalTree)
+        # One tree for each haplotype and one for the combination to check homozygous variants
+        self.chrom2itree = defaultdict(list)
         for chrom, chrom2region in chrom2regions.items():
             if len(chrom2region) > 100000:
                 logger.debug(f'RegionSet init: {chrom=} {len(chrom2region)=}')
-            self.chrom2itree[chrom] = IntervalTree.from_tuples((region.start, region.end, region)
+            self.chrom2itree[chrom] = [IntervalTree() for _ in range(3)]
+
+            for hap in [0, 1, 2]:
+                self.chrom2itree[chrom][hap] = IntervalTree.from_tuples((region.start, region.end, region)
                                                                 for region in chrom2region)
 
 
@@ -236,7 +240,7 @@ class RegionSet:
         if to_region_set:
             logger.info(f'Constructing Interval Tree from {len(regions)} regions...')
             region_set = RegionSet(regions)
-            logger.info(f'Constructed INterval Tree from {len(regions)} regions.')
+            logger.info(f'Constructed Interval Tree from {len(regions)} regions.')
         return region_set
 
     @staticmethod
@@ -265,8 +269,8 @@ class RegionSet:
                                       orig_start=0, orig_end=chrom_length))
             return RegionSet(regions)
 
-    def get_region_list(self):
-        return [ival.data for chrom_itree in self.chrom2itree.values() for ival in chrom_itree]
+    def get_region_list(self, hap):
+        return [ival.data for chrom_itree in self.chrom2itree.values() for ival in chrom_itree[hap]]
 
     def filtered(self, region_filter):
         """Construct a RegionSet containing regions from self that meet given filter"""
@@ -276,11 +280,13 @@ class RegionSet:
         def satisfies_filter(region):
             return region_filter.satisfied_for(region)
 
-        return RegionSet(filter(satisfies_filter, self.get_region_list()))
+        # Blacklist affect the three haplotypes
+        return RegionSet(filter(satisfies_filter, self.get_region_list(hap=2)))
 
     def add_region_set(self, other_region_set):
-        for chrom, other_chrom_itree in other_region_set.chrom2itree.items():
-            self.chrom2itree[chrom].update(other_chrom_itree)
+        for chrom, other_chrom_itree_list in other_region_set.chrom2itree.items():
+            for hap, other_chrom_itree in enumerate(other_chrom_itree_list):
+                self.chrom2itree[chrom][hap].update(other_chrom_itree)
 
     def add_region(self, region):
         aux_region = deepcopy(region)
@@ -290,21 +296,24 @@ class RegionSet:
                                end=min(aux_region.end + 0.5, aux_region.orig_end))
         self.add_region_set(RegionSet([aux_region]))
 
-    def chop(self, sv_region):
+    def chop(self, sv_region, genotype):
         # Remove the parts of intervals overlapping sv_region.
+        for hap in [0, 1, 2]:
+            # Only chop the intervals of the tree on the same haplotype
+            if hap != 2 and not genotype[hap]: continue
 
-        chrom_itree = self.chrom2itree[sv_region.chrom]
+            chrom_itree = self.chrom2itree[sv_region.chrom][hap]
 
-        def adjust_region(ival, is_begin):
-            if is_begin:
-                new_region = ival.data.replace(end=sv_region.start)
-            else:
-                new_region = ival.data.replace(start=sv_region.end)
-            if new_region.start == new_region.end:
-                return None
-            return new_region
+            def adjust_region(ival, is_begin):
+                if is_begin:
+                    new_region = ival.data.replace(end=sv_region.start)
+                else:
+                    new_region = ival.data.replace(start=sv_region.end)
+                if new_region.start == new_region.end:
+                    return None
+                return new_region
 
-        chrom_itree.chop(sv_region.start, sv_region.end, datafunc=adjust_region)
+            chrom_itree.chop(sv_region.start, sv_region.end, datafunc=adjust_region)
 # end class RegionSet
 
 def percent_N(seq):
