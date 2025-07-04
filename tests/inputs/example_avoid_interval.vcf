@@ -1,13 +1,11 @@
 ##fileformat=VCFv4.2
 ##FILTER=<ID=PASS,Description="All filters passed">
-##contig=<ID=chr19,length=46709983>
+##contig=<ID=chr21,length=46709983>
 ##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
-##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS for imprecise variants">
-##INFO=<ID=CIEND,Number=2,Type=Integer,Description="Confidence interval around END for imprecise variants">
 ##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
 ##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Length of structural variant">
-##INFO=<ID=SVMETHOD,Number=1,Type=String,Description="SV detection method">
+##INFO=<ID=REGION_TYPE,Number=1,Type=String,Description="SV detection method">
 ##INFO=<ID=TARGET,Number=1,Type=Integer,Description="Target location for divergent repeat">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
-chr19	16	EMPTY	N	<EMPTY>	86	PASS	END=83;SVTYPE=EMPTY;SVLEN=68	GT	1/1
+chr21	6	CNV	N	<CNV>	86	PASS	END=8;REGION_TYPE=TESTVCF;SVTYPE=CNV;SVLEN=3	GT	1/1
