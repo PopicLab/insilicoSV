@@ -213,7 +213,7 @@ The output VCF file will label which SVs were placed at specified intervals with
 chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVLP=L1HS;VSET=0;IN_PLACE=in_place;GRAMMAR=A>AA;SOURCE_LETTER=A  GT  0/1
 ```
 
-### Example 5a - Placing specific SV components at regions of interest
+### Example 5 - Placing specific SV components at regions of interest
 
 The portion of the SV which participates in overlap with an ROI is termed an _anchor_ 
 and is denoted with () in the supported SV grammar.
@@ -244,3 +244,38 @@ can be used to constrain an insertion target for instance.
 
 If an anchor constrains a dispersion, the dispersion will be intrachromosomal even if the SV is set as interchromosomal 
 (In this case, other unconstrained dispersions of the SV will then be interchromosomal). 
+
+### Example 6 - Placing Interchromosomal SVs
+InsilicoSV allows you to simulate interchromosomal SVs by using the `interchromosomal` flag. 
+This means the SV will involve changes across different chromosomes.
+
+To define an interchromosomal SV, set `interchromosomal: True` within the variant set definition, 
+as shown in the example below:
+```yaml
+reference: "{path}/{to}/ref.fa"
+variant_sets:
+    - type: "nrTRA"  
+      interchromosomal: True
+      number: 5
+      length_ranges:
+        - [500, 1000]
+        - [null, null]
+    - type: "A__ -> A_AB_A"
+      number: 1
+      interchromosomal: True
+      length_ranges:
+         - [500, 1000]
+         - [null, null]
+         - [null, null] 
+         - [500, 1000]
+```
+Key Considerations for Interchromosomal Dispersions
+- Unbounded Lengths: When defining interchromosomal dispersions, their lengths must be unbounded (specified as [null, null]).  
+- Multiple Dispersions: If a custom SV with multiple dispersions is flagged as interchromosomal, each dispersion will involve a change to a different chromosome.
+- Example Scenario: In the second example provided above, where the type is "A__ -> A_AB_A", a possible placement for this interchromosomal SV could be:
+  - The source of A is on chr1.
+  - The AB segment is placed on chr3.
+  - The second copy of A is placed on chr2.
+  
+  Because all dispersions are interchromosomal, the last copy of A cannot be placed back on chr3. 
+  However, it could be placed in a different region of chr1.
