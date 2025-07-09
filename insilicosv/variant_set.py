@@ -500,12 +500,10 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         symbol_min_lengths = {}
         while remaining_symbols:
             idx = remaining_symbols.pop(0)
-            print('letter', idx)
             min_range, max_range = ranges[idx]
             if (isinstance(min_range, int) or min_range is None) and (isinstance(max_range, int) or max_range is None):
                 # Both bounds are independent to other letter lengths.
                 def assign_length(min_range, max_range, is_dispersion):
-                    print(min_range, max_range, is_dispersion)
                     if max_range is None:
                         length = None
                         if min_range is not None:
