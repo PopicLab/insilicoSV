@@ -182,7 +182,7 @@ class SV(ABC):
                 f'The anchor length is smaller than the minimum overlap for a partial overlap.', error_type='syntax')
 
         # The letters cannot be unbounded unless the overlap is Exact and they are in the anchor.
-        chk(all(
+        chk(self.fixed_placement or all(
             length is not None for idx, length in enumerate(self.breakend_interval_lengths) if
             (idx not in self.dispersions) and
             ((not self.anchor) or (self.overlap_mode != OverlapMode.EXACT) or not (
