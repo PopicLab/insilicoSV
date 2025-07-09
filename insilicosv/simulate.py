@@ -295,7 +295,7 @@ class SVSimulator:
                                                     blacklist_regions=blacklist_regions, roi_length=roi_length, total_length=total_length)
             num_tries += 1
         if breakend is None:
-            # The breakend failed to be assign by random sampling, the actual available region has to be checked.
+            # The breakend failed to be assigned by random sampling, look for a region fitting the SV actually available.
             return self.get_breakend_from_regions(containing_region=containing_region, avoid_chrom=avoid_chrom,
                                              blacklist_regions=blacklist_regions, roi_length=roi_length, total_length=total_length)
         return breakend, ref_roi
