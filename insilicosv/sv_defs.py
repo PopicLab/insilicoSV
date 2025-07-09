@@ -171,32 +171,37 @@ class SV(ABC):
 
         if self.overlap_mode == OverlapMode.CONTAINED:
             chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() > self.roi_filter.region_length_range[0]),
-                f'The anchor length is smaller than the minimum overlap for a contained overlap.')
+                f'The anchor length is smaller than the minimum overlap for a contained overlap.', error_type='syntax')
             chk((self.roi_filter.region_length_range[1] is None) or (self.anchor.length() < self.roi_filter.region_length_range[1]),
-                f'The anchor length is larger than the maximum overlap for a contained overlap.')
+                f'The anchor length is larger than the maximum overlap for a contained overlap.', error_type='syntax')
         if self.overlap_mode == OverlapMode.CONTAINING:
             chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() > self.roi_filter.region_length_range[0]),
-                f'The anchor length is smaller than the minimum overlap for a containing overlap.')
+                f'The anchor length is smaller than the minimum overlap for a containing overlap.', error_type='syntax')
         if self.overlap_mode == OverlapMode.CONTAINING:
             chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() >= self.roi_filter.region_length_range[0]),
-                f'The anchor length is smaller than the minimum overlap for a partial overlap.')
+                f'The anchor length is smaller than the minimum overlap for a partial overlap.', error_type='syntax')
 
-        if self.anchor is not None:
-            chk(all(
-                length is not None for idx, length in enumerate(self.breakend_interval_lengths) if
-                (idx not in self.dispersions) and
-                ((self.overlap_mode != OverlapMode.EXACT) or not (
-                            self.anchor.start_breakend <= idx < self.anchor.end_breakend))),
-                f'A length range can onl be [null, null] for dispersions or the anchor for an exact overlap.')
-            chk(all([breakend not in self.dispersions for breakend in range(self.anchor.start_breakend, self.anchor.end_breakend-1)]),
-                f'anchors cannot contain a dispersion: {self.config_descr}')
+        # The letters cannot be unbounded unless the overlap is Exact and they are in the anchor.
+        chk(all(
+            length is not None for idx, length in enumerate(self.breakend_interval_lengths) if
+            (idx not in self.dispersions) and
+            ((not self.anchor) or (self.overlap_mode != OverlapMode.EXACT) or not (
+                    self.anchor.start_breakend <= idx < self.anchor.end_breakend))),
+            f'A length range can only be [null, null] for dispersions or the anchor for an exact overlap.', error_type='syntax')
+
+        # Interchromosomal dispersions have to be unbounded
+        chk(not self.is_interchromosomal or all(
+            length is None for idx, length in enumerate(self.breakend_interval_lengths) if (idx in self.dispersions)),
+            f'The length ranges of dispersions has to be [null, null] for interchromosomal SVs.', error_type='syntax')
+
+        if not self.anchor:
             chk((self.overlap_mode != OverlapMode.EXACT) or
                 all((self.breakend_interval_lengths[breakend] is None and
                  self.breakend_interval_min_lengths[breakend] is None) for breakend in range(self.anchor.start_breakend, self.anchor.end_breakend)),
-                f'overlap_mode "exact" requires leaving the length of the anchor symbols unspecified: {self}')
+                f'overlap_mode "exact" requires leaving the length of the anchor symbols unspecified: {self}', error_type='syntax')
             chk((self.overlap_mode != OverlapMode.PARTIAL and self.overlap_mode != OverlapMode.CONTAINING)
                 or self.anchor.end_breakend != self.anchor.start_breakend ,
-                f'overlap_mode "partial" and "containing" require non-empty anchor: {self}')
+                f'overlap_mode "partial" and "containing" require non-empty anchor: {self}', error_type='syntax')
 
         assert self.fixed_placement is None or self.overlap_mode is None
         assert self.genotype and sum(self.genotype)
@@ -226,7 +231,6 @@ class SV(ABC):
 
         self.placement = placement
         self.roi = roi
-
         for operation in self.operations:
             operation.placement = placement
 

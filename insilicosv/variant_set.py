@@ -427,14 +427,14 @@ class FromGrammarVariantSet(SimulatedVariantSet):
 
         if self.svtype == VariantType.SNP:
             chk(vset_cfg.get('length_ranges') in (None, [[1, 1]]),
-                f'length_ranges for SNP can only be [[1, 1]]. Error in for {vset_cfg['config_descr']}', error_type='value')
+                f'length_ranges for SNP can only be [[1, 1]]. Error in %s' % vset_cfg['config_descr'], error_type='value')
             chk('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] in [[1], 1],
-                f'divergence prob for SNP can only be 1. Error in {vset_cfg['config_descr']}', error_type='value')
+                f'divergence prob for SNP can only be 1. Error in %s' % vset_cfg['config_descr'], error_type='value')
             vset_cfg['length_ranges'] = [[1, 1]]
             vset_cfg['divergence_prob'] = [1.0]
         else:
-            chk('length_ranges' in vset_cfg, f'Please specify length ranges for {vset_cfg['config_descr']}', error_type='syntax')
-            chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list for {vset_cfg['config_descr']}',
+            chk('length_ranges' in vset_cfg, f'Please specify length ranges in %s' % (vset_cfg['config_descr']), error_type='syntax')
+            chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list in %s' % vset_cfg['config_descr'],
                 error_type='syntax')
             for length_range in vset_cfg['length_ranges']:
                 chk(isinstance(length_range, str) or
@@ -442,17 +442,17 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                      isinstance(length_range[0], (type(None), int, str)) and
                      isinstance(length_range[1], (type(None), int, str))),
                     f'invalid length_ranges. it must be a list of 2-tuples of str or int. '
-                    f'Error in {vset_cfg['config_descr']}', error_type='value')
+                    f'Error in %s' % vset_cfg['config_descr'], error_type='value')
 
         if 'novel_insertions' in self.vset_config:
             try:
                 with open(self.vset_config['novel_insertions'], 'r') as sequences:
                     self.novel_insertion_seqs = [line.rstrip() for line in sequences]
                     chk(all(bool(re.match('^[TCGA]+$', line)) for line in self.novel_insertion_seqs),
-                        f'The file novel_insertions {self.vset_config['novel_insertions']}'
+                        f'The file novel_insertions %s' % self.vset_config['novel_insertions'] +
                         f' contains invalid characters. It must be a list of sequences.', error_type='value')
             except:
-                chk(False, f'novel_insertion file {self.vset_config['novel_insertions']} must be a readable '
+                chk(False, f'novel_insertion file %s must be a readable ' % self.vset_config['novel_insertions'] +
                            f'file containing a sequence per line.', error_type='file not found')
         chk(isinstance(self.vset_config.get('type'), (type(None), list, str, tuple)),
             '%s must be a string or list of strings'.format(self.vset_config.get('type')), error_type='syntax')
@@ -491,7 +491,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         ranges = length_ranges + dispersion_ranges
         remaining_symbols = [i for i in range(len(ranges))]
         chk(all(isinstance(length_range, str) or (isinstance(length_range, list) and (len(length_range) == 2))
-                for length_range in ranges), f'length_ranges must be a list of [min, max] pairs {ranges} for {vset_config['config_descr']}', error_type='syntax')
+                for length_range in ranges), f'length_ranges must be a list of [min, max] pairs {ranges} in %s' % vset_config['config_descr'], error_type='syntax')
         # Keep track of the dependencies between the symbols length ranges.
         # A dependency is the index of the letter the range is depending on (possibly a different letter for the min and max bounds)
         # and the offset to those letter lengths.
@@ -500,19 +500,21 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         symbol_min_lengths = {}
         while remaining_symbols:
             idx = remaining_symbols.pop(0)
+            print('letter', idx)
             min_range, max_range = ranges[idx]
             if (isinstance(min_range, int) or min_range is None) and (isinstance(max_range, int) or max_range is None):
                 # Both bounds are independent to other letter lengths.
                 def assign_length(min_range, max_range, is_dispersion):
+                    print(min_range, max_range, is_dispersion)
                     if max_range is None:
                         length = None
                         if min_range is not None:
-                            chk(is_dispersion, f'Only dispersions can have min but not max length {ranges} for {vset_config['config_descr']}', error_type='syntax')
+                            chk(is_dispersion, f'Only dispersions can have min but not max length {ranges} in %s' % vset_config['config_descr'], error_type='syntax')
                         min_length = min_range
                     else:
-                        chk(min_range is not None, f'max_length given but not min_length {ranges} for {vset_config['config_descr']}', error_type='syntax')
-                        chk(min_range <= max_range, f'max bound less than min bound {ranges} for {vset_config['config_descr']}', error_type='syntax')
-                        chk(min_range >= 0, f'min length cannot be negative {ranges} for {vset_config['config_descr']}', error_type='value')
+                        chk(min_range is not None, f'max_length given but not min_length {ranges} in %s' % vset_config['config_descr'], error_type='syntax')
+                        chk(min_range <= max_range, f'max bound less than min bound {ranges} in %s' % vset_config['config_descr'], error_type='syntax')
+                        chk(min_range >= 0, f'min length cannot be negative {ranges} in %s' % vset_config['config_descr'], error_type='value')
                         length = random.randint(min_range, max_range)
                         min_length = None
                     return length, min_length
@@ -530,14 +532,14 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                                          isinstance(char, str) and char.isalpha()]
                         chk(all(letter in letter_indexes for _, letter in letters_bound),
                             f'The length of a symbol depends on {letters_bound} '
-                            f'one of which is not define in neither the source nor target for {vset_config['config_descr']}', error_type='value')
+                            f'one of which is not define in neither the source nor target in %s' % vset_config['config_descr'], error_type='value')
                         computed_letter = 0
                         for idx_in_dependency, letter in letters_bound:
                             # Gets the index of the letter in the list of length ranges.
                             index = letter_indexes[letter]
                             if index in symbol_lengths:
                                 chk(symbol_lengths[index] is not None,
-                                    f'A symbol length cannot depend on an unbounded symbol for {vset_config['config_descr']}', error_type='syntax')
+                                    f'A symbol length cannot depend on an unbounded symbol in %s' % vset_config['config_descr'], error_type='syntax')
                                 ope = ''
                                 if (idx_in_dependency > 0) and (isinstance(format_bound[idx_in_dependency - 1], int)
                                                                 or format_bound[
@@ -552,7 +554,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                                 dependencies[idx].append(index)
                                 if index in dependencies:
                                     chk(not idx in dependencies[index],
-                                        f'There is a cyclic dependency in the length definitions {letter} for {vset_config['config_descr']}',
+                                        f'There is a cyclic dependency in the length definitions {letter} in %s' % vset_config['config_descr'],
                                         error_type='syntax')
                                     dependencies[idx] += dependencies[index]
                                 dependencies[idx] = list(set(dependencies[idx]))
@@ -567,10 +569,10 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                                     eval_bound = math.floor(eval_bound)
                                 ranges[idx][pos] = eval_bound
                             except:
-                                chk(False, f'The length of a symbol depends on an invalid operation {idx} for {vset_config['config_descr']}',
+                                chk(False, f'The length of a symbol depends on an invalid operation {idx} in %s' % vset_config['config_descr'],
                                     error_type='syntax')
                             chk(ranges[idx][pos] >= 0,
-                                f'The operation defining the {idx}th symbol length gives a negative bound for {vset_config['config_descr']}',
+                                f'The operation defining the {idx}th symbol length gives a negative bound in %s' % vset_config['config_descr'],
                                 error_type='value')
                 remaining_symbols.append(idx)
         lengths = sorted(symbol_lengths.items(), key=lambda x: x[0])
