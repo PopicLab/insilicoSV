@@ -134,7 +134,16 @@ class OutputWriter:
         hap_chrom_lengths = {}
         with open(hap_fa, 'w') as sim_fa:
             chrom2operations: dict[str, list[Operation]] = self.get_chrom2operations(hap_index)
-            for chrom, chrom_length in zip(self.reference.references, self.reference.lengths):
+            references = self.reference.references
+            lengths = self.reference.lengths
+
+            for chrom in chrom2operations:
+                # Add chromosome copies for aneuploidy
+                if chrom not in references:
+                    references.append(chrom)
+                    lengths.append(0)
+
+            for chrom, chrom_length in zip(references, lengths):
                 hap_str = ['hapA', 'hapB'][hap_index]
                 hap_chrom = f'{chrom}_{hap_str}'
                 sim_fa.write(f'>{hap_chrom}\n')

@@ -56,6 +56,10 @@ For trEXP and trCON variants, a BED file of existing repeats must be specified i
 *overlap_regions* global setting, and *overlap_region_type* for the existing repeat regions must
 be specified in the variant set. The BED file columns must contain in order the chromosome, the start position, the end position, the region type, and the motif of the repeat.
 
+For specifying arm gain/loss or aneuploidy, the following parameters are available:
+9. *arm_gain_loss=False [optional]*: bool - for the SV to duplicate or delete a whole chromosome arm.
+10. *arm_percent=[100, 100] [optional]*: [int, int] - range from which to determine the percent of the chromosome arm to duplicate or delete starting from the extremity.
+11. *aneuploidy=False [optional]*: bool - for the SV to duplicate or delete a whole chromosome copy.
 
 The following parameters can be set on the top level of the config file and provide higher-order controls over SV placement:
 1. *reference*: str - path to input reference used as template for simulation.
@@ -66,6 +70,8 @@ The following parameters can be set on the top level of the config file and prov
 5. *overlap_regions*: list[str] - list of paths to BED files containing genome elements to be used for overlapping SV placement (see [example config](use_cases#example-5---placing-svs-at-known-repetitive-element-intervals)).
 6. *filter_small_chr [optional]*: int - filter out chromosomes of length less than the given integer (if no value is provided then no filtering will occur).
 7. *th_proportion_N=0.05 [optional]*: The proportion of N and n base pairs an SV is allowed to cover.
+8. *arms [optional]*: str - a file specifying the position of the centromere of the chromosomes, see [use_cases](uses_cases#example-7---placing-a-del-or-dup-on-a-chromosome-arm)
+for a description of the file format.
 
 Examples of the full set of simulation options available through various config inputs can be found in the [use cases](use_cases) page.
 

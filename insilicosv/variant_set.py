@@ -50,6 +50,10 @@ class VariantSet(ABC):
         self.overlap_ranges = []
         self.header = []
         self.overlap_mode = None
+        self.aneuploidy = self.vset_config.get('aneuploidy', False)
+        self.arm_gain_loss = self.vset_config.get('arm_gain_loss', False)
+        self.arm_ranges = None
+
         if 'overlap_mode' in self.vset_config:
             chk(isinstance(self.vset_config['overlap_mode'], str) or
                 (isinstance(self.vset_config['overlap_mode'], list) and all(
@@ -379,7 +383,9 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'n_copies',
                 'novel_insertions',
                 'interchromosomal',
-                'config_descr', 'VSET'
+                'config_descr', 'VSET',
+                'aneuploidy',
+                'arm_gain_loss'
             ), f'invalid SV config key {vset_config_key}', error_type='syntax')
 
         vset_cfg = self.vset_config
@@ -416,7 +422,6 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         chk(isinstance(self.vset_config.get('type'), (type(None), list, str, tuple)),
             '%s must be a string or list of strings'.format(self.vset_config.get('type')), error_type='syntax')
 
-
         rhs_strs_list: list[str] = []
         for c in self.target:
             if c in (Syntax.DIVERGENCE, Syntax.MULTIPLE_COPIES):
@@ -432,6 +437,19 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         if ((self.overlap_mode is not None) and (Syntax.DISPERSION not in self.source) and
                 (Syntax.ANCHOR_START not in self.source)):
             self.source = tuple([Syntax.ANCHOR_START, *self.source, Syntax.ANCHOR_END])
+
+        if self.aneuploidy or self.arm_gain_loss:
+            chk(arms in config, f'An SV set has been flagged as arm_gain_loss or aneuploidy but the arm regions have'
+                                f'not been provided %s' % vset_cfg['config_descr'])
+            chk(all(length is None for idx, length in enumerate(vset_cfg.get('length_ranges', []))),
+                'All the lengths have to be null for aneuploidy or arm gain loss. Error in %s' % vset_cfg['config_descr'])
+            chk(self.svtype in [VariantType.DEL, VariantType.DUP], 'Only DUP or DEL SVs can be used for aneuploidy and arm gain loss. Error in %s' % vset_cfg['config_descr'])
+            chk(not Syntax.ANCHOR_END in self.source and not Syntax.ANCHOR_START in self.source and
+                not self.overlap_mode, 'SVs with arm_gain_loss or aneuploidy enabled cannot be constrained. Error in %s' % vset_cfg['config_descr'])
+            self.arm_ranges = vset_cfg.get('copy_percent', [100, 100])
+            chk(isinstance(self.arm_ranges, list),
+                f'copy_percent must be a list for %s' % vset_cfg['config_descr'],
+                error_type='syntax')
 
     @property
     def is_interchromosomal(self):
@@ -593,6 +611,10 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         n_copies_list = self.vset_config.get('n_copies', [])
         divergence_prob_list = self.vset_config.get('divergence_prob', [])
 
+        arm_percent = 100
+        if self.arm_ranges:
+            arm_percent = random.randint(self.arm_ranges[0], self.arm_ranges[1])
+
         # Build the different operations and anchor, determine the breakends and the distance between them.
         (operations, anchor, dispersions, breakend_interval_lengths,
          breakend_interval_min_lengths) = self.grammar_to_variant_set(lhs_strs, rhs_strs, symbol_lengths,
@@ -617,7 +639,10 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                       fixed_placement=None,
                       info=info,
                       genotype=self.pick_genotype(),
-                      config_descr=self.vset_config['config_descr'])
+                      config_descr=self.vset_config['config_descr'],
+                      aneuploidy=self.aneuploidy,
+                      arm_gain_loss=self.arm_gain_loss,
+                      arm_percent=arm_percent)
 
     def construct_info(self, lhs_strs, rhs_strs):
         sv_type_str = self.svtype.value

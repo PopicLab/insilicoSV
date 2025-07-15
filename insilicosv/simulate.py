@@ -85,7 +85,9 @@ class SVSimulator:
         self.chrom_lengths = { chrom: chrom_length
                                for chrom, chrom_length in zip(self.reference.references,
                                                               self.reference.lengths) }
-
+        # Store a dict of the chr arms if any of the sv has the flag arm_gain_loss or aneuploidy
+        self.arm_regions = {}
+        self.chrom_copies = defaultdict(int)
 
     def pre_check_config(self):
         config = self.config
@@ -114,6 +116,16 @@ class SVSimulator:
                 for key in variant_set.keys():
                     chk(not key.startswith('overlap_'),
                         f'Using {key} in {variant_set} requires specifying overlap_regions in global config')
+
+    def load_arms(self):
+        if not 'arms' in self.config: return
+        chr_lines = open(self.config['arms'], 'r').readlines()
+        for line in chr_lines:
+            fields = line.split('\t')
+            # Long arm
+            self.arm_regions[chrom].append(Region(chrom=fields[0], start=0, end=fields[2]))
+            # Short arm
+            self.arm_regions[chrom].append(Region(chrom=fields[0], start=fields[3], end=fields[1]))
 
     def load_rois(self):
         self.reference_regions = RegionSet.from_fasta(self.config['reference'], self.config.get('filter_small_chr', 0), region_kind='_reference_')
@@ -184,6 +196,7 @@ class SVSimulator:
     def run(self):
         self.construct_svs()
         self.load_rois()
+        self.load_arms()
         self.place_svs()
         self.output_results()
 
@@ -224,6 +237,22 @@ class SVSimulator:
                 region_padded = region.padded(self.config.get('min_intersv_dist', 1))
                 self.reference_regions.chop(region_padded)
 
+                if self.arm_regions:
+                    # We remove used arms from the arm_regions unless the SV is a DUP with aneuploidy flag
+                    if sv.aneuploidy and sv.info['SVTYPE'] == 'DUP':
+                        self.chrom_copies[region.chrom] += 1
+                        # For the writing of the output, we create an insertion point in a new chromosome
+                        sv.operations[0].target_region = Region(chrom=region.chrom + f'_copy_{self.chrom_copies[region.chrom]}',
+                                                                start=region.start, end=region.start)
+                        continue
+                    if region.chrom in self.arm_regions:
+                        arm_regions = self.arm_regions[region.chrom]
+                        keep_regions = []
+                        for arm_region in arm_regions:
+                            if not(arm_region.start < region.start < arm_region.end):
+                                keep_regions.append(arm_region)
+                        self.arm_regions[region.chrom] = keep_regions
+
             if time.time() - t_last_status > 10:
                 logger.info(f'Placed {sv_num} of {len(self.svs)} SVs in {time.time()-t_start_placing:.1f}s')
                 t_last_status = time.time()
@@ -232,11 +261,13 @@ class SVSimulator:
     def determine_sv_placement_order(self) -> None:
         # place most constrained SVs first
         logger.info(f'Deciding placement order for {len(self.svs)} SVs')
-        types_order = [OverlapMode.EXACT,  OverlapMode.PARTIAL, OverlapMode.CONTAINING, OverlapMode.CONTAINED, None]
+        types_order = ['ARM', OverlapMode.EXACT,  OverlapMode.PARTIAL, OverlapMode.CONTAINING, OverlapMode.CONTAINED, None]
         for sv in self.svs:
             with error_context(sv.config_descr):
                 if sv.fixed_placement:
                     sv.priority = 0
+                elif sv.arm_gain_loss or sv.aneuploidy:
+                    sv.priority = 1
                 else:
                     distance = sum([dist for dist in sv.breakend_interval_lengths if dist is not None]) + 2
                     sv.priority = (types_order.index(sv.overlap_mode) + 1) + 1/distance
@@ -457,7 +488,7 @@ class SVSimulator:
                 return None, None
             return region, ref_interval
         else:
-            chk(False, f'Invalip overlap_mode {overlap_mode}')
+            chk(False, f'Invalid overlap_mode {overlap_mode}')
 
     def get_reference_interval(self, roi):
         #Get the reference interval overlapping a ROI if any.
@@ -597,6 +628,18 @@ class SVSimulator:
                 placement_dict[breakend + shift] = Locus(chrom=roi.chrom, pos=position)
             return placement_dict
 
+    def get_arm_region(self, aneuploidy):
+        # If self.chrom_copies[chrom] > 0, the chromosome has been copied by an aneuploid DUP, it can only be used for aneuploid DUP
+        available_regions = [region for chrom, regions in self.arm_regions.items() for region in regions
+                             if not self.chrom_copies[chrom] > 0]
+        if aneuploidy:
+            available_regions = []
+            for chrom, regions in self.arm_regions.items():
+                if len(regions) == 2:
+                    if sv.info['SVTYPE'] == 'DEL' and self.chrom_copies[chrom] > 0: continue
+                    available_regions.append(Region(chrom=chrom, start=0, end=self.chrom_lengths[chrom]))
+        return random.choice(available_regions)
+
     def place_sv(self, sv, roi_index):
         assert not sv.is_placed()
         if sv.fixed_placement:
@@ -604,6 +647,20 @@ class SVSimulator:
                 f'cannot place imported SV')
             sv.set_placement(placement=sv.fixed_placement, roi=None)
             return
+        elif sv.arm_gain_loss or sv.aneuploidy:
+            region = self.get_arm_region(sv.aneuploidy)
+
+            # Only affect the requested arm_percent portion of the arm
+            portion_length = region.length() * sv.arm_percent / 100
+            start = 0  if region.start == 0 else region.end - portion_length
+            end = region.start + portion_length if region.start == 0 else region.end
+            region = Region(chrom=region.chrom, start=start, end=end)
+
+            placement = [Locus(chrom=region.chrom, pos=start),
+                         Locus(chrom=region.chrom, pos=end)]
+            sv.set_placement(placement=placement, roi=region, operation=sv.operations[0])
+            return
+
         n_placement_attempts = 0
         max_tries = self.config.get("max_tries", DEFAULT_MAX_TRIES)
         blacklist_regions = self.get_relevant_blacklist_regions(sv.blacklist_filter)

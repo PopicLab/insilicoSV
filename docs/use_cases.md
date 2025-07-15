@@ -235,7 +235,7 @@ variant_sets:
       overlap_region_type: ["L1HS"]
 ```
 
-Parentheses indicate which part(s) of the SV that are constrained to overlap with an ROI according
+Parentheses indicate which part(s) of the SV are constrained to overlap with an ROI according
 to the overlap mode.  The anchor must be placed on the source, and can wrap
 any contiguous sub-sequence of source elements (including an empty one).
 For `"exact"` overlap mode, the length ranges of the constrained SV's part(s) must
@@ -244,3 +244,40 @@ can be used to constrain an insertion target for instance.
 
 If an anchor constrains a dispersion, the dispersion will be intrachromosomal even if the SV is set as interchromosomal 
 (In this case, other unconstrained dispersions of the SV will then be interchromosomal). 
+
+### Example 7 - Placing a DEL or DUP on a chromosome arm
+Use the command `faSize -veryDetailed -tab /{path}/{to}/ref.fa > /{path}/{to}/centromeres.bed` to obtain a BED file containing 
+the centromere positions for each chromosome of your reference.
+See [this](https://open.bioqueue.org/home/knowledge/showKnowledge/sig/ucsc-fasize) for instructions to install and run faSize.
+The BED file first four columns must be: 
+- Chromosome name
+- Chromosome length
+- Beginning of the centromere
+- End of the centromere
+
+This BED file has to be provided in the `arms` field.
+The file does not have to contain all the chromosomes of the reference, only the ones for which we want to enable the arm gain/loss
+or aneuploidy.
+
+The variant sets have to be flagged with `arm_gain_loss: True` for the deletion or duplication of an arm, or
+`aneuploidy: True` for the deletion or duplication of a whole chromosome copy.
+Only DEL and DUP are compatible.
+
+Several aneuploid DUPs can affect the same chromosomes to increase the number of chromosome copies to an arbitrary number.
+In this case, overlap constraints will not be authorized.
+Besides, the length_ranges should not be provided or should be `[[null, null]]`.
+
+```yaml
+reference: "{path}/{to}/ref.fa"
+arms: ["/{path_to}/{arm_regions}.bed"]
+variant_sets:
+    - type: "DUP" 
+      number: 3
+      aneuploidy: True
+    - type: "DEL" 
+      number: 5
+      arm_gain_loss: True
+      arm_percent: [60, 80]
+```
+For a DUP with `aneuploidy: True`, a new chromosome copy of the chromosome `chrom` will be created and named `chrom_copy_num`,
+with `num` the number of the copy.
