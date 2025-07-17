@@ -257,7 +257,7 @@ class SVSimulator:
                 if sv.aneuploidy and sv.info['OP_TYPE'] == 'DUP':
                     orig_op = sv.operations[0]
                     operations = []
-                    for copy_num in range(sv.operations[0].transform.n_copies):
+                    for copy_num in range(orig_op.transform.n_copies):
                         # For the writing of the output, we create an operation per copy to create new chromosome copies
                         transform = Transform(
                                                 transform_type=TransformType.IDENTITY,
@@ -273,9 +273,10 @@ class SVSimulator:
                                       target_insertion_breakend=Breakend(2),
                                       placement=[Locus(chrom=region.chrom, pos=region.start),
                                                  Locus(chrom=region.chrom, pos=region.end),
-                                                 Locus(chrom=region.chrom + f'_copy_{copy_num}', pos=region.start)]
+                                                 Locus(chrom=region.chrom + f'_copy_{self.chrom_copies[region.chrom] + copy_num}', pos=region.start)]
                                       )
                         )
+                    self.chrom_copies[region.chrom] += orig_op.transform.n_copies
                     sv.operations = operations
                 else:
                     self.used_aneuploid_chrom.add(region.chrom)

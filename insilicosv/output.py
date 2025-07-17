@@ -252,9 +252,9 @@ class OutputWriter:
                         paf_records.append(paf_rec)
                     # end: for _ in range(operation.transform.n_copies):
                 # end: for operation in chrom2operations[chrom]
-
-                hap_chrom_lengths[hap_chrom] = hap_chrom_pos
-                sim_fa.write('\n')
+                if not first_seq:
+                    hap_chrom_lengths[hap_chrom] = hap_chrom_pos
+                    sim_fa.write('\n')
             # end: for chrom, chrom_length in zip(...)
         # end: with open(hap_fa, 'w') as sim_fa
         if self.config.get('output_paf', False):
