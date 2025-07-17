@@ -244,3 +244,27 @@ can be used to constrain an insertion target for instance.
 
 If an anchor constrains a dispersion, the dispersion will be intrachromosomal even if the SV is set as interchromosomal 
 (In this case, other unconstrained dispersions of the SV will then be interchromosomal). 
+
+
+### Example 5b - Inversion within segmental duplications (SDs)
+To simulate INVs that span the regions between SDs, from a BED file annotating the SD regions.
+
+First, use the `workspace/complement_bed.py` to obtain the regions within SDs.
+Then, you can simulate `INV` script to generate a BED file containing the regions outside the SDs. 
+These are the "regions within SDs" you'll use for the inversion.
+```
+python workspace/complement_bed.py --bed your_sd_regions.bed -o regions_within_SDs.bed
+```
+Then, you can configure your simulation YAML file like this to simulate INV with an exact overlap mode:
+```yaml
+reference: "{path}/{to}/ref.fa"
+overlap_regions: ["/{path_to}/{regions_within_SDs}.bed"]
+variant_sets:
+    - type: "INV"
+      number: 5
+      length_ranges: [[null, null]]
+      overlap_mode: "exact"
+      # The complement_bed.py script generates annotations of the complement type. 
+      # This type allows for distinction from other overlap regions defined in separate BED files.
+      overlap_region_type: ["complement"] 
+```
