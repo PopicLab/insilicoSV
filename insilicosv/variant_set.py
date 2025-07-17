@@ -433,16 +433,17 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             vset_cfg['length_ranges'] = [[1, 1]]
             vset_cfg['divergence_prob'] = [1.0]
         else:
-            chk('length_ranges' in vset_cfg, f'Please specify length ranges in %s' % (vset_cfg['config_descr']), error_type='syntax')
-            chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list in %s' % vset_cfg['config_descr'],
-                error_type='syntax')
-            for length_range in vset_cfg['length_ranges']:
-                chk(isinstance(length_range, str) or
-                    (isinstance(length_range, list) and len(length_range) == 2 and
-                     isinstance(length_range[0], (type(None), int, str)) and
-                     isinstance(length_range[1], (type(None), int, str))),
-                    f'invalid length_ranges. it must be a list of 2-tuples of str or int. '
-                    f'Error in %s' % vset_cfg['config_descr'], error_type='value')
+            chk('length_ranges' in vset_cfg or 'novel_insertions' in self.vset_config, f'Please specify length ranges in %s' % (vset_cfg['config_descr']), error_type='syntax')
+            if 'length_ranges' in vset_cfg:
+                chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list in %s' % vset_cfg['config_descr'],
+                    error_type='syntax')
+                for length_range in vset_cfg['length_ranges']:
+                    chk(isinstance(length_range, str) or
+                        (isinstance(length_range, list) and len(length_range) == 2 and
+                         isinstance(length_range[0], (type(None), int, str)) and
+                         isinstance(length_range[1], (type(None), int, str))),
+                        f'invalid length_ranges. it must be a list of 2-tuples of str or int. '
+                        f'Error in %s' % vset_cfg['config_descr'], error_type='value')
 
         if 'novel_insertions' in self.vset_config:
             try:
