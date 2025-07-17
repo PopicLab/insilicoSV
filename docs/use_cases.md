@@ -245,39 +245,50 @@ can be used to constrain an insertion target for instance.
 If an anchor constrains a dispersion, the dispersion will be intrachromosomal even if the SV is set as interchromosomal 
 (In this case, other unconstrained dispersions of the SV will then be interchromosomal). 
 
-### Example 7 - Placing a DEL or DUP on a chromosome arm
-Use the command `faSize -veryDetailed -tab /{path}/{to}/ref.fa > /{path}/{to}/centromeres.bed` to obtain a BED file containing 
-the centromere positions for each chromosome of your reference.
-See [this](https://open.bioqueue.org/home/knowledge/showKnowledge/sig/ucsc-fasize) for instructions to install and run faSize.
-The BED file first four columns must be: 
-- Chromosome name
-- Chromosome length
-- Beginning of the centromere
-- End of the centromere
+### Example 7 - Chromosome Gain/Loss
+This section details parameters for simulating chromosome arm gain/loss or whole chromosome aneuploidy.
 
-This BED file has to be provided in the `arms` field.
-The file does not have to contain all the chromosomes of the reference, only the ones for which we want to enable the arm gain/loss
-or aneuploidy.
+#### Arm Gain/Loss (`arm_gain_loss: True`)
+To enable the duplication or deletion of entire chromosome arms, set the `arm_gain_loss` parameter to `True`.
 
-The variant sets have to be flagged with `arm_gain_loss: True` for the deletion or duplication of an arm, or
-`aneuploidy: True` for the deletion or duplication of a whole chromosome copy.
-Only DEL and DUP are compatible.
+##### Centromere File (arms)
+- **Purpose:** A BED file containing the centromere positions for each chromosome of your reference genome. This file is required when arm_gain_loss is True.
+- **Obtaining the file:** Use the command `faSize -veryDetailed -tab /{path}/{to}/ref.fa > /{path}/{to}/centromeres.bed`. 
+Refer to [this link](https://open.bioqueue.org/home/knowledge/showKnowledge/sig/ucsc-fasize) for faSize installation and usage instructions.
+- **File Format:** The first four columns of the BED file must be:
+  - Chromosome name 
+  - Chromosome length 
+  - Beginning of the centromere (start coordinate)
+  - End of the centromere (end coordinate)
+- **Scope:** The file does not need to include all reference chromosomes; only those for which arm gain/loss is intended.
 
-Several aneuploid DUPs can affect the same chromosomes to increase the number of chromosome copies to an arbitrary number.
-In this case, overlap constraints will not be authorized.
-Besides, the length_ranges should not be provided or should be `[[null, null]]`.
+**arm_percent parameter:** specifies a range (e.g., `[60, 80]`) 
+to determine the percentage of the chromosome arm to be duplicated or deleted, starting from the arm's extremity.
+
+#### Aneuploidy (aneuploidy: True)
+**aneuploid_chrom parameter:** You may optionally provide a list of specific chromosome names (e.g., `['chr1', 'chr22']`) 
+on which aneuploidy is permitted. If this parameter is not provided, aneuploidy can occur on any chromosome in the reference.
+
+#### General Considerations
+- **Compatible SV Types:** Only DEL (Deletion) and DUP (Duplication) are compatible with arm_gain_loss and aneuploidy flags.
+- **length_ranges:** When simulating aneuploidy, length_ranges should either not be provided or be set to `[[null, null]]`.
+- **Multiple Aneuploid DUPs:** Multiple aneuploid duplications can target the same chromosomes to increase chromosome copy numbers arbitrarily. In such cases, overlap constraints will be disregarded.
+- **Heterozygous Nature:** Chromosome gain/loss and aneuploidy events are defined as heterozygous, affecting only one of the existing chromosome copies.
+- **New Chromosome Copies (DUP Aneuploidy):** For a DUP with `aneuploidy: True`, new chromosome copies will be created and named chrom_copy_num (where num is the copy number).
+  - If n_copies is not provided or set to 1, a case of trisomy (one additional chromosome copy) will be simulated.
+  - As shown in the example, `n_copies: 3` allows for the creation of three additional chromosome copies.
 
 ```yaml
 reference: "{path}/{to}/ref.fa"
-arms: ["/{path_to}/{arm_regions}.bed"]
+arms: ["/{path_to}/{arm_regions}.bed"] # Required for arm_gain_loss, but not for aneuploidy
 variant_sets:
     - type: "DUP" 
       number: 3
       aneuploidy: True
+      aneuploid_chrom: ['chr1', 'chr22']
+      n_copies: 3 # Simulates 3 additional copies for selected chromosomes
     - type: "DEL" 
       number: 5
       arm_gain_loss: True
-      arm_percent: [60, 80]
+      arm_percent: [60, 80] # Deletes 60-80% of a chromosome arm from its extremity
 ```
-For a DUP with `aneuploidy: True`, a new chromosome copy of the chromosome `chrom` will be created and named `chrom_copy_num`,
-with `num` the number of the copy.

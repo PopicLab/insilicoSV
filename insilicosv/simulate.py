@@ -16,12 +16,14 @@ import numpy as np
 from intervaltree import Interval, IntervalTree
 from pysam import FastaFile
 import yaml
+from collections import defaultdict
+from math import floor
 
 from insilicosv import utils, __version__
 from insilicosv.utils import (
     Locus, Region, RegionSet, OverlapMode, chk, error_context,
     has_duplicates, if_not_none, pairwise)
-from insilicosv.sv_defs import SV, Breakend
+from insilicosv.sv_defs import SV, Breakend, Transform, TransformType, Operation, BreakendRegion
 from insilicosv.variant_set import make_variant_set_from_config
 from insilicosv.output import OutputWriter
 
@@ -88,6 +90,8 @@ class SVSimulator:
         # Store a dict of the chr arms if any of the sv has the flag arm_gain_loss or aneuploidy
         self.arm_regions = {}
         self.chrom_copies = defaultdict(int)
+        # Chromosomes already used for aneuploidy
+        self.used_aneuploid_chrom = set()
 
     def pre_check_config(self):
         config = self.config
@@ -98,7 +102,7 @@ class SVSimulator:
             chk(k in ('reference', 'max_tries', 'max_random_breakend_tries', 'homozygous_only', 'min_intersv_dist',
                       'random_seed', 'output_no_haps', 'output_adjacencies', 'output_paf', 'output_svops_bed', 'th_proportion_N'
                       'output_paf_intersv', 'verbose', 'variant_sets', 'overlap_regions', 'blacklist_regions',
-                      'filter_small_chr'),
+                      'filter_small_chr', 'arms'),
                 f'invalid top-level config: {k}')
 
         chk(utils.is_readable_file(config['reference']), f'reference must be a readable file')
@@ -122,10 +126,13 @@ class SVSimulator:
         chr_lines = open(self.config['arms'], 'r').readlines()
         for line in chr_lines:
             fields = line.split('\t')
+            if fields[0] in self.arm_regions:
+                logger.warning(f'Duplicated chromosome {fields[0]} in the input arms BED file.'
+                               f'Only the latest occurrence will be used.')
             # Long arm
-            self.arm_regions[chrom].append(Region(chrom=fields[0], start=0, end=fields[2]))
+            self.arm_regions[fields[0]] = [Region(chrom=fields[0], start=0, end=int(fields[2]))]
             # Short arm
-            self.arm_regions[chrom].append(Region(chrom=fields[0], start=fields[3], end=fields[1]))
+            self.arm_regions[fields[0]].append(Region(chrom=fields[0], start=int(fields[3]), end=int(fields[1])))
 
     def load_rois(self):
         self.reference_regions = RegionSet.from_fasta(self.config['reference'], self.config.get('filter_small_chr', 0), region_kind='_reference_')
@@ -237,14 +244,8 @@ class SVSimulator:
                 region_padded = region.padded(self.config.get('min_intersv_dist', 1))
                 self.reference_regions.chop(region_padded)
 
+                # We remove used arms from the arm_regions
                 if self.arm_regions:
-                    # We remove used arms from the arm_regions unless the SV is a DUP with aneuploidy flag
-                    if sv.aneuploidy and sv.info['SVTYPE'] == 'DUP':
-                        self.chrom_copies[region.chrom] += 1
-                        # For the writing of the output, we create an insertion point in a new chromosome
-                        sv.operations[0].target_region = Region(chrom=region.chrom + f'_copy_{self.chrom_copies[region.chrom]}',
-                                                                start=region.start, end=region.start)
-                        continue
                     if region.chrom in self.arm_regions:
                         arm_regions = self.arm_regions[region.chrom]
                         keep_regions = []
@@ -252,6 +253,33 @@ class SVSimulator:
                             if not(arm_region.start < region.start < arm_region.end):
                                 keep_regions.append(arm_region)
                         self.arm_regions[region.chrom] = keep_regions
+
+                if sv.aneuploidy and sv.info['OP_TYPE'] == 'DUP':
+                    orig_op = sv.operations[0]
+                    operations = []
+                    for copy_num in range(sv.operations[0].transform.n_copies):
+                        # For the writing of the output, we create an operation per copy to create new chromosome copies
+                        transform = Transform(
+                                                transform_type=TransformType.IDENTITY,
+                                                is_in_place=False,
+                                                divergence_prob=orig_op.transform.divergence_prob,
+                                                n_copies=1
+                                            )
+                        operations.append(
+                            Operation(transform=transform,
+                                      op_info=orig_op.op_info,
+                                      source_breakend_region=BreakendRegion(start_breakend=Breakend(0),
+                                                                            end_breakend=Breakend(1)),
+                                      target_insertion_breakend=Breakend(2),
+                                      placement=[Locus(chrom=region.chrom, pos=region.start),
+                                                 Locus(chrom=region.chrom, pos=region.end),
+                                                 Locus(chrom=region.chrom + f'_copy_{copy_num}', pos=region.start)]
+                                      )
+                        )
+                    sv.operations = operations
+                else:
+                    self.used_aneuploid_chrom.add(region.chrom)
+
 
             if time.time() - t_last_status > 10:
                 logger.info(f'Placed {sv_num} of {len(self.svs)} SVs in {time.time()-t_start_placing:.1f}s')
@@ -628,16 +656,17 @@ class SVSimulator:
                 placement_dict[breakend + shift] = Locus(chrom=roi.chrom, pos=position)
             return placement_dict
 
-    def get_arm_region(self, aneuploidy):
+    def get_arm_region(self, sv):
         # If self.chrom_copies[chrom] > 0, the chromosome has been copied by an aneuploid DUP, it can only be used for aneuploid DUP
-        available_regions = [region for chrom, regions in self.arm_regions.items() for region in regions
-                             if not self.chrom_copies[chrom] > 0]
-        if aneuploidy:
-            available_regions = []
-            for chrom, regions in self.arm_regions.items():
-                if len(regions) == 2:
-                    if sv.info['SVTYPE'] == 'DEL' and self.chrom_copies[chrom] > 0: continue
-                    available_regions.append(Region(chrom=chrom, start=0, end=self.chrom_lengths[chrom]))
+        if not sv.aneuploidy:
+            available_regions = [region for chrom, regions in self.arm_regions.items() for region in regions
+                                 if not self.chrom_copies[chrom] > 0]
+        else:
+            available_chrom = sv.aneuploid_chrom
+            if not available_chrom:
+                available_chrom = list(self.chrom_lengths.keys())
+            available_chrom = [chrom for chrom in available_chrom if chrom not in self.used_aneuploid_chrom]
+            available_regions = [Region(chrom=chrom, start=0, end=self.chrom_lengths[chrom]) for chrom in available_chrom]
         return random.choice(available_regions)
 
     def place_sv(self, sv, roi_index):
@@ -648,10 +677,10 @@ class SVSimulator:
             sv.set_placement(placement=sv.fixed_placement, roi=None)
             return
         elif sv.arm_gain_loss or sv.aneuploidy:
-            region = self.get_arm_region(sv.aneuploidy)
+            region = self.get_arm_region(sv)
 
             # Only affect the requested arm_percent portion of the arm
-            portion_length = region.length() * sv.arm_percent / 100
+            portion_length = floor(region.length() * sv.arm_percent / 100)
             start = 0  if region.start == 0 else region.end - portion_length
             end = region.start + portion_length if region.start == 0 else region.end
             region = Region(chrom=region.chrom, start=start, end=end)

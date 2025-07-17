@@ -164,6 +164,7 @@ class SV(ABC):
     arm_gain_loss: Optional[bool] = False
     aneuploidy: Optional[bool] = False
     arm_percent: Optional[int] = 100
+    aneuploid_chrom: Optional[list[str]] = None
 
     def __post_init__(self):
         assert self.sv_id

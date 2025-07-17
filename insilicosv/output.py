@@ -119,6 +119,7 @@ class OutputWriter:
         self.svs = svs
         self.reference = reference
         self.chrom_lengths = chrom_lengths
+        self.aneuploidy_chrom_lengths = copy.deepcopy(self.chrom_lengths)
         self.output_path = output_path
         self.config = config
 
@@ -134,19 +135,16 @@ class OutputWriter:
         hap_chrom_lengths = {}
         with open(hap_fa, 'w') as sim_fa:
             chrom2operations: dict[str, list[Operation]] = self.get_chrom2operations(hap_index)
-            references = self.reference.references
-            lengths = self.reference.lengths
 
-            for chrom in chrom2operations:
+            for chrom, operations in chrom2operations.items():
                 # Add chromosome copies for aneuploidy
-                if chrom not in references:
-                    references.append(chrom)
-                    lengths.append(0)
-
-            for chrom, chrom_length in zip(references, lengths):
+                if chrom not in self.aneuploidy_chrom_lengths:
+                    self.aneuploidy_chrom_lengths[chrom] = operations[0].source_region.length()
+            for chrom, chrom_length in self.aneuploidy_chrom_lengths.items():
                 hap_str = ['hapA', 'hapB'][hap_index]
                 hap_chrom = f'{chrom}_{hap_str}'
-                sim_fa.write(f'>{hap_chrom}\n')
+
+                first_seq = True
 
                 hap_chrom_pos = 0
                 for operation in chrom2operations[chrom]:
@@ -238,6 +236,9 @@ class OutputWriter:
                                 seq = operation.transform.replacement_seq[hap_index]
                                 assert len(seq) == len(orig_seq)
                         if seq is not None:
+                            if first_seq:
+                                sim_fa.write(f'>{hap_chrom}\n')
+                                first_seq = False
                             sim_fa.write(seq)
                             hap_chrom_pos += len(seq)
 
@@ -423,9 +424,9 @@ class OutputWriter:
         vcf_path = os.path.join(self.output_path, 'sim.vcf')
         with open(vcf_path, "w") as vcf:
             vcf.write("##fileformat=VCFv4.2\n")
-            for chrm, chrm_len in zip(self.reference.references,
-                                      self.reference.lengths):
+            for chrm, chrm_len in self.aneuploidy_chrom_lengths.items():
                 vcf.write("##contig=<ID=%s,length=%d>\n" % (chrm, chrm_len))
+
             vcf.write("#%s\n" % "\t".join(["CHROM", "POS", "ID",
                                            "REF", "ALT", "QUAL", "FILTER", "INFO",
                                            "FORMAT", "SAMPLE"]))
