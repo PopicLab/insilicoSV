@@ -250,7 +250,7 @@ class SVSimulator:
                         arm_regions = self.arm_regions[region.chrom]
                         keep_regions = []
                         for arm_region in arm_regions:
-                            if not(arm_region.start < region.start < arm_region.end):
+                            if not(arm_region.start <= region.start <= arm_region.end or arm_region.start <= region.end <= arm_region.end):
                                 keep_regions.append(arm_region)
                         self.arm_regions[region.chrom] = keep_regions
 
