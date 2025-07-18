@@ -159,6 +159,9 @@ class OutputWriter:
                             operation_start = operation.source_region.start
                             # Represents the end of the operation for position_shifts
                             operation_end = operation.source_region.end
+                        if operation.overlap_position:
+                            operation_start = operation_start + operation.source_region.overlap_position
+                            operation_end = operation_start + operation.origin_length
                         # Represents the length of the sequence affected by the operation
                         operation_length = operation_end - operation_start + 1
 
@@ -488,7 +491,6 @@ class OutputWriter:
                             operation_overlap = interval_overlap.data
                             if not operation_overlap.recurrent: continue
                             # All recurrent operations overlapping with the source and happening before have to impact the target
-                            # If an operation happened on the source afterwards and is fully contained in the source, 50% chance to be on the target instead.
                             if operation.time_point> interval_overlap.time_point:
                                 inside_start = max(interval_overlap.begin, source_interval.begin)
                                 inside_end = min(interval_overlap.end, source_interval.end)
@@ -497,15 +499,6 @@ class OutputWriter:
                                                            placement=[Locus(chrom, inside_start),
                                                                       Locus(chrom, inside_end)])
                                 chrom2operations[chrom][lookup_idx].append(past_operation)
-                            elif (operation_overlap in merged_lookup) and (source_interval.begin < interval_overlap.begin < interval_overlap.end < source_interval.end):
-                                # Ulterior operation unclaimed by an inplace operation and fully contained in the source
-                                if random.randint(0, 1):
-                                    # 50% probability for the modification to only affect the source or the target
-                                    chrom2operations[chrom][lookup_idx].append(
-                                        chrom2operations[chrom][merged_lookup[operation_overlap.op_id]])
-                                    # The overlap_operation is fully contained so keeping track of operation overlaps is enough.
-                                    del merged_lookup[operation_overlap.op_id]
-
 
         # Clean up and order the operations by time point.
         for chrom in chrom2operations:

@@ -121,8 +121,9 @@ class Region:
     orig_end: int = -1
 
     # Operation the Region stems from (for overlapping with SNPs and INDELs)
-    origin_operation: Optional[Operation] = None
+    origin_length: Optional[int] = None
     overlap_position: Optional[int] = None
+    length_insertion: Optional[int] = None
 
     def __post_init__(self):
         assert self.chrom
