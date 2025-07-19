@@ -86,18 +86,30 @@ class TestObject():
 
     def get_frag(self, fasta):
         result = [fasta.fetch(ref) for ref in fasta.references]
+        print(result, fasta.references)
         return result[0] if len(result) == 1 else tuple(result)
 
     def get_actual_frag(self, return_haps='hap1'):
         # return_haps: ['hap1', 'hap2', 'both'] for control over which haplotype we check
         print('return haps', return_haps, self.hap1, self.hap2)
-        with FastaFile(self.hap1) as fasta_out_1, FastaFile(self.hap2) as fasta_out_2:
-            if return_haps == 'hap1':
-                return self.get_frag(fasta_out_1)
-            elif return_haps == 'hap2':
-                return self.get_frag(fasta_out_2)
-            else:
-                return self.get_frag(fasta_out_1), self.get_frag(fasta_out_2)
+
+        try:
+            with FastaFile(self.hap1) as fasta_out_1:
+                frags1 = self.get_frag(fasta_out_1)
+        except:
+            frags1 = ''
+        try:
+            with FastaFile(self.hap2) as fasta_out_2:
+                frags2 = self.get_frag(fasta_out_2)
+        except:
+            frags2 = ''
+
+        if return_haps == 'hap1':
+            return frags1
+        elif return_haps == 'hap2':
+            return frags2
+        else:
+            return frags1, frags2
 
 
 class TestSVSimulator(unittest.TestCase):
@@ -125,6 +137,7 @@ class TestSVSimulator(unittest.TestCase):
         self.test_overlap_bed_13 = "tests/inputs/example_overlap_events_13.bed"
         self.test_overlap_bed_14 = "tests/inputs/example_overlap_events_14.bed"
         self.test_overlap_bed_15 = "tests/inputs/example_overlap_events_15.bed"
+        self.arms = 'tests/inputs/example_arms.bed'
 
         self.test_exclude_bed = "tests/inputs/exclude.bed"
 
@@ -1443,6 +1456,81 @@ class TestSVSimulator(unittest.TestCase):
              ['GGACTC']],
         ]
 
+        self.test_arm = [
+            ["TCGATCGATCGATCGA",
+             TestObject([self.ref_file, {"chr21": "TCGATCGATCGATCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "arms": self.arms,
+                                    "random_seed": 2,
+                                    "variant_sets": [{"type": "DEL",
+                                                      "arm_gain_loss": True,
+                                                      "number": 1}]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TCGATCGATCGA", "TCGATCGA"]],
+            ["TCGATCGATCGATCGA",
+             TestObject([self.ref_file, {"chr21": "TCGATCGATCGATCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "arms": self.arms,
+                                    "random_seed": 2,
+                                    "variant_sets": [{"type": "DEL",
+                                                      "arm_percent": [25, 50],
+                                                      "arm_gain_loss": True,
+                                                      "number": 1}]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TCGATCGATCGATCGA", "GATCGATCGATCGA", "CGATCGATCGATCGA", "TCGATCGATCGA", "TCGATCGATCGATC", 'TCGATCGATCGAT']],
+            ["TCGATCGATCGATCGA",
+             TestObject([self.ref_file, {"chr21": "TCGATCGATCGATCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "arms": self.arms,
+                                    "random_seed": 2,
+                                    "variant_sets": [{"type": "DUP",
+                                                      "arm_gain_loss": True,
+                                                      "number": 1}]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TCGATCGATCGATCGATCGA", "TCGATCGATCGATCGATCGATCGA"]],
+            ["TCGATCGATCGATCGA",
+             TestObject([self.ref_file, {"chr21": "TCGATCGATCGATCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "arms": self.arms,
+                                    "random_seed": 2,
+                                    "variant_sets": [{"type": "DUP",
+                                                      "arm_percent": [25, 50],
+                                                      "arm_gain_loss": True,
+                                                      "number": 1}]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TCTCGATCGATCGATCGA", "TTCGATCGATCGATCGA", "TCGATCGATCGATCGATCGA", "TCGATCGATCGATCGAGA", "TCGATCGATCGATCGACGA"]],
+            ["TCGATCGATCGATCGA",
+             TestObject([self.ref_file, {"chr21": "TCGATCGATCGATCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    "variant_sets": [{"type": "DUP",
+                                                      "aneuploidy": True,
+                                                      "number": 1}]}],
+                        self.hap1, self.hap2, self.bed),
+             [("TCGATCGATCGATCGA", "TCGATCGATCGATCGA"), "TCGATCGATCGATCGA"]],
+            [["TCGATCGATCGATCGA", "TCGA"],
+             TestObject([self.ref_file, {"chr21": "TCGATCGATCGATCGA", "chr12": "TCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    "variant_sets": [{"type": "DEL",
+                                                      "aneuploidy": True,
+                                                      "number": 1}]}],
+                        self.hap1, self.hap2, self.bed),
+             [("TCGATCGATCGATCGA", "TCGA"), "TCGA", "TCGATCGATCGATCGA"]]
+            ,
+            [["TCGATCGATCGATCGA", "TCGA"],
+             TestObject([self.ref_file, {"chr21": "TCGATCGATCGATCGA", "chr12": "TCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    "variant_sets": [{"type": "DEL",
+                                                      "aneuploidy": True,
+                                                      "aneuploid_chrom": ['chr12'],
+                                                      "number": 1}]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TCGATCGATCGATCGA", ("TCGATCGATCGATCGA", "TCGA")]
+        ]
+    ]
+
     def tearDown(self):
         try:
             shutil.rmtree(self.test_dir)
@@ -1457,8 +1545,9 @@ class TestSVSimulator(unittest.TestCase):
         print(config.par_content)
         curr_sim = SVSimulator(config.par)
         curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref)
-        print(curr_sim.config, config.hap1, config.hap2, config.ref, config.bed)
+        print('HELPER', curr_sim.config, config.hap1, config.hap2, config.ref, config.bed)
         changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        print('HAP', changed_frag_1, changed_frag_2)
         config.remove_test_files()
         if target_frags is not None:
             statement = (changed_frag_1 in target_frags) or (changed_frag_2 in target_frags)
@@ -1804,8 +1893,8 @@ class TestSVSimulator(unittest.TestCase):
             with self.assertRaises(Exception):
                 curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref)
 
-    def test_simple_tests(self):
-        for test_num, (ref, vs_config, expected_outputs) in enumerate(self.simple_test_data):
+    def run_test(self, tests):
+        for test_num, (ref, vs_config, expected_outputs) in enumerate(tests):
             print(ref, vs_config, expected_outputs)
             # if test_num != 1: continue
             print('TEST', test_num, 'config', vs_config)
@@ -1860,6 +1949,13 @@ class TestSVSimulator(unittest.TestCase):
             print('OCCURENCES', count_occ, test_num, 'config', vs_config, expected_results)
             assert all(expected_result in results_seen for expected_result in
                        expected_results), f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
+
+
+    def test_simple_tests(self):
+        self.run_test(self.simple_test_data)
+
+    def test_simple_gain_loss(self):
+        self.run_test(self.test_arm)
 
 
 def test_inv(tmp_path):
