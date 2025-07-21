@@ -16,12 +16,14 @@ import numpy as np
 from intervaltree import Interval, IntervalTree
 from pysam import FastaFile
 import yaml
+import copy
+from collections import defaultdict
 
 from insilicosv import utils, __version__
 from insilicosv.utils import (
     Locus, Region, RegionSet, OverlapMode, chk, error_context,
     has_duplicates, if_not_none, pairwise)
-from insilicosv.sv_defs import SV, Breakend, Operation
+from insilicosv.sv_defs import SV, Breakend, Operation, TransformType
 from insilicosv.variant_set import make_variant_set_from_config
 from insilicosv.output import OutputWriter
 
@@ -80,13 +82,13 @@ class SVSimulator:
         self.rois_overlap = {}
 
         # Keep track of the SNPs and INDELS that have to be added at different time points.
-        self.recurrent_svs = dict()
+        self.recurrent_svs = {}
         self.orig_rois_overlap = {}
         self.placed_recurrent_svs = []
         # Keep track of deleted and inserted sequences for overlap with SNPs and INDELs
         self.regions_for_overlap = RegionSet()
         self.length_for_overlap = {}
-        self.length_insertions = {}
+        self.length_insertions = defaultdict(int)
         self.inserted_regions = RegionSet()
 
         self.num_svs = {}
@@ -240,9 +242,10 @@ class SVSimulator:
             chrom = operation.source_region.chrom
             operation.recurrent = sv.overlap_sv
             if operation.transform.transform_type == TransformType.DEL:
+                print('DEL OPERATION', operation)
                 op_length = operation.source_region.length()
                 op_start = operation.source_region.start
-                # Check first of an insertion region has been overlapped
+                # Check first if an insertion region has been overlapped
                 if (chrom in self.inserted_regions.chrom2itree) and self.inserted_regions.chrom2itree[chrom].overlaps(
                         Interval(op_start, op_start + op_length)):
                     insertion_overlap = list(inserted_regions.chrom2itree[chrom].overlaps(
@@ -262,10 +265,10 @@ class SVSimulator:
                             self.length_insertions[chrom] -= length_overlap
                     # Adapt the region of the DEL overlapping the reference
                     operation.source_region.end = op_start + op_length
+                print(operation.source_region)
                 self.regions_for_overlap.chop(operation.source_region)
-                self.orig_rois_overlap.chop(operation.source_region)
                 self.length_for_overlap[chrom] -= op_length
-            elif operation.novel_insertion_sequence:
+            elif operation.novel_insertion_seq:
                 # Insertion
                 length = len(operation.novel_insertion_sequence)
                 self.inserted_regions.add_region(Region(start=operation.target_region.start,
@@ -304,16 +307,15 @@ class SVSimulator:
             for sv_set, (svs, recurrence, recurrence_num) in self.recurrent_svs.items():
                 if not svs: continue
                 num_iterations = recurrence_num
-                to_place = (current_svnum % recurrence == 0)
+                to_place = (current_svnum != 0 and current_svnum % recurrence == 0) or (current_svnum == recurrence == 0)
                 if place_all or recurrence == 0:
                     # Places potential remaining recurrent SVs.
                     to_place = True
                     num_iterations = len(self.recurrent_svs[sv_set])
-                    if num_iterations > recurrence_num:
+                    if num_iterations > recurrence_num and recurrence != -1:
                         logger.warning(
-                            f'WARNING: for recurrent SVs {sv_set}, place {num_iterations} SVs at the last step instead of the requested number {self.recurrence_nums[sv_set]}. '
+                            f'WARNING: for recurrent SVs {sv_set}, place {num_iterations} SVs at the last step instead of the requested number {recurrence_num}. '
                             f'If this is not wanted, adapt the field \'recurrence_num\' to the total number of non-recurrent SVs.')
-
                 if to_place:
                     for _ in range(num_iterations):
                         if not self.recurrent_svs[sv_set]: break
@@ -438,8 +440,9 @@ class SVSimulator:
         else:
             # If enable_overlap, we look over all the regions of the chromosomes, without the deleted regions, plus the inserted regions
             breakend = random.randint(0, self.length_for_overlap[chrom] + self.length_insertions[chrom])
+            print('breakend', breakend, self.length_for_overlap[chrom] + self.length_insertions[chrom])
             if breakend > self.length_for_overlap[chrom]:
-                breakend -= length_chrom_with_dels
+                breakend -= self.length_for_overlap[chrom]
                 for idx_ins, ins in enumerate(self.inserted_regions):
                     length_insertion = ins.data.length_insertion
                     if breakend >= length_insertion:
@@ -448,7 +451,15 @@ class SVSimulator:
                     else:
                         # We insert here
                         region = Region(start=ins.begin, end=ins.begin, chrom=chrom, overlap_position=breakend, origin_length=total_length)
-                        ref_roi = source_ins
+                        ref_roi = [ins]
+                        break
+            else:
+                ref_roi = list(self.regions_for_overlap.chrom2itree[chrom].at(breakend))
+                print('ref roi', ref_roi)
+                if not ref_roi:
+                    #breakend was in a DEL region, process has to be repeated
+                    return None, None
+                region = Region(start=breakend, end=breakend, chrom=chrom, origin_length=total_length)
         return region, ref_roi[0].data
 
     def get_breakend_from_regions(self, containing_region=None, avoid_chrom=None, blacklist_regions=None,

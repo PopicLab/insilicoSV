@@ -13,8 +13,6 @@ import pysam
 from sortedcontainers import SortedSet  # type: ignore
 from copy import deepcopy
 
-from insilicosv.sv_defs import Operation
-
 logger = logging.getLogger(__name__)
 
 def if_not_none(a, b):

@@ -5,7 +5,6 @@ import os
 import os.path
 import re
 from pysam import VariantFile
-import copy
 from intervaltree import IntervalTree, Interval
 import operator
 import numpy as np
@@ -159,9 +158,9 @@ class OutputWriter:
                             operation_start = operation.source_region.start
                             # Represents the end of the operation for position_shifts
                             operation_end = operation.source_region.end
-                        if operation.overlap_position:
-                            operation_start = operation_start + operation.source_region.overlap_position
-                            operation_end = operation_start + operation.origin_length
+                            if operation.source_region.overlap_position:
+                                operation_start = operation_start + operation.source_region.overlap_position
+                                operation_end = operation_start + operation.origin_length
                         # Represents the length of the sequence affected by the operation
                         operation_length = operation_end - operation_start + 1
 
@@ -366,32 +365,84 @@ class OutputWriter:
                 adjacency_file.write('\t'.join(map(str, record)) + '\n')
 
     @staticmethod
-    def update_operation_groups(orig_operation, inside_start, inside_end, outside_start, outside_end, merged_lookup,
+    def update_operation_groups(overlap_operation, overlap_start, overlap_end, target_operation, target_start, target_end, merged_lookup,
                                 target_region2transform, chrom2operations, lookup_idx):
         # Split a recurrent operation into two operations, one inside and one outside the target interval, update the tree and lists of operations
-        chrom = orig_operation.target_region.chrom
-        operation_inside = Operation(transform=orig_operation.transform,
-                                     source_breakend_region=BreakendRegion(0, 1),
-                                     placement=[Locus(chrom, inside_start),
-                                                Locus(chrom, inside_end)],
-                                     op_id=orig_operation.op_id + 'in',
-                                     recurrent=True)
-        operation_outside = Operation(transform=orig_operation.transform,
+        chrom = overlap_operation.target_region.chrom
+        if target_start != target_end:
+            # Inplace target operation
+            inside_start = max(overlap_start, target_start)
+            inside_end = min(overlap_end, target_end)
+            inside_length = inside_end - inside_start
+
+            operation_inside = Operation(transform=overlap_operation.transform,
+                                         source_breakend_region=BreakendRegion(0, 1),
+                                         placement=[Locus(chrom, inside_start),
+                                                    Locus(chrom, inside_end)],
+                                         op_id=overlap_operation.op_id + 'in',
+                                         time_point=overlap_operation.time_point,
+                                         recurrent=True)
+        else:
+            # Insertion target
+            if overlap_operation.overlap_position:
+                # The recurrent operation was placed inside the interval
+                inside_position = overlap_operation.overlap_position
+                inside_length = min(target_operation.origin_length - inside_position, overlap_operation.origin_length)
+            else:
+                # The recurrent SV starts before the operation and overlaps it.
+                inside_position = 0
+                inside_length = min(overlap_start + overlap_operation.origin_length - target_start, target_operation.origin_length)
+            target_operation.origin_length -= inside_length
+            operation_inside = Operation(transform=overlap_operation.transform,
+                                         source_breakend_region=BreakendRegion(0, 1),
+                                         placement=[Locus(chrom, target_start),
+                                                    Locus(chrom, target_start)],
+                                         overlap_position=inside_position,
+                                         origin_length=inside_length,
+                                         time_point=overlap_operation.time_point,
+                                         op_id=overlap_operation.op_id + 'in',
+                                         recurrent=True)
+
+        operations_outside = []
+        left_length = 0
+        if overlap_start < target_start:
+            # The overlap started on the left of the target
+            left_length = target_start - overlap_start
+            aux_outside = Operation(transform=overlap_operation.transform,
                                       source_breakend_region=BreakendRegion(0, 1),
-                                      placement=[Locus(chrom, outside_start),
-                                                 Locus(chrom, outside_end)],
-                                      op_id=orig_operation.op_id + 'out',
+                                      placement=[Locus(chrom, overlap_start),
+                                                 Locus(chrom, target_start)],
+                                      op_id=overlap_operation.op_id + 'out',
+                                      time_point=overlap_operation.time_point,
                                      recurrent=True)
-        chrom2operations[chrom][merged_lookup[orig_operation.op_id]].remove(orig_operation)
-        del merged_lookup[orig_operation.op_id]
+            operations_outside.append(aux_outside)
+            # Update the tree to detect overlap with the outside operations
+            target_region2transform[chrom].add(
+                Interval(begin=overlap_start - 0.1, end=outside_end + 0.1, data=aux_outside))
+
+        if overlap_end > target_end or inside_length + left_length < overlap_operation.origin_length:
+            # The overlap started on the right or inside the target
+            remaining_length = overlap_operation.origin_length - inside_length - left_length
+            aux_outside = Operation(transform=overlap_operation.transform,
+                                                source_breakend_region=BreakendRegion(0, 1),
+                                                placement=[Locus(chrom, target_end + 1),
+                                                           Locus(chrom, target_end + remaining_length)],
+                                                op_id=overlap_operation.op_id + 'out',
+                                                time_point=overlap_operation.time_point,
+                                                recurrent=True)
+            operations_outside.append(aux_outside)
+            # Update the tree to detect overlap with the outside operations
+            target_region2transform[chrom].add(
+                Interval(begin=target_end + 1 - 0.1, end=target_end + remaining_length + 0.1, data=aux_outside))
+
+        # Update the stored operations
+        chrom2operations[chrom][merged_lookup[overlap_operation.op_id]].remove(overlap_operation)
+        del merged_lookup[overlap_operation.op_id]
+        # Merge the inside operation
         chrom2operations[chrom][lookup_idx].append(operation_inside)
         merged_lookup[operation_inside.op_id] = lookup_idx
 
-        target_region2transform[chrom].add(
-            Interval(begin=outside_start+0.1, end=outside_end-0.1, data=operation_outside))
-        target_region2transform[chrom].add(
-            Interval(begin=inside_start+0.1, end=inside_end-0.1, data=operation_inside))
-        return operation_outside
+        return operations_outside
 
     def get_chrom2operations(self, hap_index):
         """For each chromosome, make a list of operations targeting that chromosome,
@@ -420,6 +471,14 @@ class OutputWriter:
                     # Padding of the interval to be able to include points as intervals.
                     target_interval = Interval(begin=target_start-0.1, end=target_end+0.1, data=operation)
 
+                    # Initialize the length of the target available for overlap
+                    if not operation.origin_length:
+                        if operation.source_region:
+                            length = operation.source_region.length()
+                        else:
+                            length = len(operation.novel_insertion_seq)
+                        operation.origin_length = length
+
                     overlap = target_region2transform[chrom].overlap(target_interval.begin, target_interval.end)
                     if operation.is_in_place:
                         if target_region2transform[operation.target_region] and (not operation.recurrent and any(not interval.data.recurrent for interval  in overlap)):
@@ -441,46 +500,14 @@ class OutputWriter:
                         # The overlap operation is not recurrent or has been merged with a non-recurrent SV
                         if not overlap_operation.recurrent or not overlap_operation.op_id in merged_lookup: continue
 
-                        inside_start = max(overlap_start, target_start)
-                        inside_end = min(overlap_end, target_end)
-
-                        # Cut the recurrent operations to fit the target region
-                        if target_interval.begin == target_interval.end:
-                            # The recurrent operation is containing an insertion target, we decide if the right or left side will be included in the target.
-                            # 0 if left side is included, 1 if right
-                            side = np.argmin([target_start - inside_start, inside_end - target_end])
-
-                            if side:
-                                operation_outside.op_info['source_region'] = (
-                                operation_outside.source_region.start, operation_outside.source_region.end)
-                                operation_outside.op_info['side'] = 0
-                                operation.source_region.start = operation.source_region.end = target_interval.end
-                            else:
-                                operation_outside.op_info['source_region'] = (operation_outside.source_region.start, operation_outside.source_region.end)
-                                operation_outside.op_info['side'] = 1
-                                operation.source_region.start = operation.source_region.end = target_interval.end
-
-                        if not operation.recurrent and inside_start < overlap_start and inside_end == overlap_end:
-                            # the recurrent operation is on the right side, the operation outside the target region is added again to the operations to merge
-                            operation_outside = self.update_operation_groups(overlap_operation, inside_start, inside_end,
-                                                               inside_end+1, target_end, merged_lookup,
-                                                               target_region2transform, chrom2operations, lookup_idx)
-                            operations.append(operation_outside)
-
-                        elif not operation.recurrent and inside_start == overlap_start and inside_end < overlap_end:
-                            # the recurrent operation is on the left side, the operation outside the target region is added again to the operations to merge
-                            operation_outside = self.update_operation_groups(overlap_operation, inside_start, inside_end,
-                                                    target_start, inside_start-1, merged_lookup,
-                                                    target_region2transform, chrom2operations, lookup_idx)
-                            operations.append(operation_outside)
-
-                        else:
-                            # The recurrent operation is included in the target (recurrent or not)
-                            op_idx = overlap_operation.op_id
-                            chrom2operations[chrom][lookup_idx].extend(chrom2operations[chrom][merged_lookup[op_idx]])
-                            print('merging', operation, lookup_idx, op_idx, merged_lookup[op_idx], merged_lookup[operation.op_id])
-                            chrom2operations[chrom][merged_lookup[op_idx]] = []
-                            merged_lookup[op_idx] = lookup_idx
+                        # Merge the part of the overlap_operation overlapping the current target, append to the operations the remaining part
+                        outside_operations = self.update_operation_groups(overlap_operation, overlap_start, overlap_end,
+                                                                          operation,
+                                                                         target_start, target_end, merged_lookup,
+                                                                         target_region2transform, chrom2operations,
+                                                                         lookup_idx)
+                        if outside_operations:
+                            operations += outside_operations
 
                     target_region2transform[chrom].add(target_interval)
                     if not operation.is_in_place and operation.source_region:
@@ -497,7 +524,8 @@ class OutputWriter:
                                 past_operation = Operation(transform=interval_overlap.transform,
                                                            source_breakend_region=BreakendRegion(0, 1),
                                                            placement=[Locus(chrom, inside_start),
-                                                                      Locus(chrom, inside_end)])
+                                                                      Locus(chrom, inside_end)],
+                                                           time_point=interval_overlap.time_point)
                                 chrom2operations[chrom][lookup_idx].append(past_operation)
 
         # Clean up and order the operations by time point.
