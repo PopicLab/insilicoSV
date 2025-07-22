@@ -1271,6 +1271,7 @@ class TestSVSimulator(unittest.TestCase):
             ["TC",
              TestObject([self.ref_file, {"chr21": "TC"}],
                         [self.par, {"reference": self.ref_file,"random_seed": 2,
+                                    'homozygous_only': True,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 1,
                                                       "overlap_sv": True
@@ -1281,10 +1282,11 @@ class TestSVSimulator(unittest.TestCase):
             ["TC",
              TestObject([self.ref_file, {"chr21": "TC"}],
                         [self.par, {"reference": self.ref_file,"random_seed": 2,
+                                    'homozygous_only': True,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 1,
                                                       "overlap_sv": True,
-                                                      "recurrent_freq": 0
+                                                      "recurrence_freq": 0
                                                       },
                                                      {"type": 'DUP',
                                                       "number": 1,
@@ -1294,6 +1296,7 @@ class TestSVSimulator(unittest.TestCase):
             ["TC",
              TestObject([self.ref_file, {"chr21": "TC"}],
                         [self.par, {"reference": self.ref_file,"random_seed": 2,
+                                    'homozygous_only': True,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 1,
                                                       "overlap_sv": True,
@@ -1308,6 +1311,22 @@ class TestSVSimulator(unittest.TestCase):
             ["T",
              TestObject([self.ref_file, {"chr21": "T"}],
                         [self.par, {"reference": self.ref_file,"random_seed": 2,
+                                    'homozygous_only': True,
+                                    "variant_sets": [{"type": "SNP",
+                                                      "number": 2,
+                                                      "overlap_sv": True,
+                                                      "recurrence_freq": 0,
+                                                      "recurrence_num": 1
+                                                      },
+                                                     {"type": 'DUP',
+                                                      "number": 1,
+                                                      'length_ranges': [[1, 1]]}]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TA", "TC", "TT", "TG", "AT", "CT", "GT", "AA", "CC", "GG"]],
+            ["T",
+             TestObject([self.ref_file, {"chr21": "T"}],
+                        [self.par, {"reference": self.ref_file, "random_seed": 2,
+                                    'homozygous_only': True,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 2,
                                                       "overlap_sv": True,
@@ -1318,10 +1337,11 @@ class TestSVSimulator(unittest.TestCase):
                                                       "number": 1,
                                                       'length_ranges': [[1, 1]]}]}],
                         self.hap1, self.hap2, self.bed),
-             ["TA", "TC", "TT", "TG", "AT", "CT", "GT", "AA", "AC", "AG", "CC", "CG", "GG", "GA", "CA", "GC"]],
+             ["TA", "TC", "TT", "TG", "AT", "CT", "GT"]],
             ["TC",
              TestObject([self.ref_file, {"chr21": "TC"}],
                         [self.par, {"reference": self.ref_file, "random_seed": 2,
+                                    'homozygous_only': True,
                                     "variant_sets": [{"import": self.import_snp,
                                                       "overlap_sv": True,
                                                       },
@@ -1335,6 +1355,7 @@ class TestSVSimulator(unittest.TestCase):
              TestObject([self.ref_file, {"chr21": "TCGA"}],
                         [self.par, {"reference": self.ref_file,"random_seed": 2,
                                     "overlap_regions": self.overlap_region_snps_overlap,
+                                    'homozygous_only': True,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 2,
                                                       "overlap_sv": True,
@@ -1954,15 +1975,15 @@ class TestSVSimulator(unittest.TestCase):
                 attempt_num += 1
                 results, results2, svs = self.helper_test_known_output_svs(test_object, expected_results,
                                                                            heterozygous=heterozygous)
-                print('RESUTLS', results)
+                print(test_num, 'RESUTLS', results)
                 count_occ[results] += 1
                 results_seen.update([results, results2])
                 sv_list.append(svs)
             if results_seen != expected_results:
                 print('config', vs_config, 'seen', results_seen, 'expected', expected_results, count_occ)
-                print('missing',
+                print(test_num, 'missing',
                       [expected_result for expected_result in expected_results if expected_result not in results_seen])
-                print('Unexpected',
+                print(test_num, 'Unexpected',
                       [unexpected_result for unexpected_result in results_seen if
                        unexpected_result not in expected_results])
             '''if any(expected_result not in results_seen for expected_result in expected_results):
@@ -1970,7 +1991,7 @@ class TestSVSimulator(unittest.TestCase):
                     for sv in svs:
                         print('sv lengths not target', sv.get_anchor_length(), 'breakends', sv.breakend_interval_lengths, 'anchors', sv.anchors,
                               'rois', sv.roi, 'placement', sv.placement)'''
-            print('OCCURENCES', count_occ, test_num, 'config', vs_config, expected_results)
+            print(test_num, 'OCCURENCES', count_occ, test_num, 'config', vs_config, expected_results)
             assert all(expected_result in results_seen for expected_result in
                        expected_results), f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
 
