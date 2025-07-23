@@ -147,6 +147,8 @@ recorded in `blacklist_regions` will be avoided by those variants. In the above 
 which will result in none of the three deletions from being placed in any of the regions in `blacklist_regions`. 
 If `blacklist_regions` is given in BED file format, records can include a fourth column recording `type`, 
 which can then be used to filter the blacklist intervals considered for a given set of SVs.
+If `blacklist_regions` is given in VCF file format, records can include the info field `REGION_TYPE` which can then be used to filter the blacklist intervals considered for a given set of SVs.
+If `REGION_TYPE` is not provided, the name of the region will be `DEFAULT`.
 In this example, the three insertions will be placed randomly regardless of the blacklist regions as the blacklist_region_type
 is not specified.
 
