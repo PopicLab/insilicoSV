@@ -129,6 +129,7 @@ class TestSVSimulator(unittest.TestCase):
         self.import_snp = "tests/inputs/import_snp.vcf"
         self.import_inv = "tests/inputs/import_inv.vcf"
         self.overlap_region_snps_overlap = "tests/inputs/overlap_region_snps_overlap.bed"
+        self.novel_insertions_T = "tests/inputs/novel_insertions_T.txt"
 
         self.test_exclude_bed = "tests/inputs/exclude.bed"
 
@@ -1282,6 +1283,19 @@ class TestSVSimulator(unittest.TestCase):
             ["TC",
              TestObject([self.ref_file, {"chr21": "TC"}],
                         [self.par, {"reference": self.ref_file,"random_seed": 2,
+                                    "variant_sets": [{"type": "SNP",
+                                                      "number": 1,
+                                                      "overlap_sv": True,
+                                                      "recurrence_freq": 0
+                                                      },
+                                                     {"type": 'DUP',
+                                                      "number": 1,
+                                                      'length_ranges': [[2, 2]]}]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TATA", "TGTG", "TTTT", "ACAC", "GCGC", "CCCC", "TA", "TG", "TT", "AC", "TC", "GC", "CC", "TCTC"]],
+            ["TC",
+             TestObject([self.ref_file, {"chr21": "TC"}],
+                        [self.par, {"reference": self.ref_file, "random_seed": 2,
                                     'homozygous_only': True,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 1,
@@ -1307,22 +1321,37 @@ class TestSVSimulator(unittest.TestCase):
                                                       'length_ranges': [[2, 2]]}]}],
                         self.hap1, self.hap2, self.bed),
              ["TCTA", "TCTG", "TCTT", "TCAC", "TCGC", "TCCC",
-              "TACC", "TGTC", "TTTC", "ACTC", "GCTC", "CCTC"]],
-            ["T",
-             TestObject([self.ref_file, {"chr21": "T"}],
+              "TATC", "TGTC", "TTTC", "ACTC", "GCTC", "CCTC"]],
+            ["TC",
+             TestObject([self.ref_file, {"chr21": "TC"}],
                         [self.par, {"reference": self.ref_file,"random_seed": 2,
+                                    'min_intersv_dist': 0,
                                     'homozygous_only': True,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 2,
                                                       "overlap_sv": True,
-                                                      "recurrence_freq": 0,
+                                                      "recurrence_freq": 1,
                                                       "recurrence_num": 1
                                                       },
                                                      {"type": 'DUP',
-                                                      "number": 1,
+                                                      "number": 2,
                                                       'length_ranges': [[1, 1]]}]}],
                         self.hap1, self.hap2, self.bed),
-             ["TA", "TC", "TT", "TG", "AT", "CT", "GT", "AA", "CC", "GG"]],
+             ["T" + first + second + second for second in "TGA" for first in "CGA"] +
+             [first + "T" + second + second for second in "TGA" for first in "CGA"] +
+             [first + first + "C" + second for second in "TGA" for first in "CGA"] +
+             [first + first + second + "C" for second in "TGA" for first in "CGA"] +
+             [first + second + "C" + "C" for second in "CGA" for first in "CGA"] +
+             [first + "T" + second + "C" for second in "TGA" for first in "CGA"] +
+             ["T" + first + second + "C" for second in "TGA" for first in "CGA"] +
+             [first + "T" + "C" + second for second in "TGA" for first in "CGA"] +
+             ["T" + first + "C" + second for second in "TGA" for first in "CGA"] +
+             ["TT" + first + second for second in "TGA" for first in "TGA"] +
+             ["TTC" + first for first in "TCGA"] +
+             ["TT" + first + "C" for first in "TCGA"] +
+             [first + "TCC" for first in "TCGA"] +
+             ["T" + first + "CC" for first in "TCGA"]
+             ],
             ["T",
              TestObject([self.ref_file, {"chr21": "T"}],
                         [self.par, {"reference": self.ref_file, "random_seed": 2,
@@ -1973,8 +2002,12 @@ class TestSVSimulator(unittest.TestCase):
                 print("SEED", test_object.par_content["random_seed"])
 
                 attempt_num += 1
+                #try:
                 results, results2, svs = self.helper_test_known_output_svs(test_object, expected_results,
                                                                            heterozygous=heterozygous)
+                '''except Exception as e:
+                    print("IMPOSSIBLE TO PLACE: ", e)
+                    continue'''
                 print(test_num, 'RESUTLS', results)
                 count_occ[results] += 1
                 results_seen.update([results, results2])

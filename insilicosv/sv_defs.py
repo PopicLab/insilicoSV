@@ -60,7 +60,7 @@ class Operation:
     op_info: Optional[dict] = None
 
     op_id: Optional[str] = None
-    recurrent: Optional[bool] = None
+    recurrent: Optional[bool] = False
     time_point: Optional[tuple] = None
     overlap_operation: Optional['Operation'] = None
     origin_length: Optional[int] = None
@@ -90,9 +90,7 @@ class Operation:
             return Region(chrom=placement[self.target_insertion_breakend].chrom,
                           start=placement[self.target_insertion_breakend].pos,
                           end=placement[self.target_insertion_breakend].pos,
-                          order_key=self.target_insertion_order,
-                          origin_length=self.origin_length,
-                          overlap_position=self.overlap_position)
+                          order_key=self.target_insertion_order)
 
     @cached_property
     def source_region(self):

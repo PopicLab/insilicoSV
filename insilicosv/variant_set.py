@@ -240,7 +240,7 @@ class VariantSet(ABC):
                     or n_copies > 1):
                 # The letter has been involved in an operation and is not a placeholder.
                 identities_to_add[symbol] = False
-                operation = Operation(transform=transform, op_info={'SYMBOL': symbol.name})
+                operation = Operation(transform=transform, op_info={'SYMBOL': symbol.name}, recurrent=self.overlap_sv)
                 if is_in_place and not n_copies > 1:
                     operation.source_breakend_region = BreakendRegion(current_breakend - 1, current_breakend)
                 else:
@@ -776,8 +776,8 @@ class ImportedVariantSet(VariantSet):
         super().__init__(vset_config, config)
         chk(utils.is_readable_file(vset_config['import']),
             '{path} vcf must name a readable file'.format(path=vset_config['import']), error_type='file not found')
-        chk(set(vset_config.keys()) <= {'import', 'VSET'}, f'invalid config key in {vset_config}', error_type='syntax')
-
+        chk(set(vset_config.keys()) <= {'import', 'overlap_sv', 'VSET'}, f'invalid config key in {vset_config}', error_type='syntax')
+        self.overlap_sv = vset_config.get('overlap_sv', False)
         with FastaFile(config['reference']) as reference:
             self.chrom_lengths = {chrom: chrom_length
                                   for chrom, chrom_length in zip(reference.references,
@@ -816,14 +816,22 @@ class ImportedVariantSet(VariantSet):
         else:
             parsed_info['GENOTYPE'] = random.choice([(True, True), (True, False), (False, True)])
         vcf_info = dict(vcf_rec.info)
+        parsed_info['OVERLAP'] = False
         if set(''.join(vcf_rec.alleles).upper().replace(' ', '')) <= set('TCGA'):
             if len(vcf_rec.alleles[0]) == 1 and 1 <= len(vcf_rec.alleles[1]) <= 2:
                 # SNP
                 vcf_info['OP_TYPE'] = 'SNP'
                 vcf_info['SVTYPE'] = 'SNP'
+                parsed_info['OVERLAP'] = self.overlap_sv
 
         chk('OP_TYPE' in vcf_info or 'SVTYPE' in vcf_info, f'Need an SVTYPE or OP_TYPE to import from vcf records for {vcf_rec}', error_type='syntax')
         rec_type_str = vcf_info.get('OP_TYPE', 'NA')
+
+        if rec_type_str == 'INS' or rec_type_str == 'INV' or ('SVTYPE' in vcf_info and (vcf_info['SVTYPE']  == 'INS' or vcf_info['SVTYPE']  == 'INV')):
+            # Recurrent SVs are marked as such if they are of the correct type
+            parsed_info['OVERLAP'] = self.overlap_sv
+
+        parsed_info['TIME_POINT'] = vcf_info.get('TIME_POINT', 'NA')
 
         chk(rec_type_str in {variant_type for variant_type in self.can_import_types},
             f'Currently only the following VCF types are supported: {self.can_import_types} but {rec_type_str} was provided',
@@ -980,6 +988,8 @@ class ImportedVariantSet(VariantSet):
                 for operation in operations:
                     operation.op_info = additional_info
                     operation.target_insertion_order = insord
+                    operation.time_point = parsed_info['TIME_POINT']
+                    operation.recurrent = parsed_info['OVERLAP']
             else:
                 # The record is an atomic operation of a complex SV (CUT, COPY, INV...)
                 max_breakend = 1
@@ -1015,6 +1025,8 @@ class ImportedVariantSet(VariantSet):
                     operations.append(Operation(transform, source_breakend_region=source_region,
                                                 novel_insertion_seq=parsed_info['INSSEQ'],
                                                 target_insertion_breakend=op_target,
+                                                recurrent=parsed_info['OVERLAP'],
+                                                time_point=parsed_info['TIME_POINT'],
                                                 target_insertion_order=insord, op_info=additional_info))
             sv_operations.append(operations)
         # If we have more than one record we unify the breakends and their positions through the different operations

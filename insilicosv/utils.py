@@ -119,8 +119,6 @@ class Region:
     orig_end: int = -1
 
     # Operation the Region stems from (for overlapping with SNPs and INDELs)
-    origin_length: Optional[int] = None
-    overlap_position: Optional[int] = None
     length_insertion: Optional[int] = None
 
     def __post_init__(self):
@@ -331,9 +329,9 @@ def get_transformed_regions(chrom2operations):
     for chrom, operation_lists in chrom2operations.items():
         for overlapping_operations in operation_lists:
             # If there is a non-recurrent operation, its target and source regions are used, otherwise we merge the regions of the non-recurrent operations.
-            source_no_recurrent = []
-            target_no_recurrent = []
-            recurrent = False
+            source_recurrent = []
+            target_recurrent = []
+            non_recurrent = False
             for operation in overlapping_operations:
                 if not operation.recurrent:
                     source_region = operation.source_region
@@ -342,14 +340,14 @@ def get_transformed_regions(chrom2operations):
                         source_region = operation.target_region
                     source_regions[chrom].append(source_region)
                     transformed_regions[chrom].append(operation.target_region)
-                    recurrent = True
+                    non_recurrent = True
                     break
                 else:
-                    source_no_recurrent.append(operation.source_region)
-                    target_no_recurrent.append(operation.target_region)
-            if not recurrent:
-                source_regions[chrom].append(merge_regions(source_no_recurrent))
-                transformed_regions[chrom].append(merge_regions(target_no_recurrent))
+                    source_recurrent.append(operation.source_region)
+                    target_recurrent.append(operation.target_region)
+            if not non_recurrent:
+                source_regions[chrom].append(merge_regions(source_recurrent))
+                transformed_regions[chrom].append(merge_regions(target_recurrent))
     return transformed_regions, source_regions
 
 def pairwise(iterable):
