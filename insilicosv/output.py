@@ -126,15 +126,16 @@ class OutputWriter:
         self.chrom_lengths = chrom_lengths
         self.output_path = output_path
         self.config = config
+        self.homozygous_only = config.get('homozygous_only', False)
 
     def output_haps(self):
         if self.config.get('output_no_haps', False):
             logger.warning('Skipping haps output')
             return
         for hap_index, hap_fa in enumerate(['sim.hapA.fa', 'sim.hapB.fa']):
-            self.output_hap(os.path.join(self.output_path, hap_fa), hap_index, self.config.get('homozygous_only', False))
+            self.output_hap(os.path.join(self.output_path, hap_fa), hap_index)
 
-    def output_hap(self, hap_fa, hap_index, homozygous):
+    def output_hap(self, hap_fa, hap_index):
         with open(hap_fa, 'w') as sim_fa:
             chrom2operations, source_regions = self.get_chrom2operations(hap_index)
             for chrom, chrom_length in zip(self.reference.references, self.reference.lengths):
@@ -249,14 +250,17 @@ class OutputWriter:
                                     # The replacement_seq has already been defined in another copy of this operation
                                     operation.transform = operation.overlap_operation.transform
 
-                                if operation.transform.replacement_seq is None:
+                                if operation.transform.replacement_seq is None or operation.transform.replacement_seq[hap_index] is None:
                                     # Insure the haplotypes respect the genotype specified and store it for writing in the VCF
                                     replacement_seq = utils.divergence(modified_seq, operation.transform.divergence_prob)
-                                    if homozygous:
-                                        haplotypes = [replacement_seq, replacement_seq]
+                                    if not operation.transform.replacement_seq:
+                                        haplotypes = [replacement_seq if hap == hap_index else None for hap in [0, 1]]
+                                    elif not self.homozygous_only:
+                                        # The SNP can be homozygous or heterozygous with two different alleles
+                                        haplotypes = [operation.transform.replacement_seq[0], replacement_seq]
                                     else:
-                                        haplotypes = [modified_seq, modified_seq]
-                                        haplotypes[hap_index] = replacement_seq
+                                        # The SNP is homozygous
+                                        haplotypes = [operation.transform.replacement_seq[0], operation.transform.replacement_seq[0]]
                                     operation.transform = Transform(operation.transform_type,
                                                                 is_in_place=operation.transform.is_in_place,
                                                                 n_copies=operation.transform.n_copies,
@@ -403,6 +407,7 @@ class OutputWriter:
                                      overlap_operation=overlap_operation,
                                      overlap_op_id=target_operation.op_id,
                                      recurrent=True)
+
         operations_outside = []
         left_length = 0
         if overlap_start < target_start:
@@ -454,92 +459,98 @@ class OutputWriter:
         target_region2transform = defaultdict(IntervalTree)
         for sv in self.recurrent_svs + self.svs:
             # start with recurrent SVs, regular SVs are ordered by time point
-            if sv.genotype[hap_index]:
-                operations = []
-                for op_id, operation in enumerate(sv.operations):
-                    operation.op_info['SVID'] = sv.sv_id
-                    operation.recurrent = sv.overlap_sv
-                    operation.time_point = sv.time_point
-                    operations.append(operation)
-                while operations:
-                    operation = operations.pop()
-                    chrom = operation.target_region.chrom
-                    target_start = operation.target_region.start
-                    target_end = operation.target_region.end
-                    # Padding of the interval to be able to include points as intervals.
-                    target_interval = Interval(begin=target_start-0.1, end=target_end+0.1, data=operation)
+            if not sv.genotype[hap_index]: continue
 
-                    # Initialize the length of the target available for overlap
-                    if not operation.origin_length:
-                        if operation.source_region:
-                            length = operation.source_region.length()
-                        else:
-                            length = len(operation.novel_insertion_seq)
-                        operation.origin_length = length
+            operations = []
+            for op_id, operation in enumerate(sv.operations):
+                operation.op_info['SVID'] = sv.sv_id
+                operation.recurrent = sv.overlap_sv
+                operation.time_point = sv.time_point
+                operations.append(operation)
+            while operations:
+                operation = operations.pop()
+                chrom = operation.target_region.chrom
+                target_start = operation.target_region.start
+                target_end = operation.target_region.end
+                # Padding of the interval to be able to include points as intervals.
+                target_interval = Interval(begin=target_start-0.1, end=target_end+0.1, data=operation)
 
-                    overlap = target_region2transform[chrom].overlap(target_interval.begin, target_interval.end)
-                    if operation.is_in_place:
-                        if target_region2transform[operation.target_region] and (not operation.recurrent and any(not interval.data.recurrent for interval  in overlap)):
-                            # Check if there is already an inplace operation there, in which case they have to be the same
-                            assert (operation.transform in target_region2transform[operation.target_region])
-                            continue
+                # Initialize the length of the target available for overlap
+                if not operation.origin_length:
+                    if operation.source_region:
+                        length = operation.source_region.length()
+                    else:
+                        length = len(operation.novel_insertion_seq)
+                    operation.origin_length = length
 
-                    if operation.op_info is None:
-                        operation.op_info = dict()
-                    lookup_idx = len(chrom2operations[chrom])
-                    merged_lookup[operation.op_id] = lookup_idx
-                    chrom2operations[chrom].append([operation])
+                overlap = target_region2transform[chrom].overlap(target_interval.begin, target_interval.end)
+                if operation.is_in_place:
+                    if target_region2transform[operation.target_region] and (not operation.recurrent and any(not interval.data.recurrent for interval  in overlap)):
+                        # Check if there is already an inplace operation there, in which case they have to be the same
+                        assert (operation.transform in target_region2transform[operation.target_region])
+                        continue
 
-                    # Overlapping operations are stored in the same list to be applied together
-                    for overlap_interval in overlap:
-                        overlap_operation = overlap_interval.data
-                        overlap_start = overlap_interval.data.target_region.start
-                        overlap_end = overlap_interval.data.target_region.end
+                if operation.op_info is None:
+                    operation.op_info = dict()
+                lookup_idx = len(chrom2operations[chrom])
+                merged_lookup[operation.op_id] = lookup_idx
+                chrom2operations[chrom].append([operation])
 
-                        if (overlap_end == target_start) or (overlap_start == target_end and
-                                                             overlap_operation.overlap_op_id != operation.op_id): continue
+                # Overlapping operations are stored in the same list to be applied together
+                for overlap_interval in overlap:
+                    overlap_operation = overlap_interval.data
+                    overlap_start = overlap_interval.data.target_region.start
+                    overlap_end = overlap_interval.data.target_region.end
+                    if ((overlap_operation.overlap_op_id and overlap_operation.overlap_op_id != operation.op_id) or
+                        (operation.overlap_op_id and operation.overlap_op_id != overlap_operation.op_id)): continue
 
-                        # The overlap operation is not recurrent or has been merged with a non-recurrent SV
-                        if not overlap_operation.recurrent or not overlap_operation.op_id in merged_lookup: continue
-                        # Merge the part of the overlap_operation overlapping the current target, append to the operations the remaining part
-                        outside_operations = self.update_operation_groups(overlap_operation, overlap_start, overlap_end,
-                                                                          operation,
-                                                                         target_start, target_end, merged_lookup,
-                                                                         target_region2transform, chrom2operations,
-                                                                         lookup_idx)
-                        if outside_operations:
-                            operations += outside_operations
+                    if (overlap_end == target_start) or (overlap_start == target_end and
+                                                         overlap_operation.overlap_op_id != operation.op_id): continue
 
-                    target_region2transform[chrom].add(target_interval)
-                    if not operation.is_in_place and operation.source_region:
-                        # The SV is not in place and not a novel insertion, reference the source region to keep track of past and future modifications
-                        source_interval = Interval(operation.source_region.start, operation.source_region.end)
-                        overlap_source = target_region2transform[chrom].overlap(source_interval.begin, source_interval.end)
-                        for interval_overlap in overlap_source:
-                            overlap_operation = interval_overlap.data
-                            if not overlap_operation.recurrent: continue
-                            if (overlap_operation.source_region.start == operation.source_region.end or overlap_operation.source_region.end == operation.source_region.start or
-                                    (overlap_operation.overlap_op_id is not None and overlap_operation.overlap_op_id != operation.op_id)): continue
-                            # All recurrent operations overlapping with the source and happening before have to impact the target
-                            if operation.time_point > overlap_operation.time_point:
-                                # Position in the sequence
-                                inside_start = max(interval_overlap.data.source_region.start, source_interval.begin) - source_interval.begin
-                                inside_end = min(interval_overlap.data.source_region.end, source_interval.end) - source_interval.begin
-                                # The insertion position is the position in the new sequence of the target insertion
-                                past_operation = Operation(transform=overlap_operation.transform,
-                                                           source_breakend_region=BreakendRegion(0, 1),
-                                                           overlap_position=inside_start+target_start,
-                                                           origin_length=inside_end-inside_start,
-                                                           placement=[Locus(chrom, target_start),
-                                                                      Locus(chrom, target_start)],
-                                                           recurrent=overlap_operation.recurrent,
-                                                           overlap_operation=overlap_operation,
-                                                           op_id=overlap_operation.op_id,
-                                                           overlap_op_id=operation.op_id,
-                                                           time_point=overlap_operation.time_point)
-                                chrom2operations[chrom][lookup_idx].append(past_operation)
-                                target_region2transform[chrom].add(
-                                    Interval(begin=target_start - 0.1, end=target_start + 0.1, data=past_operation))
+                    # The overlap operation is not recurrent or has been merged with a non-recurrent SV
+                    if not overlap_operation.recurrent or not overlap_operation.op_id in merged_lookup: continue
+
+                    # Merge the part of the overlap_operation overlapping the current target, append to the operations the remaining part
+                    outside_operations = self.update_operation_groups(overlap_operation, overlap_start, overlap_end,
+                                                                      operation,
+                                                                     target_start, target_end, merged_lookup,
+                                                                     target_region2transform, chrom2operations,
+                                                                     lookup_idx)
+                    if outside_operations:
+                        operations += outside_operations
+
+                target_region2transform[chrom].add(target_interval)
+                if not operation.is_in_place and operation.source_region:
+                    # The SV is not in place and not a novel insertion, reference the source region to keep track of past and future modifications
+                    source_interval = Interval(operation.source_region.start, operation.source_region.end)
+                    overlap_source = target_region2transform[chrom].overlap(source_interval.begin, source_interval.end)
+                    for interval_overlap in overlap_source:
+                        overlap_operation = interval_overlap.data
+
+                        if not overlap_operation.recurrent: continue
+                        if (overlap_operation.source_region.start == operation.source_region.end or overlap_operation.source_region.end == operation.source_region.start or
+                                (overlap_operation.overlap_op_id is not None and overlap_operation.overlap_op_id != operation.op_id)): continue
+
+                        # All recurrent operations overlapping with the source and happening before have to impact the target
+                        if operation.time_point > overlap_operation.time_point:
+                            # Position in the sequence
+                            inside_start = max(interval_overlap.data.source_region.start, source_interval.begin) - source_interval.begin
+                            inside_end = min(interval_overlap.data.source_region.end, source_interval.end) - source_interval.begin
+                            # The insertion position is the position in the new sequence of the target insertion
+                            past_operation = Operation(transform=overlap_operation.transform,
+                                                       source_breakend_region=BreakendRegion(0, 1),
+                                                       overlap_position=inside_start+target_start,
+                                                       origin_length=inside_end-inside_start,
+                                                       placement=[Locus(chrom, target_start),
+                                                                  Locus(chrom, target_start)],
+                                                       recurrent=overlap_operation.recurrent,
+                                                       overlap_operation=overlap_operation,
+                                                       op_id=overlap_operation.op_id,
+                                                       overlap_op_id=operation.op_id,
+                                                       time_point=overlap_operation.time_point)
+                            chrom2operations[chrom][lookup_idx].append(past_operation)
+                            target_region2transform[chrom].add(
+                                Interval(begin=target_start - 0.1, end=target_start + 0.1, data=past_operation))
 
         # Clean up and order the operations by time point.
         for chrom in chrom2operations:
@@ -605,11 +616,13 @@ class OutputWriter:
 
             vcf_file.header.formats.add('GT', number=1, type='String', description="Genotype")
 
+            svs = sorted(self.svs + self.recurrent_svs, key=operator.attrgetter('time_point'))
+
             with closing(VariantFile(vcf_path, 'w', header=vcf_file.header)) as vcf_out_file:
 
                 vcf_records: list[dict] = []
 
-                for sv in self.svs:
+                for sv in svs:
                     vcf_records.extend(sv.to_vcf_records(self.config))
                 assert not utils.has_duplicates(vcf_rec['id'] for vcf_rec in vcf_records)
                 for vcf_rec in sorted(vcf_records, key=lambda rec: (rec['contig'], rec['start'])):
@@ -628,7 +641,7 @@ class OutputWriter:
         assert not any(c.isspace() or c == ';' for c in vcf_rec['id'])
         info = vcf_rec.get('info')
         assert isinstance(info, (type(None), dict))
-        for info_key, info_val in vcf_rec.get('info', {}).items():
+        for info_key, info_val in info.items():
             if isinstance(info_val, (str, list)):
                 for val in utils.as_list(info_val):
                     assert re.search(r'[\s;,=]', val) is None

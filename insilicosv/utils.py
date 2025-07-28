@@ -120,6 +120,7 @@ class Region:
 
     # Operation the Region stems from (for overlapping with SNPs and INDELs)
     length_insertion: Optional[int] = None
+    length_deletion: Optional[int] = None
     op_id: Optional[str] = None
 
     def __post_init__(self):
@@ -205,6 +206,13 @@ class RegionSet:
         overlap = list(self.chrom2itree[region.chrom].overlap(region.start, region.end))
         return any([(interval.begin == region.start and interval.end == region.end) for interval in overlap])
 
+    def strictly_contains_point(self, point, chrom):
+        overlap = list(self.chrom2itree[chrom].at(point))
+        for interval in overlap:
+            if interval.begin < point < interval.end:
+                return True
+        return False
+
     @staticmethod
     def from_beds(bed_paths, to_region_set, verbose=False):
         regions = []
@@ -247,14 +255,18 @@ class RegionSet:
     def from_vcf(vcf_path):
         regions = []
         with closing(pysam.VariantFile(vcf_path)) as vcf_file:
-            for vcf_rec in vcf_file:
+            for vcf_rec in vcf_file.fetch():
+                vcf_info = dict(vcf_rec.info)
+                kind = 'DEFAULT'
+                if 'REGION_TYPE' in vcf_info:
+                    kind = vcf_info['REGION_TYPE']
                 regions.append(Region(chrom=vcf_rec.chrom, start=vcf_rec.start, end=vcf_rec.stop,
-                                      orig_start=vcf_rec.start, orig_end=vcf_rec.stop))
-                if 'TARGET' in vcf_rec.info and isinstance(vcf_rec.info['TARGET'], int):
-                    target_chrom = vcf_rec.info.get('TARGET_CHROM', vcf_rec.chrom)
-                    target_start = vcf_rec.info['TARGET'] - 1
+                                      orig_start=vcf_rec.start, orig_end=vcf_rec.stop, kind=kind))
+                if 'TARGET' in vcf_info and isinstance(vcf_info['TARGET'], int):
+                    target_chrom = vcf_info.get('TARGET_CHROM', vcf_rec.chrom)
+                    target_start = vcf_info['TARGET'] - 1
                     regions.append(Region(chrom=target_chrom, start=target_start, end=target_start,
-                                          orig_start=target_start, orig_end=target_start))
+                                          orig_start=target_start, orig_end=target_start, kind=kind))
 
         return RegionSet(regions)
 
@@ -290,8 +302,7 @@ class RegionSet:
         aux_region = deepcopy(region)
         # Insertion points are empty intervals which are not supported. We add a padding.
         if aux_region.start == aux_region.end:
-            aux_region = aux_region.replace(start=max(aux_region.start - 0.5, aux_region.orig_start),
-                               end=min(aux_region.end + 0.5, aux_region.orig_end))
+            aux_region = aux_region.replace(start=aux_region.start - 0.1, end=aux_region.end + 0.1)
         self.add_region_set(RegionSet([aux_region]))
 
     def chop(self, sv_region):
