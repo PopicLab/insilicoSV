@@ -49,7 +49,9 @@ class VariantSet(ABC):
         self.overlap_kinds = utils.as_list(self.vset_config.get('overlap_region_type', 'all'))
         self.overlap_ranges = []
         self.header = []
+        print('VSET', vset_config, 'CONFIG', config)
         self.vset_config['config_descr'] = ', '.join("%s: %s" % item for item in self.vset_config.items())
+        print('DESCIRPTION', self.vset_config['config_descr'])
         self.novel_insertion_seqs = None
 
         # Overlap and recurrence information for SNPs and INDELs only
@@ -307,7 +309,6 @@ class SimulatedVariantSet(VariantSet):
 
     def __init__(self, vset_config, config):
         super().__init__(vset_config, config)
-
         chk(isinstance(vset_config.get('type'), str), f'Missing or bad variant type in {vset_config}', error_type='syntax')
         chk(isinstance(vset_config.get('number'), int) and vset_config['number'] >= 0,
             f'Missing or bad "number" of variants to generate in {vset_config}', error_type='value')
@@ -315,8 +316,9 @@ class SimulatedVariantSet(VariantSet):
         self.preprocess_config()
 
     def preprocess_config(self):
-        chk('divergence_prob' not in self.vset_config or isinstance(self.vset_config['divergence_prob'], list),
-            f'divergence_prob must be a list of floats in ]0, 1] or ranges in {self.vset_config}', error_type='value')
+        chk('divergence_prob' not in self.vset_config or isinstance(self.vset_config['divergence_prob'], (list, float, int)),
+            f'divergence_prob must be a float or an int or a list of floats in ]0, 1] or a list of ranges. But, a '
+            f'{type(self.vset_config.get('divergence_prob', []))} was provided in {self.vset_config}', error_type='value')
 
         if (self.svtype == VariantType.DUP) and ('n_copies' not in self.vset_config):
             self.vset_config['n_copies'] = [1]
@@ -401,7 +403,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         if self.svtype == VariantType.SNP:
             chk(vset_cfg.get('length_ranges') in (None, [[1, 1]]),
                 f'length_ranges for SNP can only be [[1, 1]]. Error in for {vset_cfg['config_descr']}', error_type='value')
-            chk('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] == [1],
+            chk('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] in [[1], 1],
                 f'divergence prob for SNP can only be 1. Error in {vset_cfg['config_descr']}', error_type='value')
             vset_cfg['length_ranges'] = [[1, 1]]
             vset_cfg['divergence_prob'] = [1.0]
@@ -409,13 +411,14 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             if self.overlap_sv:
                 self.recurrence_freq = vset_cfg.get('recurrence_freq', -1)
                 self.recurrence_num = vset_cfg.get('recurrence_num', vset_cfg['number'] / 100)
-                chk(self.overlap_sv or (not self.recurrence_freq), f'overlap_sv False but recurrence_freq True in {vset_cfg['config_descr']}')
+                chk(self.overlap_sv or (not self.recurrence_freq), f'overlap_sv False but recurrence_freq True in {vset_cfg['config_descr']}',
+                    error_type='value')
                 if self.recurrence_freq in [0, -1]:
                     # All SVs are place at the beginnning or the ned
                     self.recurrence_num = vset_cfg['number']
         else:
             chk(not ('overlap_sv' in vset_cfg or 'recurrence_freq' in vset_cfg or 'recurrence_num' in vset_cfg),
-                f'overlap_sv, recurrence_freq and recurrence_num are only available for SNPs and INDELs, but {vset_cfg['config_descr']}')
+                f'overlap_sv, recurrence_freq and recurrence_num are only available for SNPs and INDELs, but %s was provided' % vset_cfg['config_descr'])
             chk('length_ranges' in vset_cfg, f'Please specify length ranges for {vset_cfg['config_descr']}', error_type='syntax')
             chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list for {vset_cfg['config_descr']}',
                 error_type='syntax')
@@ -616,6 +619,8 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         novel_insertion_seqs = self.novel_insertion_seqs
         n_copies_list = self.vset_config.get('n_copies', [])
         divergence_prob_list = self.vset_config.get('divergence_prob', [])
+        if not isinstance(divergence_prob_list, list):
+            divergence_prob_list = [divergence_prob_list]
 
         sv_id = self.make_sv_id()
 
@@ -1100,14 +1105,13 @@ VARIANT_SET_CLASSES: list[Type[VariantSet]] = [
 
 
 def make_variant_set_from_config(vset_config, config) -> list[SV]:  # type: ignore
-    with error_context(vset_config, config):
-        for variant_set_class in VARIANT_SET_CLASSES:
-            if variant_set_class.can_make_from(vset_config):
-                variant_set = variant_set_class(vset_config, config)
-                return variant_set.make_variant_set(), variant_set.overlap_ranges, variant_set.overlap_kinds, \
-                       variant_set.overlap_mode, variant_set.overlap_sv, variant_set.recurrence_freq,\
-                       variant_set.recurrence_num, variant_set.header
-        chk(False, f"The format of the config or the sv_type is not supported {vset_config}")
+    for variant_set_class in VARIANT_SET_CLASSES:
+        if variant_set_class.can_make_from(vset_config):
+            variant_set = variant_set_class(vset_config, config)
+            return variant_set.make_variant_set(), variant_set.overlap_ranges, variant_set.overlap_kinds, \
+                   variant_set.overlap_mode, variant_set.overlap_sv, variant_set.recurrence_freq,\
+                   variant_set.recurrence_num, variant_set.header
+    chk(False, f"The format of the config or the sv_type is not supported {vset_config}")
 
 
 VCF_HEADER_INFOS = [

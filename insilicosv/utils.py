@@ -373,5 +373,4 @@ def error_context(*args):
     try:
         yield
     except RuntimeError as e:
-        e.args += context_messages
         raise

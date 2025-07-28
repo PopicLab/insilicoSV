@@ -291,8 +291,7 @@ class SVSimulator:
     def call_place_sv(self, sv, sv_num, sv_set, roi_indexes):
         t_start_placing_sv = time.time()
         logger.debug(f'Placing {sv_num=} {sv=}')
-        with error_context(sv.config_descr):
-            roi_indexes[sv_set] = self.place_sv(sv, roi_indexes[sv_set])
+        roi_indexes[sv_set] = self.place_sv(sv, roi_indexes[sv_set])
         logger.debug(f'Placed {sv_num=} {sv=} in {time.time() - t_start_placing_sv}s')
 
         sv.time_point = sv_num
