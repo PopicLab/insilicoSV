@@ -86,6 +86,7 @@ class SVSimulator:
         self.recurrent_svs = {}
         self.orig_rois_overlap = {}
         self.placed_recurrent_svs = []
+        self.overlap_sv = False
         # Keep track of deleted and inserted sequences for overlap with SNPs and INDELs
         self.regions_for_overlap = RegionSet()
         self.length_for_overlap = {}
@@ -157,7 +158,7 @@ class SVSimulator:
 
                 for sv_vset, sv_category in enumerate(self.overlap_ranges):
                     if self.overlap_modes[sv_vset] is None: continue
-                    if self.recurrent_svs and sv_set in self.recurrent_svs:
+                    if self.recurrent_svs and sv_vset in self.recurrent_svs:
                         overlap_sv_and_region = True
                     if roi.length() < if_not_none(self.overlap_ranges[sv_category][0], 0): continue
                     if (self.overlap_modes[sv_category] in [OverlapMode.CONTAINING, OverlapMode.EXACT] and
@@ -219,6 +220,8 @@ class SVSimulator:
             vset_svs, ranges, kinds, mode, overlap_sv, recurrence_freq, recurrence_num, header = make_variant_set_from_config(variant_set_config, self.config)
             for sv in vset_svs:
                 sv.info['VSET'] = vset_num
+                if sv.overlap_sv:
+                    self.overlap_sv = True
 
             self.overlap_ranges[vset_num] = ranges
             self.overlap_kinds[vset_num] = kinds
@@ -231,7 +234,7 @@ class SVSimulator:
         logger.info(f'Constructed {len(self.svs)} SVs')
         self.rois_overlap = {vset_num: [] for vset_num in range(len(self.config['variant_sets']))}
         # Init the regions available for overlap if necessary
-        if self.recurrent_svs:
+        if self.overlap_sv:
             self.regions_for_overlap = RegionSet([Region(start=0, end=length, chrom=chrom) for chrom, length in self.chrom_lengths.items()])
             self.length_for_overlap = copy.deepcopy(self.chrom_lengths)
         assert not has_duplicates(sv.sv_id for sv in self.svs)
@@ -272,7 +275,8 @@ class SVSimulator:
                 self.inserted_regions.add_region(Region(start=operation.target_region.start,
                                                            end=operation.target_region.start+length,
                                                            chrom=chrom,
-                                                           length_insertion=length))
+                                                           length_insertion=length,
+                                                            op_id=operation.op_id))
                 self.length_for_overlap[chrom] += length
             elif not operation.is_in_place:
                 # Duplication
@@ -280,7 +284,8 @@ class SVSimulator:
                 self.regions_for_overlap.add_region(Region(start=operation.target_region.start,
                                                            end=operation.target_region.start+length,
                                                            chrom=operation.source_region.chrom,
-                                                           length_insertion=length))
+                                                           length_insertion=length,
+                                                            op_id=operation.op_id))
                 self.length_for_overlap[chrom] += length
 
     def call_place_sv(self, sv, sv_num, sv_set, roi_indexes):
@@ -291,16 +296,16 @@ class SVSimulator:
         logger.debug(f'Placed {sv_num=} {sv=} in {time.time() - t_start_placing_sv}s')
 
         sv.time_point = sv_num
-        if (not self.recurrent_svs) or (not sv_set in self.recurrent_svs):
+        if not sv.overlap_sv:
             for region in sv.get_regions():
                 region_padded = region.padded(self.config.get('min_intersv_dist', MIN_INTERSV_DIST))
                 self.reference_regions.chop(region_padded)
 
-        if self.recurrent_svs:
+        if self.overlap_sv:
             self.update_regions_for_overlap(sv)
 
     def place_recurrent_sv(self, current_svnum, roi_indexes, place_all=False):
-        if self.recurrent_svs:
+        if self.overlap_sv:
             counter_recurrent = 0
             for sv_set, (svs, recurrence, recurrence_num) in self.recurrent_svs.items():
                 if not svs: continue
@@ -309,7 +314,7 @@ class SVSimulator:
                 if place_all or recurrence == 0:
                     # Places potential remaining recurrent SVs.
                     to_place = True
-                    num_iterations = len(self.recurrent_svs[sv_set])
+                    num_iterations = len(svs)
                     if num_iterations > recurrence_num and recurrence != -1 and recurrence != 0:
                         logger.warning(
                             f'WARNING: for recurrent SVs {sv_set}, place {num_iterations} SVs at the last step instead of the requested number {recurrence_num}. '
@@ -452,6 +457,7 @@ class SVSimulator:
                 region = Region(start=ref_roi.begin, end=ref_roi.begin, chrom=chrom)
                 operation.overlap_position = breakend
                 operation.origin_length = total_length
+                operation.overlap_op_id = ref_roi.data.op_id
             else:
                 # Breakend in an original sequence
                 region = Region(start=breakend, end=breakend, chrom=chrom)
@@ -532,6 +538,7 @@ class SVSimulator:
                                                                               overlap_mode, enable_overlap=enable_overlap)
                         if valid_region is not None:
                             return valid_region, ref_roi.data, roi_index
+
             valid_region, ref_roi = self.check_interval_overlap(region, roi_filter, anchor_length, overlap_mode, enable_overlap=enable_overlap)
             if valid_region is not None:
                 return valid_region, ref_roi.data, roi_index
@@ -777,7 +784,7 @@ class SVSimulator:
                                                       enable_overlap=enable_overlap)
                 if roi is None or ref_roi is None:
                     chk(False, f'No available ROI satisfying the constraints for {sv}' +
-                        f'of anchor length {sv.get_anchor_length()}'*(sv.get_anchor_length() is not None))
+                        f' of anchor length {sv.get_anchor_length()}'*(sv.get_anchor_length() is not None))
                 anchor_start = sv.anchor.start_breakend
                 anchor_end = sv.anchor.end_breakend
                 roi, ref_roi = (

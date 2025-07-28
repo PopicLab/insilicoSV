@@ -117,7 +117,7 @@ class VariantSet(ABC):
 
     def grammar_to_variant_set(self, lhs_strs, rhs_strs, symbol_lengths, symbol_min_lengths, num_letters,
                                novel_insertion_seqs,
-                               n_copies_list, divergence_prob_list, replacement_seq=None, vset_config=None,):
+                               n_copies_list, divergence_prob_list, sv_id='', replacement_seq=None, vset_config=None,):
         #
         # Parse the LHS strings into Symbols, and RHS strings into RHSItems.
         # Create unique Symbols for dispersions.
@@ -268,6 +268,7 @@ class VariantSet(ABC):
                                     length=symbol_lengths[len(lhs) - len(lhs_dispersion) + len(novel_insertions)])
                             novel_insertions[symbol] = novel_insertion
                         operation.novel_insertion_seq = novel_insertions[symbol]
+                operation.op_id = sv_id + '_' + str(len(operations))
                 operations.append(operation)
         # Add the deletions
         for letter, delete in delete_letters.items():
@@ -279,6 +280,7 @@ class VariantSet(ABC):
                 transform = Transform(transform_type=TransformType.DEL, is_in_place=True)
                 operation = Operation(transform=transform, op_info={'SYMBOL': letter.name})
                 operation.source_breakend_region = BreakendRegion(source_index, source_index + 1)
+                operation.op_id = sv_id + '_' + str(len(operations))
                 operations.append(operation)
         # Add the identities for place holder letters
         for letter, identity in identities_to_add.items():
@@ -288,6 +290,7 @@ class VariantSet(ABC):
                 transform = Transform(transform_type=TransformType.IDENTITY, is_in_place=True)
                 operation = Operation(transform=transform, op_info={'SYMBOL': letter.name})
                 operation.source_breakend_region = BreakendRegion(source_index, source_index + 1)
+                operation.op_id = sv_id + '_' + str(len(operations))
                 operations.append(operation)
         chk(len(lhs_dispersion) == n_dispersions_rhs, f'Dispersions cannot be altered, the same dispersions must '
                                                       f'be present on the left and right sides. lhs: {len(lhs_dispersion)} dispersions,'
@@ -614,18 +617,21 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         n_copies_list = self.vset_config.get('n_copies', [])
         divergence_prob_list = self.vset_config.get('divergence_prob', [])
 
+        sv_id = self.make_sv_id()
+
         # Build the different operations and anchor, determine the breakends and the distance between them.
         (operations, anchor, dispersions, breakend_interval_lengths,
          breakend_interval_min_lengths) = self.grammar_to_variant_set(lhs_strs, rhs_strs, symbol_lengths,
                                                                       symbol_min_lengths, len(letters),
                                                                       novel_insertion_seqs, n_copies_list,
-                                                                      divergence_prob_list, vset_config=self.vset_config)
+                                                                      divergence_prob_list, sv_id=sv_id,
+                                                                      vset_config=self.vset_config)
         #
         # construct the SV object
         #
         info = self.construct_info(lhs_strs, rhs_strs)
         roi_filter = self.get_roi_filter()
-        return BaseSV(sv_id=self.make_sv_id(),
+        return BaseSV(sv_id=sv_id,
                       breakend_interval_lengths=breakend_interval_lengths,
                       breakend_interval_min_lengths=breakend_interval_min_lengths,
                       is_interchromosomal=self.is_interchromosomal,
@@ -827,12 +833,6 @@ class ImportedVariantSet(VariantSet):
         chk('OP_TYPE' in vcf_info or 'SVTYPE' in vcf_info, f'Need an SVTYPE or OP_TYPE to import from vcf records for {vcf_rec}', error_type='syntax')
         rec_type_str = vcf_info.get('OP_TYPE', 'NA')
 
-        if rec_type_str == 'INS' or rec_type_str == 'INV' or ('SVTYPE' in vcf_info and (vcf_info['SVTYPE']  == 'INS' or vcf_info['SVTYPE']  == 'INV')):
-            # Recurrent SVs are marked as such if they are of the correct type
-            parsed_info['OVERLAP'] = self.overlap_sv
-
-        parsed_info['TIME_POINT'] = vcf_info.get('TIME_POINT', 'NA')
-
         chk(rec_type_str in {variant_type for variant_type in self.can_import_types},
             f'Currently only the following VCF types are supported: {self.can_import_types} but {rec_type_str} was provided',
             error_type='syntax')
@@ -852,6 +852,16 @@ class ImportedVariantSet(VariantSet):
             rec_len = rec_end.pos - rec_start.pos
         parsed_info['END'] = rec_end
         parsed_info['SVLEN'] = rec_len
+
+        if rec_len <= 50 and (rec_type_str == 'INS' or rec_type_str == 'INV' or
+                              ('SVTYPE' in vcf_info and (vcf_info['SVTYPE']  == 'INS' or vcf_info['SVTYPE']  == 'INV'))):
+            # Overlapping INDELS
+            parsed_info['OVERLAP'] = self.overlap_sv
+
+        parsed_info['TIME_POINT'] = vcf_info.get('TIME_POINT', 'NA')
+        if self.overlap_mode and not parsed_info['TIME_POINT']:
+            logging.warning('Imported SVs with overlap_sv TRUE but the TIME_POINT is not specified in the VCF, the order'
+                            f'of insertion will be th order of the records: {vcf_rec}')
 
         rec_target = None
         is_interchromosomal = False
@@ -891,7 +901,7 @@ class ImportedVariantSet(VariantSet):
             if vcf_rec.alts[0] != '<SNP>':
                 parsed_info['ALT'] = vcf_rec.alts
                 if len(vcf_rec.alts) == 1:
-                    parsed_info['ALT'] = [None]*parsed_info['GENOTYPE'][0] + [vcf_rec.alts[0]] + [None]*parsed_info['GENOTYPE'][1]
+                    parsed_info['ALT'] = [vcf_rec.alts[0] if parsed_info['GENOTYPE'][hap_idx] else None for hap_idx in range(2)]
             if vcf_rec.ref != 'N':
                 parsed_info['REF'] = vcf_rec.ref[0]
         additional_info = {}
@@ -915,7 +925,7 @@ class ImportedVariantSet(VariantSet):
         parent_info = {'SVID': parent_id}
         positions_per_rec = []
         current_insord = 0
-
+        sv_id = 'Imported_' + str(parent_id)
         # Extract the info of all the records of the SV to determine the breakends and placement.
         for vcf_rec in sv_recs:
             parsed_info, additional_info = self.parse_vcf_rec_info(vcf_rec)
@@ -984,6 +994,7 @@ class ImportedVariantSet(VariantSet):
                                                                      symbol_min_lengths, 1,
                                                                      parsed_info['INSSEQ'], [parsed_info['NCOPIES']],
                                                                      parsed_info['DIVERGENCEPROB'],
+                                                                     sv_id =sv_id,
                                                                      replacement_seq=parsed_info['ALT'], vset_config=vcf_rec)
                 for operation in operations:
                     operation.op_info = additional_info
@@ -1027,6 +1038,7 @@ class ImportedVariantSet(VariantSet):
                                                 target_insertion_breakend=op_target,
                                                 recurrent=parsed_info['OVERLAP'],
                                                 time_point=parsed_info['TIME_POINT'],
+                                                op_id=sv_id + '_' + str(len(operations)),
                                                 target_insertion_order=insord, op_info=additional_info))
             sv_operations.append(operations)
         # If we have more than one record we unify the breakends and their positions through the different operations
@@ -1058,13 +1070,13 @@ class ImportedVariantSet(VariantSet):
             # There is a single record
             sv_operations = sv_operations[0]
             placements = positions_per_rec[0]
-        sv_id = 'Imported_' + str(parent_id)
         return BaseSV(sv_id=sv_id,
                       breakend_interval_lengths=[None] * (len(placements) - 1),
                       # Positions are known, the lengths are not needed
                       breakend_interval_min_lengths=[None] * (len(placements) - 1),
                       is_interchromosomal=None,  # The target chromosome is already known from the fixed_placement
                       operations=sv_operations,
+                      overlap_sv=self.overlap_sv,
                       fixed_placement=placements,
                       overlap_mode=None,
                       anchor=None,

@@ -141,20 +141,15 @@ class OutputWriter:
                 hap_str = ['hapA', 'hapB'][hap_index]
                 hap_chrom = f'{chrom}_{hap_str}'
                 sim_fa.write(f'>{hap_chrom}\n')
-                #print('ALL opperations', chrom2operations[chrom])
                 for overlapping_operations, sv_source in zip(chrom2operations[chrom], source_regions[chrom]):
-                    #print('overlapping operations', overlapping_operations)
-                    print('SV source', sv_source)
                     seq = self.reference.fetch(
                                             reference=sv_source.chrom,
                                             start=sv_source.start,
                                             end=sv_source.end)
-                    print('INIT SEQ', seq)
                     position_shifts = []
                     # To change the position referential and find the start index of the operation in seq
-                    relative_position = sv_source.start
                     for operation in overlapping_operations:
-                        print('OPERATION', operation)
+                        relative_position = sv_source.start
                         n_copies = operation.transform.n_copies
                         if operation.motif is not None:
                             # In the trEXP case the number of copies is encoded in the motif
@@ -166,14 +161,11 @@ class OutputWriter:
                             # Represents the end of the operation for position_shifts
                             operation_end = operation.source_region.end
                         if operation.overlap_position is not None:
-                            print('init pos', sv_source.start, operation.overlap_position)
                             relative_position = target_start
                             operation_start = operation.overlap_position
                             operation_end = operation_start + operation.origin_length
-                            print('OVERLAP POSITION FINDER', operation_start, operation_end)
                         # Represents the length of the sequence affected by the operation
                         operation_length = operation_end - operation_start
-                        print('init length', operation_length, operation_start, operation_end, operation.source_region.end, operation.origin_length)
 
                         total_shift = 0
 
@@ -221,7 +213,6 @@ class OutputWriter:
                             position_shifts.insert(idx, ('DEL', operation_start, operation_end - operation_start))
                             start_in_region = operation_start - sv_source.start
                             seq = seq[:start_in_region+total_shift] + seq[start_in_region+operation_length+total_shift:]
-                            print('DEL: SHIFTED seq', seq)
                         else:
                             # The operation is not a DEL
                             # Position of the operation inside the sequence
@@ -242,7 +233,6 @@ class OutputWriter:
                                 position_shifts.insert(idx, ('INS', operation_start, len(operation.novel_insertion_seq)))
 
                             # Modify the sequence
-                            print('slice to modify', operation_start, operation_start + operation_length)
                             operation_start = operation_start + total_shift
                             modified_seq = seq[operation_start:operation_start+operation_length]
 
@@ -253,9 +243,8 @@ class OutputWriter:
                             if n_copies > 1:
                                 modified_seq = modified_seq * n_copies
 
-                            if operation.transform.divergence_prob > 0:
+                            if operation.transform.divergence_prob > 0 or operation.transform.replacement_seq:
                                 # There is a divergence
-                                print('replacement seq', operation.transform.replacement_seq, 'orig modified, seq', modified_seq, 'hap index', hap_index)
                                 if operation.overlap_operation and operation.overlap_operation.transform.replacement_seq:
                                     # The replacement_seq has already been defined in another copy of this operation
                                     operation.transform = operation.overlap_operation.transform
@@ -277,11 +266,7 @@ class OutputWriter:
                                         # Ensure the original transformation is the same, so both haplotypes will have the same replacement_seq
                                         operation.overlap_operation.transform = operation.transform
                                 modified_seq = operation.transform.replacement_seq[hap_index]
-                                print('MODIFIED SEQ, SNP', modified_seq)
-                            print('REUNITE seq', seq, operation_start, operation_length, seq[:operation_start],
-                                  seq[operation_start + operation_length:], 'end', seq[:operation_start] + modified_seq + seq[operation_start + operation_length:])
                             seq = seq[:operation_start] + modified_seq + seq[operation_start + operation_length:]
-                    print('SEQ', seq)
                     if seq:
                         sim_fa.write(seq)
                 sim_fa.write('\n')
@@ -407,7 +392,6 @@ class OutputWriter:
             if overlap_operation.transform.transform_type == TransformType.DEL:
                 # If the overlapping operation is a DEL we update the length of the insertion region for future overlap
                 target_operation.origin_length -= inside_length
-        print('INSIDE LENGTH', target_operation.origin_length, inside_length, inside_position)
         operation_inside = Operation(transform=overlap_operation.transform,
                                      source_breakend_region=BreakendRegion(0, 1),
                                      placement=[Locus(chrom, inside_start),
@@ -417,6 +401,7 @@ class OutputWriter:
                                      time_point=overlap_operation.time_point,
                                      op_id=overlap_operation.op_id + 'in',
                                      overlap_operation=overlap_operation,
+                                     overlap_op_id=target_operation.op_id,
                                      recurrent=True)
         operations_outside = []
         left_length = 0
@@ -429,10 +414,11 @@ class OutputWriter:
                                                  Locus(chrom, target_start)],
                                       op_id=overlap_operation.op_id + 'out_L',
                                       time_point=overlap_operation.time_point,
+                                      overlap_op_id=target_operation.op_id,
                                       overlap_operation=overlap_operation,
-                                     recurrent=True)
+                                    recurrent=True)
             operations_outside.append(aux_outside)
-        print('Before OVERLAP right', overlap_end > target_end or inside_length + left_length < overlap_operation.origin_length, inside_length, left_length, overlap_operation.origin_length)
+
         if overlap_end > target_end and inside_length + left_length < overlap_operation.origin_length:
             # The overlap started on the right or inside the target
             remaining_length = overlap_operation.origin_length - inside_length - left_length
@@ -443,6 +429,7 @@ class OutputWriter:
                                                 op_id=overlap_operation.op_id + 'out_R',
                                                 time_point=overlap_operation.time_point,
                                                 overlap_operation=overlap_operation,
+                                                overlap_op_id=target_operation.op_id,
                                                 recurrent=True)
             operations_outside.append(aux_outside)
 
@@ -467,20 +454,15 @@ class OutputWriter:
         target_region2transform = defaultdict(IntervalTree)
         for sv in self.recurrent_svs + self.svs:
             # start with recurrent SVs, regular SVs are ordered by time point
-            #print('SV', sv, sv.genotype[hap_index])
             if sv.genotype[hap_index]:
-                print('GENOTYPE', sv, hap_index, sv.genotype[hap_index])
                 operations = []
                 for op_id, operation in enumerate(sv.operations):
                     operation.op_info['SVID'] = sv.sv_id
                     operation.recurrent = sv.overlap_sv
                     operation.time_point = sv.time_point
-                    operation.op_id = str(sv.sv_id) + '_' + str(op_id)
                     operations.append(operation)
-                print('OPERATIONS', operations)
                 while operations:
                     operation = operations.pop()
-                    print('NEW operation', operation)
                     chrom = operation.target_region.chrom
                     target_start = operation.target_region.start
                     target_end = operation.target_region.end
@@ -494,7 +476,6 @@ class OutputWriter:
                         else:
                             length = len(operation.novel_insertion_seq)
                         operation.origin_length = length
-                        print('def origin', operation.origin_length)
 
                     overlap = target_region2transform[chrom].overlap(target_interval.begin, target_interval.end)
                     if operation.is_in_place:
@@ -515,11 +496,11 @@ class OutputWriter:
                         overlap_start = overlap_interval.data.target_region.start
                         overlap_end = overlap_interval.data.target_region.end
 
-                        if (overlap_end == target_start) or (overlap_start == target_end and overlap_operation.overlap_position is None): continue
+                        if (overlap_end == target_start) or (overlap_start == target_end and
+                                                             overlap_operation.overlap_op_id != operation.op_id): continue
 
                         # The overlap operation is not recurrent or has been merged with a non-recurrent SV
                         if not overlap_operation.recurrent or not overlap_operation.op_id in merged_lookup: continue
-                        #print('overlapped', overlap_operation)
                         # Merge the part of the overlap_operation overlapping the current target, append to the operations the remaining part
                         outside_operations = self.update_operation_groups(overlap_operation, overlap_start, overlap_end,
                                                                           operation,
@@ -537,14 +518,13 @@ class OutputWriter:
                         for interval_overlap in overlap_source:
                             overlap_operation = interval_overlap.data
                             if not overlap_operation.recurrent: continue
-                            if (overlap_operation.source_region.start == operation.source_region.end or
-                                    overlap_operation.source_region.end == operation.source_region.start): continue
+                            if (overlap_operation.source_region.start == operation.source_region.end or overlap_operation.source_region.end == operation.source_region.start or
+                                    (overlap_operation.overlap_op_id is not None and overlap_operation.overlap_op_id != operation.op_id)): continue
                             # All recurrent operations overlapping with the source and happening before have to impact the target
                             if operation.time_point > overlap_operation.time_point:
                                 # Position in the sequence
                                 inside_start = max(interval_overlap.data.source_region.start, source_interval.begin) - source_interval.begin
                                 inside_end = min(interval_overlap.data.source_region.end, source_interval.end) - source_interval.begin
-                                print('TIME POINT', operation, overlap_operation, inside_start, inside_end, target_start)
                                 # The insertion position is the position in the new sequence of the target insertion
                                 past_operation = Operation(transform=overlap_operation.transform,
                                                            source_breakend_region=BreakendRegion(0, 1),
@@ -554,6 +534,8 @@ class OutputWriter:
                                                                       Locus(chrom, target_start)],
                                                            recurrent=overlap_operation.recurrent,
                                                            overlap_operation=overlap_operation,
+                                                           op_id=overlap_operation.op_id,
+                                                           overlap_op_id=operation.op_id,
                                                            time_point=overlap_operation.time_point)
                                 chrom2operations[chrom][lookup_idx].append(past_operation)
                                 target_region2transform[chrom].add(
@@ -579,9 +561,10 @@ class OutputWriter:
                 transform=Transform(transform_type=TransformType.IDENTITY,
                                     is_in_place=True),
                 source_breakend_region=BreakendRegion(0,1),
+                op_id='identity_' + str(idx),
                 placement=[Locus(chrom, target_region.start),
                            Locus(chrom, target_region.end)])]
-                for target_region in unchanged_regions]
+                for idx, target_region in enumerate(unchanged_regions)]
 
             transformed_regions[chrom].extend(unchanged_regions)
             source_regions[chrom].extend(unchanged_regions)
@@ -590,7 +573,6 @@ class OutputWriter:
             regions_order_idx = np.argsort(transformed_regions[chrom])
             chrom2operations[chrom] = [chrom2operations[chrom][idx] for idx in regions_order_idx]
             source_regions[chrom] = [source_regions[chrom][idx] for idx in regions_order_idx]
-        #print('OPER, SOURCES', chrom2operations, source_regions)
         return chrom2operations, source_regions
 
     def output_novel_insertions(self):

@@ -65,6 +65,7 @@ class Operation:
     overlap_operation: Optional['Operation'] = None
     origin_length: Optional[int] = None
     overlap_position: Optional[int] = None
+    overlap_op_id: Optional[str] = None
 
     motif: Optional[str] = None
 

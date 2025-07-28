@@ -1357,34 +1357,33 @@ class TestSVSimulator(unittest.TestCase):
                         [self.par, {"reference": self.ref_file, "random_seed": 2,
                                     'homozygous_only': True,
                                     "variant_sets": [{"type": "SNP",
-                                                      "number": 2,
+                                                      "number": 1,
                                                       "overlap_sv": True,
-                                                      "recurrence_freq": 1,
+                                                      "recurrence_freq": -1,
                                                       "recurrence_num": 1
                                                       },
                                                      {"type": 'DUP',
                                                       "number": 1,
                                                       'length_ranges': [[1, 1]]}]}],
                         self.hap1, self.hap2, self.bed),
-             ["TA", "TC", "TT", "TG", "AT", "CT", "GT"]],
+             ["TA", "TG", 'TC', "AT", 'CT', 'GT']],
             ["TC",
              TestObject([self.ref_file, {"chr21": "TC"}],
                         [self.par, {"reference": self.ref_file, "random_seed": 2,
-                                    'homozygous_only': True,
                                     "variant_sets": [{"import": self.import_snp,
                                                       "overlap_sv": True,
                                                       },
                                                      {"type": 'DUP',
                                                       "number": 1,
-                                                      "homozygous_only": True,
                                                       'length_ranges': [[2, 2]]}]}],
                         self.hap1, self.hap2, self.bed),
-             [("TATA", "TCTC")]],
-            ["TC",
-             TestObject([self.ref_file, {"chr21": "TCGA"}],
+             ["TATA", "TCTC"]],
+            ["TCGAT",
+             TestObject([self.ref_file, {"chr21": "TCGAT"}],
                         [self.par, {"reference": self.ref_file,"random_seed": 2,
                                     "overlap_regions": self.overlap_region_snps_overlap,
                                     'homozygous_only': True,
+                                    "min_intersv_dist": 0,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 2,
                                                       "overlap_sv": True,
@@ -1396,14 +1395,37 @@ class TestSVSimulator(unittest.TestCase):
                                                       "number": 2,
                                                       'length_ranges': [[2, 2]]}]}],
                         self.hap1, self.hap2, self.bed),
-             ["TCT" + x + y + "AGA" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C']] + ['TCTCGAGA'] +
-              ["T"+x+"TC"+ y + "AGA" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C'] ] +
-             ["T"+x+"TCGA"+ y + "A" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C'] ] +
-             ["TCT"+x+"GA"+ y + "A" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C'] ] +
-             ["T"+x+"T" + x + y + "AGA" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C']] +
-             ["TCT" + x + y + "A"+ y + "A" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C']] +
-             ["T"+x+"T"+x+"GA"+ y + "A" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C'] ] +
-             ["T"+x+"TC"+ y + "AA"+ y + "A" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C'] ] ],
+             ["T" + x + "TC" + y + "AGAT" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C']] +
+             ['TCTCGAGAT'] +
+             ["T"+x+"T" + x + y + "AGAT" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C']] +
+             ["T"+x+"TC"+ y + "A"+ y + "AT" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C'] ] +
+
+             ["T" + x + "TCGAGAT" for x in ['A', 'T', 'G', 'C']] +
+             ["T" + x + "T" + y + "GAGAT" for x in ['A', 'T', 'G', 'C'] for y in ['A', 'T', 'G', "C"] if x != y] +
+             ["TCTC" + x + "A" + y + "AT" for y in ['A', 'T', 'C', 'G'] for x in ['A', 'T', 'G', "C"] if x != y] +
+             ["TCTC" + y + "A" + x + "AT" for y in ['A', 'T', 'C', 'G'] for x in ['A', 'T', 'C', 'G'] if x != y] +
+             ["TCTC" + y + "AGAT" for y in ['A', 'T', 'C', 'G']] +
+
+             ["T" + x + "TC" + y + "ATAT" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C']] +
+             ["T" + x + "T" + x + y + "ATAT" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C']] +
+             ["T" + x + "TCGATAT" for x in ['A', 'T', 'G', 'C']] +
+             ["TCTC" + y + "ATAT" for y in ['A', 'T', 'C', 'G']] +
+
+             ["T" + x + y + x + "GATAT" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C']] +
+             ["T" + x + 'G' + y + 'G' + "ATAT" for x in ['A', 'T', 'G', 'C'] for y in ['A', 'T', 'G', 'C'] if x != y] +
+             ["T" + x + 'GCG' + "ATAT" for x in ['A', 'T', 'G', "C"]] +
+             ["T" + x + 'G' + y + "GATAT" for x in ['A', 'T', 'G', "C"] for y in ['A', 'T', 'G', "C"] if x != y] +
+             ["T" + y + 'G' + x + "GATAT" for x in ['A', 'T', 'G', "C"] for y in ['A', 'T', 'G', "C"] if x != y] +
+             ["TC" + x + 'CG' + "ATAT" for x in ['A', 'T', 'G', "C"]] +
+             ["TCGC" + x + "ATAT" for x in ['A', 'T', 'G', "C"]] +
+             ["TCG" + x + "GATAT" for x in ['A', 'T', 'G', "C"]] +
+             ["TC" + y + 'C' + x + "ATAT" for x in ['A', 'T', 'G', "C"]  for y in ['A', 'T', 'G', "C"] if x != y] +
+             ["T" + x + y + 'C' + y + "ATAT" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C']] +
+             ["T" + x + y + "CGATAT" for x in ['A', 'T', 'G'] for y in ['A', 'T', 'C']] +
+             ["TC" + x + 'C' + y + "ATAT" for x in ['A', 'T', 'C'] for y in ['A', 'T', 'C'] if x != y] +
+             ["T" + y + "T" + x + "GATAT" for x in ['A', 'T', 'G']  for y in['A', 'T', 'G', "C"] if x != y] +
+             ["T" + y + "T" + x + "GATAT" for x in ['A', 'T', 'G', 'C'] for y in ['A', 'T', 'G'] if x != y]
+             ],
             ]
 
         self.simple_test_data = [
