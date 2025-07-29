@@ -127,9 +127,9 @@ class OutputWriter:
             logger.warning('Skipping haps output')
             return
         for hap_index, hap_fa in enumerate(['sim.hapA.fa', 'sim.hapB.fa']):
-            self.output_hap(os.path.join(self.output_path, hap_fa), hap_index, self.config.get('homozygous_only', False))
+            self.output_hap(os.path.join(self.output_path, hap_fa), hap_index)
 
-    def output_hap(self, hap_fa, hap_index, homozygous):
+    def output_hap(self, hap_fa, hap_index):
         paf_records = []
         hap_chrom_lengths = {}
         with open(hap_fa, 'w') as sim_fa:
@@ -211,16 +211,13 @@ class OutputWriter:
                                 seq = utils.reverse_complement(seq)
                                 paf_rec = paf_rec._replace(strand='-')
                             if operation.transform.divergence_prob > 0:
-                                orig_seq = seq
-                                if operation.transform.replacement_seq is None or operation.transform.replacement_seq[hap_index] is None:
-                                    haplotypes = operation.transform.replacement_seq
-                                    if haplotypes is None:
-                                        haplotypes = [None, None]
-                                    if homozygous and hap_index == 1:
-                                        replacement_seq = haplotypes[0]
-                                    else:
-                                        replacement_seq = utils.divergence(seq, operation.transform.divergence_prob)
-                                    haplotypes[hap_index] = replacement_seq
+                                orig_seq = self.reference.fetch(reference=operation.source_region.chrom,
+                                                                start=operation.source_region.start,
+                                                                end=operation.source_region.end)
+                                if not operation.transform.replacement_seq:
+                                    replacement_seq = utils.divergence(seq, operation.transform.divergence_prob)
+                                    haplotypes = [replacement_seq if operation.genotype[hap] else None for hap in [0, 1]]
+
                                     operation.transform = Transform(operation.transform_type,
                                                                     is_in_place=operation.transform.is_in_place,
                                                                     n_copies=operation.transform.n_copies,
@@ -378,6 +375,8 @@ class OutputWriter:
                     if operation.op_info is None:
                         operation.op_info = dict()
                     operation.op_info['SVID'] = sv.sv_id
+                    if operation.transform.divergence_prob > 0:
+                        operation.genotype = sv.genotype
                     chrom2operations[operation.target_region.chrom].append(operation)
 
         for chrom, chrom_length in self.chrom_lengths.items():

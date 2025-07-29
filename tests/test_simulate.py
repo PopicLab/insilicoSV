@@ -127,6 +127,8 @@ class TestSVSimulator(unittest.TestCase):
         self.test_overlap_bed_15 = "tests/inputs/example_overlap_events_15.bed"
 
         self.test_exclude_bed = "tests/inputs/exclude.bed"
+        self.import_snp = "tests/inputs/import_snp.vcf"
+        self.import_test = "tests/inputs/import_test.vcf"
 
         self.test_objects_no_dis = [TestObject([self.ref_file, {
             "chr21": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
@@ -1014,46 +1016,75 @@ class TestSVSimulator(unittest.TestCase):
                                   ]
         # ------------- test objects for blacklist regions
         self.test_blacklist_regions = [
-            TestObject([self.ref_file, {
-                "chr21": "ACTAATCTCTTCTCTCTTCTCTCTCCGT"}],
+            ['TCGATCGATCGAT', TestObject([self.ref_file, {
+                "chr21": "TCGATCGATCGAT"}],
                        [self.par,
                         {"reference": self.ref_file,
-                         "blacklist_regions": "tests/inputs/example_avoid_intervals_2.bed",
+                         "random_seed": 3,
+                         "homozygous_only": True,
+                         "blacklist_regions": "tests/inputs/example_avoid_interval_3.bed",
                          "variant_sets": [{"type": "DEL", "number": 1,
-                                           "length_ranges": [[5, 5]],
-                                           "blacklist_region_type": "ALR"}]}],
-                       self.hap1, self.hap2, self.bed),
-            TestObject([self.ref_file, {
-                "chr21": "ACTAATCTCTTCTCTCTTCTCTCTCCGT"}],
+                                           "length_ranges": [[6, 6]],
+                                           "blacklist_region_type": "all"}]}],
+                       self.hap1, self.hap2, self.bed), ['TCTCGAT', 'TCGATCG']],
+            ['TCGATCGATCGAT', TestObject([self.ref_file, {
+                "chr21": "TCGATCGATCGAT"}],
+                                         [self.par,
+                                          {"reference": self.ref_file,
+                                           "random_seed": 3,
+                                           "homozygous_only": True,
+                                           "blacklist_regions": "tests/inputs/example_avoid_interval_3.bed",
+                                           "variant_sets": [{"type": "DEL", "number": 1,
+                                                             "length_ranges": [[6, 6]],
+                                                             "blacklist_region_type": ['TEST1', 'TEST3']}]}],
+                                         self.hap1, self.hap2, self.bed), ['TCTCGAT', 'TCGATCT', 'TCGCGAT', 'TCGATCG', 'TCGATAT', 'GATCGAT']],
+            ['TCGATCGATCGAA', TestObject([self.ref_file, {
+                "chr21": "TCGATCGATCGAA"}],
                        [self.par,
                         {"reference": self.ref_file,
-                         "blacklist_regions": ["tests/inputs/example_avoid_intervals_2.bed",
-                                               "tests/inputs/example_avoid_intervals_3.bed",
+                         "random_seed": 3,
+                         "homozygous_only": True,
+                         "blacklist_regions": ["tests/inputs/example_avoid_interval_2.bed",
+                                               "tests/inputs/example_avoid_interval_3.bed",
                                                "tests/inputs/example_avoid_interval.vcf"],
-                         "variant_sets": [{"type": "DEL", "number": 1,
-                                           "length_ranges": [[5, 5]],
-                                           "blacklist_region_type": "Alu"},
-                                          {"type": "DEL", "number": 2,
-                                           "length_ranges": [[5, 5]],
-                                           "blacklist_region_type": "L1"}
+                         "variant_sets": [{"type": "A_->A_A", "number": 1,
+                                           "length_ranges": [[6, 6], [5, 5]],
+                                           "blacklist_region_type": ['TEST1', 'TEST2', 'TEST3', 'TEST']},
+                                          {"type": "DEL", "number": 1,
+                                           "length_ranges": [[3, 3]]}
                                           ]}],
-                       self.hap1, self.hap2, self.bed),
-            TestObject([self.ref_file, {
-                "chr21": "ACTAATCTCTTCTCTCTTCTCTCTCCGT"}],
+                       self.hap1, self.hap2, self.bed), ['TCGATCGATAGATCGA']],
+            ['TCGATCGATCGAT', TestObject([self.ref_file, {
+                "chr21": "TCGATCGATCGAT"}],
                        [self.par,
                         {"reference": self.ref_file,
+                         "random_seed": 3,
+                         "homozygous_only": True,
                          # can specify same files for blacklist and ROIs
-                         "overlap_regions": ["tests/inputs/example_avoid_intervals_2.bed"],
-                         "blacklist_regions": ["tests/inputs/example_avoid_intervals_2.bed"],
+                         "overlap_regions": ["tests/inputs/example_avoid_interval_2.bed"],
+                         "blacklist_regions": ["tests/inputs/example_avoid_interval_2.bed"],
                          "variant_sets": [{"type": "DEL", "number": 1,
-                                           "length_ranges": [[1, 5]],
-                                           "overlap_mode": "exact",
-                                           "overlap_region_type": "L1"},
-                                          {"type": "DEL", "number": 1,
                                            "length_ranges": [[5, 10]],
-                                           "blacklist_region_type": "L1"}
+                                           "overlap_mode": "containing",
+                                           "blacklist_region_type": "all"},
                                           ]}],
-                       self.hap1, self.hap2, self.bed)
+                       self.hap1, self.hap2, self.bed), ['TCGATCGA', 'TCGATCG', 'TCGATC', 'TCGAT', 'TCG', 'TCGA']],
+
+            ['TCGATCGATCGAT', TestObject([self.ref_file, {
+                "chr21": "TCGATCGATCGAT"}],
+                                         [self.par,
+                                          {"reference": self.ref_file,
+                                           "random_seed": 3,
+                                           "homozygous_only": True,
+                                           # can specify same files for blacklist and ROIs
+                                           "overlap_regions": ["tests/inputs/example_avoid_interval_3.bed"],
+                                           "blacklist_regions": ["tests/inputs/example_avoid_interval.vcf"],
+                                           "variant_sets": [{"type": "DEL", "number": 1,
+                                                             "length_ranges": [[5, 5]],
+                                                             "overlap_mode": "partial",
+                                                             "blacklist_region_type": "all"},
+                                                            ]}],
+                                         self.hap1, self.hap2, self.bed), ['TCGACGAT', 'TCGATGAT', 'CGATCGAT']],
         ]
         # ----------- test objects for unbounded dispersions -----------
         self.test_objects_unbounded_disp = [
@@ -1441,6 +1472,18 @@ class TestSVSimulator(unittest.TestCase):
             ["GGACCT", {"type": "_ABC_->A_B_C",
                         "length_ranges": [[1, 1], [1, 1], [2, 2], [1, 1], [1, 1]]},
              ['GGACTC']],
+
+            ['TCGA', TestObject([self.ref_file, {"chr21": "TCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    "variant_sets": [{'import': self.import_snp}]}],
+                        self.hap1, self.hap2, self.bed), ['ACTA', 'ACGC']],
+
+            ['TCGATCGA', TestObject([self.ref_file, {"chr1": "TCGATCGA"}],
+                                    [self.par, {"reference": self.ref_file,
+                                            "random_seed": 2,
+                                            "variant_sets": [{'import': self.import_test}]}],
+                                    self.hap1, self.hap2, self.bed), ['TCGAGACGTTCG', 'TCGATCCGA']],
         ]
 
     def tearDown(self):
@@ -1803,6 +1846,60 @@ class TestSVSimulator(unittest.TestCase):
             curr_sim = SVSimulator(config.par)
             with self.assertRaises(Exception):
                 curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref)
+                
+    def test_blacklist_regions(self):
+        for test_num, (ref, vs_config, expected_outputs) in enumerate(self.test_blacklist_regions):
+            sv_list = []
+            if not isinstance(vs_config, TestObject):
+                if not isinstance(vs_config, list):
+                    vs_config = [vs_config]
+                heterozygous = False
+                test_object = TestObject([self.ref_file, {f"chrTest{ref_num}": ref_seq
+                                                          for ref_num, ref_seq in enumerate(as_list(ref))}],
+                                         [self.par, {"reference": self.ref_file,
+                                                     "homozygous_only": True,
+                                                     "min_intersv_dist": 0,
+                                                     "random_seed": 88,
+                                                     "variant_sets": [dict(number=1, **vs_conf)
+                                                                      for vs_conf in vs_config]}],
+                                         '/data/enzo/insilicoSV/hap1.fna', '/data/enzo/insilicoSV/hap2.fna',
+                                         '/data/enzo/insilicoSV/hap.bed')
+            else:
+                heterozygous = True
+                test_object = vs_config
+
+            results_seen = set()
+            count_occ = defaultdict(int)
+            attempt_num = 0
+            expected_results = set(expected_outputs)
+            while any(
+                    expected_result not in results_seen for expected_result in expected_results) and attempt_num < len(
+                expected_results) * 100:
+                test_object.par_content["random_seed"] += 150
+                print("SEED", test_object.par_content["random_seed"])
+
+                attempt_num += 1
+                results, results2, svs = self.helper_test_known_output_svs(test_object, expected_results,
+                                                                           heterozygous=heterozygous)
+                print('RESUTLS', results)
+                count_occ[results] += 1
+                results_seen.update([results, results2])
+                sv_list.append(svs)
+            if results_seen != expected_results:
+                print('config', vs_config, 'seen', results_seen, 'expected', expected_results, count_occ)
+                print('missing',
+                      [expected_result for expected_result in expected_results if expected_result not in results_seen])
+                print('Unexpected',
+                      [unexpected_result for unexpected_result in results_seen if
+                       unexpected_result not in expected_results])
+            '''if any(expected_result not in results_seen for expected_result in expected_results):
+                for svs in sv_list:
+                    for sv in svs:
+                        print('sv lengths not target', sv.get_anchor_length(), 'breakends', sv.breakend_interval_lengths, 'anchors', sv.anchors,
+                              'rois', sv.roi, 'placement', sv.placement)'''
+            print('OCCURRENCES', count_occ, test_num, 'config', vs_config, expected_results)
+            assert all(expected_result in results_seen for expected_result in
+                       expected_results), f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
 
     def test_simple_tests(self):
         for test_num, (ref, vs_config, expected_outputs) in enumerate(self.simple_test_data):

@@ -67,8 +67,19 @@ A\_B $\rightarrow$ B\_A or B\_A $\rightarrow$ A\_B
 
 ![rTRA](gallery/rTRA.png)
 
+### INV_nrTRA
+A\_ $\rightarrow$ \_a or \_A $\rightarrow$ a\_
+
+![INV_nrTRA](gallery/INV_nrTRA.png)
+
+### INV_rTRA
+A\_B $\rightarrow$ b\_a or B\_A $\rightarrow$ a\_b
+
+![INV_rTRA](gallery/INV_rTRA.png)
+
 ### dDUP_iDEL
 A\_B $\rightarrow$ A\_A or B\_A $\rightarrow$ A\_A
+
 
 ![dDUP_iDEL](gallery/dDUP_iDEL.png)
 
@@ -91,6 +102,11 @@ AB $\rightarrow$ baB
 AB $\rightarrow$ b
 
 ![delINV](gallery/delINV.png)
+
+### INVdel
+AB $\rightarrow$ a
+
+![INVdel](gallery/INVdel.png)
 
 ### delINVdel
 ABC $\rightarrow$ b
@@ -125,17 +141,17 @@ The motif is expanded, 'repeat_count_change_range' repetitions are added.
 ### Context Aware Examples
 Provides examples of the impact of the different placement options on the SV signatures.
 ### Contained Overlap
-The DEL is contained in an Alu region.
-![DEL_contained](gallery/DEL_contained.png)
+The DUP is contained in an L1 region.
+![DUP_contained](gallery/DUP_contained.png)
 
 ### Containing Overlap
 The DEL contains a L1 region.
 ![DEL_containing](gallery/DEL_containing.png)
 
 ### Partial Overlap
-One and only one of the DEL breakends is in an L1HS region.
-![DEL_partial](gallery/del_partial.png)
+One and only one of the DUP breakends is in an L1 region.
+![DUP_partial](gallery/DUP_partial.png)
 
 ### Exact Overlap
-The DEL breakends delimit an Alu region.
-![DEL_exact](gallery/DEL_exact.png)
+The DUP breakends delimit an L1 region.
+![DUP_exact](gallery/DUP_exact.png)
