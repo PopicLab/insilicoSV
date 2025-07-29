@@ -616,13 +616,11 @@ class OutputWriter:
 
             vcf_file.header.formats.add('GT', number=1, type='String', description="Genotype")
 
-            svs = sorted(self.svs + self.recurrent_svs, key=operator.attrgetter('time_point'))
-
             with closing(VariantFile(vcf_path, 'w', header=vcf_file.header)) as vcf_out_file:
 
                 vcf_records: list[dict] = []
 
-                for sv in svs:
+                for sv in self.svs + self.recurrent_svs:
                     vcf_records.extend(sv.to_vcf_records(self.config))
                 assert not utils.has_duplicates(vcf_rec['id'] for vcf_rec in vcf_records)
                 for vcf_rec in sorted(vcf_records, key=lambda rec: (rec['contig'], rec['start'])):

@@ -305,6 +305,7 @@ class SVSimulator:
             counter_recurrent = 0
             for sv_set, (svs, recurrence, recurrence_num) in self.recurrent_svs.items():
                 if not svs: continue
+                if recurrence == -1 and not place_all: continue
                 num_iterations = recurrence_num
                 to_place = (current_svnum != 0 and current_svnum % recurrence == 0) or (current_svnum == recurrence == 0)
                 if place_all or recurrence == 0:
