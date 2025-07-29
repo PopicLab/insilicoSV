@@ -394,9 +394,16 @@ class BaseSV(SV):
                         and (operation.transform.replacement_seq is not None)):
                     # Find the original and altered bases.
                     alts = str(if_not_none(operation.transform.replacement_seq[0], ''))
+
+                    if alts == operation.transform.orig_seq:
+                        alts = 'N'
                     if (operation.transform.replacement_seq[1] is not None and
                             operation.transform.replacement_seq[1] != operation.transform.replacement_seq[0]):
-                        alts += ', '*(len(alts)) + str(if_not_none(operation.transform.replacement_seq[1], ''))
+                        second_alt = str(if_not_none(operation.transform.replacement_seq[1], ''))
+                        if second_alt == operation.transform.orig_seq:
+                            second_alt = '.'
+
+                        alts = alts + ',' + second_alt if alts else second_alt
                     alleles = [operation.transform.orig_seq, '%s' % alts]
                 else:
                     sv_info['OP_TYPE'] = sv_type_str

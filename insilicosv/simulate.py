@@ -314,7 +314,7 @@ class SVSimulator:
                     num_iterations = len(svs)
                     if num_iterations > recurrence_num and recurrence != -1 and recurrence != 0:
                         logger.warning(
-                            f'WARNING: for recurrent SVs {sv_set}, place {num_iterations} SVs at the last step instead of the requested number {recurrence_num}. '
+                            f'for recurrent variant set {sv_set}, place {num_iterations} SVs at the last step instead of the requested number {recurrence_num}. '
                             f'If this is not wanted, adapt the field \'recurrence_num\' to the total number of non-recurrent SVs.')
                 if to_place:
                     num_iterations = min(num_iterations, len(svs))
