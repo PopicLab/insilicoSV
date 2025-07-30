@@ -182,15 +182,15 @@ class SV(ABC):
                                                  self.breakend_interval_min_lengths))
 
         if self.overlap_mode == OverlapMode.CONTAINED:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() > self.roi_filter.region_length_range[0]),
+            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() > self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a contained overlap.', error_type='syntax')
-            chk((self.roi_filter.region_length_range[1] is None) or (self.anchor.length() < self.roi_filter.region_length_range[1]),
+            chk((self.roi_filter.region_length_range[1] is None) or (self.get_anchor_length() < self.roi_filter.region_length_range[1]),
                 f'The anchor length is larger than the maximum overlap for a contained overlap.', error_type='syntax')
         if self.overlap_mode == OverlapMode.CONTAINING:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() > self.roi_filter.region_length_range[0]),
+            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() > self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a containing overlap.', error_type='syntax')
-        if self.overlap_mode == OverlapMode.CONTAINING:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() >= self.roi_filter.region_length_range[0]),
+        if self.overlap_mode == OverlapMode.PARTIAL:
+            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() >= self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a partial overlap.', error_type='syntax')
 
         # The letters cannot be unbounded unless the overlap is Exact and they are in the anchor.
@@ -305,6 +305,7 @@ class VariantType(Enum):
 
     SNP = "SNP"
     DIVERGENCE = "DIVERGENCE"
+    INDEL = 'INDEL'
 
     CUSTOM = "Custom"
 
@@ -333,7 +334,7 @@ class BaseSV(SV):
             sv_info = dict(self.info)
             op_type_str = operation.transform_type.value
             if (operation.transform_type == TransformType.IDENTITY) and operation.is_in_place:
-                if (operation.transform.divergence_prob == 1) and (self.breakend_interval_lengths[0] == 1):
+                if sv_type_str == 'SNP':
                     # SNP
                     op_type_str = 'NA'
                     rec_id = sv_id = 'snp' + self.sv_id.split('sv')[-1]
@@ -394,7 +395,6 @@ class BaseSV(SV):
                         and (operation.transform.replacement_seq is not None)):
                     # Find the original and altered bases.
                     alts = str(if_not_none(operation.transform.replacement_seq[0], ''))
-
                     if alts == operation.transform.orig_seq:
                         alts = 'N'
                     if (operation.transform.replacement_seq[1] is not None and
@@ -405,6 +405,10 @@ class BaseSV(SV):
 
                         alts = alts + ',' + second_alt if alts else second_alt
                     alleles = [operation.transform.orig_seq, '%s' % alts]
+                elif sv_type_str == 'INDEL':
+                    alleles = ['<INS>', operation.novel_insertion_seq]
+                    if sv_info['OP_TYPE'] == 'DEL':
+                        alleles = [operation.transform.orig_seq, '<DEL>']
                 else:
                     sv_info['OP_TYPE'] = sv_type_str
                     alleles = ['N', '<%s>' % sv_type_str]
@@ -453,7 +457,7 @@ class BaseSV(SV):
         if len(combined_recs) == 1:
             combined_recs[0]['id'] = sv_id
             combined_recs[0]['info']['OP_TYPE'] = 'NA'
-            if not combined_recs[0]['info']['SVTYPE'] == 'SNP':
+            if not combined_recs[0]['info']['SVTYPE'] in ['SNP', 'INDEL']:
                 combined_recs[0]['alleles'][1] = '<%s>' % combined_recs[0]['info']['SVTYPE']
         elif len(combined_recs) != len(sv_vcf_recs):
             for idx, operation in enumerate(combined_recs):
@@ -537,6 +541,7 @@ SV_KEY = {
 
     VariantType.DIVERGENCE: (("A",), ("A*",)),
     VariantType.SNP: (("A",), ("A*",)),
+    VariantType.INDEL: (('',), ('',)),
 }
 
 

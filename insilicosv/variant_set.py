@@ -11,7 +11,7 @@ import re
 from pysam import FastaFile, VariantFile
 
 from insilicosv import utils
-from insilicosv.utils import RegionFilter, OverlapMode, Locus, error_context, chk, TandemRepeatRegionFilter
+from insilicosv.utils import RegionFilter, OverlapMode, Locus, error_context, chk, TandemRepeatRegionFilter, if_not_none
 from insilicosv.sv_defs import (Transform, TransformType, BreakendRegion, Operation, SV, VariantType, BaseSV,
                                 Syntax, Symbol, SV_KEY, TandemRepeatExpansionContractionSV)
 
@@ -84,7 +84,7 @@ class VariantSet(ABC):
                 grammar = self.vset_config['type'].split('->')
             else:
                 self.svtype = VariantType(self.vset_config['type'])
-                grammar = SV_KEY[VariantType(self.vset_config['type'])]
+                grammar = SV_KEY[self.svtype]
 
             self.source = grammar[0]
             chk(not Syntax.DIVERGENCE in self.source and not Syntax.MULTIPLE_COPIES in self.source,
@@ -426,6 +426,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             lhs = tuple([letter for letter in self.source if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]])
             rhs = tuple(self.target)
             for key, grammar in SV_KEY.items():
+                if key == 'INDEL': continue
                 # Test if the grammar or its symmetric match the grammar of the record
                 if (grammar[0] == lhs and grammar[1] == rhs) or (
                         grammar[0] == lhs[::-1] and grammar[1] == rhs[::-1]):
@@ -448,6 +449,20 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 f'divergence prob for SNP can only be 1. Error in %s' % vset_cfg['config_descr'], error_type='value')
             vset_cfg['length_ranges'] = [[1, 1]]
             vset_cfg['divergence_prob'] = [1.0]
+        elif vset_cfg['type'] == 'INDEL':
+            # INDELS have to be of size <= 50
+            chk(not vset_cfg.get('length_ranges') or (if_not_none(vset_cfg['length_ranges'][0][0], 0) <= 50 and
+                                                          if_not_none(vset_cfg['length_ranges'][0][1], 0) <= 50 ),
+                f'length_ranges for INDEL must be included in [0, 50]. Error in %s' % vset_cfg['config_descr'],
+                error_type='value')
+            chk(not vset_cfg.get('overlap_range') or (if_not_none(vset_cfg['overlap_range'][0], 0) <= 50 and
+                                                          if_not_none(vset_cfg['overlap_range'][1], 0) <= 50 ),
+                f'overlap_range for INDEL must be included in [0, 50]. Error in %s' % vset_cfg['config_descr'],
+                error_type='value')
+            if not vset_cfg.get('length_ranges'):
+                vset_cfg['length_ranges'] = [[1, 50]]
+
+        if self.svtype in [VariantType.SNP, VariantType.INDEL]:
             self.overlap_sv = vset_cfg.get('overlap_sv', False)
             if self.overlap_sv:
                 self.recurrence_freq = vset_cfg.get('recurrence_freq', -1)
@@ -610,6 +625,12 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         lhs_strs = self.source
         rhs_strs = self.target
         svtype = self.svtype
+        if self.vset_config['type'] == 'INDEL':
+            anchor = Syntax.ANCHOR_START in lhs_strs
+            svtype = VariantType('DEL' if random.randint(0, 1) else 'INS')
+            lhs_strs, rhs_strs = SV_KEY[svtype]
+            if anchor:
+                lhs_strs = [Syntax.ANCHOR_START, lhs_strs[0], Syntax.ANCHOR_END]
         length_ranges = self.vset_config['length_ranges'] if 'length_ranges' in self.vset_config else []
         letter_ranges = length_ranges
         dispersion_ranges = []
@@ -684,7 +705,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                       config_descr=self.vset_config['config_descr'])
 
     def construct_info(self, lhs_strs, rhs_strs):
-        sv_type_str = self.svtype.value
+        sv_type_str = self.vset_config['type']
         source_str = ''.join(lhs_strs)
         target_str = ''.join(rhs_strs)
         grammar = f'{source_str}->{target_str}'

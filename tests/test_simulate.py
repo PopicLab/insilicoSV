@@ -2118,6 +2118,7 @@ class TestSVSimulator(unittest.TestCase):
                     expected_result not in results_seen for expected_result in expected_results) and attempt_num < len(
                     expected_results) * 100:
                 test_object.par_content["random_seed"] += 150
+                print('TEST', test_num, 'config', vs_config)
                 print("SEED", test_object.par_content["random_seed"])
 
                 attempt_num += 1

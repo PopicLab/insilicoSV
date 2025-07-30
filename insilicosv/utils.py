@@ -118,9 +118,8 @@ class Region:
     orig_start: int = -1
     orig_end: int = -1
 
-    # Operation the Region stems from (for overlapping with SNPs and INDELs)
+    # Information on the operation the Region stems from (for overlapping with SNPs and INDELs)
     length_insertion: Optional[int] = None
-    length_deletion: Optional[int] = None
     op_id: Optional[str] = None
 
     def __post_init__(self):
@@ -198,9 +197,9 @@ class RegionSet:
         for chrom, chrom2region in chrom2regions.items():
             if len(chrom2region) > 100000:
                 logger.debug(f'RegionSet init: {chrom=} {len(chrom2region)=}')
-            self.chrom2itree[chrom] = IntervalTree.from_tuples((region.start, region.end, region)
+            # Padding to allow insertion target regions
+            self.chrom2itree[chrom] = IntervalTree.from_tuples((region.start-0.1, region.end+0.1, region)
                                                                 for region in chrom2region)
-
 
     def __contains__(self, region):
         overlap = list(self.chrom2itree[region.chrom].overlap(region.start, region.end))
@@ -209,7 +208,7 @@ class RegionSet:
     def strictly_contains_point(self, point, chrom):
         overlap = list(self.chrom2itree[chrom].at(point))
         for interval in overlap:
-            if interval.begin < point < interval.end:
+            if interval.data.start < point < interval.data.end:
                 return True
         return False
 
@@ -300,9 +299,6 @@ class RegionSet:
 
     def add_region(self, region):
         aux_region = deepcopy(region)
-        # Insertion points are empty intervals which are not supported. We add a padding.
-        if aux_region.start == aux_region.end:
-            aux_region = aux_region.replace(start=aux_region.start - 0.1, end=aux_region.end + 0.1)
         self.add_region_set(RegionSet([aux_region]))
 
     def chop(self, sv_region):
@@ -311,15 +307,16 @@ class RegionSet:
         chrom_itree = self.chrom2itree[sv_region.chrom]
 
         def adjust_region(ival, is_begin):
+            # Chop the bounds of the regions while ensuring they remain integers
             if is_begin:
-                new_region = ival.data.replace(end=sv_region.start)
+                new_region = ival.data.replace(end=round(sv_region.start))
             else:
-                new_region = ival.data.replace(start=sv_region.end)
+                new_region = ival.data.replace(start=round(sv_region.end))
             if new_region.start == new_region.end:
                 return None
             return new_region
-
-        chrom_itree.chop(sv_region.start, sv_region.end, datafunc=adjust_region)
+        # Pad to fully remove insertion target
+        chrom_itree.chop(sv_region.start-0.1, sv_region.end+0.1, datafunc=adjust_region)
 # end class RegionSet
 
 def percent_N(seq):
@@ -338,6 +335,7 @@ def get_transformed_regions(chrom2operations):
     # Find a set of disjoint modified regions.
     transformed_regions = defaultdict(list)
     source_regions = defaultdict(list)
+    insertion_orders = defaultdict(list)
     for chrom, operation_lists in chrom2operations.items():
         for overlapping_operations in operation_lists:
             # If there is a non-recurrent operation, its target and source regions are used, otherwise we merge the regions of the non-recurrent operations.
@@ -352,6 +350,8 @@ def get_transformed_regions(chrom2operations):
                         source_region = operation.target_region
                     source_regions[chrom].append(source_region)
                     transformed_regions[chrom].append(operation.target_region)
+                    insertion_order = if_not_none(operation.target_insertion_order, [0, 0])[1]
+                    insertion_orders[chrom].append(insertion_order)
                     non_recurrent = True
                     break
                 else:
@@ -360,7 +360,8 @@ def get_transformed_regions(chrom2operations):
             if not non_recurrent:
                 source_regions[chrom].append(merge_regions(source_recurrent))
                 transformed_regions[chrom].append(merge_regions(target_recurrent))
-    return transformed_regions, source_regions
+                insertion_orders[chrom].append(0)
+    return transformed_regions, source_regions, insertion_orders
 
 def pairwise(iterable):
     # pairwise('ABCD') → [('A', 'B'), ('B', 'C'), ('C', 'D')]

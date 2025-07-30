@@ -241,8 +241,7 @@ class OutputWriter:
                                 modified_seq = operation.novel_insertion_seq
                             if operation.transform_type == TransformType.INV:
                                 modified_seq = utils.reverse_complement(modified_seq)
-                            if n_copies > 1:
-                                modified_seq = modified_seq * n_copies
+                            modified_seq = modified_seq * n_copies
 
                             if operation.transform.divergence_prob > 0 or operation.transform.replacement_seq:
                                 # There is a divergence
@@ -460,7 +459,6 @@ class OutputWriter:
         for sv in self.recurrent_svs + self.svs:
             # start with recurrent SVs, regular SVs are ordered by time point
             if not sv.genotype[hap_index]: continue
-
             operations = []
             for op_id, operation in enumerate(sv.operations):
                 operation.op_info['SVID'] = sv.sv_id
@@ -501,12 +499,10 @@ class OutputWriter:
                     overlap_operation = overlap_interval.data
                     overlap_start = overlap_interval.data.target_region.start
                     overlap_end = overlap_interval.data.target_region.end
-                    if ((overlap_operation.overlap_op_id and overlap_operation.overlap_op_id != operation.op_id) or
-                        (operation.overlap_op_id and operation.overlap_op_id != overlap_operation.op_id)): continue
 
-                    if (overlap_end == target_start) or (overlap_start == target_end and
+                    # If the overlap is at the breakends we only keep the overlap if it has the corresponding overlap_op_id in which case it is in the inserted region
+                    if ((overlap_end == target_start or overlap_start == target_end) and
                                                          overlap_operation.overlap_op_id != operation.op_id): continue
-
                     # The overlap operation is not recurrent or has been merged with a non-recurrent SV
                     if not overlap_operation.recurrent or not overlap_operation.op_id in merged_lookup: continue
 
@@ -559,7 +555,7 @@ class OutputWriter:
             chrom2operations[chrom] = [sorted(operations, key=lambda ope: ope.time_point) for operations in chrom2operations[chrom]]
 
         # Find the disjoint regions affected  by at least one operation.
-        transformed_regions, source_regions = utils.get_transformed_regions(chrom2operations)
+        transformed_regions, source_regions, insertion_order = utils.get_transformed_regions(chrom2operations)
         for chrom, chrom_length in self.chrom_lengths.items():
             target_regions = sorted([Region(chrom=chrom, start=0, end=0)] + 
                                     [region for region in transformed_regions[chrom]] +
@@ -576,12 +572,14 @@ class OutputWriter:
                 placement=[Locus(chrom, target_region.start),
                            Locus(chrom, target_region.end)])]
                 for idx, target_region in enumerate(unchanged_regions)]
-
             transformed_regions[chrom].extend(unchanged_regions)
             source_regions[chrom].extend(unchanged_regions)
             chrom2operations[chrom].extend(intersv_ops)
-            # The operations are directly written in the order of the target locations
-            regions_order_idx = np.argsort(transformed_regions[chrom])
+            insertion_order[chrom].extend([0 for _ in unchanged_regions])
+            # The operations are directly written in the order of the target locations and then insertion order
+            sorted_elements = sorted(zip(transformed_regions[chrom], insertion_order[chrom], range(len(insertion_order[chrom]))),
+                                     key=lambda x: (x[0], x[1]))
+            regions_order_idx = [item[2] for item in sorted_elements]
             chrom2operations[chrom] = [chrom2operations[chrom][idx] for idx in regions_order_idx]
             source_regions[chrom] = [source_regions[chrom][idx] for idx in regions_order_idx]
         return chrom2operations, source_regions
