@@ -236,7 +236,7 @@ class OutputWriter:
                             # Modify the sequence
                             operation_start = operation_start + total_shift
                             modified_seq = seq[operation_start:operation_start+operation_length]
-
+                            print('OPERATION output', operation,'INIT SEQ', seq, 'MODIFIED SEQ', modified_seq)
                             if operation.novel_insertion_seq:
                                 modified_seq = operation.novel_insertion_seq
                             if operation.transform_type == TransformType.INV:
@@ -270,6 +270,7 @@ class OutputWriter:
                                         operation.overlap_operation.transform = operation.transform
                                 modified_seq = operation.transform.replacement_seq[hap_index]
                             seq = seq[:operation_start] + modified_seq + seq[operation_start + operation_length:]
+                            print('FINAL SEQ', seq, 'MODIFIED SEQ', modified_seq)
                     if seq:
                         sim_fa.write(seq)
                 sim_fa.write('\n')
@@ -460,26 +461,33 @@ class OutputWriter:
             # start with recurrent SVs, regular SVs are ordered by time point
             if not sv.genotype[hap_index]: continue
             operations = []
+            origin_lengths = sv.breakend_interval_lengths
             for op_id, operation in enumerate(sv.operations):
                 operation.op_info['SVID'] = sv.sv_id
                 operation.recurrent = sv.overlap_sv
                 operation.time_point = sv.time_point
                 operations.append(operation)
+                # Get the Original length of the operation if defined in case of overlap with insertions that would cause a
+                # mismatch between the source_region length and the original length
+                if operation.source_breakend_region:
+                    breakend_start = operation.source_breakend_region.start_breakend
+                    operation.origin_length = origin_lengths[breakend_start]
+                else:
+                    operation.origin_length = len(operation.novel_insertion_seq)
+
+                if not operation.origin_length:
+                    operation.origin_length = operation.source_region.length()
+
             while operations:
                 operation = operations.pop()
                 chrom = operation.target_region.chrom
-                target_start = operation.target_region.start
-                target_end = operation.target_region.end
+                # If the operation is in place the source and target regions are the same otherwise the target is an insertion point
+                target_start = target_end = operation.target_region.start
+                if operation.target_region == operation.source_region:
+                    target_end = target_start + operation.origin_length
                 # Padding of the interval to be able to include points as intervals.
                 target_interval = Interval(begin=target_start-0.1, end=target_end+0.1, data=operation)
-
-                # Initialize the length of the target available for overlap
-                if not operation.origin_length:
-                    if operation.source_region:
-                        length = operation.source_region.length()
-                    else:
-                        length = len(operation.novel_insertion_seq)
-                    operation.origin_length = length
+                print('OPERATION', operation, target_interval)
 
                 overlap = target_region2transform[chrom].overlap(target_interval.begin, target_interval.end)
                 if operation.is_in_place:
@@ -497,8 +505,10 @@ class OutputWriter:
                 # Overlapping operations are stored in the same list to be applied together
                 for overlap_interval in overlap:
                     overlap_operation = overlap_interval.data
-                    overlap_start = overlap_interval.data.target_region.start
-                    overlap_end = overlap_interval.data.target_region.end
+                    # If the operation is in place the source and target regions are the same otherwise the target is an insertion point
+                    overlap_start = overlap_end = overlap_interval.data.target_region.start
+                    if overlap_operation.target_region == overlap_operation.source_region:
+                        overlap_end = overlap_start + overlap_operation.origin_length
 
                     # If the overlap is at the breakends we only keep the overlap if it has the corresponding overlap_op_id in which case it is in the inserted region
                     if ((overlap_end == target_start or overlap_start == target_end) and
@@ -518,7 +528,7 @@ class OutputWriter:
                 target_region2transform[chrom].add(target_interval)
                 if not operation.is_in_place and operation.source_region:
                     # The SV is not in place and not a novel insertion, reference the source region to keep track of past and future modifications
-                    source_interval = Interval(operation.source_region.start, operation.source_region.end)
+                    source_interval = Interval(operation.source_region.start, operation.source_region.start + operation.origin_length)
                     overlap_source = target_region2transform[chrom].overlap(source_interval.begin, source_interval.end)
                     for interval_overlap in overlap_source:
                         overlap_operation = interval_overlap.data

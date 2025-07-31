@@ -328,8 +328,10 @@ class SimulatedVariantSet(VariantSet):
         if (self.svtype == VariantType.DUP) and ('n_copies' not in self.vset_config):
             self.vset_config['n_copies'] = [1]
         if 'n_copies' in self.vset_config:
-            chk(isinstance(self.vset_config['n_copies'], list),
-                f'The number of copies must be a list of integers or ranges in {self.vset_config}', error_type='value')
+            chk(isinstance(self.vset_config['n_copies'], (list, int)),
+                f'The number of copies must be an integer or a list of integers or a list of ranges in {self.vset_config}', error_type='value')
+            if isinstance(self.vset_config['n_copies'], int):
+                self.vset_config['n_copies'] = [self.vset_config['n_copies']]
         if self.svtype == VariantType.mCNV:
             chk(('n_copies' in self.vset_config) and (self.vset_config['n_copies'][0] > 1),
                 f'n_copies has to be provided and be above 1 for a mCNV in {self.vset_config}', error_type='value')
@@ -462,7 +464,9 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             if not vset_cfg.get('length_ranges'):
                 vset_cfg['length_ranges'] = [[1, 50]]
 
-        if self.svtype in [VariantType.SNP, VariantType.INDEL]:
+        if self.svtype in [VariantType.SNP, VariantType.INDEL] or (self.svtype in [VariantType.INS, VariantType.DEL] and
+                                                                   vset_cfg['length_ranges'][0][1]  and
+                                                                   vset_cfg['length_ranges'][0][1] < 50):
             self.overlap_sv = vset_cfg.get('overlap_sv', False)
             if self.overlap_sv:
                 self.recurrence_freq = vset_cfg.get('recurrence_freq', -1)
