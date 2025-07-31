@@ -43,9 +43,9 @@ For Custom types, the length ranges are in order of appearance of the letters an
 4. *overlap_mode [optional]*: str - enforce the SV to overlap a region defined in the files provided in `overlap_regions`. Must be `partial`, `contained`, `containing` or `exact` (see [example config](use_cases#example-5---placing-svs-at-known-repetitive-element-intervals)).
 5. *overlap_region_type [optional]*: list of str - only if an overlap mode is specified. Characterizes the regions to overlap, the name of the region has to contain one of the strings of the list. 
 
-6. *is_interchromosomal=False [for SVs containing dispersions]*: Enable interchromosomal SVs. If True, each dispersion in the SV will be 
+6. *interchromosomal: False [for SVs containing dispersions]*: Enable interchromosomal SVs. If True, each dispersion in the SV will be 
 between two different chromosomes. All dispersions must be unbounded i.e. the dispersion range must be [null, null].
-7. *n_copies=[] [for SVs containing '+' grammar notation]*: specifies the number of copies for each sequence affected by a '+' in order of appearance in the grammar.
+7. *n_copies: [] [for SVs containing '+' grammar notation]*: specifies the number of copies for each sequence affected by a '+' in order of appearance in the grammar.
 Each element of the list can be a positive number or a range of positive numbers. If a range is provided, a random number of copies included in the range will be used.
 The default number of copies for a DUP is [1] and does not need to be specified.
 
@@ -59,13 +59,13 @@ be specified in the variant set. The BED file columns must contain in order the 
 
 The following parameters can be set on the top level of the config file and provide higher-order controls over SV placement:
 1. *reference*: str - path to input reference used as template for simulation.
-2. *max_tries=100 [optional]*: int - number of tries to find a valid position to simulate each SV.
-3. *max_random_breakend_tries=100 [optional]*: int - number of tries to find a breakend by taking a random position in the genome before checking available regions.
-3. *homozygous_only=False [optional]*: bool - if set to True, make all simulated variants homozygous
-4. *blacklist_regions*: list[str] - list of paths to BED or VCF files containing intervals to be ignored during SV placement (see [example config](use_cases#example-4---marking-banned-intervals-of-the-genome)).
-5. *overlap_regions*: list[str] - list of paths to BED files containing genome elements to be used for overlapping SV placement (see [example config](use_cases#example-5---placing-svs-at-known-repetitive-element-intervals)).
-6. *filter_small_chr [optional]*: int - filter out chromosomes of length less than the given integer (if no value is provided then no filtering will occur).
-7. *th_proportion_N=0.05 [optional]*: The proportion of N and n base pairs an SV is allowed to cover.
+2. *blacklist_regions*: list[str] - list of paths to BED or VCF files containing intervals to be ignored during SV placement (see [example config](use_cases#example-4---marking-banned-intervals-of-the-genome)).
+3. *overlap_regions*: list[str] - list of paths to BED files containing genome elements to be used for overlapping SV placement (see [example config](use_cases#example-5---placing-svs-at-known-repetitive-element-intervals)).
+4. *max_tries: 100 [optional]*: int - number of tries to find a valid position to simulate each SV.
+5. *max_random_breakend_tries: 100 [optional]*: int - number of tries to find a breakend by taking a random position in the genome before checking available regions.
+6. *homozygous_only: False [optional]*: bool - if set to True, make all simulated variants homozygous
+7. *filter_small_chr [optional]*: int - filter out chromosomes of length less than the given integer (if no value is provided then no filtering will occur).
+8. *th_proportion_N: 0.05 [optional]*: The proportion of N and n base pairs an SV is allowed to cover.
 
 Examples of the full set of simulation options available through various config inputs can be found in the [use cases](use_cases) page.
 
