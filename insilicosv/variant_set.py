@@ -49,9 +49,17 @@ class VariantSet(ABC):
         self.overlap_kinds = utils.as_list(self.vset_config.get('overlap_region_type', 'all'))
         self.overlap_ranges = []
         self.header = []
+
+        self.vset_config['config_descr'] = ', '.join("%s: %s" % item for item in self.vset_config.items())
+        self.novel_insertion_seqs = None
+
         # For predefined types given as custom in the config file, to keep track they have to be treated as custom
         self.input_type = None
         self.overlap_mode = None
+
+        # For SNPs and INDELs overlap
+        self.overlap_sv = False
+
         if 'overlap_mode' in self.vset_config:
             chk(isinstance(self.vset_config['overlap_mode'], str) or
                 (isinstance(self.vset_config['overlap_mode'], list) and all(
@@ -61,9 +69,6 @@ class VariantSet(ABC):
                 self.overlap_mode = OverlapMode(self.vset_config['overlap_mode'])
             except ValueError:
                 chk(False, f'Invalid overlap_mode in {vset_config}', error_type='value')
-        self.novel_insertion_seqs = None
-
-        self.vset_config['config_descr'] = ', '.join("%s: %s" % item for item in self.vset_config.items())
 
         self.vset_config['overlap_region_type'] = (tuple(utils.as_list(self.vset_config['overlap_region_type']))
                                                    if 'overlap_region_type' in self.vset_config else ('all',))
@@ -72,6 +77,7 @@ class VariantSet(ABC):
         self.overlap_ranges = tuple(
             self.vset_config['overlap_region_length_range'] if 'overlap_region_length_range' in self.vset_config else
             [None, None])
+
         if 'type' in self.vset_config:
             self.vset_config['type'] = self.vset_config['type'].replace(" ", "")
             if '->' in self.vset_config['type']:
@@ -79,9 +85,6 @@ class VariantSet(ABC):
                 grammar = self.vset_config['type'].split('->')
             else:
                 self.svtype = VariantType(self.vset_config['type'])
-                if self.vset_config['type'] == 'INDEL':
-                    # INDELs are either DELs or INSs with a 50% probability.
-                    self.svtype = VariantType('INS')
                 grammar = SV_KEY[self.svtype]
 
             self.source = grammar[0]
@@ -310,20 +313,26 @@ class SimulatedVariantSet(VariantSet):
         super().__init__(vset_config, config)
 
         chk(isinstance(vset_config.get('type'), str), f'Missing or bad variant type in {vset_config}', error_type='syntax')
-        chk(isinstance(vset_config.get('number'), int) and vset_config['number'] >= 0,
+        chk((isinstance(vset_config.get('number'), int) and vset_config['number'] >= 0) or
+            (isinstance(vset_config.get('mutation_ratio'), float) and 1 > vset_config['mutation_ratio'] > 0),
             f'Missing or bad "number" of variants to generate in {vset_config}', error_type='value')
 
         self.preprocess_config()
 
     def preprocess_config(self):
         chk('divergence_prob' not in self.vset_config or isinstance(self.vset_config['divergence_prob'], (list, int, float)),
-            f'divergence_prob must be a float, a list of floats in ]0, 1] or ranges in {self.vset_config}', error_type='value')
+            f'divergence_prob must be a float or an int or a list of floats in ]0, 1] or a list of ranges. But, a '
+                 f'{type(self.vset_config.get('divergence_prob', []))} was provided in {self.vset_config}', error_type='value')
 
         if (self.svtype == VariantType.DUP) and ('n_copies' not in self.vset_config):
             self.vset_config['n_copies'] = [1]
-        if 'n_copies' in self.vset_config:
-            chk(isinstance(self.vset_config['n_copies'], list),
-                f'The number of copies must be a list of integers or ranges in {self.vset_config}', error_type='value')
+
+        chk(isinstance(self.vset_config['n_copies'], (list, int)),
+            f'The number of copies must be an integer or a list of integers or a list of ranges in {self.vset_config}',
+            error_type='value')
+        if isinstance(self.vset_config['n_copies'], int):
+            self.vset_config['n_copies'] = [self.vset_config['n_copies']]
+
         if self.svtype == VariantType.mCNV:
             chk(('n_copies' in self.vset_config) and (self.vset_config['n_copies'][0] > 1),
                 f'n_copies has to be provided and be above 1 for a mCNV in {self.vset_config}', error_type='value')
@@ -388,7 +397,9 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'n_copies',
                 'novel_insertions',
                 'interchromosomal',
-                'config_descr', 'VSET'
+                'config_descr',
+                'overlap_sv',
+                'VSET'
             ), f'invalid SV config key {vset_config_key}', error_type='syntax')
 
         vset_cfg = self.vset_config
@@ -437,18 +448,47 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             vset_cfg['divergence_prob'] = [1.0]
         elif vset_cfg['type'] == 'INDEL':
             # INDELS have to be of size <= 50
-            chk(not vset_cfg.get('length_ranges') or (if_not_none(vset_cfg['length_ranges'][0][0], 0) <= 50 and
-                                                          if_not_none(vset_cfg['length_ranges'][0][1], 0) <= 50 ),
+            chk(not vset_cfg.get('length_ranges', False) or (1 <= if_not_none(vset_cfg['length_ranges'][0][0], 1) <=
+                                                          if_not_none(vset_cfg['length_ranges'][0][1], 50) <= 50 ),
                 f'length_ranges for INDEL must be included in [0, 50]. Error in %s' % vset_cfg['config_descr'],
                 error_type='value')
-            chk(not vset_cfg.get('overlap_range') or (if_not_none(vset_cfg['overlap_range'][0], 0) <= 50 and
-                                                          if_not_none(vset_cfg['overlap_range'][1], 0) <= 50 ),
-                f'overlap_range for INDEL must be included in [0, 50]. Error in %s' % vset_cfg['config_descr'],
+            chk(not vset_cfg.get('overlap_region_length_range', False) or (if_not_none(vset_cfg['overlap_region_length_range'][0], 0) <=
+                                                          if_not_none(vset_cfg['overlap_region_length_range'][1], 50) <= 50 ),
+                f'overlap_region_length_range for INDEL must be included in [0, 50]. Error in %s' % vset_cfg['config_descr'],
                 error_type='value')
+
+            # In case the max length_range was null, set it to 50 as it is the maximum for INDEL
+            if vset_cfg.get('length_ranges', False) and not vset_cfg['length_ranges'][0][1]:
+                vset_cfg['length_ranges'][0][1] = 50
+                if not vset_cfg['length_ranges'][0][0]:
+                    vset_cfg['length_ranges'][0][0] = 1
+
             if not vset_cfg.get('length_ranges'):
                 vset_cfg['length_ranges'] = [[1, 50]]
+
+            if vset_cfg.get('overlap_mode', False):
+                if not vset_cfg.get('overlap_region_length_range', False):
+                    vset_cfg['overlap_region_length_range'] = [[1, 50]]
+
+
+        if self.svtype in [VariantType.SNP, VariantType.INDEL] or (self.svtype in [VariantType.INS, VariantType.DEL] and
+                                                                   vset_cfg['length_ranges'][0][1] and
+                                                                   vset_cfg['length_ranges'][0][1] < 50):
+            self.overlap_sv = vset_cfg.get('overlap_sv', False)
+            chk(not('mutation_ratio' in vset_cfg and 'number' in vset_cfg), 'mutation_rate and number cannot'
+                                                                            ' be used simultaneously. '
+                                                                            'Error in %s' % vset_cfg['config_descr'],
+                error_type='syntax')
+            if 'mutation_ratio' in vset_cfg:
+                self.vset_config['number'] = 1
         else:
-            chk('length_ranges' in vset_cfg or 'novel_insertions' in self.vset_config, f'Please specify length ranges in %s' % (vset_cfg['config_descr']), error_type='syntax')
+            chk(not ('overlap_sv' in vset_cfg or 'mutation_ratio' in vset_cfg),
+                f'overlap_sv and mutation_ratio are only available for SNPs and INDELs, but %s was provided' %
+                vset_cfg['config_descr'], error_type='type')
+
+            chk('length_ranges' in vset_cfg or 'novel_insertions' in self.vset_config, f'Please specify length ranges in %s' %
+                (vset_cfg['config_descr']), error_type='syntax')
+
             if 'length_ranges' in vset_cfg:
                 chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list in %s' % vset_cfg['config_descr'],
                     error_type='syntax')
@@ -644,7 +684,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         n_copies_list = self.vset_config.get('n_copies', [])
 
         divergence_prob_list = self.vset_config.get('divergence_prob', [])
-        if isinstance(divergence_prob_list, (int, float)):
+        if not isinstance(divergence_prob_list, list):
             divergence_prob_list = [divergence_prob_list]
 
         # Build the different operations and anchor, determine the breakends and the distance between them.
@@ -653,6 +693,11 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                                                                       symbol_min_lengths, len(letters),
                                                                       novel_insertion_seqs, n_copies_list,
                                                                       divergence_prob_list, vset_config=self.vset_config)
+
+        overlap_length_ranges = None
+        if self.overlap_sv and self.mutation_ratio:
+            overlap_length_ranges = letter_ranges
+
         #
         # construct the SV object
         #
@@ -671,6 +716,9 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                       fixed_placement=None,
                       info=info,
                       genotype=self.pick_genotype(),
+                      length_ranges=overlap_length_ranges,
+                      enable_overlap_sv=self.enable_overlap_sv,
+                      mutation_ratio=self.mutation_ratio,
                       config_descr=self.vset_config['config_descr'])
 
     def construct_info(self, lhs_strs, rhs_strs):
@@ -808,7 +856,8 @@ class ImportedVariantSet(VariantSet):
         super().__init__(vset_config, config)
         chk(utils.is_readable_file(vset_config['import']),
             '{path} vcf must name a readable file'.format(path=vset_config['import']), error_type='file not found')
-        chk(set(vset_config.keys()) <= {'import', 'VSET'}, f'invalid config key in {vset_config}', error_type='syntax')
+        chk(set(vset_config.keys()) <= {'import', 'VSET'}, f'invalid config key in {vset_config}',
+            error_type='syntax')
 
         with FastaFile(config['reference']) as reference:
             self.chrom_lengths = {chrom: chrom_length
@@ -839,7 +888,7 @@ class ImportedVariantSet(VariantSet):
 
     def parse_vcf_rec_info(self, vcf_rec):
         chk(vcf_rec.chrom in self.chrom_lengths, f'Unknown contig {vcf_rec.chrom}  in {vcf_rec}', error_type='value')
-        chk(3 >= len(vcf_rec.alleles) >= 2, f'Can only import bi-allelic variants from VCF for {vcf_rec}', error_type='value')
+        chk(3 >= len(vcf_rec.alleles) >= 2, f'Only diploids are supported. But, {vcf_rec} was provided.', error_type='value')
         chk(len(vcf_rec.samples) <= 1, f'Can only import VCFs with one sample for {vcf_rec}', error_type='value')
         parsed_info = {}
         if vcf_rec.samples:
@@ -848,17 +897,23 @@ class ImportedVariantSet(VariantSet):
         else:
             parsed_info['GENOTYPE'] = random.choice([(True, True), (True, False), (False, True)])
         vcf_info = dict(vcf_rec.info)
+
+        parsed_info['ALLOW_OVERLAP_SV'] = vcf_info.get('ALLOW_OVERLAP_SV', False)
+
         if set(''.join(vcf_rec.alleles).upper().replace(' ', '')) <= set('TCGA'):
             if len(vcf_rec.alleles[0]) == 1 and 1 <= len(vcf_rec.alleles[1]) <= 2:
-                if not vcf_info['SVTYPE']:
+                if not vcf_info.get('SVTYPE'):
                     # SNP
                     vcf_info['OP_TYPE'] = 'SNP'
                     vcf_info['SVTYPE'] = 'SNP'
+
         chk('OP_TYPE' in vcf_info, f'Need an SVTYPE to import from vcf records for {vcf_rec}', error_type='syntax')
         rec_type_str = vcf_info['OP_TYPE']
+
         chk(rec_type_str in {variant_type for variant_type in self.can_import_types},
             f'Currently only the following VCF types are supported: {self.can_import_types} but {rec_type_str} was provided',
             error_type='syntax')
+
         if rec_type_str not in self.op_types:
             parsed_info['OP_TYPE'] = VariantType(rec_type_str)
         else:
@@ -878,6 +933,10 @@ class ImportedVariantSet(VariantSet):
 
         if 'GRAMMAR' in vcf_info:
             parsed_info['GRAMMAR'] = vcf_info['GRAMMAR']
+
+        if not (rec_len <= 50 and (rec_type_str == 'INS' or rec_type_str == 'INV' or vcf_info['SVTYPE'] == 'SNP' or
+                              ('SVTYPE' in vcf_info and (vcf_info['SVTYPE'] == 'INS' or vcf_info['SVTYPE'] == 'INV')))):
+            check(not parsed_info['OVERLAP_SV'], f'ALLOW_OVERLAP_SV only allowed for SNPs or INDELs. But, {vcf_rec} was provided.')
 
         rec_target = None
         is_interchromosomal = False
@@ -1122,12 +1181,11 @@ VARIANT_SET_CLASSES: list[Type[VariantSet]] = [
 
 
 def make_variant_set_from_config(vset_config, config) -> list[SV]:  # type: ignore
-    with error_context(vset_config, config):
-        for variant_set_class in VARIANT_SET_CLASSES:
-            if variant_set_class.can_make_from(vset_config):
-                variant_set = variant_set_class(vset_config, config)
-                return variant_set.make_variant_set(), variant_set.overlap_ranges, variant_set.overlap_kinds, variant_set.overlap_mode, variant_set.header
-        chk(False, f"The format of the config or the sv_type is not supported {vset_config}")
+    for variant_set_class in VARIANT_SET_CLASSES:
+        if variant_set_class.can_make_from(vset_config):
+            variant_set = variant_set_class(vset_config, config)
+            return variant_set.make_variant_set(), variant_set.overlap_ranges, variant_set.overlap_kinds, variant_set.overlap_mode, variant_set.header
+    chk(False, f"The format of the config or the sv_type is not supported {vset_config}")
 
 
 VCF_HEADER_INFOS = [
@@ -1157,6 +1215,8 @@ VCF_HEADER_INFOS = [
          description="Type of ROI on which the insertion target of an SV component was placed"),
     dict(id='OVLP_TYPE', number=1, type='String',
          description="Type of overlap with the ROI"),
+    dict(id='ALLOW_OVERLAP_SV', number=1, type='String',
+         description="If this record was allowed to overlap with other SVs."),
     dict(id='SVID', number=1, type='String',
          description="ID of parent SV of which this record is one part"),
     dict(id='SVTYPE', number=1, type='String',

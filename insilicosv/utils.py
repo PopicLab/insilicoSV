@@ -13,6 +13,8 @@ import pysam
 from sortedcontainers import SortedSet  # type: ignore
 from copy import deepcopy
 
+from insilicosv.sv_defs import Operation
+
 logger = logging.getLogger(__name__)
 
 def if_not_none(a, b):
@@ -118,6 +120,9 @@ class Region:
     orig_start: int = -1
     orig_end: int = -1
 
+    # keep the operation in the region for the source regions of overlapping SVs
+    operation: Optional[Operation] = None
+
     def __post_init__(self):
         assert self.chrom
         assert self.start <= self.end
@@ -193,7 +198,8 @@ class RegionSet:
         for chrom, chrom2region in chrom2regions.items():
             if len(chrom2region) > 100000:
                 logger.debug(f'RegionSet init: {chrom=} {len(chrom2region)=}')
-            self.chrom2itree[chrom] = IntervalTree.from_tuples((region.start, region.end, region)
+                # Padding to allow insertion target regions
+            self.chrom2itree[chrom] = IntervalTree.from_tuples((region.start - 0.1, region.end + 0.1, region)
                                                                 for region in chrom2region)
 
 
@@ -204,7 +210,7 @@ class RegionSet:
     def strictly_contains_point(self, point, chrom):
         overlap = list(self.chrom2itree[chrom].at(point))
         for interval in overlap:
-            if interval.begin < point < interval.end:
+            if interval.data.start < point < interval.data.end:
                 return True
         return False
 
@@ -295,10 +301,6 @@ class RegionSet:
 
     def add_region(self, region):
         aux_region = deepcopy(region)
-        # Insertion points are empty intervals which are not supported. We add a padding.
-        if aux_region.start == aux_region.end:
-            aux_region = aux_region.replace(start=max(aux_region.start - 0.5, aux_region.orig_start),
-                               end=min(aux_region.end + 0.5, aux_region.orig_end))
         self.add_region_set(RegionSet([aux_region]))
 
     def chop(self, sv_region):
@@ -308,14 +310,15 @@ class RegionSet:
 
         def adjust_region(ival, is_begin):
             if is_begin:
-                new_region = ival.data.replace(end=sv_region.start)
+                new_region = ival.data.replace(end=round(sv_region.start))
             else:
-                new_region = ival.data.replace(start=sv_region.end)
+                new_region = ival.data.replace(start=round(sv_region.end))
             if new_region.start == new_region.end:
                 return None
             return new_region
 
-        chrom_itree.chop(sv_region.start, sv_region.end, datafunc=adjust_region)
+        # Pad to fully remove insertion target
+        chrom_itree.chop(sv_region.start-0.1, sv_region.end+0.1, datafunc=adjust_region)
 # end class RegionSet
 
 def percent_N(seq):

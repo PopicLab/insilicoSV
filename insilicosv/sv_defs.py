@@ -61,8 +61,6 @@ class Operation:
 
     motif: Optional[str] = None
 
-    genotype: Optional[tuple] = None
-
     @property
     def transform_type(self):
         return self.transform.transform_type
@@ -161,6 +159,11 @@ class SV(ABC):
 
     # Fields used while finding a placement
     num_valid_placements: int = 0
+
+    # Probability to introduce mutations in a region of the genome
+    mutation_ratio: Optional[float] = 0
+    length_ranges: Optional[tuple[int, int]] = None
+    enable_overlap_sv: Optional[bool] = False
 
     def __post_init__(self):
         assert self.sv_id
@@ -292,12 +295,14 @@ class VariantType(Enum):
     dupINVdel = "dupINVdel"
 
     SNP = "SNP"
+    INDEL= "INDEL"
     DIVERGENCE = "DIVERGENCE"
 
-    Custom = "Custom"
+    CUSTOM = "Custom"
 
     trEXP = "trEXP"
     trCON = "trCON"
+
 
 
 class BaseSV(SV):
@@ -532,7 +537,7 @@ SV_KEY = {
 
     VariantType.DIVERGENCE: (("A",), ("A*",)),
     VariantType.SNP: (("A",), ("A*",)),
-    VariantType.INDEL: (),
+    VariantType.INDEL: ((), ()),
 }
 
 

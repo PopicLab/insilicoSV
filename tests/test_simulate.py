@@ -1484,6 +1484,14 @@ class TestSVSimulator(unittest.TestCase):
                                             "random_seed": 2,
                                             "variant_sets": [{'import': self.import_test}]}],
                                     self.hap1, self.hap2, self.bed), ['TCGAGACGTTCG', 'TCGATCCGA']],
+
+            ['TCGA', TestObject([self.ref_file, {"chr1": "TCGA"}],
+                                    [self.par, {"reference": self.ref_file,
+                                                "random_seed": 2,
+                                                "variant_sets": [{'type': "ABCD->ABCDBABDC",
+                                                                  'number': 1,
+                                                "length_ranges": [[1, 1], [1, 1], [1, 1], [1, 1]]}]}],
+                                    self.hap1, self.hap2, self.bed), ['TCGACTCAG']],
         ]
 
     def tearDown(self):
