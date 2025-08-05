@@ -16,6 +16,7 @@ import numpy as np
 from intervaltree import Interval, IntervalTree
 from pysam import FastaFile
 import yaml
+import copy
 
 from insilicosv import utils, __version__
 from insilicosv.utils import (
@@ -42,8 +43,6 @@ class SVSimulator:
 
     config: dict[str, Any]
     svs: list[SV]
-    # Store the SVs simulated from mutation ratios separately
-    mutation_ratio_svs: list[SV]
     # Region set containing ROI regions to enforce overlapping constraints
     rois_overlap: list[Region]
     # Region set defined by the reference updated to keep track of the available regions.
@@ -198,13 +197,11 @@ class SVSimulator:
     def run(self):
         self.construct_svs()
         self.load_rois()
-        self.place_mutation_rate_svs()
         self.place_svs()
         self.output_results()
 
     def construct_svs(self):
         self.svs = []
-        self.mutation_ratio_svs = []
         logger.info('Constructing SVs from {} categories'.format(len(self.config['variant_sets'])))
         for vset_num, variant_set_config in enumerate(self.config['variant_sets']):
             variant_set_config['VSET'] = vset_num
@@ -215,10 +212,7 @@ class SVSimulator:
             self.overlap_kinds[vset_num] = kinds
             self.overlap_modes[vset_num] = mode
 
-            if vset_svs[0].mutation_ratio:
-                self.mutation_ratio_svs.extend(vset_svs)
-            else:
-                self.svs.extend(vset_svs)
+            self.svs.extend(vset_svs)
 
             if vset_svs[0].enable_overlap_sv:
                 self.has_overlap_sv = True
@@ -235,42 +229,8 @@ class SVSimulator:
 
     def update_overlap_svs(self, sv):
         for region in sv.get_regions():
-            region = region.replace(operation, sv.operations)
-            self.overlap_sv_regions.add_region(region)
-
-    def place_mutation_rate_svs(self):
-        logger.info(f'Placing SNPs and INDELs defined by mutation rate')
-        snp_counter = 0
-        for sv in self.mutation_ratio_svs:
-            # GET REGIONS (REMOVE BLACKLIST and overlap_SVs, GET ANCHORED REGIONS ONLY FROM AVAILABLE REGIONS, IF SOME REGIONS ARE SINGLED OUT BY A TYPE OF SV SHOULD NOT BE AFFECTED BY MORE GENERAL ONES of the same type)
-            # IF INDEL ALSO RANDOMLY DRAW INS or DEL
-            # RANDOMLY SELECT positions in the region with prob the mutation ratio, might overlap
-            # For INDELs draw a length in the range
-
-            # Identify the available regions after blacklisting and overlap constraints,
-            # compute the total available length and infer the number of SVs to place
-            available_length = 0
-            reference_regions = self.reference_regions
-            if sv.enable_overlap_sv:
-                reference_regions = self.reference_sv_overlap_regions
-
-            blacklist_regions = self.get_relevant_blacklist_regions(sv.blacklist_filter)
-
-            # We want all the regions that fulffil hte minimum size requirements
-            overlap_regions = []
-            if sv.overlap_mode:
-                anchor_length = max(sv.length_ranges[0][0], sv.overlap_ranges[0][0])
-                overlap_rois = self.rois_overlap[sv.info['VSET']]
-                for roi in overlap_rois:
-                    valid_region, ref_roi = self.check_interval_overlap(roi, reference_regions, sv.roi_filter, anchor_length, sv.overlap_mode)
-
-            if not sv.enable_overlap_sv:
-                self.update_available_reference(sv)
-            else:
-                self.update_overlap_svs(sv)
-
-        logger.info(f'Placed {snp_counter} SNPs and INDELs defined by mutation rate')
-
+            self.overlap_sv_regions.add_region(region, sv=sv)
+            self.reference_sv_overlap_regions.chop(region)
 
     def place_svs(self):
         # Currently, we place SVs one at a time.
@@ -378,7 +338,7 @@ class SVSimulator:
                                                          blacklist_regions.strictly_contains_point(region.end, region.chrom)):
             return None, None
         ref_roi = self.get_reference_interval(region, reference_regions)
-        if (len(ref_roi) != 1) or (breakend + roi_length > ref_roi[0].end):
+        if (len(ref_roi) != 1) or (breakend + roi_length > ref_roi[0].data.end):
             return None, None
         return region, ref_roi[0].data
 
@@ -442,7 +402,7 @@ class SVSimulator:
         return roi.data, ref_roi.data
 
     # Provides a list of valid rois and weights corresponding to their length to uniformly draw from
-    def get_overlap_region(self, sv_category, roi_index, init_roi, anchor_length=None,
+    def get_overlap_region(self, sv_category, roi_index, init_roi, reference_regions, anchor_length=None,
                            overlap_mode=None, roi_filter=None):
         # The region is constrained we use the interval tree defined from the bed file
         roi_list = self.rois_overlap[sv_category]
@@ -450,7 +410,7 @@ class SVSimulator:
         for region in (roi_list[roi_index:] + roi_list[:init_roi]):
             roi_index = (roi_index + 1) % len(roi_list)
             if not roi_filter.satisfied_for(region): continue
-            valid_region, ref_roi = self.check_interval_overlap(region, roi_filter, anchor_length, overlap_mode)
+            valid_region, ref_roi = self.check_interval_overlap(region, reference_regions, roi_filter, anchor_length, overlap_mode)
             if valid_region is not None:
                 return valid_region, ref_roi.data, roi_index
         return None, None, None
@@ -682,7 +642,7 @@ class SVSimulator:
                             right_bound = (roi.start - bound) if backward else self.chrom_lengths[roi.chrom]
                         if left_bound > right_bound: return None
                         containing_region = Region(chrom=roi.chrom, start=left_bound, end=right_bound)
-                    roi, ref_roi = self.get_breakend(reference_regions,
+                    roi, ref_roi = self.get_breakend(self.reference_regions,
                                                      avoid_chrom=avoid_chrom,
                                                      blacklist_regions=blacklist_regions,
                                                      containing_region=containing_region,
@@ -735,6 +695,7 @@ class SVSimulator:
             if sv.anchor is not None:
                 roi, ref_roi, roi_index = self.get_overlap_region(sv_category=sv_set,
                                                                   anchor_length=sv.get_anchor_length(),
+                                                                  reference_regions=reference_regions,
                                                                   overlap_mode=sv.overlap_mode,
                                                                   roi_filter=sv.roi_filter,
                                                                   roi_index=roi_index,

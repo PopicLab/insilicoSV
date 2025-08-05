@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import dataclasses
 from dataclasses import dataclass
 from copy import copy
 from enum import Enum
@@ -31,6 +32,10 @@ class Transform:
                 (self.is_in_place and self.divergence_prob == 0 and self.replacement_seq is None))
         chk(0 <= self.divergence_prob <= 1, f'Invalid divergence probability, please specify a value between 0 and 1 {self.divergence_prob} provided.',
             error_type='value')
+
+    def replace(self, **kw):
+        """Return a copy of self with fields replaced according to `kw`"""
+        return dataclasses.replace(self, **kw)
 
 Breakend: TypeAlias = int
 
@@ -160,9 +165,7 @@ class SV(ABC):
     # Fields used while finding a placement
     num_valid_placements: int = 0
 
-    # Probability to introduce mutations in a region of the genome
-    mutation_ratio: Optional[float] = 0
-    length_ranges: Optional[tuple[int, int]] = None
+    # If a SNP or INDEL can be overlapped by other SVs
     enable_overlap_sv: Optional[bool] = False
 
     def __post_init__(self):
@@ -387,7 +390,7 @@ class BaseSV(SV):
                     # Find the original and altered bases.
                     alts = str(if_not_none(alleles[0], ''))
                     if (alleles[1] is not None) and (alleles[1] != alleles[0]):
-                        alts += ', '*(len(alts)) + str(if_not_none(alleles[1], ''))
+                        alts += ','*(len(alts)) + str(if_not_none(alleles[1], ''))
                     alleles = [operation.transform.orig_seq, '%s' % alts]
                 elif sv_type_str == 'INDEL':
                     alleles = ['<INS>', operation.novel_insertion_seq]
@@ -398,6 +401,9 @@ class BaseSV(SV):
                     alleles = ['N', '<%s>' % sv_type_str]
             sv_info['SVID'] = rec_id
             sv_info['SVTYPE'] = sv_type_str
+
+            if self.enable_overlap_sv:
+                sv_info['ENABLE_OVERLAP_SV'] = str(True)
 
             for key, value in operation.op_info.items():
                 sv_info[key] = value

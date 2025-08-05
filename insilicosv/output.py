@@ -5,7 +5,6 @@ import os
 import os.path
 import re
 from pysam import VariantFile
-import copy
 
 from insilicosv import utils
 from insilicosv.utils import Region, Locus, if_not_none
@@ -115,12 +114,14 @@ PafRecord = namedtuple('PafRecord', [
 
 class OutputWriter:
 
-    def __init__(self, svs, reference, chrom_lengths, output_path, config):
+    def __init__(self, svs, overlap_sv_regions, reference, chrom_lengths, output_path, config):
         self.svs = svs
         self.reference = reference
         self.chrom_lengths = chrom_lengths
         self.output_path = output_path
         self.config = config
+        self.overlap_sv_regions = overlap_sv_regions
+        self.homozygous_only = config.get('homozygous_only', False)
 
     def output_haps(self):
         if self.config.get('output_no_haps', False):
@@ -130,8 +131,10 @@ class OutputWriter:
             self.output_hap(os.path.join(self.output_path, hap_fa), hap_index)
 
     def output_hap(self, hap_fa, hap_index):
+        # paf format: https://cran.r-project.org/web/packages/pafr/vignettes/Introduction_to_pafr.html
         paf_records = []
         hap_chrom_lengths = {}
+        paf_mapq = 60
         with open(hap_fa, 'w') as sim_fa:
             chrom2operations: dict[str, list[Operation]] = self.get_chrom2operations(hap_index)
             for chrom, chrom_length in zip(self.reference.references, self.reference.lengths):
@@ -140,71 +143,98 @@ class OutputWriter:
                 sim_fa.write(f'>{hap_chrom}\n')
 
                 hap_chrom_pos = 0
-                for operation in chrom2operations[chrom]:
-                    # paf format: https://cran.r-project.org/web/packages/pafr/vignettes/Introduction_to_pafr.html
-                    paf_mapq = 60
-                    n_copies = operation.transform.n_copies
-                    if operation.motif is not None:
-                        # In the trEXP case the number of copies is encoded in the motif
-                        n_copies = 1
-                    for _ in range(n_copies):
+
+                for overlapping_operations in chrom2operations[chrom]:
+                    # The non-overlapping operation if any is at the end
+                    sv_region = overlapping_operations[-1].target_region
+                    if overlapping_operations[-1].source_region:
+                        sv_region = overlapping_operations[-1].source_region
+
+                    seq = self.reference.fetch(
+                                            reference=sv_region.chrom,
+                                            start=sv_region.start,
+                                            end=sv_region.end)
+                    position_shifts = []
+                    length_shift = 0
+                    # To change the position referential and find the start index of the operation in seq
+                    for op_idx, operation in enumerate(overlapping_operations):
+                        relative_position = sv_region.start
+                        n_copies = operation.transform.n_copies
+                        if operation.motif is not None:
+                            # In the trEXP case the number of copies is encoded in the motif
+                            n_copies = 1
+                        target_start = operation.target_region.start
+                        operation_start = operation_end = target_start
+                        if operation.source_region:
+                            operation_start = operation.source_region.start
+                            # Represents the end of the operation for position_shifts
+                            operation_end = operation.source_region.end
+                        # Represents the length of the sequence affected by the operation
+                        operation_length = operation_end - operation_start
+                        if op_idx == len(overlapping_operations) - 1:
+                            # The original SV is encompassing all the overlapped INS, its length has to be adapted
+                            operation_length += length_shift
+
+                        total_shift = 0
+                        position_idx= 0
+                        # Get the current position of the SV adapted after INS and DEL
+                        for idx, (shift_type, shift_start, shift_length) in enumerate(position_shifts):
+                            if shift_start < operation_start:
+                                # the current operation starts after, shift accordingly
+                                current_shift = shift_length
+                                if shift_type == 'DEL':
+                                    current_shift = -shift_length
+                                total_shift += current_shift
+                            else:
+                                # The remaining shift intervals are after the current operation
+                                position_idx = idx
+                                break
+
+                        # If INS or DEL, we adapt the shift
+                        if operation.novel_insertion_seq:
+                            position_shifts.insert(position_idx,
+                                                   ('INS', operation_start, len(operation.novel_insertion_seq)))
+                            length_shift += len(operation.novel_insertion_seq)
+                        elif operation.transform_type == TransformType.DEL:
+                            position_shifts.insert(position_idx,
+                                                   ('DEL', operation_start, operation_end - operation_start))
+
                         if operation.transform_type == TransformType.DEL:
-                            assert operation.source_region is not None
-                            target_end = operation.source_region.end
-                            length = operation.source_region.length()
-                            seq = None
-                            if operation.motif is not None:
-                                length = len(operation.motif)
-                                target_end = operation.source_region.start + length
-                                # the rest of the tandem repeat region is kept
-                                seq = self.reference.fetch(
-                                            reference=operation.source_region.chrom,
-                                            start=target_end,
-                                            end=operation.source_region.end)
-                            elif length <= 50:
+                            if operation_length <= 50:
+                                # INDEL we report the original sequence
                                 orig_seq = self.reference.fetch(
                                     reference=operation.source_region.chrom,
-                                    start=operation.source_region.start,
-                                    end=target_end)
-                                operation.transform = Transform(operation.transform_type,
-                                                            is_in_place=operation.transform.is_in_place,
-                                                            n_copies=operation.transform.n_copies,
-                                                            divergence_prob=operation.transform.divergence_prob,
-                                                            orig_seq=orig_seq)
+                                    start=operation_start,
+                                    end=operation_end)
+                                operation.transform = operation.transform.replace(orig_seq=orig_seq)
+
+                            start_in_region = operation_start - relative_position
+                            # Apply the DEL
+                            seq = seq[:start_in_region + total_shift] + seq[
+                                                                        start_in_region + operation_length + total_shift:]
+
                             paf_rec = PafRecord(
                                 query_name=hap_chrom, query_length=None,
                                 query_start=hap_chrom_pos, query_end=hap_chrom_pos,
                                 strand='+',
                                 target_name=operation.source_region.chrom,
                                 target_length=self.chrom_lengths[operation.source_region.chrom],
-                                target_start=operation.source_region.start,
-                                target_end=target_end,
-                                residue_matches=0, alignment_block_length=length,
+                                target_start=operation_start,
+                                target_end=operation_end,
+                                residue_matches=0, alignment_block_length=operation_length,
                                 mapping_quality=paf_mapq,
                                 tags=f'cg:Z:{operation.source_region.length()}D')
                         else:
-                            if operation.source_region is not None:
-                                if operation.motif is None:
-                                    seq = self.reference.fetch(
-                                        reference=operation.source_region.chrom,
-                                        start=operation.source_region.start,
-                                        end=operation.source_region.end)
-                                else:
-                                    seq = operation.motif
-                                paf_rec = PafRecord(
-                                    query_name=hap_chrom, query_length=None,
-                                    query_start=hap_chrom_pos, query_end=hap_chrom_pos + len(seq),
-                                    strand='+',
-                                    target_name=operation.source_region.chrom,
-                                    target_length=self.chrom_lengths[operation.source_region.chrom],
-                                    target_start=operation.source_region.start,
-                                    target_end=operation.source_region.end,
-                                    residue_matches=len(seq), alignment_block_length=len(seq),
-                                    mapping_quality=paf_mapq,
-                                    tags=f'cg:Z:{len(seq)}M')
-                            else:
-                                assert operation.novel_insertion_seq is not None
-                                seq = operation.novel_insertion_seq
+                            # The operation is not a DEL
+                            # Position of the operation inside the sequence
+                            operation_start = operation_start - relative_position
+
+
+                            # Modify the sequence
+                            operation_start = operation_start + total_shift
+                            modified_seq = seq[operation_start:operation_start + operation_length]
+                            if operation.novel_insertion_seq:
+                                modified_seq = operation.novel_insertion_seq
                                 paf_rec = PafRecord(
                                     query_name=hap_chrom, query_length=None,
                                     query_start=hap_chrom_pos, query_end=hap_chrom_pos + len(seq),
@@ -216,41 +246,65 @@ class OutputWriter:
                                     residue_matches=0, alignment_block_length=len(seq),
                                     mapping_quality=paf_mapq,
                                     tags=f'cg:Z:{len(seq)}I')
+                            else:
 
-                            if operation.transform_type == TransformType.INV:
-                                seq = utils.reverse_complement(seq)
-                                paf_rec = paf_rec._replace(strand='-')
-                            if operation.transform.divergence_prob > 0:
-                                orig_seq = self.reference.fetch(reference=operation.source_region.chrom,
-                                                                start=operation.source_region.start,
-                                                                end=operation.source_region.end)
-                                if not operation.transform.replacement_seq:
-                                    replacement_seq = utils.divergence(seq, operation.transform.divergence_prob)
-                                    haplotypes = [replacement_seq if operation.genotype[hap] else None for hap in [0, 1]]
+                                if operation.motif:
+                                    # TR
+                                    modified_seq = operation.motif
 
-                                    operation.transform = Transform(operation.transform_type,
-                                                                    is_in_place=operation.transform.is_in_place,
-                                                                    n_copies=operation.transform.n_copies,
-                                                                    divergence_prob=operation.transform.divergence_prob,
-                                                                    replacement_seq=haplotypes, orig_seq=orig_seq)
-                                seq = operation.transform.replacement_seq[hap_index]
-                                assert len(seq) == len(orig_seq)
-                        if seq is not None:
-                            sim_fa.write(seq)
-                            hap_chrom_pos += len(seq)
+                                strand = '+'
+                                if operation.transform_type == TransformType.INV:
+                                    modified_seq = utils.reverse_complement(modified_seq)
+                                    strand = '-'
 
-                        # end: if operation.transform_type == TransformType.DEL:
+                                paf_rec = PafRecord(
+                                    query_name=hap_chrom, query_length=None,
+                                    query_start=hap_chrom_pos, query_end=hap_chrom_pos + len(modified_seq),
+                                    strand=strand,
+                                    target_name=operation.source_region.chrom,
+                                    target_length=self.chrom_lengths[operation.source_region.chrom],
+                                    target_start=operation_start,
+                                    target_end=operation_end,
+                                    residue_matches=len(modified_seq), alignment_block_length=len(modified_seq),
+                                    mapping_quality=paf_mapq,
+                                    tags=f'cg:Z:{len(modified_seq)}M')
 
-                        assert paf_rec is not None
+                                # For a DUP or an mCNV apply the correct number of copies
+                                modified_seq = modified_seq * n_copies
 
-                        if operation.op_info and operation.op_info.get('SVID'):
-                            sv_id = operation.op_info['SVID']
-                            paf_rec = paf_rec._replace(tags=paf_rec.tags + f'\tsv:Z:{sv_id}')
-                        paf_records.append(paf_rec)
-                    # end: for _ in range(operation.transform.n_copies):
-                # end: for operation in chrom2operations[chrom]
+                            if operation.transform.divergence_prob > 0 or operation.transform.replacement_seq:
+                                # There is a divergence
+                                if operation.transform.replacement_seq is None or operation.transform.replacement_seq[
+                                    hap_index] is None:
+                                    # Insure the haplotypes respect the genotype specified and store it for writing in the VCF
+                                    replacement_seq = utils.divergence(modified_seq,
+                                                                       operation.transform.divergence_prob)
+                                    if not operation.transform.replacement_seq:
+                                        haplotypes = [replacement_seq if hap == hap_index else None for hap in [0, 1]]
+                                    elif not self.homozygous_only:
+                                        # The SNP can be homozygous or heterozygous with two different alleles
+                                        haplotypes = [operation.transform.replacement_seq[0], replacement_seq]
+                                    else:
+                                        # The SNP is homozygous
+                                        haplotypes = [operation.transform.replacement_seq[0],
+                                                      operation.transform.replacement_seq[0]]
 
-                hap_chrom_lengths[hap_chrom] = hap_chrom_pos
+                                     # Retain the replacement_seq and orig_seq for applying to other copies and to write in the VCF output
+                                    operation.transform = operation.transform.replace(replacement_seq=haplotypes,
+                                                                                      orig_seq=modified_seq)
+
+                                modified_seq = operation.transform.replacement_seq[hap_index]
+
+                            if operation.op_info and operation.op_info.get('SVID'):
+                                sv_id = operation.op_info['SVID']
+                                paf_rec = paf_rec._replace(tags=paf_rec.tags + f'\tsv:Z:{sv_id}')
+
+                            seq = seq[:operation_start] + modified_seq + seq[operation_start + operation_length:]
+                        if paf_rec:
+                            paf_records.append(paf_rec)
+                    if seq:
+                        hap_chrom_lengths[hap_chrom] = hap_chrom_pos
+                        sim_fa.write(seq)
                 sim_fa.write('\n')
             # end: for chrom, chrom_length in zip(...)
         # end: with open(hap_fa, 'w') as sim_fa
@@ -370,41 +424,75 @@ class OutputWriter:
         by SVs."""
         chrom2operations = defaultdict(list)
         target_region2transform = {}
+        placed_overlap_sv = []
         for sv in self.svs:
-            assert sv.genotype is not None
-            if sv.genotype[hap_index]:
-                for operation in sv.operations:
-                    assert operation.target_region is not None
-                    if operation.is_in_place:
-                        if operation.target_region in target_region2transform:
-                            assert (operation.transform ==
-                                    target_region2transform[operation.target_region])
-                            continue
-                        target_region2transform[operation.target_region] = operation.transform
+            # If the SV is on the other haplotype or overlapping it will be treated later
+            if not sv.genotype[hap_index] or sv.enable_overlap_sv: continue
 
-                    if operation.op_info is None:
-                        operation.op_info = dict()
-                    operation.op_info['SVID'] = sv.sv_id
-                    if operation.transform.divergence_prob > 0:
-                        operation.genotype = sv.genotype
-                    chrom2operations[operation.target_region.chrom].append(operation)
+            for operation in sv.operations:
+                assert operation.target_region is not None
+                if operation.is_in_place:
+                    if operation.target_region in target_region2transform:
+                        assert (operation.transform ==
+                                target_region2transform[operation.target_region])
+                        continue
+                    target_region2transform[operation.target_region] = operation.transform
+
+                if operation.op_info is None:
+                    operation.op_info = dict()
+                operation.op_info['SVID'] = sv.sv_id
+                if operation.transform.divergence_prob > 0:
+                    operation.genotype = sv.genotype
+
+                overlapping_region = [operation]
+                overlap_sv = self.overlap_sv_regions.chrom2itree[operation.target_region.chrom].overlap(operation.target_region.start,
+                                                                                            operation.target_region.end)
+                region_to_overlap_start = operation.target_region.start
+                region_to_overlap_end = operation.target_region.end
+                is_placed = True
+                if operation.source_region  and operation.source_region != operation.target_region:
+                    # In the case of a duplication, a change in the source has to be reflected on the target
+                    overlap_sv = self.overlap_sv_regions.chrom2itree[operation.target_region.chrom].overlap(operation.source_region.start,
+                                                                                                            operation.source_region.end)
+                    region_to_overlap_start = operation.source_region.start
+                    region_to_overlap_end = operation.source_region.end
+                    # The overlapping SV still has to be placed on the source region
+                    is_placed = False
+
+                for overlap in overlap_sv:
+                    sv = overlap.data.sv
+                    if sv.genotype[hap_index] and not (overlap.data.start < region_to_overlap_start or
+                    overlap.data.end > region_to_overlap_end or overlap.data.start == overlap.data.end == region_to_overlap_start
+                    or overlap.data.start == overlap.data.end == region_to_overlap_end):
+                        # We do not consider SVs at the boundaries as overlapping
+                        overlapping_region.insert(0, sv.operations[0])
+                        if is_placed:
+                            placed_overlap_sv.append(overlap)
+
+                chrom2operations[operation.target_region.chrom].append(overlapping_region)
+
+        for chrom, tree in self.overlap_sv_regions.chrom2itree.items():
+            for overlap_regions in tree:
+                sv = overlap_regions.data.sv
+                if sv.genotype[hap_index] and not overlap_regions in placed_overlap_sv:
+                    chrom2operations[chrom].append([sv.operations[0]])
 
         for chrom, chrom_length in self.chrom_lengths.items():
             target_regions = sorted([Region(chrom=chrom, start=0, end=0)] + 
-                                    [operation.target_region for operation in chrom2operations[chrom]] +
+                                    [operations[-1].target_region for operations in chrom2operations[chrom]] +
                                     [Region(chrom=chrom, start=chrom_length, end=chrom_length)])
 
-            intersv_ops = [Operation(
+            intersv_ops = [[Operation(
                 transform=Transform(transform_type=TransformType.IDENTITY,
                                     is_in_place=True),
                 source_breakend_region=BreakendRegion(0,1),
                 placement=[Locus(chrom, target_region1.end),
-                           Locus(chrom, target_region2.start)])
+                           Locus(chrom, target_region2.start)])]
                 for target_region1, target_region2 in utils.pairwise(target_regions)
                 if target_region2.start > target_region1.end]
             
             chrom2operations[chrom].extend(intersv_ops)
-            chrom2operations[chrom].sort(key=lambda operation: operation.target_region)
+            chrom2operations[chrom].sort(key=lambda operation: operation[-1].target_region)
         return chrom2operations
 
     def output_novel_insertions(self):

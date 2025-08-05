@@ -13,8 +13,6 @@ import pysam
 from sortedcontainers import SortedSet  # type: ignore
 from copy import deepcopy
 
-from insilicosv.sv_defs import Operation
-
 logger = logging.getLogger(__name__)
 
 def if_not_none(a, b):
@@ -121,7 +119,7 @@ class Region:
     orig_end: int = -1
 
     # keep the operation in the region for the source regions of overlapping SVs
-    operation: Optional[Operation] = None
+    sv: Optional['SV'] = None
 
     def __post_init__(self):
         assert self.chrom
@@ -299,8 +297,10 @@ class RegionSet:
         for chrom, other_chrom_itree in other_region_set.chrom2itree.items():
             self.chrom2itree[chrom].update(other_chrom_itree)
 
-    def add_region(self, region):
+    def add_region(self, region, sv=None):
         aux_region = deepcopy(region)
+        if sv:
+            aux_region = aux_region.replace(sv=sv)
         self.add_region_set(RegionSet([aux_region]))
 
     def chop(self, sv_region):
