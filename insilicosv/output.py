@@ -5,6 +5,8 @@ import os
 import os.path
 import re
 from pysam import VariantFile
+import copy
+from functools import cmp_to_key
 
 from insilicosv import utils
 from insilicosv.utils import Region, Locus, if_not_none
@@ -461,11 +463,52 @@ class OutputWriter:
 
                 for overlap in overlap_sv:
                     sv = overlap.data.sv
-                    if sv.genotype[hap_index] and not (overlap.data.start < region_to_overlap_start or
-                    overlap.data.end > region_to_overlap_end or overlap.data.start == overlap.data.end == region_to_overlap_start
-                    or overlap.data.start == overlap.data.end == region_to_overlap_end):
+                    if sv.genotype[hap_index] and not ( overlap.data.start <= overlap.data.end == region_to_overlap_start
+                    or region_to_overlap_end == overlap.data.start <= overlap.data.end):
                         # We do not consider SVs at the boundaries as overlapping
-                        overlapping_region.insert(0, sv.operations[0])
+                        overlapping_operation = sv.operations[0]
+
+                        if (overlap.data.start < region_to_overlap_start < overlap.data.end or
+                        overlap.data.start < region_to_overlap_end < overlap.data.end):
+                            # A non-contained overlapping DEL
+                            overlapping_start = max(overlap.data.start, region_to_overlap_start)
+                            overlapping_end = min(overlap.data.end, region_to_overlap_end)
+
+                            overlapping_operation = sv.operations[0]
+                            # Keep the information on the original position
+                            overlapping_operation.orig_start = overlap.data.start
+                            overlapping_operation.orig_end = overlap.data.end
+
+                            overlapping_operation.placement = [Locus(pos=overlapping_start, chrom=overlapping_operation.target_region.chrom),
+                                                     Locus(pos=overlapping_end, chrom=overlapping_operation.target_region.chrom)]
+
+                            # Add potential remaining left and right operations
+                            if overlapping_start > overlap.data.start:
+                                left_sv = copy.deepcopy(sv)
+                                left_operation = left_sv.operations[0]
+                                left_operation.placement = [
+                                    Locus(pos=overlap.data.start, chrom=overlapping_operation.target_region.chrom),
+                                    Locus(pos=region_to_overlap_start, chrom=overlapping_operation.target_region.chrom)]
+                                self.overlap_sv_regions.add_region(Region(chrom=overlapping_operation.target_region.chrom,
+                                                                          start=overlap.data.start,
+                                                                          end=region_to_overlap_start),
+                                                                          sv=left_sv)
+
+
+                            if overlapping_end < overlap.data.end:
+                                right_sv= copy.deepcopy(sv)
+                                right_operation = right_sv.operations[0]
+                                right_operation.placement = [
+                                    Locus(pos=region_to_overlap_end, chrom=overlapping_operation.target_region.chrom),
+                                    Locus(pos=overlap.data.end, chrom=overlapping_operation.target_region.chrom)]
+                                self.overlap_sv_regions.add_region(
+                                    Region(chrom=overlapping_operation.target_region.chrom,
+                                           start=region_to_overlap_end,
+                                           end=overlap.data.end),
+                                           sv=right_sv)
+
+
+                        overlapping_region.insert(0, overlapping_operation)
                         if is_placed:
                             placed_overlap_sv.append(overlap)
 
@@ -485,14 +528,60 @@ class OutputWriter:
             intersv_ops = [[Operation(
                 transform=Transform(transform_type=TransformType.IDENTITY,
                                     is_in_place=True),
+                op_info={'SVID': 'sv' + str(idx_id + len(self.svs))},
                 source_breakend_region=BreakendRegion(0,1),
                 placement=[Locus(chrom, target_region1.end),
                            Locus(chrom, target_region2.start)])]
-                for target_region1, target_region2 in utils.pairwise(target_regions)
+                for idx_id, (target_region1, target_region2) in enumerate(utils.pairwise(target_regions))
                 if target_region2.start > target_region1.end]
             
             chrom2operations[chrom].extend(intersv_ops)
-            chrom2operations[chrom].sort(key=lambda operation: operation[-1].target_region)
+
+            def compare_operations(operations1, operations2):
+                # The last operation of the list is the non-overlapping one if any, if not they will have the same target
+                operation1 = operations1[-1]
+                operation2 = operations2[-1]
+
+                # Primary sort: target_region_start
+                if operation1.target_region.start != operation2.target_region.start:
+                    return operation1.target_region.start - operation2.target_region.start
+
+                # Secondary sort: target_region_end if at least one of them is not an insertion target
+                if operation1.target_region.end != operation2.target_region.end:
+                    return operation1.target_region.end - operation2.target_region.end
+
+
+                # Tertiary sort: the operation comes from the same operation, the insertion order if provided has to be used
+                if (operation1.target_insertion_order and operation2.target_insertion_order and
+                        operation1.target_insertion_order[0] == operation2.target_insertion_order[0]):
+                    return operation1.target_insertion_order[1] - operation2.target_insertion_order[1]
+
+                # Quaternary case, different SVs, the insertion targets are inserted by proximity to the source if any (so DUPs are not separated form their copies)
+                if operation1.source_region:
+                   # Targets belong to the same chrom by design not source regions
+                    if (operation1.source_region.chrom == operation1.target_region.chrom and
+                            operation1.source_region.end == operation1.target_region.start):
+                        # operation1 is inserted right next to its source, on the right, it has to be first
+                        return -1
+                    elif (operation1.source_region.chrom == operation1.target_region.chrom and
+                          operation1.target_region.end == operation1.source_region.start):
+                        # operation1 is inserted right next to its source, on the left, it has to be second
+                        return 1
+
+                if operation2.source_region:
+                    if (operation2.source_region.chrom == operation2.target_region.chrom and
+                            operation2.source_region.end == operation2.target_region.start):
+                        # operation2 is inserted right next to its source, on the right, it has to be first
+                        return 1
+                    elif (operation2.source_region.chrom == operation2.target_region.chrom and
+                          operation2.target_region.end == operation2.source_region.start):
+                        # operation2 is inserted right next to its source, on the left, it has to be second
+                        return -1
+
+                # None of the operations are inserted at a position adjacent to the source, the order is arbitrary, we choose the svid
+                return operation1.op_info['SVID'] > operation2.op_info['SVID']
+            chrom2operations[chrom].sort(key=cmp_to_key(compare_operations))
+            print('CHROM', chrom, 'OPERATIONS', chrom2operations[chrom])
         return chrom2operations
 
     def output_novel_insertions(self):

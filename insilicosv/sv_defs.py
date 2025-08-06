@@ -66,6 +66,10 @@ class Operation:
 
     motif: Optional[str] = None
 
+    # To retain the information of the actual position of an overlapping DEL that was partially overlapping another SV
+    orig_start: Optional[int] = None
+    orig_end: Optional[int] = None
+
     @property
     def transform_type(self):
         return self.transform.transform_type
@@ -212,6 +216,7 @@ class SV(ABC):
         assert self.fixed_placement is None or self.overlap_mode is None
         assert self.genotype and sum(self.genotype)
         for operation in self.operations:
+            operation.op_info['SVID'] = self.sv_id
             if operation.target_insertion_order is not None:
                 operation.target_insertion_order = (self.sv_id,) + operation.target_insertion_order
 
@@ -343,6 +348,12 @@ class BaseSV(SV):
                 svlen = len(operation.novel_insertion_seq)
                 if config.get('output_vcf_ins_seq', True):
                     sv_info['INSSEQ'] = operation.novel_insertion_seq
+            elif operation.orig_start is not None:
+                # The SV is a DEL partially overlapping another SV
+                op_chrom = operation.source_region.chrom
+                op_start = operation.orig_start
+                op_end = operation.orig_end + 1
+                svlen = op_end - op_start - 1
             elif operation.source_region is not None:
                 op_chrom = operation.source_region.chrom
                 op_start = operation.source_region.start

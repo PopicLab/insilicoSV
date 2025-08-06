@@ -137,6 +137,8 @@ class TestSVSimulator(unittest.TestCase):
         self.import_snp_overlap = "tests/inputs/import_snp_overlap.vcf"
         self.import_test = "tests/inputs/import_test.vcf"
 
+        self.test_insertion_order_exact = "tests/inputs/test_insertion_order_exact.bed"
+
         self.test_objects_no_dis = [TestObject([self.ref_file, {
             "chr21": "CTCCGTCGTACTAGACAGCTCCCGACAGAGCACTGGTGTCTTGTTTCTTTAAACACCAGTATTTAGATGCACTATCTCTCCGT"}],
                                                [self.par,
@@ -1301,7 +1303,7 @@ class TestSVSimulator(unittest.TestCase):
                                                       },
                                                      {"import": self.import_del}]}],
                         self.hap1, self.hap2, self.bed),
-             ["C", "T", "A"]],
+             ["C", "T", "A", 'G']],
             ["TC",
              TestObject([self.ref_file, {"chr21": "TC"}],
                         [self.par, {"reference": self.ref_file, "random_seed": 2,
@@ -1418,7 +1420,7 @@ class TestSVSimulator(unittest.TestCase):
                                                       'length_ranges': [[2,2], [1,1]]
                                                       }]}],
                         self.hap1, self.hap2, self.bed),
-             ['G' + snp + 'C' for snp in 'CGA'] + ['GT' + snp for snp in 'TGA']
+             ['G' + snp + 'C' for snp in 'CGA'] + ['GT' + snp for snp in 'TGA'] + [snp +'TC' for snp in 'TCA']
              ]
 
         ]
@@ -1454,7 +1456,7 @@ class TestSVSimulator(unittest.TestCase):
                                                       }]}],
                         self.hap1, self.hap2, self.bed),
              ['TT', 'CC'] + [snp + 'TCTC' for snp in 'TCGA'] + ['T' + snp + 'CT' + snp + 'C' for snp in 'TCGA']
-             + ['TC' + snp + 'TC' for snp in 'TCGA']
+             + ['TCTC' + snp for snp in 'TCGA']
              ],
             ["TC",
              TestObject([self.ref_file, {"chr21": "TC"}],
@@ -1473,7 +1475,7 @@ class TestSVSimulator(unittest.TestCase):
                                                       }]}],
                         self.hap1, self.hap2, self.bed),
              ['TTTT', 'CCCC'] + [snp + 'TCTCTCTC' for snp in 'TCGA'] + ['T' + snp + 'CT' + snp + 'CT' + snp + 'CT' + snp + 'C' for snp in 'TCGA']
-             + ['TC' + snp + 'TCTCTC' for snp in 'TCGA']
+             + ['TCTCTCTC' + snp for snp in 'TCGA']
              ],
             ["TCG",
              TestObject([self.ref_file, {"chr21": "TCG"}],
@@ -1490,8 +1492,27 @@ class TestSVSimulator(unittest.TestCase):
                                                       'length_ranges': [[2,2], [1,1]]
                                                       }]}],
                         self.hap1, self.hap2, self.bed),
-             ['GC', 'GT', 'TC'] + ['G' + snp + 'TC' for snp in 'TCGA'] + ['GT' + snp + 'C' for snp in 'TCGA']
-                                                                       + [snp + 'GTC' for snp in 'TCGA']
+             ['GC', 'GT', 'TC'] + ['GTC' + snp for snp in 'TCGA'] + [snp + 'GTC' for snp in 'TCGA'] + ['GT' + snp + 'C' for snp in 'TCGA']
+             ],
+            ["TCGA",
+             TestObject([self.ref_file, {"chr21": "TCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "homozygous_only": True,
+                                    "random_seed": 2,
+                                    "variant_sets": [{"type": "INDEL",
+                                                      "number": 1,
+                                                      "length_ranges": [[2, 2]],
+                                                      "enable_overlap_sv": True
+                                                      },
+                                                     {"type": 'A_->_A',
+                                                      "number": 1,
+                                                      'length_ranges': [[2,2], [2,2]]
+                                                      }]}],
+                        self.hap1, self.hap2, self.bed),
+             ['TC', 'AT', 'TC', 'GA'] + ['GATC' + snp1 + snp2 for snp1 in 'TCGA' for snp2 in 'TCGA'] +
+             [snp1 + snp2 + 'GATC' for snp1 in 'TCGA' for snp2 in 'TCGA'] +
+             ['G' + snp1 + snp2 + 'ATC' for snp1 in 'TCGA' for snp2 in 'TCGA']
+             + ['GAT' + snp1 + snp2 + 'C' for snp1 in 'TCGA' for snp2 in 'TCGA']
              ],
             ["TCGA",
              TestObject([self.ref_file, {"chr21": "TCGA"}],
@@ -1510,15 +1531,63 @@ class TestSVSimulator(unittest.TestCase):
                                                       'length_ranges': [[2, 2]]
                                                       }]}],
                         self.hap1, self.hap2, self.bed),
-             ['TC' + snp for snp in 'TCGA'] + [snp + 'TC' for snp in 'TCGA'] + ['C', 'T', 'TC']
+             ['TC' + snp for snp in 'TCGA'] + [snp + 'TC' for snp in 'TCGA'] + ['T' + snp + 'C' for snp in 'TCGA'] + ['C', 'T', 'TC']
              ]
             ]
 
         self.simple_test_data = [
+            ["TCG",
+             TestObject([self.ref_file, {"chr21": "TCG"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    'overlap_regions': self.test_insertion_order_exact,
+                                    "variant_sets": [{"type": "(A)_->_A",
+                                                      "number": 1,
+                                                      'overlap_mode': 'exact',
+                                                      "length_ranges": [[1, 1], [2, 2]]},
+                                                     {"type": "A_->A_A",
+                                                      "number": 1,
+                                                      "length_ranges": [[1, 1], [1, 1]]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["CGTC"]],
+            ["TCG",
+             TestObject([self.ref_file, {"chr21": "TCG"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    "variant_sets": [{"type": "A_->_A",
+                                                      "number": 1,
+                                                      "length_ranges": [[1, 1], [1, 1]]},
+                                                     {"type": "INV",
+                                                      "number": 1,
+                                                      "length_ranges": [[1, 1]]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["GTG", "AGC", "CTC", "TCC"]],
+            ["TCG",
+             TestObject([self.ref_file, {"chr21": "TCG"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    "variant_sets": [{"type": "_A->A_",
+                                                      "number": 1,
+                                                      "length_ranges": [[1, 1], [1, 1]]},
+                                                     {"type": "INV",
+                                                      "number": 1,
+                                                      "length_ranges": [[1, 1]]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["CAG", "CTC", "AGC", "TGG"]],
             ["TCGAGG",
              TestObject([self.ref_file, {"chr21": "TCGAGG"}],
                         [self.par, {"reference": self.ref_file,
                                     "random_seed": 2,
+                                    'homozygous_only': True,
                                     "variant_sets": [{"type": "ABC->aBBBc",
                                                       "number": 1,
                                                       "length_ranges": [[2, 2], [2, 2], [2, 2]]}]}],
@@ -1527,6 +1596,7 @@ class TestSVSimulator(unittest.TestCase):
             [["TCGAGGTCAG", 'TCGAGGTCA'],
              TestObject([self.ref_file, {"chr21": "TCGAGGTCAG", 'chr20': 'TCGAGGTCA'}],
                         [self.par, {"reference": self.ref_file,
+                                    'homozygous_only': True,
                                     "random_seed": 2, 'filter_small_chr': 10,
                                     "overlap_regions": [self.test_overlap_bed_15],
                                     "variant_sets": [{"type": "A(BC)D->ADc",
@@ -1539,6 +1609,7 @@ class TestSVSimulator(unittest.TestCase):
              TestObject([self.ref_file, {"chr21": "TCGAGGTCAG"}],
                         [self.par, {"reference": self.ref_file,
                                     "random_seed": 2,
+                                    'homozygous_only': True,
                                     "overlap_regions": [self.test_overlap_bed_15],
                                     "variant_sets": [{"type": "A(BC)D->ADc",
                                                       "number": 1,
@@ -1572,7 +1643,9 @@ class TestSVSimulator(unittest.TestCase):
                       "length_ranges": [[2, 2], [2, 2]]}, ["TCTCTCGATC"]],
             ["TCGA", {"type": "AB->A+BAB+", "n_copies": [3, [1, 2]],
                       "length_ranges": [[2, 2], [2, 2]]}, ["TCTCTCGATCGA", "TCTCTCGATCGAGA"]],
-            ["TC", {"type": "INS", "length_ranges": [[1, 1]]}, ["TTC", "TCC", "TGC", "TAC", 'ATC']],
+            ["TC", {"type": "INS", "length_ranges": [[1, 1]]}, ["TC" + ins for ins in 'TCGA'] +
+                                                                [ins + "TC" for ins in 'TCGA'] +
+                                                                ["T" + ins + "C" for ins in 'TCGA']],
             ["TC", {"type": "A->B", 'novel_insertions': "tests/inputs/novel_insertions.bed",
                     "length_ranges": [[2, 2], [None, None]]}, ["GAG"]],
             ["TC", {"type": "A->BB", 'novel_insertions': "tests/inputs/novel_insertions.bed",
@@ -1599,7 +1672,7 @@ class TestSVSimulator(unittest.TestCase):
             ["TCGA", {"type": "rTRA", "length_ranges": [[2, 2], [2, 2], [None, None]]},
              ["GATC"]],
             ["TCGA", {"type": "rTRA", "length_ranges": [[2, 2], [1, 1], [None, None]]},
-             ["AGTC", "CGTA", "TACG", "GACT", "TGAC"]],
+             ["AGTC", "CGTA", "TACG", "GACT", "TGAC", 'GTCA']],
             ["TCGA", {"type": "rTRA", "length_ranges": [[2, 2], ["A", "A"], [None, None]]},
              ["GATC"]],
             ["TCGA", {"type": "rTRA", "length_ranges": [["B", "B"], [2, 2], [None, None]]},
@@ -1637,7 +1710,7 @@ class TestSVSimulator(unittest.TestCase):
 
             ["TCGA", {"type": "DUP_INV", "length_ranges": [[2, 2]]}, ["GAGAGA", "TCTCTC", "TCGCGA"]],
 
-            ["TCGA", {"type": "INV_DUP", "length_ranges": [[3, 3]]}, ["TCGCGAA", "TCGATCG"]],
+            ["TCGA", {"type": "INV_DUP", "length_ranges": [[3, 3]]}, ["TCGCGAA", "TCGATCG", "CGATCGA", "TTCGCGA"]],
 
             ["TCGA", {"type": "dupINV", "length_ranges": [[2, 2], [2, 2]]}, ["TCTCGA"]],
 
@@ -1654,7 +1727,7 @@ class TestSVSimulator(unittest.TestCase):
              [('TCGACGA', 'CAT'), ('TCGTCGA', 'CAT')]],
 
             [["TCGA", "CAT"], {"type": "INV_dDUP", "length_ranges": [[3, 3], [None, None]]},
-             [('TCGATCG', 'CAT'), ('TCGTCGA', 'CAT')]],
+             [('TCGATCG', 'CAT'), ('TTCGCGA', 'CAT'), ('TCGTCGA', 'CAT'), ('TCGACGA', 'CAT'), ('TCGCGAA', 'CAT'), ('CGATCGA', 'CAT'), ('TCGA', 'CATATG'), ('TCGA', 'ATGCAT')]],
 
             ["TCGA", {"type": "INV_nrTRA", "length_ranges": [[3, 3], [1, 1]]}, ["ACGA", "TCGT"]],
 
@@ -1672,7 +1745,11 @@ class TestSVSimulator(unittest.TestCase):
 
             [["GGTT", "CA"], {"type": "rTRA", "interchromosomal": True,
                               "length_ranges": [[1, 4], [1, 2], [None, None]]},
-             [("CGTT", "GA"), ("CTT", "GGA"), ("GGTA", "CT"), ("GGCA", "TT"), ('CA', 'GGTT'), ('CAT', 'GGT')]],
+             [("CGTT", "GA"), ("CTT", "GGA"), ("GGTA", "CT"), ("GGCA", "TT"), ('CA', 'GGTT'), ('CAT', 'GGT'),
+              ('GGA', 'CTT'), ('GGTCA', 'T'), ('GGCAT', 'T'), ('GCATT', 'G'), ('GA', 'CGTT'), ('CAGTT', 'G'),
+              ('A', 'CGGTT'), ('GATT', 'CG'), ('AGTT', 'CG'), ('GGAT', 'CT'), ('CT', 'GGTA'), ('AT', 'CGGT'),
+              ('CT', 'GGTA'), ('GCA', 'GTT'), ('CATT', 'GG'), ('GCTT', 'GA'), ('GC', 'GTTA'), ('C', 'GGTTA'),
+              ('GCAT', 'GT'), ('GGTC', 'TA'), ('GGC', 'TTA'), ('GCT', 'GTA'), ('ATT', 'CGG'), ('GAT', 'CGT')]],
 
             # [["GGTT", "CA"], {"type": "nrTRA", "interchromosomal": True, "dispersion_ranges": [[None, None]],
             #                  "length_ranges": [[1, 4]]},
@@ -1707,19 +1784,19 @@ class TestSVSimulator(unittest.TestCase):
 
             ['TCGA', TestObject([self.ref_file, {"chr21": "TCGA"}],
                         [self.par, {"reference": self.ref_file,
-                                    "random_seed": 2,
+                                    "random_seed": 2,'homozygous_only': True,
                                     "variant_sets": [{'import': self.import_snp}]}],
                         self.hap1, self.hap2, self.bed), ['ACTA', 'ACGC']],
 
             ['TCGATCGA', TestObject([self.ref_file, {"chr1": "TCGATCGA"}],
                                     [self.par, {"reference": self.ref_file,
-                                            "random_seed": 2,
+                                            "random_seed": 2,'homozygous_only': True,
                                             "variant_sets": [{'import': self.import_test}]}],
                                     self.hap1, self.hap2, self.bed), ['TCGAGACGTTCG', 'TCGATCCGA']],
 
             ['TCGA', TestObject([self.ref_file, {"chr1": "TCGA"}],
                                     [self.par, {"reference": self.ref_file,
-                                                "random_seed": 2,
+                                                "random_seed": 2,'homozygous_only': True,
                                                 "variant_sets": [{'type': "ABCD->ABCDBABDC",
                                                                   'number': 1,
                                                 "length_ranges": [[1, 1], [1, 1], [1, 1], [1, 1]]}]}],
@@ -1733,8 +1810,10 @@ class TestSVSimulator(unittest.TestCase):
             print(f'Error removing test dir {self.test_dir}: {exc}')
 
     # helper method for tests where the output will be in a known list of possibilities
-    def helper_test_known_output_svs(self, config_event_obj, target_frags=None, heterozygous=True):
+    def helper_test_known_output_svs(self, config_event_obj, target_frags=None, heterozygous=True, test_num=None):
         # target_frags: optional input frags to be checked for match with output frags
+        if test_num:
+            print('TEST', test_num)
         config = config_event_obj
         config.initialize_files()
         print(config.par_content)
@@ -1747,22 +1826,17 @@ class TestSVSimulator(unittest.TestCase):
             statement = (changed_frag_1 in target_frags) or (changed_frag_2 in target_frags)
             if not heterozygous:
                 statement = (changed_frag_1 in target_frags) and (changed_frag_2 in target_frags)
-            if changed_frag_1 == changed_frag_2:
-                '''if not changed_frag_1 in target_frags:
-                    print('TEST IN', changed_frag_1, target_frags, curr_sim.svs)
-                    print(curr_sim.config)
-                    print('svs', curr_sim.svs)
-                    print('rois', curr_sim.rois.chrom2itree)
-                    print('roi overlap', curr_sim.rois_overlap.chrom2itree,
-                          'TRA')'''
-                if not changed_frag_1 in target_frags:
-                    print('The case', changed_frag_1,
-                          'is not covered in the test case, check manually if it is correct given',
-                          config.par_content, 'targets', target_frags)
-            else:
-                if not statement:
-                    print(f'{changed_frag_1=} {changed_frag_2=} {target_frags=}', file=sys.stderr)
-                self.assertTrue(statement)
+            if not changed_frag_1 in target_frags:
+                print('The case', changed_frag_1,
+                      'is not covered in the test case, check manually if it is correct given',
+                      config.par_content, 'targets', target_frags)
+            if not changed_frag_2 in target_frags:
+                print('The case', changed_frag_2,
+                      'is not covered in the test case, check manually if it is correct given',
+                      config.par_content, 'targets', target_frags)
+            if not statement:
+                print(f'{changed_frag_1=} {changed_frag_2=} {target_frags=}', file=sys.stderr)
+            self.assertTrue(statement)
         return changed_frag_1, changed_frag_2, curr_sim.svs
 
     def helper_test_known_output_svs_zygosity(self, config_event_obj, target_hap1, target_hap2, hetero=None):
@@ -2140,6 +2214,8 @@ class TestSVSimulator(unittest.TestCase):
             print('OCCURRENCES', count_occ, test_num, 'config', vs_config, expected_results)
             assert all(expected_result in results_seen for expected_result in
                        expected_results), f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
+            assert not [unexpected_result for unexpected_result in results_seen if
+                       unexpected_result not in expected_results], f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
 
     def test_simple_tests(self):
         for test_num, (ref, vs_config, expected_outputs) in enumerate(self.simple_test_data):
@@ -2156,7 +2232,7 @@ class TestSVSimulator(unittest.TestCase):
                                          [self.par, {"reference": self.ref_file,
                                                      "homozygous_only": True,
                                                      "min_intersv_dist": 0,
-                                                     "random_seed": 88,
+                                                     "random_seed": 55,
                                                      "variant_sets": [dict(number=1, **vs_conf)
                                                                       for vs_conf in vs_config]}],
                                          '/data/enzo/insilicoSV/hap1.fna', '/data/enzo/insilicoSV/hap2.fna',
@@ -2172,21 +2248,21 @@ class TestSVSimulator(unittest.TestCase):
             while any(
                     expected_result not in results_seen for expected_result in expected_results) and attempt_num < len(
                     expected_results) * 100:
-                test_object.par_content["random_seed"] += 150
-                print("SEED", test_object.par_content["random_seed"])
+                test_object.par_content["random_seed"] += 15
+                print(test_num, "SEED", test_object.par_content["random_seed"])
 
                 attempt_num += 1
                 results, results2, svs = self.helper_test_known_output_svs(test_object, expected_results,
-                                                                           heterozygous=heterozygous)
-                print('RESUTLS', results)
+                                                                           heterozygous=heterozygous, test_num=test_num)
+                print(test_num, 'RESUTLS', results)
                 count_occ[results] += 1
                 results_seen.update([results, results2])
                 sv_list.append(svs)
             if results_seen != expected_results:
-                print('config', vs_config, 'seen', results_seen, 'expected', expected_results, count_occ)
+                print(test_num, 'config', vs_config, 'seen', results_seen, 'expected', expected_results, count_occ)
                 print('missing',
                       [expected_result for expected_result in expected_results if expected_result not in results_seen])
-                print('Unexpected',
+                print(test_num, 'Unexpected',
                       [unexpected_result for unexpected_result in results_seen if
                        unexpected_result not in expected_results])
             '''if any(expected_result not in results_seen for expected_result in expected_results):
@@ -2194,9 +2270,12 @@ class TestSVSimulator(unittest.TestCase):
                     for sv in svs:
                         print('sv lengths not target', sv.get_anchor_length(), 'breakends', sv.breakend_interval_lengths, 'anchors', sv.anchors,
                               'rois', sv.roi, 'placement', sv.placement)'''
-            print('OCCURENCES', count_occ, test_num, 'config', vs_config, expected_results)
+            print(test_num, 'OCCURENCES', count_occ, test_num, 'config', vs_config, expected_results)
             assert all(expected_result in results_seen for expected_result in
                        expected_results), f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
+
+            assert not [unexpected_result for unexpected_result in results_seen if
+                        unexpected_result not in expected_results], f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
 
     def test_snp_overlap(self):
         for test_num, (ref, vs_config, expected_outputs) in enumerate(self.test_snp_overlap):
@@ -2255,6 +2334,9 @@ class TestSVSimulator(unittest.TestCase):
             assert all(expected_result in results_seen for expected_result in
                        expected_results), f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
 
+            assert not [unexpected_result for unexpected_result in results_seen if
+                        unexpected_result not in expected_results], f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
+
     def test_indel_overlap(self):
         for test_num, (ref, vs_config, expected_outputs) in enumerate(self.test_indel_overlap):
             print(test_num, ref, vs_config, expected_outputs)
@@ -2311,6 +2393,9 @@ class TestSVSimulator(unittest.TestCase):
             print(test_num, 'OCCURENCES', count_occ, test_num, 'config', vs_config, expected_results)
             assert all(expected_result in results_seen for expected_result in
                        expected_results), f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
+
+            assert not [unexpected_result for unexpected_result in results_seen if
+                        unexpected_result not in expected_results], f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
 
 
 def test_inv(tmp_path):

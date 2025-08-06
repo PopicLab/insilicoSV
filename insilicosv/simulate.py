@@ -313,10 +313,11 @@ class SVSimulator:
         breakend = None
         ref_roi = None
         chromosomes = [chrom for chrom in self.reference_regions.chrom2itree if chrom != avoid_chrom]
-        while breakend is None and num_tries < max_random_tries:
+        while breakend is None or ref_roi is None and num_tries < max_random_tries:
             breakend, ref_roi = self.get_random_breakend(reference_regions, containing_region=containing_region, chromosomes=chromosomes,
                                                     blacklist_regions=blacklist_regions, roi_length=roi_length, total_length=total_length)
             num_tries += 1
+
         if breakend is None:
             # The breakend failed to be assigned by random sampling, look for a region fitting the SV actually available.
             return self.get_breakend_from_regions(reference_regions, containing_region=containing_region, avoid_chrom=avoid_chrom,
@@ -337,10 +338,14 @@ class SVSimulator:
         if (chrom in blacklist_regions.chrom2itree) and (blacklist_regions.strictly_contains_point(region.start, region.chrom) or
                                                          blacklist_regions.strictly_contains_point(region.end, region.chrom)):
             return None, None
-        ref_roi = self.get_reference_interval(region, reference_regions)
-        if (len(ref_roi) != 1) or (breakend + roi_length > ref_roi[0].data.end):
-            return None, None
-        return region, ref_roi[0].data
+        ref_rois = self.get_reference_interval(region, reference_regions)
+        ref_roi = None
+        for roi in ref_rois:
+            # There might be two overlapping ref intervals if there was an insertion target and the min_intersv_dist is 0
+            if breakend + roi_length > roi.data.end: continue
+            ref_roi = roi.data
+            break
+        return region, ref_roi
 
     def get_breakend_from_regions(self, reference_regions, containing_region=None, avoid_chrom=None, blacklist_regions=None,
                             roi_length=0, total_length=0):
@@ -752,6 +757,7 @@ class SVSimulator:
                                                          dispersions=sv.dispersions,
                                                          backward=False,
                                                          anchor_breakends=sv.anchor)
+
             if placement_dict is None: continue
             placement: list[Locus] = [placement_dict[breakend] for breakend in sv.breakends]
             if not self.is_placement_valid(sv, placement): continue
