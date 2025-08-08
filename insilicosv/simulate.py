@@ -104,10 +104,10 @@ class SVSimulator:
 
         for k in config:
             chk(k in ('reference', 'max_tries', 'max_random_breakend_tries', 'homozygous_only', 'min_intersv_dist',
-                      'random_seed', 'output_no_haps', 'output_adjacencies', 'output_paf', 'output_svops_bed', 'th_proportion_N'
+                      'random_seed', 'output_no_haps', 'output_adjacencies', 'output_paf', 'output_svops_bed', 'th_proportion_N',
                       'output_paf_intersv', 'verbose', 'variant_sets', 'overlap_regions', 'blacklist_regions',
                       'filter_small_chr'),
-                f'invalid top-level config: {k}')
+                f'invalid top-level config: {k}', error_type='syntax')
 
         chk(utils.is_readable_file(config['reference']), f'reference must be a readable file')
         chk(isinstance(config.get('variant_sets'), list),'variant_sets must specify a list')
@@ -277,6 +277,9 @@ class SVSimulator:
         touch blacklisted regions."""
         # The placement does not set all breakend positions
         if not len(placement) == len(sv.breakend_interval_lengths) + 1: return False
+        chk(all([locus.pos <= self.chrom_lengths[locus.chrom] for locus in placement]), 'Please make sure that the imported'
+                                                                                ' SV positions are within the chromosome length,'
+                                                                                f' provided {sv}', error_type='value')
         for breakend1, breakend2 in pairwise(sv.breakends):
             # Ensure the positions are ordered in a same chromosome
             if not (placement[breakend1].chrom != placement[breakend2].chrom or
@@ -291,12 +294,14 @@ class SVSimulator:
                     (placement[breakend2].chrom == placement[breakend1].chrom and
                      placement[breakend2].pos - placement[breakend1].pos
                      >= sv.breakend_interval_min_lengths[breakend1])): return False
-
         for op_region in sv.get_regions(placement):
             # Ensure the regions covered by the SV do not contain a proportion of Ns above th_proportion_N
+            # To ensure that am insertion target is not in between two Ns, the region is padded
+            min_bound = max(0, op_region.start - 1)
+            max_bound = min(self.chrom_lengths[op_region.chrom], op_region.end + 1)
             if utils.percent_N(self.reference.fetch(reference=op_region.chrom,
-                                                    start=op_region.start,
-                                                    end=op_region.end)) > self.config.get('th_proportion_N', DEFAULT_PERCENT_N):
+                                                    start=min_bound,
+                                                    end=max_bound)) > self.config.get('th_proportion_N', DEFAULT_PERCENT_N):
                 return False
         return True
     # end: def is_placement_valid(...)
@@ -417,7 +422,8 @@ class SVSimulator:
             if not roi_filter.satisfied_for(region): continue
             valid_region, ref_roi = self.check_interval_overlap(region, reference_regions, roi_filter, anchor_length, overlap_mode)
             if valid_region is not None:
-                return valid_region, ref_roi.data, roi_index
+                # A copy of the valid region is returned so we do not change the provided overlap regions (several SVs might overlap it)
+                return copy.deepcopy(valid_region), ref_roi.data, roi_index
         return None, None, None
 
     def check_interval_overlap(self, region, reference_regions, roi_filter, anchor_length, overlap_mode):
@@ -479,7 +485,8 @@ class SVSimulator:
             # check that the interval is fully contained in the reference
             if len(ref_intervals) > 1: return None, None
             ref_interval = ref_intervals.pop()
-            if (ref_interval.begin > region.start) or (ref_interval.end < region.end):
+
+            if (ref_interval.data.start > region.start) or (ref_interval.data.end < region.end):
                 return None, None
             return region, ref_interval
         else:
@@ -491,6 +498,10 @@ class SVSimulator:
             if chrom_tree == roi.chrom:
                 # Padding to ensure that intervals reduced to a point are still processed correctly.
                 overlap_interval = list(tree.overlap(roi.start-0.2, roi.end+0.2))
+                # For determinism as the overlap function output is a set
+                overlap_interval.sort(key=lambda x: (x.begin, x.end))
+                # To prevent biases by always selecting the first interval.
+                random.shuffle(overlap_interval)
                 return overlap_interval
 
     # From input roi and ref_roi, places the anchor in roi such that the overlap constraints are fulfilled  and
@@ -578,7 +589,8 @@ class SVSimulator:
 
         if overlap_mode == OverlapMode.CONTAINING:
             left_bound = max(ref_roi.start, roi.end + 1 - anchor_length)
-            right_bound = roi.start - 1
+            right_bound = min(roi.start - 1, ref_roi.end - anchor_length)
+
             if left_bound > right_bound: return None, None
 
             invalid = True
@@ -588,6 +600,8 @@ class SVSimulator:
             while invalid and num_iteration < max_random_tries:
                 start_breakend = random.randint(left_bound, right_bound)
                 end_breakend = start_breakend + anchor_length
+
+                if end_breakend > ref_roi.end: return None, None
 
                 anchor_region = roi.replace(start=start_breakend, end=end_breakend)
 
@@ -620,7 +634,7 @@ class SVSimulator:
                 if breakend+shift in placement_dict:
                     # If we have an anchor so we do not move its breakend.
                     locus = placement_dict[breakend+shift]
-                    roi = Region(chrom=locus.chrom, start=locus.pos, end=locus.pos)
+                    roi = Region(chrom=locus.chrom, start=locus.pos, end=locus.pos, kind=roi.kind, motif=roi.motif)
                     continue
                 distance = lengths[pos]
                 if distance is None:
@@ -646,7 +660,7 @@ class SVSimulator:
                             left_bound = 0 if backward else (roi.end + bound)
                             right_bound = (roi.start - bound) if backward else self.chrom_lengths[roi.chrom]
                         if left_bound > right_bound: return None
-                        containing_region = Region(chrom=roi.chrom, start=left_bound, end=right_bound)
+                        containing_region = Region(chrom=roi.chrom, start=left_bound, end=right_bound, kind=roi.kind, motif=roi.motif)
                     roi, ref_roi = self.get_breakend(self.reference_regions,
                                                      avoid_chrom=avoid_chrom,
                                                      blacklist_regions=blacklist_regions,
@@ -679,7 +693,9 @@ class SVSimulator:
             reference_regions = self.reference_sv_overlap_regions
 
         if sv.fixed_placement:
-            chk(self.is_placement_valid(sv, sv.fixed_placement),f'cannot place imported SV')
+            chk(self.is_placement_valid(sv, sv.fixed_placement),f'cannot place imported SV {sv}, please check your SVs '
+                                                                f'are non overlapping and try lowering the min_intersv_dist or'
+                                                                f' increasing th_proportion_N.')
             sv.set_placement(placement=sv.fixed_placement, roi=None)
             return
 
@@ -705,6 +721,7 @@ class SVSimulator:
                                                                   roi_filter=sv.roi_filter,
                                                                   roi_index=roi_index,
                                                                   init_roi=init_roi)
+
                 if roi is None or ref_roi is None:
                     chk(False, f'No available ROI satisfying the constraints for {sv}' +
                         f' of anchor length {sv.get_anchor_length()}'*(sv.get_anchor_length() is not None))
@@ -718,8 +735,8 @@ class SVSimulator:
                         overlap_mode=sv.overlap_mode,
                         region_length_range=sv.roi_filter.region_length_range,
                         blacklist_regions=blacklist_regions))
+
                 if (roi is None) or (ref_roi is None):
-                    if n_placement_attempts > len(self.rois_overlap[sv_set]): break
                     continue
             else:
                 # Compute the length needed in the ROI to fit the breakends not seperated by dispersions

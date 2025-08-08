@@ -881,7 +881,10 @@ class ImportedVariantSet(VariantSet):
         if vcf_rec.samples:
             sample = vcf_rec.samples[0]
             parsed_info['GENOTYPE'] = (bool(sample['GT'][0]), bool(sample['GT'][1]))
-        else:
+            if not sum(parsed_info['GENOTYPE']):
+                logger.warning(f'The genotype provided in {vcf_rec} is invalid. A genotype will be randomly defined.')
+                del parsed_info['GENOTYPE']
+        if not 'GENOTYPE' in parsed_info:
             parsed_info['GENOTYPE'] = random.choice([(True, True), (True, False), (False, True)])
         vcf_info = dict(vcf_rec.info)
 
@@ -914,6 +917,10 @@ class ImportedVariantSet(VariantSet):
 
         if 'SVLEN' in vcf_info:
             rec_len = vcf_info['SVLEN']
+            if isinstance(rec_len, (tuple, list)):
+                chk(len(rec_len) == 1, f'Wrong format for the field SVLEN, only integers are supported. The record provided '
+                                       f'was {vcf_rec}', error_type='syntax')
+                rec_len = int(rec_len[0])
         else:
             rec_len = rec_end.pos - rec_start.pos
         parsed_info['END'] = rec_end
@@ -1038,6 +1045,7 @@ class ImportedVariantSet(VariantSet):
                             parsed_info['INSORD']), error_type='value')
                 insord = (parsed_info['INSORD'],) if parsed_info['INSORD'] is not None else (current_insord,)
                 current_insord = insord[0] + 1
+
             targets.append(parsed_info['TARGET'])
             positions_per_rec.append(placement)
             operations = []

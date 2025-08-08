@@ -104,6 +104,15 @@ class Operation:
         assert self.placement is not None
         return self.get_target_region(self.placement)
 
+    def update_placement(self, new_placement):
+        self.placement = new_placement
+        # Remove the associated cached properties
+        if 'target_region' in self.__dict__:
+            del self.target_region
+
+        if 'source_region' in self.__dict__:
+            del self.source_region
+
 # end: class Operation
 
 @dataclass
@@ -384,10 +393,11 @@ class BaseSV(SV):
                         self.anchor.start_breakend <= operation.source_breakend_region.start_breakend <= self.anchor.end_breakend):
                     sv_info['OVLP'] = self.roi.kind
                 # Here the target is in the anchor.
-                if (operation.target_region is not None and
-                        self.anchor.start_breakend <= operation.target_region.start <= self.anchor.end_breakend):
+                if (operation.target_insertion_breakend is not None and
+                        self.anchor.start_breakend <= operation.target_insertion_breakend <= self.anchor.end_breakend):
                     sv_info['OVLP_TARGET'] = self.roi.kind
             alleles = ['N', '<%s>' % sv_type_str]
+
             if len(self.operations) > 1:
                 rec_id += f'_{op_idx}'
                 if sv_info['OP_TYPE'] == 'IDENTITY' and not operation.is_in_place:
@@ -404,9 +414,9 @@ class BaseSV(SV):
                         alts += ','*(len(alts)) + str(if_not_none(alleles[1], ''))
                     alleles = [operation.transform.orig_seq, '%s' % alts]
                 elif sv_type_str == 'INDEL':
-                    alleles = ['<INS>', operation.novel_insertion_seq]
+                    alleles = ['N', operation.novel_insertion_seq]
                     if sv_info['OP_TYPE'] == 'DEL':
-                        alleles = [operation.transform.orig_seq, '<DEL>']
+                        alleles = [operation.transform.orig_seq, 'N']
                 else:
                     sv_info['OP_TYPE'] = sv_type_str
                     alleles = ['N', '<%s>' % sv_type_str]

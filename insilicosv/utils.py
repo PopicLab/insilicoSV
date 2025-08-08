@@ -55,7 +55,7 @@ def divergence(seq, divergence_prob):
     def mutate_base(b):
         if b not in 'TCGA':
             return b
-        return random.choice(list({"A", "C", "T", "G"} - {b}))
+        return random.choice([allele for allele in 'TCGA' if allele != b])
     return ''.join([b if random.random() > p else mutate_base(b) for b in seq.upper()])
 
 def is_readable_file(fname):
@@ -247,7 +247,7 @@ class RegionSet:
         if to_region_set:
             logger.info(f'Constructing Interval Tree from {len(regions)} regions...')
             region_set = RegionSet(regions)
-            logger.info(f'Constructed INterval Tree from {len(regions)} regions.')
+            logger.info(f'Constructed Interval Tree from {len(regions)} regions.')
         return region_set
 
     @staticmethod

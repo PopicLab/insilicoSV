@@ -201,6 +201,9 @@ class OutputWriter:
                             position_shifts.insert(position_idx,
                                                    ('DEL', operation_start, operation_end - operation_start))
 
+                        # Position of the operation inside the sequence
+                        start_in_region = operation_start - relative_position
+
                         if operation.transform_type == TransformType.DEL:
                             if operation_length <= 50:
                                 # INDEL we report the original sequence
@@ -210,7 +213,6 @@ class OutputWriter:
                                     end=operation_end)
                                 operation.transform = operation.transform.replace(orig_seq=orig_seq)
 
-                            start_in_region = operation_start - relative_position
                             # Apply the DEL
                             seq = seq[:start_in_region + total_shift] + seq[
                                                                         start_in_region + operation_length + total_shift:]
@@ -228,13 +230,9 @@ class OutputWriter:
                                 tags=f'cg:Z:{operation.source_region.length()}D')
                         else:
                             # The operation is not a DEL
-                            # Position of the operation inside the sequence
-                            operation_start = operation_start - relative_position
-
-
                             # Modify the sequence
-                            operation_start = operation_start + total_shift
-                            modified_seq = seq[operation_start:operation_start + operation_length]
+                            start_in_region = start_in_region + total_shift
+                            modified_seq = seq[start_in_region:start_in_region + operation_length]
                             if operation.novel_insertion_seq:
                                 modified_seq = operation.novel_insertion_seq
                                 paf_rec = PafRecord(
@@ -301,12 +299,13 @@ class OutputWriter:
                                 sv_id = operation.op_info['SVID']
                                 paf_rec = paf_rec._replace(tags=paf_rec.tags + f'\tsv:Z:{sv_id}')
 
-                            seq = seq[:operation_start] + modified_seq + seq[operation_start + operation_length:]
+                            seq = seq[:start_in_region] + modified_seq + seq[start_in_region + operation_length:]
                         if paf_rec:
                             paf_records.append(paf_rec)
+                    hap_chrom_pos += len(seq)
                     if seq:
-                        hap_chrom_lengths[hap_chrom] = hap_chrom_pos
                         sim_fa.write(seq)
+                hap_chrom_lengths[hap_chrom] = hap_chrom_pos
                 sim_fa.write('\n')
             # end: for chrom, chrom_length in zip(...)
         # end: with open(hap_fa, 'w') as sim_fa
@@ -420,6 +419,64 @@ class OutputWriter:
                              '/'.join(grammar), sv_grammar, genotype, sv_id]
                 adjacency_file.write('\t'.join(map(str, record)) + '\n')
 
+    def group_overlap_operations(self, overlap_sv, is_placed, region_to_overlap_start,
+                                 region_to_overlap_end, hap_index):
+        overlapping_region = []
+        placed_overlap_sv = []
+        # Group overlapping operations together and potentially slice them if they are partially overlapping
+        for overlap in overlap_sv:
+            sv = overlap.data.sv
+
+            if sv.genotype[hap_index] and not (overlap.data.end == region_to_overlap_start
+                                               or region_to_overlap_end == overlap.data.start):
+                # We do not consider SVs at the boundaries as overlapping
+                overlapping_operation = sv.operations[0]
+                if (overlap.data.start < region_to_overlap_start < overlap.data.end or
+                        overlap.data.start < region_to_overlap_end < overlap.data.end):
+                    # A non-contained overlapping DEL
+                    overlapping_start = max(overlap.data.start, region_to_overlap_start)
+                    overlapping_end = min(overlap.data.end, region_to_overlap_end)
+
+                    # Add potential remaining left and right operations
+                    if overlapping_start > overlap.data.start:
+                        left_sv = copy.deepcopy(sv)
+                        placement = [
+                            Locus(pos=overlap.data.start, chrom=overlapping_operation.target_region.chrom),
+                            Locus(pos=region_to_overlap_start, chrom=overlapping_operation.target_region.chrom)]
+
+                        left_sv.operations[0].update_placement(placement)
+                        self.overlap_sv_regions.add_region(Region(chrom=overlapping_operation.target_region.chrom,
+                                                                  start=overlap.data.start,
+                                                                  end=region_to_overlap_start),
+                                                                  sv=left_sv)
+
+                    if overlapping_end < overlap.data.end:
+                        right_sv = copy.deepcopy(sv)
+                        placement = [
+                            Locus(pos=region_to_overlap_end, chrom=overlapping_operation.target_region.chrom),
+                            Locus(pos=overlap.data.end, chrom=overlapping_operation.target_region.chrom)]
+
+                        right_sv.operations[0].update_placement(placement)
+
+                        self.overlap_sv_regions.add_region(
+                            Region(chrom=overlapping_operation.target_region.chrom,
+                                   start=region_to_overlap_end,
+                                   end=overlap.data.end),
+                            sv=right_sv)
+
+                    overlapping_operation.placement = [
+                        Locus(pos=overlapping_start, chrom=overlapping_operation.target_region.chrom),
+                        Locus(pos=overlapping_end, chrom=overlapping_operation.target_region.chrom)]
+
+                    # Keep the information on the original position
+                    overlapping_operation.orig_start = overlap.data.start
+                    overlapping_operation.orig_end = overlap.data.end
+
+                overlapping_region.append(overlapping_operation)
+                if is_placed:
+                    placed_overlap_sv.append(overlap)
+        return overlapping_region, placed_overlap_sv
+
     def get_chrom2operations(self, hap_index):
         """For each chromosome, make a list of operations targeting that chromosome,
         sorted along the chromosome.  Add identity operations for regions not touched
@@ -446,13 +503,17 @@ class OutputWriter:
                 if operation.transform.divergence_prob > 0:
                     operation.genotype = sv.genotype
 
-                overlapping_region = [operation]
-                overlap_sv = self.overlap_sv_regions.chrom2itree[operation.target_region.chrom].overlap(operation.target_region.start,
-                                                                                            operation.target_region.end)
+                overlap_sv = self.overlap_sv_regions.chrom2itree[operation.target_region.chrom].overlap(operation.target_region.start-0.1,
+                                                                                            operation.target_region.end+0.1)
                 region_to_overlap_start = operation.target_region.start
                 region_to_overlap_end = operation.target_region.end
                 is_placed = True
-                if operation.source_region  and operation.source_region != operation.target_region:
+                overlapping_region, placed_overlap_sv_cpt = self.group_overlap_operations(overlap_sv, is_placed,
+                                                                                      region_to_overlap_start,
+                                                                                      region_to_overlap_end, hap_index)
+                placed_overlap_sv += placed_overlap_sv_cpt
+
+                if operation.source_region and operation.source_region != operation.target_region:
                     # In the case of a duplication, a change in the source has to be reflected on the target
                     overlap_sv = self.overlap_sv_regions.chrom2itree[operation.target_region.chrom].overlap(operation.source_region.start,
                                                                                                             operation.source_region.end)
@@ -460,58 +521,15 @@ class OutputWriter:
                     region_to_overlap_end = operation.source_region.end
                     # The overlapping SV still has to be placed on the source region
                     is_placed = False
+                    overlapping_region_cpt, placed_overlap_sv_cpt = self.group_overlap_operations(overlap_sv, is_placed,
+                                                                                          region_to_overlap_start,
+                                                                                          region_to_overlap_end, hap_index)
+                    placed_overlap_sv += placed_overlap_sv_cpt
+                    overlapping_region += overlapping_region_cpt
 
-                for overlap in overlap_sv:
-                    sv = overlap.data.sv
-                    if sv.genotype[hap_index] and not ( overlap.data.start <= overlap.data.end == region_to_overlap_start
-                    or region_to_overlap_end == overlap.data.start <= overlap.data.end):
-                        # We do not consider SVs at the boundaries as overlapping
-                        overlapping_operation = sv.operations[0]
-
-                        if (overlap.data.start < region_to_overlap_start < overlap.data.end or
-                        overlap.data.start < region_to_overlap_end < overlap.data.end):
-                            # A non-contained overlapping DEL
-                            overlapping_start = max(overlap.data.start, region_to_overlap_start)
-                            overlapping_end = min(overlap.data.end, region_to_overlap_end)
-
-                            overlapping_operation = sv.operations[0]
-                            # Keep the information on the original position
-                            overlapping_operation.orig_start = overlap.data.start
-                            overlapping_operation.orig_end = overlap.data.end
-
-                            overlapping_operation.placement = [Locus(pos=overlapping_start, chrom=overlapping_operation.target_region.chrom),
-                                                     Locus(pos=overlapping_end, chrom=overlapping_operation.target_region.chrom)]
-
-                            # Add potential remaining left and right operations
-                            if overlapping_start > overlap.data.start:
-                                left_sv = copy.deepcopy(sv)
-                                left_operation = left_sv.operations[0]
-                                left_operation.placement = [
-                                    Locus(pos=overlap.data.start, chrom=overlapping_operation.target_region.chrom),
-                                    Locus(pos=region_to_overlap_start, chrom=overlapping_operation.target_region.chrom)]
-                                self.overlap_sv_regions.add_region(Region(chrom=overlapping_operation.target_region.chrom,
-                                                                          start=overlap.data.start,
-                                                                          end=region_to_overlap_start),
-                                                                          sv=left_sv)
-
-
-                            if overlapping_end < overlap.data.end:
-                                right_sv= copy.deepcopy(sv)
-                                right_operation = right_sv.operations[0]
-                                right_operation.placement = [
-                                    Locus(pos=region_to_overlap_end, chrom=overlapping_operation.target_region.chrom),
-                                    Locus(pos=overlap.data.end, chrom=overlapping_operation.target_region.chrom)]
-                                self.overlap_sv_regions.add_region(
-                                    Region(chrom=overlapping_operation.target_region.chrom,
-                                           start=region_to_overlap_end,
-                                           end=overlap.data.end),
-                                           sv=right_sv)
-
-
-                        overlapping_region.insert(0, overlapping_operation)
-                        if is_placed:
-                            placed_overlap_sv.append(overlap)
-
+                # Sort the overlapping operations to ensure determinism of the SNP sequences
+                overlapping_region.sort(key=lambda op: op.target_region.start)
+                overlapping_region.append(operation)
                 chrom2operations[operation.target_region.chrom].append(overlapping_region)
 
         for chrom, tree in self.overlap_sv_regions.chrom2itree.items():
@@ -551,12 +569,12 @@ class OutputWriter:
                     return operation1.target_region.end - operation2.target_region.end
 
 
-                # Tertiary sort: the operation comes from the same operation, the insertion order if provided has to be used
+                # Tertiary sort: the operation comes from the same SV, the insertion order if provided has to be used
                 if (operation1.target_insertion_order and operation2.target_insertion_order and
                         operation1.target_insertion_order[0] == operation2.target_insertion_order[0]):
                     return operation1.target_insertion_order[1] - operation2.target_insertion_order[1]
 
-                # Quaternary case, different SVs, the insertion targets are inserted by proximity to the source if any (so DUPs are not separated form their copies)
+                # Quaternary case, different SVs, the insertion targets are inserted by proximity to the source if any (so DUPs are not separated from their copies)
                 if operation1.source_region:
                    # Targets belong to the same chrom by design not source regions
                     if (operation1.source_region.chrom == operation1.target_region.chrom and
@@ -577,11 +595,9 @@ class OutputWriter:
                           operation2.target_region.end == operation2.source_region.start):
                         # operation2 is inserted right next to its source, on the left, it has to be second
                         return -1
-
                 # None of the operations are inserted at a position adjacent to the source, the order is arbitrary, we choose the svid
-                return operation1.op_info['SVID'] > operation2.op_info['SVID']
+                return 1 if operation1.op_info['SVID'] > operation2.op_info['SVID'] else -1
             chrom2operations[chrom].sort(key=cmp_to_key(compare_operations))
-            print('CHROM', chrom, 'OPERATIONS', chrom2operations[chrom])
         return chrom2operations
 
     def output_novel_insertions(self):
