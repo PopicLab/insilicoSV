@@ -187,7 +187,9 @@ class SV(ABC):
             (idx not in self.dispersions) and
             ((not self.anchor) or (self.overlap_mode != OverlapMode.EXACT) or not (
                     self.anchor.start_breakend <= idx < self.anchor.end_breakend))),
-            f'A length range can only be [null, null] for dispersions or the anchor for an exact overlap.', error_type='syntax')
+            f'A length range can only be [null, null] for dispersions or the anchor for an exact overlap. '
+            f'But, {self.config_descr} was provided. Notice that if the SV is defined from the grammar then the length of '
+            f'the dispersions are to be given in order of appearance in the grammar.', error_type='syntax')
 
         # Interchromosomal dispersions have to be unbounded
         chk(not self.is_interchromosomal or all(

@@ -66,6 +66,7 @@ The following parameters can be set on the top level of the config file and prov
 6. *homozygous_only: False [optional]*: bool - if set to True, make all simulated variants homozygous
 7. *filter_small_chr [optional]*: int - filter out chromosomes of length less than the given integer (if no value is provided then no filtering will occur).
 8. *th_proportion_N: 0.05 [optional]*: The proportion of N and n base pairs an SV is allowed to cover.
+9. *enable_hap_overlap=False [optional]*: Enable heterozygous SVs to overlap across homologous chromosomes.
 
 Examples of the full set of simulation options available through various config inputs can be found in the [use cases](use_cases) page.
 
