@@ -40,7 +40,7 @@ other parts of the SV (e.g., for an `rTRA`, `A_B -> B_A`, we can have `[[500, 10
 B must be of length comprised between half and 1.5 times the length of A).
 For predefined types with a dispersion, the length range of the dispersion will be in last position.
 For Custom types, the length ranges are in order of appearance of the letters and the dispersions.
-4. *overlap_mode [optional]*: str - enforce the SV to overlap a region defined in the files provided in `overlap_regions`. Must be `partial`, `contained`, `containing` or `exact` (see [example config](use_cases#example-5---placing-svs-at-known-repetitive-element-intervals)).
+4. *overlap_mode [optional]*: str - enforce the SV to overlap a region defined in the files provided in `overlap_regions`. Must be `partial`, `contained`, `containing` or `exact` (see [example config](use_cases.md#example-5---placing-svs-into-specific-regions-of-interest-rois)).
 5. *overlap_region_type [optional]*: list of str - only if an overlap mode is specified. Characterizes the regions to overlap, the name of the region has to contain one of the strings of the list. 
 
 6. *interchromosomal: False [for SVs containing dispersions]*: Enable interchromosomal SVs. If True, each dispersion in the SV will be 
@@ -56,6 +56,11 @@ For trEXP and trCON variants, a BED file of existing repeats must be specified i
 *overlap_regions* global setting, and *overlap_region_type* for the existing repeat regions must
 be specified in the variant set. The BED file columns must contain in order the chromosome, the start position, the end position, the region type, and the motif of the repeat.
 
+For specifying arm gain/loss or aneuploidy, the following parameters are available:
+9. *arm_gain_loss=False [optional]*: bool - set to `True` for the SV to duplicate or delete an entire chromosome arm.
+10. *arm_percent=[100, 100] [optional]*: [int, int] - a range [min_percent, max_percent] from which to determine the percentage of the chromosome arm to duplicate or delete. The operation starts from the extremity of the arm. 
+11. *aneuploidy=False [optional]*: bool - set to True for the SV to duplicate or delete a whole chromosome copy.
+12. *aneuploidy_chrom=None [optional]*: List[str] - A list of chromosome names (e.g., ['chr21', 'chrX']) on which aneuploidy is permitted to occur. If None, aneuploidy can occur on any chromosome.
 
 The following parameters can be set on the top level of the config file and provide higher-order controls over SV placement:
 1. *reference*: str - path to input reference used as template for simulation.
@@ -67,6 +72,8 @@ The following parameters can be set on the top level of the config file and prov
 7. *filter_small_chr [optional]*: int - filter out chromosomes of length less than the given integer (if no value is provided then no filtering will occur).
 8. *th_proportion_N: 0.05 [optional]*: The proportion of N and n base pairs an SV is allowed to cover.
 9. *enable_hap_overlap=False [optional]*: Enable heterozygous SVs to overlap across homologous chromosomes.
+10. *arms [optional]*: str - A path to a file specifying the centromere positions for the chromosomes. Refer to the  [use_cases](use_cases.md#example-7---chromosome-gainloss)
+for a detailed description of the required file format.
 
 Examples of the full set of simulation options available through various config inputs can be found in the [use cases](use_cases) page.
 

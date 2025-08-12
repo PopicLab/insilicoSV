@@ -52,6 +52,10 @@ class VariantSet(ABC):
         # For predefined types given as custom in the config file, to keep track they have to be treated as custom
         self.input_type = None
         self.overlap_mode = None
+        self.aneuploidy = self.vset_config.get('aneuploidy', False)
+        self.arm_gain_loss = self.vset_config.get('arm_gain_loss', False)
+        self.arm_ranges = None
+
         if 'overlap_mode' in self.vset_config:
             chk(isinstance(self.vset_config['overlap_mode'], str) or
                 (isinstance(self.vset_config['overlap_mode'], list) and all(
@@ -343,7 +347,8 @@ class SimulatedVariantSet(VariantSet):
         return RegionFilter(region_kinds=tuple(utils.as_list(self.vset_config['blacklist_region_type'])))
 
     def pick_genotype(self):
-        if self.config.get('homozygous_only', False) or random.randint(0, 1):
+        # Chromsome gain/loss and aneuploidy is heterozygous
+        if (not self.aneuploidy or self.arm_gain_loss) and (self.config.get('homozygous_only', False) or random.randint(0, 1)):
             return True, True
         else:
             return random.choice([(True, False), (False, True)])
@@ -385,7 +390,11 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'n_copies',
                 'novel_insertions',
                 'interchromosomal',
-                'config_descr', 'VSET'
+                'config_descr', 'VSET',
+                'aneuploidy',
+                'arm_gain_loss',
+                'arm_percent',
+                'aneuploid_chrom'
             ), f'invalid SV config key {vset_config_key}', error_type='syntax')
 
         vset_cfg = self.vset_config
@@ -433,9 +442,11 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             vset_cfg['length_ranges'] = [[1, 1]]
             vset_cfg['divergence_prob'] = [1.0]
         else:
-            chk('length_ranges' in vset_cfg or 'novel_insertions' in self.vset_config, f'Please specify length ranges in %s' % (vset_cfg['config_descr']), error_type='syntax')
+            chk('length_ranges' in vset_cfg or 'novel_insertions' in self.vset_config or
+                vset_cfg.get('aneuploidy', False) or vset_cfg.get('arm_gain_loss', False),
+                f'Please specify length ranges in %s' % (vset_cfg['config_descr']), error_type='syntax')
             if 'length_ranges' in vset_cfg:
-                chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list in %s' % vset_cfg['config_descr'],
+                chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list for %s' % vset_cfg['config_descr'],
                     error_type='syntax')
                 for length_range in vset_cfg['length_ranges']:
                     chk(isinstance(length_range, str) or
@@ -458,6 +469,33 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         chk(isinstance(self.vset_config.get('type'), (type(None), list, str, tuple)),
             '%s must be a string or list of strings'.format(self.vset_config.get('type')), error_type='syntax')
 
+        if self.arm_gain_loss:
+            chk('arms' in self.config, f'An SV set has been flagged as arm_gain_loss but the arm regions have'
+                                f'not been provided %s' % vset_cfg['config_descr'])
+            self.arm_ranges = vset_cfg.get('arm_percent', [100, 100])
+            chk(isinstance(self.arm_ranges, list),
+                f'arm_percent must be a list for %s' % vset_cfg['config_descr'],
+                error_type='syntax')
+
+        if self.aneuploidy or self.arm_gain_loss:
+            chk(all(length is None for idx, length in enumerate(vset_cfg.get('length_ranges', []))),
+                'All the lengths have to be null for aneuploidy or arm gain loss. Error in %s' % vset_cfg['config_descr'])
+            chk(self.svtype in [VariantType.DEL, VariantType.DUP], 'Only DUP or DEL SVs can be used for aneuploidy and arm gain loss. Error in %s' % vset_cfg['config_descr'])
+            chk(not Syntax.ANCHOR_END in self.source and not Syntax.ANCHOR_START in self.source and
+                not self.overlap_mode, 'SVs with arm_gain_loss or aneuploidy enabled cannot be constrained. Error in %s' % vset_cfg['config_descr'])
+            vset_cfg['length_ranges'] = [[None, None]]
+
+        if self.aneuploidy:
+            chk(not 'aneuploid_chrom' in vset_cfg or (isinstance(vset_cfg['aneuploid_chrom'], list) and
+                                                  all(isinstance(chrom, str) for chrom in vset_cfg['aneuploid_chrom'])),
+            'aneuploid_chrom must be a list of chromosomes. Error in %s' % vset_cfg['config_descr'])
+        elif 'aneuploid_chrom' in vset_cfg:
+            logger.warning(
+                'aneuploid_chrom provided without enabling aneuploidy. aneuploid_chrom will be ignored in %s' % vset_cfg[
+                    'config_descr'])
+
+        if not self.arm_gain_loss and 'arm_percent' in vset_cfg:
+            logger.warning('arm_percent provided without enabling arm_gain_loss. arm_percent will be ignored in %s' % vset_cfg['config_descr'])
 
     @property
     def is_interchromosomal(self):
@@ -626,6 +664,10 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         if isinstance(divergence_prob_list, (int, float)):
             divergence_prob_list = [divergence_prob_list]
 
+        arm_percent = 100
+        if self.arm_ranges:
+            arm_percent = random.randint(self.arm_ranges[0], self.arm_ranges[1])
+
         # Build the different operations and anchor, determine the breakends and the distance between them.
         (operations, anchor, dispersions, breakend_interval_lengths,
          breakend_interval_min_lengths) = self.grammar_to_variant_set(lhs_strs, rhs_strs, symbol_lengths,
@@ -650,7 +692,11 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                       fixed_placement=None,
                       info=info,
                       genotype=self.pick_genotype(),
-                      config_descr=self.vset_config['config_descr'])
+                      config_descr=self.vset_config['config_descr'],
+                      aneuploidy=self.aneuploidy,
+                      arm_gain_loss=self.arm_gain_loss,
+                      arm_percent=arm_percent,
+                      aneuploid_chrom=self.vset_config.get('aneuploid_chrom', None))
 
     def construct_info(self, lhs_strs, rhs_strs):
         sv_type_str = self.svtype.value

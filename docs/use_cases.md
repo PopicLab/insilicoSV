@@ -237,7 +237,7 @@ variant_sets:
       overlap_region_type: ["L1HS"]
 ```
 
-Parentheses indicate which part(s) of the SV that are constrained to overlap with an ROI according
+Parentheses indicate which part(s) of the SV are constrained to overlap with an ROI according
 to the overlap mode.  The anchor must be placed on the source, and can wrap
 any contiguous sub-sequence of source elements (including an empty one).
 For `"exact"` overlap mode, the length ranges of the constrained SV's part(s) must
@@ -281,3 +281,49 @@ Key Considerations for Interchromosomal Dispersions
   
   Because all dispersions are interchromosomal, the last copy of A cannot be placed back on chr3. 
   However, it could be placed in a different region of chr1.
+- 
+### Example 7 - Chromosome Gain/Loss
+This section details parameters for simulating chromosome arm gain/loss or whole chromosome aneuploidy.
+
+#### Arm Gain/Loss (`arm_gain_loss: True`)
+To enable the duplication or deletion of entire chromosome arms, set the `arm_gain_loss` parameter to `True`.
+
+##### Centromere File (arms)
+- **Purpose:** A BED file containing the centromere start and end positions for each chromosome of your reference genome. This file is required when arm_gain_loss is True.
+- **File Format:** The first four columns of the BED file must be:
+  - Chromosome name 
+  - Chromosome length 
+  - Beginning of the centromere (start coordinate)
+  - End of the centromere (end coordinate)
+- **Scope:** The file does not need to include all reference chromosomes; only those for which arm gain/loss is intended.
+
+**arm_percent parameter:** specifies a range (e.g., `[60, 80]`) 
+to determine the percentage of the chromosome arm to be duplicated or deleted, starting from the arm's extremity.
+
+#### Aneuploidy (aneuploidy: True)
+**aneuploid_chrom parameter:** You may optionally provide a list of specific chromosome names (e.g., `['chr1', 'chr22']`) 
+on which aneuploidy is permitted. If this parameter is not provided, aneuploidy can occur on any chromosome in the reference.
+
+#### General Considerations
+- **Compatible SV Types:** Only DEL (Deletion) and DUP (Duplication) are compatible with arm_gain_loss and aneuploidy flags.
+- **length_ranges:** When simulating aneuploidy, length_ranges should either not be provided or be set to `[[null, null]]`.
+- **Multiple Aneuploid DUPs:** Multiple aneuploid duplications can target the same chromosomes to increase chromosome copy numbers arbitrarily. In such cases, overlap constraints will be disregarded.
+- **Heterozygous Nature:** Chromosome gain/loss and aneuploidy events are defined as heterozygous, affecting only one of the existing chromosome copies.
+- **New Chromosome Copies (DUP Aneuploidy):** For a DUP with `aneuploidy: True`, new chromosome copies will be created and named chrom_copy_num (where num is the copy number).
+  - If n_copies is not provided or set to 1, a case of trisomy (one additional chromosome copy) will be simulated.
+  - As shown in the example, `n_copies: 3` allows for the creation of three additional chromosome copies.
+
+```yaml
+reference: "{path}/{to}/ref.fa"
+arms: ["/{path_to}/{arm_regions}.bed"] # Required for arm_gain_loss, but not for aneuploidy
+variant_sets:
+    - type: "DUP" 
+      number: 3
+      aneuploidy: True
+      aneuploid_chrom: ['chr1', 'chr22']
+      n_copies: 3 # Simulates 3 additional copies for selected chromosomes
+    - type: "DEL" 
+      number: 5
+      arm_gain_loss: True
+      arm_percent: [60, 80] # Deletes 60-80% of a chromosome arm from its extremity
+```

@@ -162,6 +162,12 @@ class SV(ABC):
     # Fields used while finding a placement
     num_valid_placements: int = 0
 
+    # for arm gain or loss
+    arm_gain_loss: Optional[bool] = False
+    aneuploidy: Optional[bool] = False
+    arm_percent: Optional[int] = 100
+    aneuploid_chrom: Optional[list[str]] = None
+
     def __post_init__(self):
         assert self.sv_id
         assert len(self.breakend_interval_min_lengths) == len(self.breakend_interval_lengths)
