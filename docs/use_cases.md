@@ -289,9 +289,7 @@ This section details parameters for simulating chromosome arm gain/loss or whole
 To enable the duplication or deletion of entire chromosome arms, set the `arm_gain_loss` parameter to `True`.
 
 ##### Centromere File (arms)
-- **Purpose:** A BED file containing the centromere positions for each chromosome of your reference genome. This file is required when arm_gain_loss is True.
-- **Obtaining the file:** Use the command `faSize -veryDetailed -tab /{path}/{to}/ref.fa > /{path}/{to}/centromeres.bed`. 
-Refer to [this link](https://open.bioqueue.org/home/knowledge/showKnowledge/sig/ucsc-fasize) for faSize installation and usage instructions.
+- **Purpose:** A BED file containing the centromere start and end positions for each chromosome of your reference genome. This file is required when arm_gain_loss is True.
 - **File Format:** The first four columns of the BED file must be:
   - Chromosome name 
   - Chromosome length 
