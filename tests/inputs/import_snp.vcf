@@ -1,0 +1,55 @@
+##fileformat=VCFv4.1
+##FILTER=<ID=PASS,Description="All	filters	passed">
+##fileDate=2016-06-03
+##source=IlluminaPlatinumGenomes,	version:	2016-1.0
+##reference=hg38
+##contig=<ID=chr1,length=248956422>
+##contig=<ID=chr2,length=242193529>
+##contig=<ID=chr3,length=198295559>
+##contig=<ID=chr4,length=190214555>
+##contig=<ID=chr5,length=181538259>
+##contig=<ID=chr6,length=170805979>
+##contig=<ID=chr7,length=159345973>
+##contig=<ID=chr8,length=145138636>
+##contig=<ID=chr9,length=138394717>
+##contig=<ID=chr10,length=133797422>
+##contig=<ID=chr11,length=135086622>
+##contig=<ID=chr12,length=133275309>
+##contig=<ID=chr13,length=114364328>
+##contig=<ID=chr14,length=107043718>
+##contig=<ID=chr15,length=101991189>
+##contig=<ID=chr16,length=90338345>
+##contig=<ID=chr17,length=83257441>
+##contig=<ID=chr18,length=80373285>
+##contig=<ID=chr19,length=58617616>
+##contig=<ID=chr20,length=64444167>
+##contig=<ID=chr21,length=46709983>
+##contig=<ID=chr22,length=50818468>
+##contig=<ID=chrX,length=156040895>
+##PEDIGREE=<Child=NA12877,Mother=NA12890,Father=NA12889>
+##PEDIGREE=<Child=NA12878,Mother=NA12892,Father=NA12891>
+##PEDIGREE=<Child=NA12879,Mother=NA12878,Father=NA12877>
+##PEDIGREE=<Child=NA12880,Mother=NA12878,Father=NA12877>
+##PEDIGREE=<Child=NA12881,Mother=NA12878,Father=NA12877>
+##PEDIGREE=<Child=NA12882,Mother=NA12878,Father=NA12877>
+##PEDIGREE=<Child=NA12883,Mother=NA12878,Father=NA12877>
+##PEDIGREE=<Child=NA12884,Mother=NA12878,Father=NA12877>
+##PEDIGREE=<Child=NA12885,Mother=NA12878,Father=NA12877>
+##PEDIGREE=<Child=NA12886,Mother=NA12878,Father=NA12877>
+##PEDIGREE=<Child=NA12887,Mother=NA12878,Father=NA12877>
+##PEDIGREE=<Child=NA12888,Mother=NA12878,Father=NA12877>
+##PEDIGREE=<Child=NA12893,Mother=NA12878,Father=NA12877>
+##INFO=<ID=KM,Number=1,Type=Float,Description="Minimum	normalized	k-mer	counts.">
+##INFO=<ID=KFP,Number=1,Type=Integer,Description="K-mer	GT	failures	in	the	main	pedigree.">
+##INFO=<ID=KFF,Number=1,Type=Integer,Description="K-mer	failures	in	the	founders.">
+##INFO=<ID=MTD,Number=.,Type=String,Description="Methods	that	call	this	site	pedigree	consistently.">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##bcftools_normVersion=1.4+htslib-1.4
+##bcftools_normCommand=norm	-f	/illumina/sync/igenomes/Homo_sapiens/NCBI/GRCh38Decoy/Sequence/WholeGenomeFasta/genome.fa	-Oz	-o	/illumina/build/platinumgenomes/2017.1-rc2/hg38/NA12878/NA12878.vcf.gz	/illumina/development/PlatinumGenomes/2016-1.0/hg38/small_variants/NA12878/NA12878.vcf.gz;	Date=Tue	May	16	11:57:41	2017
+##bcftools_viewVersion=1.16+htslib-1.16
+##bcftools_viewCommand=view	--regions	chr1	/broad/popiclab/data/phasing/VCF/NA12878AllChromosomes/IlluminaPlatinum/NA12878.vcf.gz;	Date=Wed	Feb	1	16:56:44	2023
+##bcftools_viewCommand=view	--types	snps	-I	-a	-ghet	-c1	-Ov	-s	NA12878	--max-alleles	2	-o	AllChromosomes/NA12878.chr1.filtered.vcf.noindels;	Date=Wed	Feb	1	16:56:44	2023
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NA12878
+chr21	3	.	G	T	0	PASS	KM=9.5;KFP=0;KFF=0;MTD=bwa_freebayes,bwa_gatk,bwa_platypus	GT	1|0
+chr21	4	.	A	C	0	PASS	KM=9.5;KFP=0;KFF=0;MTD=bwa_freebayes,bwa_gatk,bwa_platypus	GT	0|1
+chr21	1	.	T	A	0	PASS	KM=9.5;KFP=0;KFF=0;MTD=bwa_freebayes,bwa_gatk,bwa_platypus	GT	1|1
