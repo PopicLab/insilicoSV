@@ -309,9 +309,9 @@ class OutputWriter:
                 sim_fa.write('\n')
             # end: for chrom, chrom_length in zip(...)
         # end: with open(hap_fa, 'w') as sim_fa
+
         if self.config.get('output_paf', False):
             hap_paf = hap_fa.replace('.fa', '.paf')
-
             new_paf_records = []
             for paf_rec_num, paf_rec in enumerate(paf_records):
                 if (paf_rec.target_start == paf_rec.target_end and

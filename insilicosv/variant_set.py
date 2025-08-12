@@ -321,7 +321,7 @@ class SimulatedVariantSet(VariantSet):
     def preprocess_config(self):
         chk('divergence_prob' not in self.vset_config or isinstance(self.vset_config['divergence_prob'], (list, int, float)),
             f'divergence_prob must be a float or an int or a list of floats in ]0, 1] or a list of ranges. But, a '
-                 f'{type(self.vset_config.get('divergence_prob', []))} was provided in {self.vset_config}', error_type='value')
+                 f'%s was provided in %s' % (type(self.vset_config.get('divergence_prob', [])), self.vset_config), error_type='value')
 
         if (self.svtype == VariantType.DUP) and ('n_copies' not in self.vset_config):
             self.vset_config['n_copies'] = [1]

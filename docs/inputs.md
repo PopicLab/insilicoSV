@@ -56,6 +56,10 @@ For trEXP and trCON variants, a BED file of existing repeats must be specified i
 *overlap_regions* global setting, and *overlap_region_type* for the existing repeat regions must
 be specified in the variant set. The BED file columns must contain in order the chromosome, the start position, the end position, the region type, and the motif of the repeat.
 
+SNPs and INDELs can be allowed to be overlapped by other SVs with the parameter:
+9. *enable_overlap_sv [optional]*: bool - whether the SVs of this variant set can be overlapped by other SVs (default: False). Setting it to True
+for SVs other than SNPs and INDELs will raise an error.
+
 
 The following parameters can be set on the top level of the config file and provide higher-order controls over SV placement:
 1. *reference*: str - path to input reference used as template for simulation.

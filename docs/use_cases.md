@@ -47,7 +47,9 @@ variant_sets:
   - type: "SNP" 
     number: 10
 ```
-INDELs are not given a unique type label but can be simulated by setting a sufficiently small min and max size for an SV of type DEL or INS.
+An `INDEL` can be defined using the pre-defined INDEL type, or by specifying DEL or INS types with a length range below 50.
+If you choose the pre-defined `INDEL` type, each variant within the set will be randomly assigned as either a DEL or an INS. 
+You can also omit the `length_ranges` parameter for the INDEL type, in which case it will automatically default to a range of `[[1, 50]]`.
 
 ### Example 1c - Unbounded dispersions
 When specifying length ranges for dispersion intervals, `null` can be provided as an upper bound and this will result in
@@ -281,3 +283,42 @@ Key Considerations for Interchromosomal Dispersions
   
   Because all dispersions are interchromosomal, the last copy of A cannot be placed back on chr3. 
   However, it could be placed in a different region of chr1.
+
+### Example 7 - Placing overlapping SVs
+Any SNP or INDEL can be allowed to be overlapped by other, non-overlapping SVs.
+
+```yaml
+reference: "{path}/{to}/ref.fa"
+variant_sets:
+    - type: "nrTRA"  
+      number: 5
+      length_ranges:
+        - [500, 1000]
+        - [500, 1000]
+    - type: "DEL"
+      number: 10
+      length_ranges:
+         - [30, 50]
+      enable_overlap_sv: True
+    - type: "SNP"
+      number: 20
+      enable_overlap_sv: True
+```
+The DEL and SNP sets have the `enable_overlap_sv: True` setting, which allows them to be overlapped by the nrTRA variants.
+DEL and SNP variants cannot overlap each other.
+
+SVs that are allowed to overlap are always considered as occurring first in the simulation process. 
+This means they might be modified or even deleted by other SVs that are placed later. 
+Regardless of whether they are ultimately observable in the final genome, all overlapping SVs will be included in the final VCF output.
+
+### Example 8 - Time Point Mutations for Cancer Genome Modeling
+For more complex SV interactions, such as those found in cancer lineages, insilicoSV provides a workflow in the notebook 
+`insilicosv_cancer_genome.ipynb`. This notebook is designed to model cancer evolution, generate genomes for different 
+clonal cell populations, and simulate reads at varying tumor purity levels.
+
+The notebook requires a configuration file that specifies the reference genome, read coverage, and paths to
+`insilicoSV` configuration files. These configuration files describe the SVs at different time points, the clones 
+corresponding to each time point, and the purity of each clone. Example configuration files are available in the 
+`configs/clone_configs/` folder. 
+
+For more detailed information, you should refer to the notebook itself.

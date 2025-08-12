@@ -1,0 +1,6 @@
+# YAML CONFIG FILE
+variant_sets:
+    - type: "nrTRA"
+      number: 5
+      length_ranges: [[5000, 10000], [5000, 10000]]
+
