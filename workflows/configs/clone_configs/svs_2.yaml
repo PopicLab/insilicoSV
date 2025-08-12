@@ -1,4 +1,5 @@
 # YAML CONFIG FILE
+heterozygous_only: True
 variant_sets:
   - type: "DEL"
     number: 5

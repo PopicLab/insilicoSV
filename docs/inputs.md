@@ -68,8 +68,9 @@ The following parameters can be set on the top level of the config file and prov
 4. *max_tries: 100 [optional]*: int - number of tries to find a valid position to simulate each SV.
 5. *max_random_breakend_tries: 100 [optional]*: int - number of tries to find a breakend by taking a random position in the genome before checking available regions.
 6. *homozygous_only: False [optional]*: bool - if set to True, make all simulated variants homozygous
-7. *filter_small_chr [optional]*: int - filter out chromosomes of length less than the given integer (if no value is provided then no filtering will occur).
-8. *th_proportion_N: 0.05 [optional]*: The proportion of N and n base pairs an SV is allowed to cover.
+7. *heterozygous_only: False [optional]*: bool - if set to True, make all simulated variants heterozygous
+8. *filter_small_chr [optional]*: int - filter out chromosomes of length less than the given integer (if no value is provided then no filtering will occur).
+9. *th_proportion_N: 0.05 [optional]*: The proportion of N and n base pairs an SV is allowed to cover.
 
 Examples of the full set of simulation options available through various config inputs can be found in the [use cases](use_cases) page.
 

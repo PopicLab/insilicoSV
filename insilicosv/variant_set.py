@@ -354,7 +354,8 @@ class SimulatedVariantSet(VariantSet):
         return RegionFilter(region_kinds=tuple(utils.as_list(self.vset_config['blacklist_region_type'])))
 
     def pick_genotype(self):
-        if self.config.get('homozygous_only', False) or random.randint(0, 1):
+        if self.config.get('homozygous_only', False) or (random.randint(0, 1) and not
+           self.config.get('heterozygous_only', False)):
             return True, True
         else:
             return random.choice([(True, False), (False, True)])

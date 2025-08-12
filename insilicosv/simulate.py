@@ -103,7 +103,7 @@ class SVSimulator:
         chk(isinstance(config, dict), 'Config must be a dict')
 
         for k in config:
-            chk(k in ('reference', 'max_tries', 'max_random_breakend_tries', 'homozygous_only', 'min_intersv_dist',
+            chk(k in ('reference', 'max_tries', 'max_random_breakend_tries', 'homozygous_only', 'heterozygous_only', 'min_intersv_dist',
                       'random_seed', 'output_no_haps', 'output_adjacencies', 'output_paf', 'output_svops_bed', 'th_proportion_N',
                       'output_paf_intersv', 'verbose', 'variant_sets', 'overlap_regions', 'blacklist_regions',
                       'filter_small_chr'),
@@ -653,7 +653,7 @@ class SVSimulator:
                         if in_anchor:
                             # we add a breakend position between the last breakend placed from th same SV, and the end of the anchor roi
                             # +1 to ensure the previous symbol in the anchor doesn't have a length of 0
-                            left_bound = roi.start +1
+                            left_bound = roi.start + 1
                             # -1 to ensure the current symbol doesn't have a length of 0
                             right_bound = anchor_roi.end - 1
                         else:
