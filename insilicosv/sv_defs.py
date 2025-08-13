@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import dataclasses
 from dataclasses import dataclass
 from copy import copy
 from enum import Enum
@@ -32,6 +33,10 @@ class Transform:
         chk(0 <= self.divergence_prob <= 1, f'Invalid divergence probability, please specify a value between 0 and 1 {self.divergence_prob} provided.',
             error_type='value')
 
+    def replace(self, **kw):
+        """Return a copy of self with fields replaced according to `kw`"""
+        return dataclasses.replace(self, **kw)
+
 Breakend: TypeAlias = int
 
 @dataclass(frozen=True)
@@ -61,7 +66,9 @@ class Operation:
 
     motif: Optional[str] = None
 
-    genotype: Optional[tuple] = None
+    # To retain the information of the actual position of an overlapping DEL that was partially overlapping another SV
+    orig_start: Optional[int] = None
+    orig_end: Optional[int] = None
 
     @property
     def transform_type(self):
@@ -96,6 +103,15 @@ class Operation:
     def target_region(self):
         assert self.placement is not None
         return self.get_target_region(self.placement)
+
+    def update_placement(self, new_placement):
+        self.placement = new_placement
+        # Remove the associated cached properties
+        if 'target_region' in self.__dict__:
+            del self.target_region
+
+        if 'source_region' in self.__dict__:
+            del self.source_region
 
 # end: class Operation
 
@@ -162,6 +178,9 @@ class SV(ABC):
     # Fields used while finding a placement
     num_valid_placements: int = 0
 
+    # If a SNP or INDEL can be overlapped by other SVs
+    enable_overlap_sv: Optional[bool] = False
+
     # for arm gain or loss
     arm_gain_loss: Optional[bool] = False
     aneuploidy: Optional[bool] = False
@@ -176,19 +195,19 @@ class SV(ABC):
                                                  self.breakend_interval_min_lengths))
 
         if self.overlap_mode == OverlapMode.CONTAINED:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() > self.roi_filter.region_length_range[0]),
-                f'The anchor length is smaller than the minimum overlap for a contained overlap.', error_type='syntax')
-            chk((self.roi_filter.region_length_range[1] is None) or (self.anchor.length() < self.roi_filter.region_length_range[1]),
-                f'The anchor length is larger than the maximum overlap for a contained overlap.', error_type='syntax')
+            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() > self.roi_filter.region_length_range[0]),
+                f'The anchor length is smaller than the minimum overlap for a contained overlap.')
+            chk((self.roi_filter.region_length_range[1] is None) or (self.get_anchor_length() < self.roi_filter.region_length_range[1]),
+                f'The anchor length is larger than the maximum overlap for a contained overlap.')
         if self.overlap_mode == OverlapMode.CONTAINING:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() > self.roi_filter.region_length_range[0]),
-                f'The anchor length is smaller than the minimum overlap for a containing overlap.', error_type='syntax')
-        if self.overlap_mode == OverlapMode.CONTAINING:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() >= self.roi_filter.region_length_range[0]),
-                f'The anchor length is smaller than the minimum overlap for a partial overlap.', error_type='syntax')
+            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() > self.roi_filter.region_length_range[0]),
+                f'The anchor length is smaller than the minimum overlap for a containing overlap.')
+        if self.overlap_mode == OverlapMode.PARTIAL:
+            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() >= self.roi_filter.region_length_range[0]),
+                f'The anchor length is smaller than the minimum overlap for a partial overlap.')
 
         # The letters cannot be unbounded unless the overlap is Exact and they are in the anchor.
-        chk(self.fixed_placement or all(
+        chk(self.fixed_placement or self.aneuploidy or self.arm_gain_loss or all(
             length is not None for idx, length in enumerate(self.breakend_interval_lengths) if
             (idx not in self.dispersions) and
             ((not self.anchor) or (self.overlap_mode != OverlapMode.EXACT) or not (
@@ -214,6 +233,7 @@ class SV(ABC):
         assert self.fixed_placement is None or self.overlap_mode is None
         assert self.genotype and sum(self.genotype)
         for operation in self.operations:
+            operation.op_info['SVID'] = self.sv_id
             if operation.target_insertion_order is not None:
                 operation.target_insertion_order = (self.sv_id,) + operation.target_insertion_order
 
@@ -300,6 +320,7 @@ class VariantType(Enum):
     dupINVdel = "dupINVdel"
 
     SNP = "SNP"
+    INDEL= "INDEL"
     DIVERGENCE = "DIVERGENCE"
 
     CUSTOM = "Custom"
@@ -329,7 +350,7 @@ class BaseSV(SV):
             sv_info = dict(self.info)
             op_type_str = operation.transform_type.value
             if (operation.transform_type == TransformType.IDENTITY) and operation.is_in_place:
-                if (operation.transform.divergence_prob == 1) and (self.breakend_interval_lengths[0] == 1):
+                if sv_type_str == 'SNP':
                     # SNP
                     op_type_str = 'NA'
                     rec_id = sv_id = 'snp' + self.sv_id.split('sv')[-1]
@@ -343,6 +364,12 @@ class BaseSV(SV):
                 svlen = len(operation.novel_insertion_seq)
                 if config.get('output_vcf_ins_seq', True):
                     sv_info['INSSEQ'] = operation.novel_insertion_seq
+            elif operation.orig_start is not None:
+                # The SV is a DEL partially overlapping another SV
+                op_chrom = operation.source_region.chrom
+                op_start = operation.orig_start
+                op_end = operation.orig_end + 1
+                svlen = op_end - op_start - 1
             elif operation.source_region is not None:
                 op_chrom = operation.source_region.chrom
                 op_start = operation.source_region.start
@@ -373,10 +400,11 @@ class BaseSV(SV):
                         self.anchor.start_breakend <= operation.source_breakend_region.start_breakend <= self.anchor.end_breakend):
                     sv_info['OVLP'] = self.roi.kind
                 # Here the target is in the anchor.
-                if (operation.target_region is not None and
-                        self.anchor.start_breakend <= operation.target_region.start <= self.anchor.end_breakend):
+                if (operation.target_insertion_breakend is not None and
+                        self.anchor.start_breakend <= operation.target_insertion_breakend <= self.anchor.end_breakend):
                     sv_info['OVLP_TARGET'] = self.roi.kind
             alleles = ['N', '<%s>' % sv_type_str]
+
             if len(self.operations) > 1:
                 rec_id += f'_{op_idx}'
                 if sv_info['OP_TYPE'] == 'IDENTITY' and not operation.is_in_place:
@@ -385,20 +413,25 @@ class BaseSV(SV):
                     sv_info['OP_TYPE'] = 'COPYinv-PASTE'
                 alleles[1] = '<%s>' % sv_info['OP_TYPE']
             else:
-                if ((sv_type_str == 'SNP')
-                        and (operation.transform.orig_seq is not None)
-                        and (operation.transform.replacement_seq is not None)):
+                if sv_type_str == 'SNP':
+                    alleles = operation.transform.replacement_seq
                     # Find the original and altered bases.
-                    alts = str(if_not_none(operation.transform.replacement_seq[0], ''))
-                    if (operation.transform.replacement_seq[1] is not None and
-                            operation.transform.replacement_seq[1] != operation.transform.replacement_seq[0]):
-                        alts += ', '*(len(alts)) + str(if_not_none(operation.transform.replacement_seq[1], ''))
+                    alts = str(if_not_none(alleles[0], ''))
+                    if (alleles[1] is not None) and (alleles[1] != alleles[0]):
+                        alts += ','*(len(alts)) + str(if_not_none(alleles[1], ''))
                     alleles = [operation.transform.orig_seq, '%s' % alts]
+                elif sv_type_str == 'INDEL':
+                    alleles = ['N', operation.novel_insertion_seq]
+                    if sv_info['OP_TYPE'] == 'DEL':
+                        alleles = [operation.transform.orig_seq, 'N']
                 else:
                     sv_info['OP_TYPE'] = sv_type_str
                     alleles = ['N', '<%s>' % sv_type_str]
             sv_info['SVID'] = rec_id
             sv_info['SVTYPE'] = sv_type_str
+
+            if self.enable_overlap_sv:
+                sv_info['ENABLE_OVERLAP_SV'] = str(True)
 
             for key, value in operation.op_info.items():
                 sv_info[key] = value
@@ -434,11 +467,27 @@ class BaseSV(SV):
                     record['alleles'][1] = '<CUT>'
                 combined_recs.append(record)
 
+        # Check if a type provided as grammar is a predefined type
+        if '->' in combined_recs[0]['info']['SVTYPE']:
+            lhs, rhs = combined_recs[0]['info']['GRAMMAR'].split('->')
+            lhs = tuple([letter for letter in lhs if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]])
+            rhs = tuple(rhs)
+            for key, grammar in SV_KEY.items():
+                if key.value == 'INDEL': continue
+                # Test if the grammar or its symmetric match the grammar of the record
+                if (grammar[0] == lhs and grammar[1] == rhs) or (
+                        grammar[0] == lhs[::-1] and grammar[1] == rhs[::-1]):
+                    combined_recs[0]['info']['SVTYPE'] = key.name
+                    if len(combined_recs) == 1:
+                        combined_recs[0]['info']['OP_TYPE'] = key.name
+                        combined_recs[0]['alleles'][1] = '<%s>' % key.name
+                    break
+
         # Update the records numbering if records have been combined
         if len(combined_recs) == 1:
             combined_recs[0]['id'] = sv_id
             combined_recs[0]['info']['OP_TYPE'] = 'NA'
-            if not combined_recs[0]['info']['SVTYPE'] == 'SNP':
+            if not combined_recs[0]['info']['SVTYPE'] in ['SNP', 'INDEL']:
                 combined_recs[0]['alleles'][1] = '<%s>' % combined_recs[0]['info']['SVTYPE']
         elif len(combined_recs) != len(sv_vcf_recs):
             for idx, operation in enumerate(combined_recs):
@@ -522,6 +571,7 @@ SV_KEY = {
 
     VariantType.DIVERGENCE: (("A",), ("A*",)),
     VariantType.SNP: (("A",), ("A*",)),
+    VariantType.INDEL: ((), ()),
 }
 
 
