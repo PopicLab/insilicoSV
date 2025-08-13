@@ -181,6 +181,12 @@ class SV(ABC):
     # If a SNP or INDEL can be overlapped by other SVs
     enable_overlap_sv: Optional[bool] = False
 
+    # for arm gain or loss
+    arm_gain_loss: Optional[bool] = False
+    aneuploidy: Optional[bool] = False
+    arm_percent: Optional[int] = 100
+    aneuploid_chrom: Optional[list[str]] = None
+
     def __post_init__(self):
         assert self.sv_id
         assert len(self.breakend_interval_min_lengths) == len(self.breakend_interval_lengths)
@@ -201,12 +207,14 @@ class SV(ABC):
                 f'The anchor length is smaller than the minimum overlap for a partial overlap.')
 
         # The letters cannot be unbounded unless the overlap is Exact and they are in the anchor.
-        chk(self.fixed_placement or all(
+        chk(self.fixed_placement or self.aneuploidy or self.arm_gain_loss or all(
             length is not None for idx, length in enumerate(self.breakend_interval_lengths) if
             (idx not in self.dispersions) and
             ((not self.anchor) or (self.overlap_mode != OverlapMode.EXACT) or not (
                     self.anchor.start_breakend <= idx < self.anchor.end_breakend))),
-            f'A length range can only be [null, null] for dispersions or the anchor for an exact overlap.', error_type='syntax')
+            f'A length range can only be [null, null] for dispersions or the anchor for an exact overlap. '
+            f'But, {self.config_descr} was provided. Notice that if the SV is defined from the grammar then the length of '
+            f'the dispersions are to be given in order of appearance in the grammar.', error_type='syntax')
 
         # Interchromosomal dispersions have to be unbounded
         chk(not self.is_interchromosomal or all(
@@ -319,7 +327,6 @@ class VariantType(Enum):
 
     trEXP = "trEXP"
     trCON = "trCON"
-
 
 
 class BaseSV(SV):

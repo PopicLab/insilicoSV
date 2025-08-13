@@ -140,7 +140,7 @@ class TestKnownSVs(unittest.TestCase):
         changed_frag_hap1, changed_frag_hap2 = config.get_actual_frag(return_haps='both')
         config.remove_test_files()
         if target_frags is not None:
-            print(changed_frag_hap1, changed_frag_hap2, target_frags)
+            print('HELPER', changed_frag_hap1, changed_frag_hap2, target_frags)
             self.assertTrue(changed_frag_hap1 in target_frags or changed_frag_hap2 in target_frags)
         return changed_frag_hap1, changed_frag_hap2
 

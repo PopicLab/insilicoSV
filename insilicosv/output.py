@@ -116,14 +116,16 @@ PafRecord = namedtuple('PafRecord', [
 
 class OutputWriter:
 
-    def __init__(self, svs, overlap_sv_regions, reference, chrom_lengths, output_path, config):
+    def __init__(self, svs, overlap_sv_regions, reference, chrom_lengths, output_path, enable_hap_overlap, config):
         self.svs = svs
         self.reference = reference
         self.chrom_lengths = chrom_lengths
+        self.aneuploidy_chrom_lengths = copy.deepcopy(self.chrom_lengths)
         self.output_path = output_path
         self.config = config
         self.overlap_sv_regions = overlap_sv_regions
         self.homozygous_only = config.get('homozygous_only', False)
+        self.enable_hap_overlap = enable_hap_overlap
 
     def output_haps(self):
         if self.config.get('output_no_haps', False):
@@ -139,12 +141,18 @@ class OutputWriter:
         paf_mapq = 60
         with open(hap_fa, 'w') as sim_fa:
             chrom2operations: dict[str, list[Operation]] = self.get_chrom2operations(hap_index)
-            for chrom, chrom_length in zip(self.reference.references, self.reference.lengths):
+            for chrom, operations in chrom2operations.items():
+                # Add chromosome copies for aneuploidy
+                if chrom not in self.aneuploidy_chrom_lengths:
+                    for overlapping_op in operations:
+                        self.aneuploidy_chrom_lengths[chrom] = overlapping_op[-1].source_region.length()
+                        # Aneuploidy can only be applied to regions starting at bp 0
+                        if overlapping_op[-1].target_region.start > 0: break
+            for chrom, chrom_length in self.aneuploidy_chrom_lengths.items():
                 hap_str = ['hapA', 'hapB'][hap_index]
                 hap_chrom = f'{chrom}_{hap_str}'
-                sim_fa.write(f'>{hap_chrom}\n')
-
                 hap_chrom_pos = 0
+                first_seq = True
 
                 for overlapping_operations in chrom2operations[chrom]:
                     # The non-overlapping operation if any is at the end
@@ -304,6 +312,10 @@ class OutputWriter:
                             paf_records.append(paf_rec)
                     hap_chrom_pos += len(seq)
                     if seq:
+                        if first_seq:
+                            # Ensure we only write the chromosome_hap name if it is not empty (might cause issues when reading the file)
+                            sim_fa.write(f'>{hap_chrom}\n')
+                            first_seq = False
                         sim_fa.write(seq)
                 hap_chrom_lengths[hap_chrom] = hap_chrom_pos
                 sim_fa.write('\n')
@@ -484,6 +496,11 @@ class OutputWriter:
         chrom2operations = defaultdict(list)
         target_region2transform = {}
         placed_overlap_sv = []
+        # If not self.enable_hap_overlap, there is only one tree per chrom for the sv overlap else three
+        hap_id_overlap = 0
+        if self.enable_hap_overlap:
+            hap_id_overlap = hap_index
+
         for sv in self.svs:
             # If the SV is on the other haplotype or overlapping it will be treated later
             if not sv.genotype[hap_index] or sv.enable_overlap_sv: continue
@@ -503,7 +520,7 @@ class OutputWriter:
                 if operation.transform.divergence_prob > 0:
                     operation.genotype = sv.genotype
 
-                overlap_sv = self.overlap_sv_regions.chrom2itree[operation.target_region.chrom].overlap(operation.target_region.start-0.1,
+                overlap_sv = self.overlap_sv_regions.chrom2itree[operation.target_region.chrom][hap_id_overlap].overlap(operation.target_region.start-0.1,
                                                                                             operation.target_region.end+0.1)
                 region_to_overlap_start = operation.target_region.start
                 region_to_overlap_end = operation.target_region.end
@@ -515,7 +532,7 @@ class OutputWriter:
 
                 if operation.source_region and operation.source_region != operation.target_region:
                     # In the case of a duplication, a change in the source has to be reflected on the target
-                    overlap_sv = self.overlap_sv_regions.chrom2itree[operation.target_region.chrom].overlap(operation.source_region.start,
+                    overlap_sv = self.overlap_sv_regions.chrom2itree[operation.target_region.chrom][hap_id_overlap].overlap(operation.source_region.start,
                                                                                                             operation.source_region.end)
                     region_to_overlap_start = operation.source_region.start
                     region_to_overlap_end = operation.source_region.end
@@ -532,7 +549,8 @@ class OutputWriter:
                 overlapping_region.append(operation)
                 chrom2operations[operation.target_region.chrom].append(overlapping_region)
 
-        for chrom, tree in self.overlap_sv_regions.chrom2itree.items():
+        for chrom, trees in self.overlap_sv_regions.chrom2itree.items():
+            tree = trees[hap_id_overlap]
             for overlap_regions in tree:
                 sv = overlap_regions.data.sv
                 if sv.genotype[hap_index] and not overlap_regions in placed_overlap_sv:
@@ -616,9 +634,9 @@ class OutputWriter:
         vcf_path = os.path.join(self.output_path, 'sim.vcf')
         with open(vcf_path, "w") as vcf:
             vcf.write("##fileformat=VCFv4.2\n")
-            for chrm, chrm_len in zip(self.reference.references,
-                                      self.reference.lengths):
+            for chrm, chrm_len in self.aneuploidy_chrom_lengths.items():
                 vcf.write("##contig=<ID=%s,length=%d>\n" % (chrm, chrm_len))
+
             vcf.write("#%s\n" % "\t".join(["CHROM", "POS", "ID",
                                            "REF", "ALT", "QUAL", "FILTER", "INFO",
                                            "FORMAT", "SAMPLE"]))
