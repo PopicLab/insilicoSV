@@ -706,7 +706,7 @@ class SVSimulator:
                 if distance is None:
                     # If we have an interchromosomal dispersion we check the period and adapt the chromosome otherwise keep the same one.
                     avoid_chrom = [roi.chrom]
-                    if interchromosomal_period:
+                    if interchromosomal_period is not None and interchromosomal_period != 1:
                         # If the cycle is not complete we explore new not yet overlapped chroms
                         avoid_chrom = overlapped_chroms
                         if len(overlapped_chroms) == interchromosomal_period:
@@ -721,7 +721,7 @@ class SVSimulator:
                     contiguous_length = self.sum_lengths(lengths[pos:], breakends[breakend:], dispersions[breakend:])
                     # If interchromosomal the length is the contiguous length
                     total_length = contiguous_length
-                    if interchromosomal_period is None or in_anchor:
+                    if interchromosomal_period is None or interchromosomal_period == 1 or in_anchor:
                         total_length = sum([length for length in lengths[pos:] if length is not None])
                         avoid_chrom = None
                         bound = if_not_none(min_dist[pos], 0)
