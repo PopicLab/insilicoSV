@@ -249,31 +249,46 @@ can be used to constrain an insertion target for instance.
 If an anchor constrains a dispersion, the dispersion will be intrachromosomal even if the SV is set as interchromosomal 
 (In this case, other unconstrained dispersions of the SV will then be interchromosomal). 
 
-### Example 6 - Placing Interchromosomal SVs
-InsilicoSV allows you to simulate interchromosomal SVs by using the `interchromosomal` flag. 
-This means the SV will involve changes across different chromosomes.
+### Example 6 - Interchromosomal Dispersions and Interchromosomal Periods
+You can use the `interchromosomal_period` flag to control how an SV is dispersed across chromosomes. 
+By default, this value is None, which means the SV is intrachromosomal (it stays on the same chromosome).
 
-To define an interchromosomal SV, set `interchromosomal: True` within the variant set definition, 
-as shown in the example below:
+#### Understanding the `interchromosomal_period` Flag
+- `interchromosomal_period=0`: Each dispersion of the SV will switch chromosome. 
+This ensures that every part of the SV is placed on a different chromosome than the last.
+
+- `interchromosomal_period > 1`: This creates a cycle of dispersions among a specific number of different chromosomes.
+The first `interchromosomal_period` dispersions will each be placed on a new, unique chromosome.
+Any subsequent dispersions will then cycle back through these same chromosomes in the order they were first visited creating a cycle.
+
+- `interchromosomal_period=1` or `interchromosomal_period=null`: This is the default. The cycle involves only one chromosome, the SV will behave as if it were intrachromosomal.
+
+- List of Integers (e.g., [2, 3]): You can provide a list of two integers to define a range. 
+For each SV in the variant set, a random `interchromosomal_period` value will be chosen from this range.
+
+- The default value is `None`, meaning that the SV is intrachromosomal.
+
+The provided YAML code defines a variant set that places cycles of templated insertions across chromosomes.
 ```yaml
 reference: "{path}/{to}/ref.fa"
+overlap_regions: ["/{path_to}/{candidate_overlap_events_1}.bed"]
 variant_sets:
-    - type: "nrTRA"  
-      interchromosomal: True
+    - type: "A_B_C -> A_BCAB_C" 
       number: 5
       length_ranges:
         - [500, 1000]
         - [null, null]
-    - type: "A__ -> A_AB_A"
-      number: 1
-      interchromosomal: True
-      length_ranges:
-         - [500, 1000]
-         - [null, null]
-         - [null, null] 
-         - [500, 1000]
+        - [500, 1000]
+        - [null, null]
+        - [500, 1000]
+      interchromosomal_period: [2, 3]
 ```
 Key Considerations for Interchromosomal Dispersions
+- `Unbounded Lengths`: When defining interchromosomal dispersions, their lengths must be unbounded (specified as [null, null]).  
+- `Example scenario`: for each of the 5 structural variants defined, the `interchromosomal_period` will be randomly set to either 2 or 3. 
+This means some SVs will cycle between two chromosomes, while others will cycle between three, creating a diverse set of interchromosomal insertions.
+
+### Example 7 - Chromosome Gain/Loss
 - Unbounded Lengths: When defining interchromosomal dispersions, their lengths must be unbounded (specified as [null, null]).  
 - Multiple Dispersions: If a custom SV with multiple dispersions is flagged as interchromosomal, each dispersion will involve a change to a different chromosome.
 - Example Scenario: In the second example provided above, where the type is "A__ -> A_AB_A", a possible placement for this interchromosomal SV could be:

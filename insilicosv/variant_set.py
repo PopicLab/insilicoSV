@@ -102,9 +102,10 @@ class VariantSet(ABC):
                 f'are not allowed in the target, If for instance, you want to constrain the insertion target of a dDUP, '
                 f'write A_(). Error in {vset_config}', error_type='syntax')
 
-    def get_sampled_int_value(self, value, locals_dict=
-    None):
-        if isinstance(value, (int, float)):
+        self.interchromosomal_period = self.vset_config.get('interchromosomal_period', None)
+
+    def get_sampled_int_value(self, value, locals_dict=None):
+        if isinstance(value, (int, float)) or value is None:
             return value
         elif isinstance(value, list):
             chk(len(value) == 2, f'Expected [min, max] pair: {value}', error_type='value')
@@ -401,7 +402,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'divergence_prob',
                 'n_copies',
                 'novel_insertions',
-                'interchromosomal',
+                'interchromosomal_period',
                 'config_descr',
                 'enable_overlap_sv',
                 'aneuploidy',
@@ -411,7 +412,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'VSET'
             ), f'invalid SV config key {vset_config_key}', error_type='syntax')
 
-        vset_cfg = self.vset_config
+        vset_config = self.vset_config
         rhs_strs_list: list[str] = []
         for c in self.target:
             if c in (Syntax.DIVERGENCE, Syntax.MULTIPLE_COPIES):
@@ -440,70 +441,70 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                     self.svtype = key
                     # Distinguish between SNP and DIVERGENCE
                     if key in [VariantType.DIVERGENCE, VariantType.SNP]:
-                        if ((vset_cfg.get('length_ranges') in (None, [[1, 1]])) and
-                            ('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] in [[1], 1, 1., [1.]])):
+                        if ((vset_config.get('length_ranges') in (None, [[1, 1]])) and
+                            ('divergence_prob' not in vset_config or vset_config['divergence_prob'] in [[1], 1, 1., [1.]])):
                             self.svtype = VariantType.SNP
                         else:
                             self.svtype = VariantType.DIVERGENCE
                     self.input_type = VariantType.CUSTOM
 
         if self.svtype == VariantType.SNP:
-            chk(vset_cfg.get('length_ranges') in (None, [[1, 1]]),
-                f'length_ranges for SNP can only be [[1, 1]]. Error in %s' % vset_cfg['config_descr'], error_type='value')
-            chk('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] in [[1], 1],
-                f'divergence prob for SNP can only be 1. Error in %s' % vset_cfg['config_descr'], error_type='value')
-            vset_cfg['length_ranges'] = [[1, 1]]
-            vset_cfg['divergence_prob'] = [1.0]
-        elif vset_cfg['type'] == 'INDEL':
+            chk(vset_config.get('length_ranges') in (None, [[1, 1]]),
+                f'length_ranges for SNP can only be [[1, 1]]. Error in %s' % vset_config['config_descr'], error_type='value')
+            chk('divergence_prob' not in vset_config or vset_config['divergence_prob'] in [[1], 1],
+                f'divergence prob for SNP can only be 1. Error in %s' % vset_config['config_descr'], error_type='value')
+            vset_config['length_ranges'] = [[1, 1]]
+            vset_config['divergence_prob'] = [1.0]
+        elif vset_config['type'] == 'INDEL':
             # INDELS have to be of size <= 50
-            chk(not vset_cfg.get('length_ranges', False) or (1 <= if_not_none(vset_cfg['length_ranges'][0][0], 1) <=
-                                                          if_not_none(vset_cfg['length_ranges'][0][1], 50) <= 50 ),
-                f'length_ranges for INDEL must be included in [0, 50]. Error in %s' % vset_cfg['config_descr'],
+            chk(not vset_config.get('length_ranges', False) or (1 <= if_not_none(vset_config['length_ranges'][0][0], 1) <=
+                                                          if_not_none(vset_config['length_ranges'][0][1], 50) <= 50 ),
+                f'length_ranges for INDEL must be included in [0, 50]. Error in %s' % vset_config['config_descr'],
                 error_type='value')
-            chk(not vset_cfg.get('overlap_region_length_range', False) or (if_not_none(vset_cfg['overlap_region_length_range'][0], 0) <=
-                                                          if_not_none(vset_cfg['overlap_region_length_range'][1], 50) <= 50 ),
-                f'overlap_region_length_range for INDEL must be included in [0, 50]. Error in %s' % vset_cfg['config_descr'],
+            chk(not vset_config.get('overlap_region_length_range', False) or (if_not_none(vset_config['overlap_region_length_range'][0], 0) <=
+                                                          if_not_none(vset_config['overlap_region_length_range'][1], 50) <= 50 ),
+                f'overlap_region_length_range for INDEL must be included in [0, 50]. Error in %s' % vset_config['config_descr'],
                 error_type='value')
 
             # In case the max length_range was null, set it to 50 as it is the maximum for INDEL
-            if vset_cfg.get('length_ranges', False) and not vset_cfg['length_ranges'][0][1]:
-                vset_cfg['length_ranges'][0][1] = 50
-                if not vset_cfg['length_ranges'][0][0]:
-                    vset_cfg['length_ranges'][0][0] = 1
+            if vset_config.get('length_ranges', False) and not vset_config['length_ranges'][0][1]:
+                vset_config['length_ranges'][0][1] = 50
+                if not vset_config['length_ranges'][0][0]:
+                    vset_config['length_ranges'][0][0] = 1
 
-            if not vset_cfg.get('length_ranges'):
-                vset_cfg['length_ranges'] = [[1, 50]]
+            if not vset_config.get('length_ranges'):
+                vset_config['length_ranges'] = [[1, 50]]
 
-            if vset_cfg.get('overlap_mode', False):
-                if not vset_cfg.get('overlap_region_length_range', False):
-                    vset_cfg['overlap_region_length_range'] = [[1, 50]]
+            if vset_config.get('overlap_mode', False):
+                if not vset_config.get('overlap_region_length_range', False):
+                    vset_config['overlap_region_length_range'] = [[1, 50]]
 
 
         if self.svtype in [VariantType.SNP, VariantType.INDEL] or (self.svtype in [VariantType.INS, VariantType.DEL] and
-                                                                   'length_ranges' in vset_cfg and
-                                                                   vset_cfg['length_ranges'][0][1] and
-                                                                   vset_cfg['length_ranges'][0][1] < 50):
-            self.overlap_sv = vset_cfg.get('enable_overlap_sv', False)
+                                                                   'length_ranges' in vset_config and
+                                                                   vset_config['length_ranges'][0][1] and
+                                                                   vset_config['length_ranges'][0][1] < 50):
+            self.overlap_sv = vset_config.get('enable_overlap_sv', False)
         else:
-            chk(not ('enable_overlap_sv' in vset_cfg),
+            chk(not ('enable_overlap_sv' in vset_config),
                 f'overlap_sv are only available for SNPs and INDELs, but %s was provided' %
-                vset_cfg['config_descr'], error_type='type')
+                vset_config['config_descr'], error_type='type')
 
-            chk('length_ranges' in vset_cfg or 'novel_insertions' in self.vset_config or
-                vset_cfg.get('aneuploidy', False) or vset_cfg.get('arm_gain_loss', False),
+            chk('length_ranges' in vset_config or 'novel_insertions' in self.vset_config or
+                vset_config.get('aneuploidy', False) or vset_config.get('arm_gain_loss', False),
                 f'Please specify length ranges in %s' %
-                (vset_cfg['config_descr']), error_type='syntax')
+                (vset_config['config_descr']), error_type='syntax')
 
-            if 'length_ranges' in vset_cfg:
-                chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list for %s' % vset_cfg['config_descr'],
+            if 'length_ranges' in vset_config:
+                chk(isinstance(vset_config['length_ranges'], list), f'length_ranges must be a list for %s' % vset_config['config_descr'],
                     error_type='syntax')
-                for length_range in vset_cfg['length_ranges']:
+                for length_range in vset_config['length_ranges']:
                     chk(isinstance(length_range, str) or
                         (isinstance(length_range, list) and len(length_range) == 2 and
                          isinstance(length_range[0], (type(None), int, str)) and
                          isinstance(length_range[1], (type(None), int, str))),
                         f'invalid length_ranges. it must be a list of 2-tuples of str or int. '
-                        f'Error in %s' % vset_cfg['config_descr'], error_type='value')
+                        f'Error in %s' % vset_config['config_descr'], error_type='value')
 
         if 'novel_insertions' in self.vset_config:
             try:
@@ -520,35 +521,47 @@ class FromGrammarVariantSet(SimulatedVariantSet):
 
         if self.arm_gain_loss:
             chk('arms' in self.config, f'An SV set has been flagged as arm_gain_loss but the arm regions have'
-                                f'not been provided %s' % vset_cfg['config_descr'])
-            self.arm_ranges = vset_cfg.get('arm_percent', [100, 100])
+                                f'not been provided %s' % vset_config['config_descr'])
+            self.arm_ranges = vset_config.get('arm_percent', [100, 100])
             chk(isinstance(self.arm_ranges, list),
-                f'arm_percent must be a list for %s' % vset_cfg['config_descr'],
+                f'arm_percent must be a list for %s' % vset_config['config_descr'],
                 error_type='syntax')
 
         if self.aneuploidy or self.arm_gain_loss:
-            chk(all(length is None for idx, length in enumerate(vset_cfg.get('length_ranges', []))),
-                'All the lengths have to be null for aneuploidy or arm gain loss. Error in %s' % vset_cfg['config_descr'])
-            chk(self.svtype in [VariantType.DEL, VariantType.DUP], 'Only DUP or DEL SVs can be used for aneuploidy and arm gain loss. Error in %s' % vset_cfg['config_descr'])
+            chk(all(length is None for idx, length in enumerate(vset_config.get('length_ranges', []))),
+                'All the lengths have to be null for aneuploidy or arm gain loss. Error in %s' % vset_config['config_descr'])
+            chk(self.svtype in [VariantType.DEL, VariantType.DUP], 'Only DUP or DEL SVs can be used for aneuploidy and arm gain loss. Error in %s' % vset_config['config_descr'])
             chk(not Syntax.ANCHOR_END in self.source and not Syntax.ANCHOR_START in self.source and
-                not self.overlap_mode, 'SVs with arm_gain_loss or aneuploidy enabled cannot be constrained. Error in %s' % vset_cfg['config_descr'])
-            vset_cfg['length_ranges'] = [[None, None]]
+                not self.overlap_mode, 'SVs with arm_gain_loss or aneuploidy enabled cannot be constrained. Error in %s' % vset_config['config_descr'])
+            vset_config['length_ranges'] = [[None, None]]
 
         if self.aneuploidy:
-            chk(not 'aneuploid_chrom' in vset_cfg or (isinstance(vset_cfg['aneuploid_chrom'], list) and
-                                                  all(isinstance(chrom, str) for chrom in vset_cfg['aneuploid_chrom'])),
-            'aneuploid_chrom must be a list of chromosomes. Error in %s' % vset_cfg['config_descr'])
-        elif 'aneuploid_chrom' in vset_cfg:
+            chk(not 'aneuploid_chrom' in vset_config or (isinstance(vset_config['aneuploid_chrom'], list) and
+                                                  all(isinstance(chrom, str) for chrom in vset_config['aneuploid_chrom'])),
+            'aneuploid_chrom must be a list of chromosomes. Error in %s' % vset_config['config_descr'])
+        elif 'aneuploid_chrom' in vset_config:
             logger.warning(
-                'aneuploid_chrom provided without enabling aneuploidy. aneuploid_chrom will be ignored in %s' % vset_cfg[
+                'aneuploid_chrom provided without enabling aneuploidy. aneuploid_chrom will be ignored in %s' % vset_config[
                     'config_descr'])
 
-        if not self.arm_gain_loss and 'arm_percent' in vset_cfg:
-            logger.warning('arm_percent provided without enabling arm_gain_loss. arm_percent will be ignored in %s' % vset_cfg['config_descr'])
+        if not self.arm_gain_loss and 'arm_percent' in vset_config:
+            logger.warning('arm_percent provided without enabling arm_gain_loss. arm_percent will be ignored in %s' % vset_config['config_descr'])
+
+        chk('interchromosomal_period' not in vset_config or isinstance(vset_config['interchromosomal_period'], (int, list)),
+            'interchromosomal_period must be an int or a list of ints. '
+            'Provided %s' % vset_config['config_descr'],
+            error_type='syntax')
+        interchromosomal_period = vset_config.get('interchromosomal_period', None)
+
+        if isinstance(interchromosomal_period, list):
+            chk(len(interchromosomal_period) == 2 and isinstance(interchromosomal_period[0], int) and
+                isinstance(interchromosomal_period[1], int),
+                'interchromosomal_period when provided as a range must contain two integers. '
+                'Provided %s' % vset_config['config_descr'], error_type='syntax')
 
     @property
     def is_interchromosomal(self):
-        return self.vset_config.get('interchromosomal', False)
+        return self.interchromosomal_period is not None and self.interchromosomal_period != 1
 
     def symmetrize(self, lhs_strs, rhs_strs, letter_ranges):
         # Enforce the symmetry of the predefined SVs with duplications or dispersions.
@@ -736,10 +749,13 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         #
         info = self.construct_info(lhs_strs, rhs_strs)
         roi_filter = self.get_roi_filter()
+
+        interchromosomal_period = self.get_sampled_int_value(self.interchromosomal_period)
+
         return BaseSV(sv_id=self.make_sv_id(),
                       breakend_interval_lengths=breakend_interval_lengths,
                       breakend_interval_min_lengths=breakend_interval_min_lengths,
-                      is_interchromosomal=self.is_interchromosomal,
+                      interchromosomal_period=interchromosomal_period,
                       operations=operations,
                       anchor=anchor,
                       dispersions=dispersions,

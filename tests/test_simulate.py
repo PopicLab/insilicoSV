@@ -1623,6 +1623,75 @@ class TestSVSimulator(unittest.TestCase):
              ]
             ]
 
+        self.interchromsomal_period = [
+            [("TCGATCGA", "AGCTAGCT", "CG"),
+             TestObject([self.ref_file, {"chr21": "TCGAGG"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    "variant_sets": [{"type": "A_B_C_->A_B_C_ABC",
+                                                      "number": 1,
+                                                      "interchromosomal_period": 2,
+                                                      "length_ranges": [[2, 2], [None, None],
+                                                                        [2, 2], [None, None], [2, 2], [None, None]]}]}],
+                        self.hap1, self.hap2, self.bed),
+             [("TCGATCGA", "AGCTAGCT"[insertion_idx:] + A + B + C + "AGCTAGCT"[:insertion_idx], "CG")
+              for A in ['AG', 'GC', 'CT', 'TA']
+              for C in ['AG', 'GC', 'CT', 'TA']
+              for B in ['TC', 'CG', 'GA', 'AT'] for insertion_idx in range(8)] +
+             [("TCGATCGA"[insertion_idx:] + A + B + C + "TCGATCGA"[:insertion_idx], "AGCTAGCT", "CG")
+              for A in ['TC', 'CG', 'GA', 'AT']
+              for C in ['TC', 'CG', 'GA', 'AT']
+              for B in ['AG', 'GC', 'CT', 'TA'] for insertion_idx in range(8)] +
+             [("TCGATCGA", "AGCTAGCT", "CG"[:insertion_idx] + A + B + C + "CG"[insertion_idx:])
+              for A in ['TC', 'CG', 'GA', 'AT']
+              for C in ['TC', 'CG', 'GA', 'AT']
+              for B in ['CG'] for insertion_idx in [0, 2]] +
+             [("TCGATCGA", "AGCTAGCT", "CG"[:insertion_idx] + A + B + C + "CG"[insertion_idx:])
+              for A in ['AG', 'GC', 'CT', 'TA']
+              for C in ['AG', 'GC', 'CT', 'TA']
+              for B in ['CG'] for insertion_idx in [0, 2]]
+             ],
+            [("TCGATCGA", "AGCTAGCT", "CG"),
+             TestObject([self.ref_file, {"chr21": "TCGAGG"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    "variant_sets": [{"type": "A_B_C_->A_B_C_ABC",
+                                                      "number": 1,
+                                                      "interchromosomal_period": 3,
+                                                      "length_ranges": [[2, 2], [None, None],
+                                                                        [2, 2], [None, None], [2, 2], [None, None]]}]}],
+                        self.hap1, self.hap2, self.bed),
+             [("TCGATCGA", "AGCTAGCT"[insertion_idx:] + A + B + C + "AGCTAGCT"[:insertion_idx], "CG")
+              for A in ['AG', 'GC', 'CT', 'TA']
+              for C in ['CG']
+              for B in ['TC', 'CG', 'GA', 'AT'] for insertion_idx in range(8)] +
+             [("TCGATCGA", "AGCTAGCT"[insertion_idx:] + A + B + C + "AGCTAGCT"[:insertion_idx], "CG")
+              for A in ['AG', 'GC', 'CT', 'TA']
+              for C in ['TC', 'CG', 'GA', 'AT']
+              for B in ['CG'] for insertion_idx in range(8)] +
+             [("TCGATCGA"[insertion_idx:] + A + B + C + "TCGATCGA"[:insertion_idx], "AGCTAGCT", "CG")
+              for A in ['TC', 'CG', 'GA', 'AT']
+              for C in ['CG']
+              for B in ['AG', 'GC', 'CT', 'TA'] for insertion_idx in range(8)] +
+             [("TCGATCGA"[insertion_idx:] + A + B + C + "TCGATCGA"[:insertion_idx], "AGCTAGCT", "CG")
+              for A in ['TC', 'CG', 'GA', 'AT']
+              for C in ['AG', 'GC', 'CT', 'TA']
+              for B in ['CG'] for insertion_idx in range(8)] +
+             [("TCGATCGA", "AGCTAGCT", "CG"[:insertion_idx] + A + B + C + "CG"[insertion_idx:])
+              for A in ['TC', 'CG', 'GA', 'AT']
+              for C in ['TC', 'CG', 'GA', 'AT']
+              for B in ['CG'] for insertion_idx in [0, 2]] +
+             [("TCGATCGA", "AGCTAGCT", "CG"[:insertion_idx] + A + B + C + "CG"[insertion_idx:])
+              for A in ['CG']
+              for C in ['TC', 'CG', 'GA', 'AT']
+              for B in ['AG', 'GC', 'CT', 'TA'] for insertion_idx in [0, 2]] +
+             [("TCGATCGA", "AGCTAGCT", "CG"[:insertion_idx] + A + B + C + "CG"[insertion_idx:])
+              for A in ['CG']
+              for C in ['AG', 'GC', 'CT', 'TA']
+              for B in ['TC', 'CG', 'GA', 'AT'] for insertion_idx in [0, 2]]
+             ],
+        ]
+
         self.simple_test_data = [
             ["TCG",
              TestObject([self.ref_file, {"chr21": "TCG"}],
@@ -1807,7 +1876,7 @@ class TestSVSimulator(unittest.TestCase):
             [["TCGA", "CAT"], {"type": "dDUP", "length_ranges": [[3, 3], [1, None]]},
              [("TCGATCG", "CAT"), ("CGATCGA", "CAT")]],
             [["TCGA", "CAT"], {"type": "dDUP", "length_ranges": [[3, 3], [None, None]],
-                               "interchromosomal": True},
+                               "interchromosomal_period": 0},
              [("TCGA"[:i] + "CAT" + "TCGA"[i:], "CAT") for i in range(0, len("TCGA") + 1)] +
              [("TCGA", "CAT"[:j] + s + "CAT"[j:]) for j in range(0, len("CAT") + 1) for s in ("TCG", "CGA")]],
 
@@ -1820,7 +1889,7 @@ class TestSVSimulator(unittest.TestCase):
             ["TCGA", {"type": "INV_nrTRA", "length_ranges": [[3, 3], [1, 1]]}, ["ACGA", "TCGT"]],
 
             [["GGTT", "CA"],
-             {"type": "INV_rTRA", "length_ranges": [[3, 3], [1, 1], [None, None]], "interchromosomal": True},
+             {"type": "INV_rTRA", "length_ranges": [[3, 3], [1, 1], [None, None]], "interchromosomal_period": 0},
              [('GT', 'ACCA'), ('GT', 'CAAC'), ('GG', 'AACA'), ('TT', 'CACC')]],
 
             ["T", {"type": "A->AA*", "length_ranges": [[1, 1]],
@@ -1831,7 +1900,7 @@ class TestSVSimulator(unittest.TestCase):
                                  "length_ranges": [[2, 2], [2, 2], [2, 2]]}, ],
              [("GGTT", "CA")]],
 
-            [["GGTT", "CA"], {"type": "rTRA", "interchromosomal": True,
+            [["GGTT", "CA"], {"type": "rTRA", "interchromosomal_period": 0,
                               "length_ranges": [[1, 4], [1, 2], [None, None]]},
              [("CGTT", "GA"), ("CTT", "GGA"), ("GGTA", "CT"), ("GGCA", "TT"), ('CA', 'GGTT'), ('CAT', 'GGT'),
               ('GGA', 'CTT'), ('GGTCA', 'T'), ('GGCAT', 'T'), ('GCATT', 'G'), ('GA', 'CGTT'), ('CAGTT', 'G'),
@@ -1839,7 +1908,7 @@ class TestSVSimulator(unittest.TestCase):
               ('CT', 'GGTA'), ('GCA', 'GTT'), ('CATT', 'GG'), ('GCTT', 'GA'), ('GC', 'GTTA'), ('C', 'GGTTA'),
               ('GCAT', 'GT'), ('GGTC', 'TA'), ('GGC', 'TTA'), ('GCT', 'GTA'), ('ATT', 'CGG'), ('GAT', 'CGT')]],
 
-            # [["GGTT", "CA"], {"type": "nrTRA", "interchromosomal": True, "dispersion_ranges": [[None, None]],
+            # [["GGTT", "CA"], {"type": "nrTRA", "interchromosomal_period": 0, "dispersion_ranges": [[None, None]],
             #                  "length_ranges": [[1, 4]]},
             # [("CGGTT", "A"), ("GCGTT", "A"), ("GGCTT", "A"), ("GGTCT", "A"), ("GGTTC", "A"), ("GTT", "GCA"),
             #  ("TT", "CGGA"), ("TT", "CAGG"), ("TT", "CAGG"),
@@ -1848,7 +1917,7 @@ class TestSVSimulator(unittest.TestCase):
 
             [["GGCCTTG", "CA"], [{"type": "A_B_C->A__C",
                                   "length_ranges": [[1, 1], [1, 1], [1, 1], [2, 2], [1, 1]]},
-                                 {"type": "rTRA", "interchromosomal": True,
+                                 {"type": "rTRA", "interchromosomal_period": 0,
                                   "length_ranges": [[1, 1], [2, 2], [None, None]]}],
              [('GGCAG', 'CTT'), ('GGCCG', 'TTA'), ('CAGCTTG', 'G'), ('GGCTG', 'CTA'), ('GGCCATG', 'T'),
               ('GGCTTCA', 'G'),
@@ -2324,64 +2393,28 @@ class TestSVSimulator(unittest.TestCase):
             curr_sim = SVSimulator(config.par)
             with self.assertRaises(Exception):
                 curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref)
-                
+
     def test_blacklist_regions(self):
-        for test_num, (ref, vs_config, expected_outputs) in enumerate(self.test_blacklist_regions):
-            sv_list = []
-            if not isinstance(vs_config, TestObject):
-                if not isinstance(vs_config, list):
-                    vs_config = [vs_config]
-                heterozygous = False
-                test_object = TestObject([self.ref_file, {f"chrTest{ref_num}": ref_seq
-                                                          for ref_num, ref_seq in enumerate(as_list(ref))}],
-                                         [self.par, {"reference": self.ref_file,
-                                                     "homozygous_only": True,
-                                                     "min_intersv_dist": 0,
-                                                     "random_seed": 88,
-                                                     "variant_sets": [dict(number=1, **vs_conf)
-                                                                      for vs_conf in vs_config]}],
-                                         self.hap1, self.hap2, self.bed)
-            else:
-                heterozygous = True
-                test_object = vs_config
+        self.run_test(self.test_blacklist_regions)
 
-            results_seen = set()
-            count_occ = defaultdict(int)
-            attempt_num = 0
-            expected_results = set(expected_outputs)
-            while any(
-                    expected_result not in results_seen for expected_result in expected_results) and attempt_num < len(
-                expected_results) * 100:
-                test_object.par_content["random_seed"] += 150
-                print("SEED", test_object.par_content["random_seed"])
+    def test_simple_tests(self):
+        self.run_test(self.simple_test_data)
 
-                attempt_num += 1
-                results, results2, svs = self.helper_test_known_output_svs(test_object, expected_results,
-                                                                           heterozygous=heterozygous)
-                print('RESUTLS', results)
-                count_occ[results] += 1
-                results_seen.update([results, results2])
-                sv_list.append(svs)
-            if results_seen != expected_results:
-                print('config', vs_config, 'seen', results_seen, 'expected', expected_results, count_occ)
-                print('missing',
-                      [expected_result for expected_result in expected_results if expected_result not in results_seen])
-                print('Unexpected',
-                      [unexpected_result for unexpected_result in results_seen if
-                       unexpected_result not in expected_results])
-            '''if any(expected_result not in results_seen for expected_result in expected_results):
-                for svs in sv_list:
-                    for sv in svs:
-                        print('sv lengths not target', sv.get_anchor_length(), 'breakends', sv.breakend_interval_lengths, 'anchors', sv.anchors,
-                              'rois', sv.roi, 'placement', sv.placement)'''
-            print('OCCURRENCES', count_occ, test_num, 'config', vs_config, expected_results)
-            assert all(expected_result in results_seen for expected_result in
-                       expected_results), f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
-            assert not [unexpected_result for unexpected_result in results_seen if
-                       unexpected_result not in expected_results], f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
+    def test_interchromsomal_period(self):
+        self.run_test(self.interchromsomal_period)
 
-    def run_test(self, tests):
-        for test_num, (ref, vs_config, expected_outputs) in enumerate(tests):
+    def test_simple_gain_loss(self):
+        self.run_test(self.test_arm)
+
+    def test_snp_overlap(self):
+        self.run_test(self.test_snp_overlap)
+
+
+    def test_indel_overlap(self):
+        self.run_test(self.test_indel_overlap)
+
+    def run_test(self, data):
+        for test_num, (ref, vs_config, expected_outputs) in enumerate(data):
             print(ref, vs_config, expected_outputs)
             print('TEST', test_num, 'config', vs_config)
             sv_list = []
@@ -2394,7 +2427,7 @@ class TestSVSimulator(unittest.TestCase):
                                          [self.par, {"reference": self.ref_file,
                                                      "homozygous_only": True,
                                                      "min_intersv_dist": 0,
-                                                     "random_seed": 55,
+                                                     "random_seed": 88,
                                                      "variant_sets": [dict(number=1, **vs_conf)
                                                                       for vs_conf in vs_config]}],
                                          self.hap1, self.hap2, self.bed)
@@ -2433,21 +2466,6 @@ class TestSVSimulator(unittest.TestCase):
 
             assert not [unexpected_result for unexpected_result in results_seen if
                         unexpected_result not in expected_results], f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
-
-    def test_snp_overlap(self):
-        self.run_test(self.test_snp_overlap)
-
-
-    def test_indel_overlap(self):
-        self.run_test(self.test_indel_overlap)
-
-
-    def test_simple_tests(self):
-        self.run_test(self.simple_test_data)
-
-    def test_simple_gain_loss(self):
-        self.run_test(self.test_arm)
-
 
 def test_inv(tmp_path):
     d = tmp_path / "sub"

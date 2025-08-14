@@ -133,7 +133,7 @@ class SV(ABC):
     dispersions: list[Optional[int]]
 
     # whether unbounded dispersions in this SV are interchromosomal
-    is_interchromosomal: bool
+    interchromosomal_period: int
 
     # list of operations comprising this SV, specified in terms of its breakends.
     operations: list[Operation]
