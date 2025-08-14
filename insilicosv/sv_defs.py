@@ -241,6 +241,10 @@ class SV(ABC):
     def breakends(self):
         return tuple(range(len(self.breakend_interval_lengths) + 1))
 
+    @property
+    def is_interchromosomal(self):
+        return self.interchromosomal_period is not None and self.interchromosomal_period != 1
+
     @abstractmethod
     def to_vcf_records(self, config):
         raise NotImplementedError()
