@@ -1,0 +1,31 @@
+##fileformat=VCFv4.1
+##FILTER=<ID=PASS,Description="All	filters	passed">
+##fileDate=2016-06-03
+##fileformat=VCFv4.2
+##FILTER=<ID=PASS,Description="All	filters	passed">
+##contig=<ID=chr1,length=248956422>
+##INFO=<ID=END,Number=1,Type=Integer,Description="End	position	of	the	variant	described	in	this	record">
+##INFO=<ID=INSSEQ,Number=1,Type=String,Description="Novel	insertion	sequence">
+##INFO=<ID=INSORD,Number=1,Type=Integer,Description="Insertion	order	for	insertions	at	given	position">
+##INFO=<ID=VSET,Number=1,Type=Integer,Description="Variant	set	number	(numbered	from	0)	from	which	this	variant	was	created">
+##INFO=<ID=OP_TYPE,Number=1,Type=String,Description="Type	of	operation	performed	for	the	corresponding	record">
+##INFO=<ID=GRAMMAR,Number=1,Type=String,Description="Grammar	of	the	structural	variant">
+##INFO=<ID=SYMBOL,Number=1,Type=String,Description="Symbol	the	record	considers">
+##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Length	of	structural	variant">
+##INFO=<ID=NCOPIES,Number=1,Type=Integer,Description="Number	of	sequence	copies	to	insert	at	target">
+##INFO=<ID=TARGET,Number=1,Type=Integer,Description="Target	location	for	a	dispersed	duplication	or	translocation">
+##INFO=<ID=TARGET_CHROM,Number=1,Type=String,Description="Target	chromosome	for	a	dispersed	duplication	or	translocation">
+##INFO=<ID=OVLP,Number=1,Type=String,Description="Type	of	ROI	on	which	the	SV	component	was	placed">
+##INFO=<ID=OVLP_TARGET,Number=1,Type=String,Description="Type	of	ROI	on	which	the	insertion	target	of	an	SV	component	was	placed">
+##INFO=<ID=OVLP_TYPE,Number=1,Type=String,Description="Type	of	overlap	with	the	ROI">
+##INFO=<ID=SVID,Number=1,Type=String,Description="ID	of	parent	SV	of	which	this	record	is	one	part">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="type	of	parent	SV	of	which	this	record	is	one	part">
+##INFO=<ID=TR_INS_REP_SEQ,Number=1,Type=String,Description="for	tandem	repeat	insertions,	the	sequence	of	a	single	repeat">
+##INFO=<ID=TR_CHANGE,Number=1,Type=Integer,Description="for	tandem	repeat	insertions/expansions/deletions,	number	of	repeats	inserted	or	removed">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+chr1	3	sv1	N	<DUP>	100	PASS	END=4;OP_TYPE=NA;GRAMMAR=A->AA+;VSET=1;TARGET_CHROM=chr1;TARGET=4;SVLEN=2;INSORD=0;SVID=sv1;SVTYPE=DUP;SYMBOL=A	GT	1|0
+chr1	1	sv2	N	<dDUP>	100	PASS	END=2;OP_TYPE=NA;GRAMMAR=_A->A_A;VSET=2;TARGET_CHROM=chr1;TARGET=5;SVLEN=2;INSORD=0;SVID=sv2;SVTYPE=dDUP;SYMBOL=A	GT	0|1
+chr1	6	sv5_2	N	<COPY-PASTE>	100	PASS	END=7;OP_TYPE=COPY-PASTE;GRAMMAR=AB->AbbA;VSET=5;TARGET_CHROM=chr1;TARGET=8;SVLEN=8994;INSORD=1;SVID=sv5;SVTYPE=Custom;SYMBOL=A	GT	1|0
+chr1	8	sv5_0	N	<INV>	100	PASS	END=8;OP_TYPE=INV;GRAMMAR=AB->AbbA;VSET=5;SVLEN=1;SVID=sv5;SVTYPE=Custom;SYMBOL=B	GT	1|0
+chr1	8	sv5_1	N	<COPYinv-PASTE>	100	PASS	END=8;OP_TYPE=COPYinv-PASTE;GRAMMAR=AB->AbbA;VSET=5;TARGET_CHROM=chr1;TARGET=8;SVLEN=1;INSORD=0;SVID=sv5;SVTYPE=Custom;SYMBOL=B	1|0
+chr1	5	sv_test	N	<DEL>	0	PASS	END=5;OP_TYPE=NA;GRAMMAR=A->;VSET=80;SVLEN=1;SVID=test;SVTYPE=Custom;SYMBOL=A	GT	1|1

@@ -56,11 +56,15 @@ For trEXP and trCON variants, a BED file of existing repeats must be specified i
 *overlap_regions* global setting, and *overlap_region_type* for the existing repeat regions must
 be specified in the variant set. The BED file columns must contain in order the chromosome, the start position, the end position, the region type, and the motif of the repeat.
 
+SNPs and INDELs can be allowed to be overlapped by other SVs with the parameter:
+9. *enable_overlap_sv [optional]*: bool - whether the SVs of this variant set can be overlapped by other SVs (default: False). Setting it to True
+for SVs other than SNPs and INDELs will raise an error.
+
 For specifying arm gain/loss or aneuploidy, the following parameters are available:
-9. *arm_gain_loss=False [optional]*: bool - set to `True` for the SV to duplicate or delete an entire chromosome arm.
-10. *arm_percent=[100, 100] [optional]*: [int, int] - a range [min_percent, max_percent] from which to determine the percentage of the chromosome arm to duplicate or delete. The operation starts from the extremity of the arm. 
-11. *aneuploidy=False [optional]*: bool - set to True for the SV to duplicate or delete a whole chromosome copy.
-12. *aneuploidy_chrom=None [optional]*: List[str] - A list of chromosome names (e.g., ['chr21', 'chrX']) on which aneuploidy is permitted to occur. If None, aneuploidy can occur on any chromosome.
+10. *arm_gain_loss=False [optional]*: bool - set to `True` for the SV to duplicate or delete an entire chromosome arm.
+11. *arm_percent=[100, 100] [optional]*: [int, int] - a range [min_percent, max_percent] from which to determine the percentage of the chromosome arm to duplicate or delete. The operation starts from the extremity of the arm. 
+12. *aneuploidy=False [optional]*: bool - set to True for the SV to duplicate or delete a whole chromosome copy.
+13. *aneuploidy_chrom=None [optional]*: List[str] - A list of chromosome names (e.g., ['chr21', 'chrX']) on which aneuploidy is permitted to occur. If None, aneuploidy can occur on any chromosome.
 
 The following parameters can be set on the top level of the config file and provide higher-order controls over SV placement:
 1. *reference*: str - path to input reference used as template for simulation.
@@ -69,10 +73,11 @@ The following parameters can be set on the top level of the config file and prov
 4. *max_tries: 100 [optional]*: int - number of tries to find a valid position to simulate each SV.
 5. *max_random_breakend_tries: 100 [optional]*: int - number of tries to find a breakend by taking a random position in the genome before checking available regions.
 6. *homozygous_only: False [optional]*: bool - if set to True, make all simulated variants homozygous
-7. *filter_small_chr [optional]*: int - filter out chromosomes of length less than the given integer (if no value is provided then no filtering will occur).
-8. *th_proportion_N: 0.05 [optional]*: The proportion of N and n base pairs an SV is allowed to cover.
-9. *enable_hap_overlap=False [optional]*: Enable heterozygous SVs to overlap across homologous chromosomes.
-10. *arms [optional]*: str - A path to a file specifying the centromere positions for the chromosomes. Refer to the  [use_cases](use_cases.md#example-7---chromosome-gainloss)
+7. *heterozygous_only: False [optional]*: bool - if set to True, make all simulated variants heterozygous
+8. *filter_small_chr [optional]*: int - filter out chromosomes of length less than the given integer (if no value is provided then no filtering will occur).
+9. *th_proportion_N: 0.05 [optional]*: The proportion of N and n base pairs an SV is allowed to cover.
+10. *enable_hap_overlap=False [optional]*: Enable heterozygous SVs to overlap across homologous chromosomes.
+11. *arms [optional]*: str - A path to a file specifying the centromere positions for the chromosomes. Refer to the  [use_cases](use_cases.md#example-7---chromosome-gainloss)
 for a detailed description of the required file format.
 
 Examples of the full set of simulation options available through various config inputs can be found in the [use cases](use_cases) page.

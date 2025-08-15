@@ -47,7 +47,9 @@ variant_sets:
   - type: "SNP" 
     number: 10
 ```
-INDELs are not given a unique type label but can be simulated by setting a sufficiently small min and max size for an SV of type DEL or INS.
+An `INDEL` can be defined using the pre-defined INDEL type, or by specifying DEL or INS types with a length range below 50.
+If you choose the pre-defined `INDEL` type, each variant within the set will be randomly assigned as either a DEL or an INS. 
+You can also omit the `length_ranges` parameter for the INDEL type, in which case it will automatically default to a range of `[[1, 50]]`.
 
 ### Example 1c - Unbounded dispersions
 When specifying length ranges for dispersion intervals, `null` can be provided as an upper bound and this will result in
@@ -247,31 +249,50 @@ can be used to constrain an insertion target for instance.
 If an anchor constrains a dispersion, the dispersion will be intrachromosomal even if the SV is set as interchromosomal 
 (In this case, other unconstrained dispersions of the SV will then be interchromosomal). 
 
-### Example 6 - Placing Interchromosomal SVs
-InsilicoSV allows you to simulate interchromosomal SVs by using the `interchromosomal` flag. 
-This means the SV will involve changes across different chromosomes.
+### Example 6 - Interchromosomal Dispersions and Interchromosomal Periods
+You can use the `interchromosomal` and `interchromosomal_period` flags to control how an SV is dispersed across chromosomes. 
+By default, `interchromosomal` is False, which means the SV is intrachromosomal (it stays on the same chromosome).
 
-To define an interchromosomal SV, set `interchromosomal: True` within the variant set definition, 
-as shown in the example below:
+#### Understanding the `interchromosomal_period` Flag
+The `interchromosomal_period` flag gives you fine-grained control over which chromosomes are affected by an interchromosomal SV.
+
+- `interchromosomal_period=0`: This is the default.  Each dispersion of the SV will switch chromosome. 
+This ensures that every part of the SV is placed on a different chromosome than the last.
+
+- `interchromosomal_period > 0`: This creates a cycle of dispersions among a specific number of different chromosomes.
+The first `interchromosomal_period` dispersions will each be placed on a new, unique chromosome.
+Any subsequent dispersions will then cycle back through these same chromosomes in the order they were first visited creating a cycle.
+
+- List of Integers (e.g., [2, 3]): You can provide a list of two integers to define a range. 
+For each SV in the variant set, a random `interchromosomal_period` value will be chosen from this range.
+
+##### Key Considerations for Interchromosomal Dispersions
+- `Unbounded Lengths`: When defining interchromosomal dispersions, their lengths must be unbounded (specified as [null, null]).  
+- Simplified Syntax: If you provide a non-null `interchromosomal_period` value in your configuration, the SV will automatically be treated as `interchromosomal`, 
+even if the `interchromosomal` flag is not explicitly set to True.
+- If `interchromosomal_period=0`, a chromosome can be repeated, however a dispersion is ensured to connect two different chromosomes.
+
+#### Example scenario: Cycling between Chromosomes
+The provided YAML code defines a variant set that places cycles of templated insertions across chromosomes.
 ```yaml
 reference: "{path}/{to}/ref.fa"
+overlap_regions: ["/{path_to}/{candidate_overlap_events_1}.bed"]
 variant_sets:
-    - type: "nrTRA"  
-      interchromosomal: True
+    - type: "A_B_C -> A_BCAB_C" 
       number: 5
       length_ranges:
         - [500, 1000]
         - [null, null]
-    - type: "A__ -> A_AB_A"
-      number: 1
-      interchromosomal: True
-      length_ranges:
-         - [500, 1000]
-         - [null, null]
-         - [null, null] 
-         - [500, 1000]
+        - [500, 1000]
+        - [null, null]
+        - [500, 1000]
+      interchromsomal: True
+      interchromosomal_period: [2, 3]
 ```
-Key Considerations for Interchromosomal Dispersions
+In this example, for each of the 5 structural variants defined, the `interchromosomal_period` will be randomly set to either 2 or 3. 
+This means some SVs will cycle between two chromosomes, while others will cycle between three, creating a diverse set of interchromosomal insertions.
+
+### Example 7 - Chromosome Gain/Loss
 - Unbounded Lengths: When defining interchromosomal dispersions, their lengths must be unbounded (specified as [null, null]).  
 - Multiple Dispersions: If a custom SV with multiple dispersions is flagged as interchromosomal, each dispersion will involve a change to a different chromosome.
 - Example Scenario: In the second example provided above, where the type is "A__ -> A_AB_A", a possible placement for this interchromosomal SV could be:
@@ -281,8 +302,47 @@ Key Considerations for Interchromosomal Dispersions
   
   Because all dispersions are interchromosomal, the last copy of A cannot be placed back on chr3. 
   However, it could be placed in a different region of chr1.
+
+### Example 7 - Placing overlapping SVs
+Any SNP or INDEL can be allowed to be overlapped by other, non-overlapping SVs.
+
+```yaml
+reference: "{path}/{to}/ref.fa"
+variant_sets:
+    - type: "nrTRA"  
+      number: 5
+      length_ranges:
+        - [500, 1000]
+        - [500, 1000]
+    - type: "DEL"
+      number: 10
+      length_ranges:
+         - [30, 50]
+      enable_overlap_sv: True
+    - type: "SNP"
+      number: 20
+      enable_overlap_sv: True
+```
+The DEL and SNP sets have the `enable_overlap_sv: True` setting, which allows them to be overlapped by the nrTRA variants.
+DEL and SNP variants cannot overlap each other.
+
+SVs that are allowed to overlap are always considered as occurring first in the simulation process. 
+This means they might be modified or even deleted by other SVs that are placed later. 
+Regardless of whether they are ultimately observable in the final genome, all overlapping SVs will be included in the final VCF output.
+
+### Example 8 - Time Point Mutations for Cancer Genome Modeling
+For more complex SV interactions, such as those found in cancer lineages, insilicoSV provides a workflow in the notebook 
+`insilicosv_cancer_genome.ipynb`. This notebook is designed to model cancer evolution, generate genomes for different 
+clonal cell populations, and simulate reads at varying tumor purity levels.
+
+The notebook requires a configuration file that specifies the reference genome, read coverage, and paths to
+`insilicoSV` configuration files. These configuration files describe the SVs at different time points, the clones 
+corresponding to each time point, and the purity of each clone. Example configuration files are available in the 
+`configs/clone_configs/` folder. 
+
+For more detailed information, you should refer to the notebook itself.
 - 
-### Example 7 - Chromosome Gain/Loss
+### Example 9 - Chromosome Gain/Loss
 This section details parameters for simulating chromosome arm gain/loss or whole chromosome aneuploidy.
 
 #### Arm Gain/Loss (`arm_gain_loss: True`)

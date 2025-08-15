@@ -55,7 +55,7 @@ def divergence(seq, divergence_prob):
     def mutate_base(b):
         if b not in 'TCGA':
             return b
-        return random.choice(list({"A", "C", "T", "G"} - {b}))
+        return random.choice([allele for allele in 'TCGA' if allele != b])
     return ''.join([b if random.random() > p else mutate_base(b) for b in seq.upper()])
 
 def is_readable_file(fname):
@@ -117,6 +117,9 @@ class Region:
     # if this region is derived from an ROI, start/end of the original ROI
     orig_start: int = -1
     orig_end: int = -1
+
+    # keep the operation in the region for the source regions of overlapping SVs
+    sv: Optional['SV'] = None
 
     def __post_init__(self):
         assert self.chrom
@@ -197,18 +200,20 @@ class RegionSet:
             if len(chrom2region) > 100000:
                 logger.debug(f'RegionSet init: {chrom=} {len(chrom2region)=}')
             for hap in range(self.num_hap_tree):
-                self.chrom2itree[chrom][hap] = IntervalTree.from_tuples((region.start, region.end, region)
-                                                                for region in chrom2region)
-
+                # Padding to allow insertion target regions
+                self.chrom2itree[chrom][hap] = IntervalTree.from_tuples((region.start - 0.1, region.end + 0.1, region)
+                                                                        for region in chrom2region)
 
     def __contains__(self, region):
-        overlap = list(self.chrom2itree[region.chrom].overlap(region.start, region.end))
+        overlap = []
+        for hap in range(self.num_hap_tree):
+            overlap += list(self.chrom2itree[region.chrom].overlap(region.start, region.end))
         return any([(interval.begin == region.start and interval.end == region.end) for interval in overlap])
 
     def strictly_contains_point(self, point, chrom):
         overlap = list(self.chrom2itree[chrom][0].at(point))
         for interval in overlap:
-            if interval.begin < point < interval.end:
+            if interval.data.start < point < interval.data.end:
                 return True
         return False
 
@@ -299,13 +304,11 @@ class RegionSet:
             for hap, other_chrom_itree in other_chrom_itree_list.items():
                 self.chrom2itree[chrom][hap].update(other_chrom_itree)
 
-    def add_region(self, region):
+    def add_region(self, region, sv=None, enable_hap_overlap=None):
         aux_region = deepcopy(region)
-        # Insertion points are empty intervals which are not supported. We add a padding.
-        if aux_region.start == aux_region.end:
-            aux_region = aux_region.replace(start=max(aux_region.start - 0.5, aux_region.orig_start),
-                               end=min(aux_region.end + 0.5, aux_region.orig_end))
-        self.add_region_set(RegionSet([aux_region]))
+        if sv:
+            aux_region = aux_region.replace(sv=sv)
+        self.add_region_set(RegionSet([aux_region], enable_hap_overlap=enable_hap_overlap))
 
     def chop(self, sv_region, genotype):
         # Remove the parts of intervals overlapping sv_region.
@@ -317,14 +320,15 @@ class RegionSet:
 
             def adjust_region(ival, is_begin):
                 if is_begin:
-                    new_region = ival.data.replace(end=sv_region.start)
+                    new_region = ival.data.replace(end=round(sv_region.start))
                 else:
-                    new_region = ival.data.replace(start=sv_region.end)
+                    new_region = ival.data.replace(start=round(sv_region.end))
                 if new_region.start == new_region.end:
                     return None
                 return new_region
 
-            chrom_itree.chop(sv_region.start, sv_region.end, datafunc=adjust_region)
+            # Pad to fully remove insertion target
+            chrom_itree.chop(sv_region.start-0.1, sv_region.end+0.1, datafunc=adjust_region)
 # end class RegionSet
 
 def percent_N(seq):

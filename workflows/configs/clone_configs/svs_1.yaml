@@ -1,0 +1,6 @@
+# YAML CONFIG FILE
+heterozygous_only: True
+variant_sets:
+  - type: "INDEL"
+    number: 50
+    length_ranges: [ [ 30, 50 ] ]
