@@ -45,7 +45,8 @@ For Custom types, the length ranges are in order of appearance of the letters an
 
 6. *interchromosomal: False [for SVs containing dispersions]*: Enable interchromosomal SVs. If True, each dispersion in the SV will be 
 between two different chromosomes. All dispersions must be unbounded i.e. the dispersion range must be [null, null].
-7. *n_copies: [] [for SVs containing '+' grammar notation]*: specifies the number of copies for each sequence affected by a '+' in order of appearance in the grammar.
+7. *interchromosomal_period: 0*: A value of `interchromosomal_period: 0` means each dispersion jumps to a different, randomly selected chromosome, while a value greater than 0 creates a cycle where the SV returns to the same set of chromosomes every `interchromosomal_period` dispersions.
+8. *n_copies: [] [for SVs containing '+' grammar notation]*: specifies the number of copies for each sequence affected by a '+' in order of appearance in the grammar.
 Each element of the list can be a positive number or a range of positive numbers. If a range is provided, a random number of copies included in the range will be used.
 The default number of copies for a DUP is [1] and does not need to be specified.
 
