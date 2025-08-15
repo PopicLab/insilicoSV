@@ -410,7 +410,7 @@ class SVSimulator:
             overlaps = sv_regions.chrom2itree[chrom][0].overlap(breakend-0.1, breakend + roi_length+0.1)
             for overlap in overlaps:
                 # We allow overlap at the start if one of the two is an insertion point or if the overlap is at the end.
-                if ((roi_length == 0 or overlap.data.length == 0) and overlap.data.start == breakend) or overlap.data.end == breakend: continue
+                if overlap.data.end == breakend or overlap.data.start == breakend + roi_length: continue
                 return None, None
 
         region = Region(start=breakend, end=breakend, chrom=chrom)
