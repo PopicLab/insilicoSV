@@ -214,9 +214,10 @@ class RegionSet:
                     if line.startswith('#') or line.isspace():
                         continue
                     fields = line.strip().split()
-                    chk(len(fields) >= 4,
+                    chk(len(fields) >= 3,
                         f'{loc}: too few fields in line in the BED file {bed_path}', error_type='value')
-                    chrom, start_str, end_str, kind = fields[:4]
+                    chrom, start_str, end_str = fields[:3]
+                    kind = fields[4] if len(fields) > 3 else 'OVLP_REGION'
                     chk(all((chrom, start_str, end_str, kind)),
                         f'{loc}: empty value in first four columns in the BED file {bed_path}', error_type='value')
                     try:
