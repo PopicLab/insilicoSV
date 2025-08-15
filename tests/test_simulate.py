@@ -1627,8 +1627,8 @@ class TestSVSimulator(unittest.TestCase):
             ]
 
         self.interchromsomal_period = [
-            [("TCGATCGA", "AGCTAGCT"),
-             TestObject([self.ref_file, {"chr21": "TCGATCGA", 'chr5': "AGCTAGCT"}],
+            [("TCGA", "AG"),
+             TestObject([self.ref_file, {"chr21": "TCGA", 'chr5': "AG"}],
                         [self.par, {"reference": self.ref_file,
                                     "random_seed": 2,
                                     "homozygous_only": True,
@@ -1638,18 +1638,36 @@ class TestSVSimulator(unittest.TestCase):
                                                       "length_ranges": [[2, 2], [None, None],
                                                                         [2, 2], [None, None], [2, 2], [None, None]]}]}],
                         self.hap1, self.hap2, self.bed),
-             [("TCGATCGA", "AGCTAGCT"[:insertion_idx] + A + "AGCTAGCT"[B_index:B_index+2] + C + "AGCTAGCT"[insertion_idx:])
-              for A in ['TC', 'CG', 'GA', 'AT']
-              for C in ['TC', 'CG', 'GA', 'AT']
-              for B_index in range(7) for insertion_idx in range(9) if (A != 'AT' or C != 'AT') and
-              (B_index >= insertion_idx or B_index+2 <= insertion_idx)] +
-             [("TCGATCGA"[:insertion_idx] + A + "TCGATCGA"[B_index:B_index+2] + C + "TCGATCGA"[insertion_idx:], "AGCTAGCT")
-              for A in ['AG', 'GC', 'CT', 'TA']
-              for C in ['AG', 'GC', 'CT', 'TA']
-              for B_index in range(7) for insertion_idx in range(9) if (A != 'TA' or C != 'TA') and
-              (B_index >= insertion_idx or B_index+2 <= insertion_idx)]
-             ],
-            [("TCGATCGA", "AGCTAGCT", "TG"),
+             [("TCGA", "AG"[:insertion_idx] + A + "AG" + C + "AG"[insertion_idx:])
+              for A in ['TC', 'GA']
+              for C in ['TC', 'GA']
+              for insertion_idx in [0, 2] if A != C]],
+
+            [("TC", "AC", "TG"),
+             TestObject([self.ref_file, {"chr21": "TC", 'chr5': "AC", 'chr1': "TG"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    "homozygous_only": True,
+                                    "variant_sets": [{"type": "A_B_C_->A_B_C_ABC",
+                                                      "number": 1,
+                                                      "interchromosomal_period": 2,
+                                                      "length_ranges": [[2, 2], [None, None],
+                                                                        [2, 2], [None, None], [2, 2], [None, None]]}]}],
+                        self.hap1, self.hap2, self.bed),
+             [("TC", "AC"[:insertion_idx] + A + B + C + "AC"[insertion_idx:], "TG")
+              for A in ['AC']
+              for C in ['TC', 'TG']
+              for B in ['TC', 'TG'] for insertion_idx in [0, 2] if C != B] +
+            [("TC"[:insertion_idx] + A + B + C + "TC"[insertion_idx:], "AC", "TG")
+             for A in ['TC']
+             for C in ['AC', 'TG']
+             for B in ['AC', 'TG'] for insertion_idx in [0, 2] if C != B] +
+            [("TC", "AC", "TG"[:insertion_idx] + A + B + C + "TG"[insertion_idx:])
+             for A in ['TG']
+             for C in ['TC', 'AC']
+             for B in ['TC', 'AC'] for insertion_idx in [0, 2] if C != B]]
+        ]
+        '''[("TCGATCGA", "AGCTAGCT", "TG"),
              TestObject([self.ref_file, {"chr21": "TCGATCGA", 'chr5': "AGCTAGCT", 'chr1': "TG"}],
                         [self.par, {"reference": self.ref_file,
                                     "random_seed": 2,
@@ -1686,8 +1704,7 @@ class TestSVSimulator(unittest.TestCase):
               for C in ['AG', 'GC', 'CT', 'TA']
               for B in ['TC', 'CG', 'GA', 'AT'] for insertion_idx in [0, 2]]
              ],
-        ]
-        '''[("TCGATCGA", "AGCTAGCT", "TG"),
+             [("TCGATCGA", "AGCTAGCT", "TG"),
                     TestObject([self.ref_file, {"chr21": "TCGATCGA", 'chr5': "AGCTAGCT", 'chr1': "TG"}],
                                [self.par, {"reference": self.ref_file,
                                            "random_seed": 2,
