@@ -7,7 +7,6 @@ import logging
 import random
 from typing_extensions import ClassVar, Type, override
 import re
-
 from pysam import FastaFile, VariantFile
 
 from insilicosv import utils
@@ -102,7 +101,15 @@ class VariantSet(ABC):
                 f'are not allowed in the target, If for instance, you want to constrain the insertion target of a dDUP, '
                 f'write A_(). Error in {vset_config}', error_type='syntax')
 
+        self.interchromosomal = self.vset_config.get('interchromosomal', False)
+        chk(isinstance(self.interchromosomal, bool), 'interchromosomal if provided must be a boolean. '
+                                                     'But %s was provided' % vset_config, error_type='syntax')
         self.interchromosomal_period = self.vset_config.get('interchromosomal_period', None)
+        if self.interchromosomal and self.interchromosomal_period is None:
+            self.interchromosomal_period = 0
+
+        if self.interchromosomal_period is not None:
+            self.interchromosomal = True
 
     def get_sampled_int_value(self, value, locals_dict=None):
         if isinstance(value, (int, float)) or value is None:
@@ -402,6 +409,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'divergence_prob',
                 'n_copies',
                 'novel_insertions',
+                'interchromosomal',
                 'interchromosomal_period',
                 'config_descr',
                 'enable_overlap_sv',
@@ -559,15 +567,11 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'interchromosomal_period when provided as a range must contain two integers. '
                 'Provided %s' % vset_config['config_descr'], error_type='syntax')
 
-    @property
-    def is_interchromosomal(self):
-        return self.interchromosomal_period is not None and self.interchromosomal_period != 1
-
     def symmetrize(self, lhs_strs, rhs_strs, letter_ranges):
         # Enforce the symmetry of the predefined SVs with duplications or dispersions.
         if (("DUP" in self.svtype.name or "TRA" in self.svtype.name or
              "iDEL" in self.svtype.name)
-                and (not self.is_interchromosomal)
+                and (not self.interchromosomal)
                 and (not self.input_type)
                 and random.randint(0, 1)):
             def flip_anchor(val: str) -> str:
@@ -836,7 +840,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                 sv_id=self.make_sv_id(),
                 breakend_interval_lengths=breakend_interval_lengths,
                 breakend_interval_min_lengths=[None] * len(breakend_interval_lengths),
-                is_interchromosomal=False,
+                interchromosomal_period=None,
                 operations=operations,
                 anchor=anchor,
                 overlap_mode=self.overlap_mode,
@@ -863,7 +867,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                 sv_id=self.make_sv_id(),
                 breakend_interval_lengths=breakend_interval_lengths,
                 breakend_interval_min_lengths=[None],
-                is_interchromosomal=False,
+                interchromosomal_period=False,
                 operations=operations,
                 anchor=anchor,
                 overlap_mode=self.overlap_mode,
@@ -1212,14 +1216,15 @@ class ImportedVariantSet(VariantSet):
             sv_operations = sv_operations[0]
             placements = positions_per_rec[0]
         sv_id = 'Imported_' + str(parent_id)
+        placement_dict = {breakend: locus for breakend, locus in enumerate(placements)}
 
         return BaseSV(sv_id=sv_id,
                       breakend_interval_lengths=[None] * (len(placements) - 1),
                       # Positions are known, the lengths are not needed
                       breakend_interval_min_lengths=[None] * (len(placements) - 1),
-                      is_interchromosomal=None,  # The target chromosome is already known from the fixed_placement
+                      interchromosomal_period=None,  # The target chromosome is already known from the fixed_placement
                       operations=sv_operations,
-                      fixed_placement=placements,
+                      fixed_placement=placement_dict,
                       overlap_mode=None,
                       anchor=None,
                       roi_filter=None,

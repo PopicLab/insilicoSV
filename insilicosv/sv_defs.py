@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from copy import copy
 from enum import Enum
 from functools import cached_property
-
-from PIL.ImageOps import scale
 from typing_extensions import TypeAlias, Optional, Any, cast, override
 
 from insilicosv.utils import (
@@ -60,7 +58,7 @@ class Operation:
     target_insertion_breakend: Optional[Breakend] = None
     target_insertion_order: Optional[tuple] = None
 
-    placement: Optional[list[Locus]] = None
+    placement: Optional[dict[Breakend, Locus]] = None
 
     op_info: Optional[dict] = None
 
@@ -80,13 +78,21 @@ class Operation:
 
     def get_source_region(self, placement):
         if self.source_breakend_region is not None:
-            return Region(chrom=placement[self.source_breakend_region.start_breakend].chrom,
-                          start=placement[self.source_breakend_region.start_breakend].pos,
-                          end=placement[self.source_breakend_region.end_breakend].pos)
+            # We adapt for incomplete placement, if only one of the breakends has been placed, we return a point region
+            start = placement[self.source_breakend_region.start_breakend] if self.source_breakend_region.start_breakend in placement else None
+            end = placement[self.source_breakend_region.end_breakend] if self.source_breakend_region.end_breakend in placement else None
+
+            if start is None and end is None:
+                return None
+            if start is None:
+                start = end
+            if end is None:
+                end = start
+            return Region(chrom=start.chrom, start=start.pos, end=end.pos)
         return None
 
     def get_target_region(self, placement):
-        if self.is_in_place:
+        if self.is_in_place or self.target_insertion_breakend not in placement:
             return cast(Region, self.get_source_region(placement))
         else:
             return Region(chrom=placement[self.target_insertion_breakend].chrom,
@@ -155,7 +161,7 @@ class SV(ABC):
     blacklist_filter: Optional[RegionFilter]
 
     # a specific placement prescribed for this SV -- used for SVs imported from a vcf
-    fixed_placement: Optional[Locus]
+    fixed_placement: Optional[dict[Locus]]
 
     #########################
 
@@ -172,7 +178,7 @@ class SV(ABC):
     #
     # Fields set when SV is placed
     #
-    placement: Optional[list[Locus]] = None
+    placement: Optional[dict[Locus]] = None
     roi: Optional[Region] = None
 
     # Fields used while finding a placement
@@ -243,7 +249,7 @@ class SV(ABC):
 
     @property
     def is_interchromosomal(self):
-        return self.interchromosomal_period is not None and self.interchromosomal_period != 1
+        return self.interchromosomal_period is not None
 
     @abstractmethod
     def to_vcf_records(self, config):
@@ -260,7 +266,6 @@ class SV(ABC):
 
     def set_placement(self, placement, roi, operation=None):
         placement = copy(placement)
-
         self.placement = placement
         self.roi = roi
         for operation in self.operations:
@@ -513,7 +518,7 @@ class TandemRepeatExpansionContractionSV(BaseSV):
     num_repeats_in_placement: int = 0
 
     @override
-    def set_placement(self, placement, roi, operation):
+    def set_placement(self, placement, roi, operation=None):
         self.roi = roi
         # The operation gets the motif to insert or delete
         operation.motif = roi.motif * self.num_repeats_in_placement * operation.transform.n_copies

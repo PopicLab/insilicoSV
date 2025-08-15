@@ -8,6 +8,9 @@ import numpy as np
 import pytest
 import yaml
 from collections import defaultdict
+
+from scipy.optimize import anderson
+
 from insilicosv.simulate import SVSimulator
 from pysam import FastaFile
 from insilicosv import utils
@@ -1624,73 +1627,98 @@ class TestSVSimulator(unittest.TestCase):
             ]
 
         self.interchromsomal_period = [
-            [("TCGATCGA", "AGCTAGCT", "CG"),
-             TestObject([self.ref_file, {"chr21": "TCGAGG"}],
+            [("TCGATCGA", "AGCTAGCT"),
+             TestObject([self.ref_file, {"chr21": "TCGATCGA", 'chr5': "AGCTAGCT"}],
                         [self.par, {"reference": self.ref_file,
                                     "random_seed": 2,
+                                    "homozygous_only": True,
+                                    "variant_sets": [{"type": "A_B_C_->A_B_C_ABC",
+                                                      "number": 1,
+                                                      "interchromosomal_period": 1,
+                                                      "length_ranges": [[2, 2], [None, None],
+                                                                        [2, 2], [None, None], [2, 2], [None, None]]}]}],
+                        self.hap1, self.hap2, self.bed),
+             [("TCGATCGA", "AGCTAGCT"[:insertion_idx] + A + "AGCTAGCT"[B_index:B_index+2] + C + "AGCTAGCT"[insertion_idx:])
+              for A in ['TC', 'CG', 'GA', 'AT']
+              for C in ['TC', 'CG', 'GA', 'AT']
+              for B_index in range(7) for insertion_idx in range(9) if (A != 'AT' or C != 'AT') and
+              (B_index >= insertion_idx or B_index+2 <= insertion_idx)] +
+             [("TCGATCGA"[:insertion_idx] + A + "TCGATCGA"[B_index:B_index+2] + C + "TCGATCGA"[insertion_idx:], "AGCTAGCT")
+              for A in ['AG', 'GC', 'CT', 'TA']
+              for C in ['AG', 'GC', 'CT', 'TA']
+              for B_index in range(7) for insertion_idx in range(9) if (A != 'TA' or C != 'TA') and
+              (B_index >= insertion_idx or B_index+2 <= insertion_idx)]
+             ],
+            [("TCGATCGA", "AGCTAGCT", "TG"),
+             TestObject([self.ref_file, {"chr21": "TCGATCGA", 'chr5': "AGCTAGCT", 'chr1': "TG"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    "homozygous_only": True,
                                     "variant_sets": [{"type": "A_B_C_->A_B_C_ABC",
                                                       "number": 1,
                                                       "interchromosomal_period": 2,
                                                       "length_ranges": [[2, 2], [None, None],
                                                                         [2, 2], [None, None], [2, 2], [None, None]]}]}],
                         self.hap1, self.hap2, self.bed),
-             [("TCGATCGA", "AGCTAGCT"[insertion_idx:] + A + B + C + "AGCTAGCT"[:insertion_idx], "CG")
-              for A in ['AG', 'GC', 'CT', 'TA']
+             [("TCGATCGA", "AGCTAGCT"[:insertion_idx] + "AGCTAGCT"[A_index:A_index+2] + B + C + "AGCTAGCT"[insertion_idx:], "TG")
+              for A_index in range(7)
+              for C in ['TG']
+              for B in ['TC', 'CG', 'GA', 'AT'] for insertion_idx in range(9)
+              if A_index >= insertion_idx or A_index+2 <= insertion_idx] +
+             [("TCGATCGA", "AGCTAGCT"[:insertion_idx] + "AGCTAGCT"[A_index:A_index+2] + B + C + "AGCTAGCT"[insertion_idx:], "TG")
+              for A_index in range(7)
+              for C in ['TC', 'CG', 'GA', 'AT']
+              for B in ['TG'] for insertion_idx in range(9) if A_index >= insertion_idx or A_index+2 <= insertion_idx] +
+             [("TCGATCGA"[:insertion_idx] + "TCGATCGA"[A_index:A_index+2] + B + C + "TCGATCGA"[insertion_idx:], "AGCTAGCT", "TG")
+              for A_index in range(7)
+              for C in ['TG']
+              for B in ['AG', 'GC', 'CT', 'TA'] for insertion_idx in range(9) if A_index >= insertion_idx or A_index+2 <= insertion_idx] +
+             [("TCGATCGA"[:insertion_idx] + "TCGATCGA"[A_index:A_index+2] + B + C + "TCGATCGA"[insertion_idx:], "AGCTAGCT", "TG")
+              for A_index in range(7)
               for C in ['AG', 'GC', 'CT', 'TA']
-              for B in ['TC', 'CG', 'GA', 'AT'] for insertion_idx in range(8)] +
-             [("TCGATCGA"[insertion_idx:] + A + B + C + "TCGATCGA"[:insertion_idx], "AGCTAGCT", "CG")
-              for A in ['TC', 'CG', 'GA', 'AT']
-              for C in ['TC', 'CG', 'GA', 'AT']
-              for B in ['AG', 'GC', 'CT', 'TA'] for insertion_idx in range(8)] +
-             [("TCGATCGA", "AGCTAGCT", "CG"[:insertion_idx] + A + B + C + "CG"[insertion_idx:])
-              for A in ['TC', 'CG', 'GA', 'AT']
-              for C in ['TC', 'CG', 'GA', 'AT']
-              for B in ['CG'] for insertion_idx in [0, 2]] +
-             [("TCGATCGA", "AGCTAGCT", "CG"[:insertion_idx] + A + B + C + "CG"[insertion_idx:])
-              for A in ['AG', 'GC', 'CT', 'TA']
-              for C in ['AG', 'GC', 'CT', 'TA']
-              for B in ['CG'] for insertion_idx in [0, 2]]
-             ],
-            [("TCGATCGA", "AGCTAGCT", "CG"),
-             TestObject([self.ref_file, {"chr21": "TCGAGG"}],
-                        [self.par, {"reference": self.ref_file,
-                                    "random_seed": 2,
-                                    "variant_sets": [{"type": "A_B_C_->A_B_C_ABC",
-                                                      "number": 1,
-                                                      "interchromosomal_period": 3,
-                                                      "length_ranges": [[2, 2], [None, None],
-                                                                        [2, 2], [None, None], [2, 2], [None, None]]}]}],
-                        self.hap1, self.hap2, self.bed),
-             [("TCGATCGA", "AGCTAGCT"[insertion_idx:] + A + B + C + "AGCTAGCT"[:insertion_idx], "CG")
-              for A in ['AG', 'GC', 'CT', 'TA']
-              for C in ['CG']
-              for B in ['TC', 'CG', 'GA', 'AT'] for insertion_idx in range(8)] +
-             [("TCGATCGA", "AGCTAGCT"[insertion_idx:] + A + B + C + "AGCTAGCT"[:insertion_idx], "CG")
-              for A in ['AG', 'GC', 'CT', 'TA']
-              for C in ['TC', 'CG', 'GA', 'AT']
-              for B in ['CG'] for insertion_idx in range(8)] +
-             [("TCGATCGA"[insertion_idx:] + A + B + C + "TCGATCGA"[:insertion_idx], "AGCTAGCT", "CG")
-              for A in ['TC', 'CG', 'GA', 'AT']
-              for C in ['CG']
-              for B in ['AG', 'GC', 'CT', 'TA'] for insertion_idx in range(8)] +
-             [("TCGATCGA"[insertion_idx:] + A + B + C + "TCGATCGA"[:insertion_idx], "AGCTAGCT", "CG")
-              for A in ['TC', 'CG', 'GA', 'AT']
-              for C in ['AG', 'GC', 'CT', 'TA']
-              for B in ['CG'] for insertion_idx in range(8)] +
-             [("TCGATCGA", "AGCTAGCT", "CG"[:insertion_idx] + A + B + C + "CG"[insertion_idx:])
-              for A in ['TC', 'CG', 'GA', 'AT']
-              for C in ['TC', 'CG', 'GA', 'AT']
-              for B in ['CG'] for insertion_idx in [0, 2]] +
-             [("TCGATCGA", "AGCTAGCT", "CG"[:insertion_idx] + A + B + C + "CG"[insertion_idx:])
-              for A in ['CG']
+              for B in ['TG'] for insertion_idx in range(9) if A_index >= insertion_idx or A_index+2 <= insertion_idx] +
+             [("TCGATCGA", "AGCTAGCT", "TG"[:insertion_idx] + A + B + C + "TG"[insertion_idx:])
+              for A in ['TG']
               for C in ['TC', 'CG', 'GA', 'AT']
               for B in ['AG', 'GC', 'CT', 'TA'] for insertion_idx in [0, 2]] +
-             [("TCGATCGA", "AGCTAGCT", "CG"[:insertion_idx] + A + B + C + "CG"[insertion_idx:])
-              for A in ['CG']
+             [("TCGATCGA", "AGCTAGCT", "TG"[:insertion_idx] + A + B + C + "TG"[insertion_idx:])
+              for A in ['TG']
               for C in ['AG', 'GC', 'CT', 'TA']
               for B in ['TC', 'CG', 'GA', 'AT'] for insertion_idx in [0, 2]]
              ],
         ]
+        '''[("TCGATCGA", "AGCTAGCT", "TG"),
+                    TestObject([self.ref_file, {"chr21": "TCGATCGA", 'chr5': "AGCTAGCT", 'chr1': "TG"}],
+                               [self.par, {"reference": self.ref_file,
+                                           "random_seed": 2,
+                                           "homozygous_only": True,
+                                           "variant_sets": [{"type": "A_B_C_->A_B_C_ABC",
+                                                             "number": 1,
+                                                             "interchromosomal_period": 1,
+                                                             "length_ranges": [[2, 2], [None, None],
+                                                                               [2, 2], [None, None], [2, 2], [None, None]]}]}],
+                               self.hap1, self.hap2, self.bed),
+                    [("TCGATCGA",
+                      "AGCTAGCT"[:insertion_idx] + A + "AGCTAGCT"[B_index:B_index + 2] + C + "AGCTAGCT"[insertion_idx:], "TG")
+                     for A in ['TC', 'CG', 'GA', 'AT']
+                     for C in ['TC', 'CG', 'GA', 'AT']
+                     for B_index in range(7) for insertion_idx in range(9) if (A != 'AT' or C != 'AT') and
+                     (B_index >= insertion_idx or B_index + 2 <= insertion_idx)] +
+                    [("TCGATCGA"[:insertion_idx] + A + "TCGATCGA"[B_index:B_index + 2] + C + "TCGATCGA"[insertion_idx:],
+                      "AGCTAGCT", "TG")
+                     for A in ['AG', 'GC', 'CT', 'TA']
+                     for C in ['AG', 'GC', 'CT', 'TA']
+                     for B_index in range(7) for insertion_idx in range(9) if (A != 'TA' or C != 'TA') and
+                     (B_index >= insertion_idx or B_index + 2 <= insertion_idx)] +
+                    [("TCGATCGA", "AGCTAGCT", "TG"[:insertion_idx] + A + B + C + "TG"[insertion_idx:])
+                     for A in ['TC', 'CG', 'GA', 'AT']
+                     for C in ['TC', 'CG', 'GA', 'AT']
+                     for B in ['TG'] for insertion_idx in [0, 2] if (A != 'AT' or C != 'AT')] +
+                    [("TCGATCGA", "AGCTAGCT", "TG"[:insertion_idx] + A + B + C + "TG"[insertion_idx:])
+                     for A in ['AG', 'GC', 'CT', 'TA']
+                     for C in ['AG', 'GC', 'CT', 'TA']
+                     for B in ['TG'] for insertion_idx in [0, 2] if A != 'TA' or C != 'TA']
+                    ],'''
 
         self.simple_test_data = [
             ["TCG",
@@ -1902,7 +1930,7 @@ class TestSVSimulator(unittest.TestCase):
 
             [["GGTT", "CA"], {"type": "rTRA", "interchromosomal_period": 0,
                               "length_ranges": [[1, 4], [1, 2], [None, None]]},
-             [("CGTT", "GA"), ("CTT", "GGA"), ("GGTA", "CT"), ("GGCA", "TT"), ('CA', 'GGTT'), ('CAT', 'GGT'),
+             [("CGTT", "GA"), ("GGCT", "TA"), ("CTT", "GGA"), ("GGTA", "CT"), ("GGCA", "TT"), ('CA', 'GGTT'), ('CAT', 'GGT'),
               ('GGA', 'CTT'), ('GGTCA', 'T'), ('GGCAT', 'T'), ('GCATT', 'G'), ('GA', 'CGTT'), ('CAGTT', 'G'),
               ('A', 'CGGTT'), ('GATT', 'CG'), ('AGTT', 'CG'), ('GGAT', 'CT'), ('CT', 'GGTA'), ('AT', 'CGGT'),
               ('CT', 'GGTA'), ('GCA', 'GTT'), ('CATT', 'GG'), ('GCTT', 'GA'), ('GC', 'GTTA'), ('C', 'GGTTA'),
@@ -2239,7 +2267,8 @@ class TestSVSimulator(unittest.TestCase):
                     for operation in curr_sim.svs[0].operations
                     if not operation.transform.is_in_place][0]
                 print('index', i, placement, curr_sim.svs[0].operations)
-                self.assertTrue((13 <= placement[0].pos <= 14) or 14 <= placement[-1].pos <= 15)
+                breakend_pos = sorted([locus.pos for locus in placement.values()])
+                self.assertTrue((13 <= breakend_pos[0] <= 14) or 14 <= breakend_pos[-1] <= 15)
             elif i == 8:
                 print(curr_sim.svs)
                 print([sv.info['GRAMMAR'] for sv in curr_sim.svs])

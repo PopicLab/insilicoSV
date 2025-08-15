@@ -10,7 +10,7 @@ from functools import cmp_to_key
 
 from insilicosv import utils
 from insilicosv.utils import Region, Locus, if_not_none
-from insilicosv.sv_defs import Operation, Transform, TransformType, BreakendRegion, VariantType, Syntax
+from insilicosv.sv_defs import Operation, Transform, TransformType, BreakendRegion, VariantType, Syntax, Breakend
 from insilicosv.variant_set import get_vcf_header_infos
 
 logger = logging.getLogger(__name__)
@@ -452,9 +452,9 @@ class OutputWriter:
                     # Add potential remaining left and right operations
                     if overlapping_start > overlap.data.start:
                         left_sv = copy.deepcopy(sv)
-                        placement = [
-                            Locus(pos=overlap.data.start, chrom=overlapping_operation.target_region.chrom),
-                            Locus(pos=region_to_overlap_start, chrom=overlapping_operation.target_region.chrom)]
+                        placement = {
+                            Breakend(0): Locus(pos=overlap.data.start, chrom=overlapping_operation.target_region.chrom),
+                            Breakend(1): Locus(pos=region_to_overlap_start, chrom=overlapping_operation.target_region.chrom)}
 
                         left_sv.operations[0].update_placement(placement)
                         self.overlap_sv_regions.add_region(Region(chrom=overlapping_operation.target_region.chrom,
@@ -464,9 +464,9 @@ class OutputWriter:
 
                     if overlapping_end < overlap.data.end:
                         right_sv = copy.deepcopy(sv)
-                        placement = [
-                            Locus(pos=region_to_overlap_end, chrom=overlapping_operation.target_region.chrom),
-                            Locus(pos=overlap.data.end, chrom=overlapping_operation.target_region.chrom)]
+                        placement = {
+                            Breakend(0): Locus(pos=region_to_overlap_end, chrom=overlapping_operation.target_region.chrom),
+                            Breakend(1): Locus(pos=overlap.data.end, chrom=overlapping_operation.target_region.chrom)}
 
                         right_sv.operations[0].update_placement(placement)
 
@@ -476,9 +476,9 @@ class OutputWriter:
                                    end=overlap.data.end),
                             sv=right_sv)
 
-                    overlapping_operation.placement = [
-                        Locus(pos=overlapping_start, chrom=overlapping_operation.target_region.chrom),
-                        Locus(pos=overlapping_end, chrom=overlapping_operation.target_region.chrom)]
+                    overlapping_operation.placement = {
+                        Breakend(0): Locus(pos=overlapping_start, chrom=overlapping_operation.target_region.chrom),
+                        Breakend(1): Locus(pos=overlapping_end, chrom=overlapping_operation.target_region.chrom)}
 
                     # Keep the information on the original position
                     overlapping_operation.orig_start = overlap.data.start
@@ -557,7 +557,7 @@ class OutputWriter:
                     chrom2operations[chrom].append([sv.operations[0]])
 
         for chrom, chrom_length in self.chrom_lengths.items():
-            target_regions = sorted([Region(chrom=chrom, start=0, end=0)] + 
+            target_regions = sorted([Region(chrom=chrom, start=0, end=0)] +
                                     [operations[-1].target_region for operations in chrom2operations[chrom]] +
                                     [Region(chrom=chrom, start=chrom_length, end=chrom_length)])
 
@@ -566,8 +566,8 @@ class OutputWriter:
                                     is_in_place=True),
                 op_info={'SVID': 'sv' + str(idx_id + len(self.svs))},
                 source_breakend_region=BreakendRegion(0,1),
-                placement=[Locus(chrom, target_region1.end),
-                           Locus(chrom, target_region2.start)])]
+                placement={Breakend(0): Locus(chrom, target_region1.end),
+                           Breakend(1): Locus(chrom, target_region2.start)})]
                 for idx_id, (target_region1, target_region2) in enumerate(utils.pairwise(target_regions))
                 if target_region2.start > target_region1.end]
             
