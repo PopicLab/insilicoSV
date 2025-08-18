@@ -40,7 +40,7 @@ other parts of the SV (e.g., for an `rTRA`, `A_B -> B_A`, we can have `[[500, 10
 B must be of length comprised between half and 1.5 times the length of A).
 For predefined types with a dispersion, the length range of the dispersion will be in last position.
 For Custom types, the length ranges are in order of appearance of the letters and the dispersions.
-4. *overlap_mode [optional]*: str - enforce the SV to overlap a region defined in the files provided in `overlap_regions`. Must be `partial`, `contained`, `containing` or `exact` (see [example config](use_cases.md#example-5---placing-svs-into-specific-regions-of-interest-rois)).
+4. *overlap_mode [optional]*: str - enforce the SV to overlap a region defined in the files provided in `overlap_regions`. Must be `partial`, `contained`, `containing`, `exact`, `arm` or `chrom` (see [example config](use_cases.md#example-5---placing-svs-into-specific-regions-of-interest-rois)).
 5. *overlap_region_type [optional]*: list of str - only if an overlap mode is specified. Characterizes the regions to overlap, the name of the region has to contain one of the strings of the list. 
 
 6. *interchromosomal: False [for SVs containing dispersions]*: Enable interchromosomal SVs. If True, each dispersion in the SV will be 
