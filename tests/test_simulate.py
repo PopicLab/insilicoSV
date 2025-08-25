@@ -140,7 +140,6 @@ class TestSVSimulator(unittest.TestCase):
         self.test_overlap_bed_13 = "tests/inputs/example_overlap_events_13.bed"
         self.test_overlap_bed_14 = "tests/inputs/example_overlap_events_14.bed"
         self.test_overlap_bed_15 = "tests/inputs/example_overlap_events_15.bed"
-        self.arms = 'tests/inputs/example_arms.bed'
 
         self.import_del = "tests/inputs/import_del.vcf"
         self.import_snp = "tests/inputs/import_snp.vcf"
@@ -2011,7 +2010,7 @@ class TestSVSimulator(unittest.TestCase):
                         [self.par, {"reference": self.ref_file,
                                     "random_seed": 2,
                                     "variant_sets": [{"type": "DEL",
-                                                      "overlap_mode": 'arm',
+                                                      "overlap_mode": 'terminal',
                                                       'length_ranges': [[4, 4]],
                                                       "number": 1}]}],
                         self.hap1, self.hap2, self.bed),
@@ -2033,7 +2032,7 @@ class TestSVSimulator(unittest.TestCase):
                         [self.par, {"reference": self.ref_file,
                                     "random_seed": 2,
                                     "variant_sets": [{"type": "(AB)C ->bcb",
-                                                      "overlap_mode": 'arm',
+                                                      "overlap_mode": 'terminal',
                                                       "length_ranges": [[4, 4], [4, 4], [4, 4]],
                                                       "number": 1}]}],
                         self.hap1, self.hap2, self.bed),

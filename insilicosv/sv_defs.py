@@ -194,7 +194,7 @@ class SV(ABC):
                    for bi_len, bi_min_len in zip(self.breakend_interval_lengths,
                                                  self.breakend_interval_min_lengths))
 
-        if self.overlap_mode in [OverlapMode.CONTAINED, OverlapMode.ARM]:
+        if self.overlap_mode in [OverlapMode.CONTAINED, OverlapMode.TERMINAL]:
             chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() > self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a contained overlap.')
             chk((self.roi_filter.region_length_range[1] is None) or (self.get_anchor_length() < self.roi_filter.region_length_range[1]),
@@ -205,9 +205,9 @@ class SV(ABC):
         if self.overlap_mode == OverlapMode.PARTIAL:
             chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() >= self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a partial overlap.')
-        if self.overlap_mode in [OverlapMode.ARM, OverlapMode.CHROM]:
+        if self.overlap_mode in [OverlapMode.TERMINAL, OverlapMode.CHROM]:
             chk(self.roi_filter.region_kinds == ['all'], 'No overlap_region_kinds can be specified for overlap_mode'
-                                                          f'arm and chrom. Error in {self}', error_type='syntax')
+                                                          f'terminal and chrom. Error in {self}', error_type='syntax')
 
         # The letters cannot be unbounded unless the overlap is Exact and they are in the anchor.
         chk(self.fixed_placement or all(

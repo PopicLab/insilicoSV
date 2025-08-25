@@ -186,7 +186,7 @@ determined by the ROI, so you must use `[null, null]` for the corresponding rang
 * **`"partial"`**: The constrained breakends of the SV must overlap with one of the boundaries of a selected ROI.
 * **`"containing"`**: The constrained breakends of the SV must completely contain a selected ROI.
 * **`"contained"`**: The constrained breakends of the SV must be completely contained within a selected ROI.
-* **`"arm"`**: The constrained breakends of the SV is placed at the extremity of a chromosome arm.
+* **`"terminal"`**: The constrained breakends of the SV is placed at the extremity of a chromosome arm.
 * **`"chrom"`**: The SV spans an entire chromosome. This mode is only compatible with **Deletions (DEL)** and **Duplications (DUP)**. 
 For Duplications, setting `n_copies` to `1` (or not specifying it) creates a single additional chromosome copy (trisomy).
 
@@ -200,14 +200,13 @@ the entire SV defaults to being the anchor.
 
 An **empty anchor** `()` can be used to constrain the target location of an insertion and is only compatible with the `"contained"` overlap mode.
 
----
 
 ### General Considerations
 
 * **Filtering Regions**: You can filter the ROIs from your BED files based on their name (4th column) using `overlap_region_type` 
 or by length using `overlap_region_length_range`.
 * **N-Regions**: By default, InsilicoSV avoids placing SVs in regions with a high proportion of 'N' base pairs (over 10%). 
-This can affect placements in telomeres (`overlap_mode: arm`). You can adjust this threshold using the global parameter `th_proportion_N`.
+This can affect placements in telomeres (`overlap_mode: terminal`). You can adjust this threshold using the global parameter `th_proportion_N`.
 * **Intrachromosomal Constraint**: If a dispersion is part of an anchor, it will be forced to be intrachromosomal, even if the overall SV is marked as interchromosomal.
 The potential remaining dispersions will be interchromosomal.
 * **BED Format**: Multiple BED files (provided as a list of paths) can be given as input and their records will be combined and drawn 
@@ -239,6 +238,14 @@ the `candidate_overlap_events_1.bed` file, with the overlap mode set to `"exact"
 ```
 chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVLP=L1HS;VSET=0;IN_PLACE=in_place;GRAMMAR=A>;SOURCE_LETTER=A  GT  0/1
 ```
+
+#### Simulating Chromosome Arm-Level SVs
+You can use overlapping constraints to simulate SVs affecting an entire chromosome arm. 
+This is particularly useful for modeling large-scale genetic events like whole-arm deletions or duplications.
+
+For this purpose, you need a BED file that defines the precise start and end coordinates for each chromosome arm. 
+Then, you can apply the overlap_mode `exact` to the variant sets of your choice to enforce the resulting SVs to completely
+span a chromosome arm.
 
 ### Example 6 - Interchromosomal Dispersions and Interchromosomal Periods
 You can use the `interchromosomal` and `interchromosomal_period` flags to control how an SV is dispersed across chromosomes. 

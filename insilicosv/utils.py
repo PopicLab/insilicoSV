@@ -180,7 +180,7 @@ class OverlapMode(Enum):
     CONTAINED = "contained"  # both endpoints of anchor in ROI
     EXACT = "exact"  # anchor exactly matches the ROI
     CONTAINING = "containing" # both endpoints of ROI strictly inside the anchor
-    ARM = "arm"
+    TERMINAL = "terminal"
     CHROM = "chrom"
 
 class RegionSet:

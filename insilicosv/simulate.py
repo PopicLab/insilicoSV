@@ -124,7 +124,7 @@ class SVSimulator:
                 chk(isinstance(variant_set, dict), f'variant set must be a dict: {variant_set}')
                 for key in variant_set.keys():
                     chk(not key.startswith('overlap_') or key == 'overlap_sv' or
-                        variant_set.get('overlap_mode', None) in ['arm', 'chrom'],
+                        variant_set.get('overlap_mode', None) in ['terminal', 'chrom'],
                         f'Using {key} in {variant_set} requires specifying overlap_regions in global config')
 
     def load_rois(self):
@@ -154,7 +154,7 @@ class SVSimulator:
                     continue
                 added_roi = False
                 for sv_idx, sv_category in enumerate(self.overlap_ranges):
-                    if self.overlap_modes[sv_idx] in [None, OverlapMode.ARM, OverlapMode.CHROM]: continue
+                    if self.overlap_modes[sv_idx] in [None, OverlapMode.TERMINAL, OverlapMode.CHROM]: continue
                     if roi.length() < if_not_none(self.overlap_ranges[sv_category][0], 0): continue
                     if (self.overlap_modes[sv_category] in [OverlapMode.CONTAINING, OverlapMode.EXACT] and
                             roi.length() > if_not_none(self.overlap_ranges[sv_category][1], roi.length()+1)):
@@ -171,7 +171,7 @@ class SVSimulator:
                 if not added_roi: n_removed_rois += 1
 
             for sv_idx, sv_category in enumerate(self.overlap_ranges):
-                if self.overlap_modes[sv_idx] not in [OverlapMode.ARM, OverlapMode.CHROM]: continue
+                if self.overlap_modes[sv_idx] not in [OverlapMode.TERMINAL, OverlapMode.CHROM]: continue
                 for chrom, chrom_length in self.chrom_lengths.items():
                     self.rois_overlap[sv_category].append(Region(chrom=chrom, start=0, end=chrom_length, kind='chr',
                                                                  orig_start=0, orig_end=chrom_length))
@@ -194,8 +194,8 @@ class SVSimulator:
                     # We have one CHROM overlap per chromosome and haplotype
                     chk(self.num_svs[sv_category] <= hap_overlap_mult * len(self.rois_overlap[sv_category]),
                         error_message_num_rois)
-                elif self.overlap_modes[sv_category] == OverlapMode.ARM:
-                    # We have two ARM overlaps per chromosome and haplotype
+                elif self.overlap_modes[sv_category] == OverlapMode.TERMINAL:
+                    # We have two TERMINAL overlaps per chromosome and haplotype
                     chk(self.num_svs[sv_category] <= 2 * hap_overlap_mult * len(self.rois_overlap[sv_category]),
                         error_message_num_rois)
                 # Shuffle the ROIs so the selection is not biased on their positions in the input bed file
@@ -305,7 +305,7 @@ class SVSimulator:
     def determine_sv_placement_order(self) -> None:
         # place most constrained SVs first
         logger.info(f'Deciding placement order for {len(self.svs)} SVs')
-        types_order = ['SV OVERLAP', 'FIXED', OverlapMode.CHROM, OverlapMode.ARM, OverlapMode.EXACT,
+        types_order = ['SV OVERLAP', 'FIXED', OverlapMode.CHROM, OverlapMode.TERMINAL, OverlapMode.EXACT,
                        OverlapMode.PARTIAL, OverlapMode.CONTAINING, OverlapMode.CONTAINED, None]
         for sv in self.svs:
             if sv.enable_overlap_sv:
@@ -499,8 +499,8 @@ class SVSimulator:
         random.shuffle(ref_intervals)
         if not ref_intervals:
             return None, None
-        if overlap_mode in [OverlapMode.CONTAINED, OverlapMode.ARM]:
-            # Remove too small regions if the overlap is contained or arm
+        if overlap_mode in [OverlapMode.CONTAINED, OverlapMode.TERMINAL]:
+            # Remove too small regions if the overlap is contained or terminal
             for ref_interval in ref_intervals:
                 if region.length() <= anchor_length: continue
                 left_bound = max(region.start, ref_interval.data.start)
@@ -583,8 +583,8 @@ class SVSimulator:
         """
         max_random_tries = self.config.get("max_random_breakend_tries", DEFAULT_MAX_TRIES)
 
-        if overlap_mode in [OverlapMode.EXACT, OverlapMode.CHROM, OverlapMode.ARM]:
-            if overlap_mode == OverlapMode.ARM:
+        if overlap_mode in [OverlapMode.EXACT, OverlapMode.CHROM, OverlapMode.TERMINAL]:
+            if overlap_mode == OverlapMode.TERMINAL:
                 # Randomly choose an extremity of the arm
                 chrom_length = self.chrom_lengths[roi.chrom]
                 start = 0
