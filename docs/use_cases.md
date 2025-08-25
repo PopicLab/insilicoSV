@@ -311,19 +311,7 @@ SVs that are allowed to overlap are always considered as occurring first in the 
 This means they might be modified or even deleted by other SVs that are placed later. 
 Regardless of whether they are ultimately observable in the final genome, all overlapping SVs will be included in the final VCF output.
 
-### Example 8 - Time Point Mutations for Cancer Genome Modeling
-For more complex SV interactions, such as those found in cancer lineages, insilicoSV provides a workflow in the notebook 
-`insilicosv_cancer_genome.ipynb`. This notebook is designed to model cancer evolution, generate genomes for different 
-clonal cell populations, and simulate reads at varying tumor purity levels.
-
-The notebook requires a configuration file that specifies the reference genome, read coverage, and paths to
-`insilicoSV` configuration files. These configuration files describe the SVs at different time points, the clones 
-corresponding to each time point, and the purity of each clone. Example configuration files are available in the 
-`configs/clone_configs/` folder. 
-
-For more detailed information, you should refer to the notebook itself.
-- 
-### Example 9 - Chromosome Gain/Loss
+### Example 8 - Chromosome Gain/Loss
 This section details parameters for simulating chromosome arm gain/loss or whole chromosome aneuploidy.
 
 #### Arm Gain/Loss (`arm_gain_loss: True`)
