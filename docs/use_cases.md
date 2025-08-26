@@ -246,14 +246,8 @@ If an anchor constrains a dispersion, the dispersion will be intrachromosomal ev
 (In this case, other unconstrained dispersions of the SV will then be interchromosomal). 
 
 
-### Example 5b - Inversion within segmental duplications (SDs)
-To simulate INVs that span the regions between SDs, from a BED file annotating the SD regions.
-
-First, use `bedtools complement` to obtain the regions between SDs.
-```
-bedtools complement -i your_sd_regions.bed -g your_reference/ref.fa > regions_between_SDs.bed
-```
-Then, you can configure your simulation YAML file like this to simulate INV with an exact overlap mode:
+### Example 5b - Inversions within segmental duplications (SDs)
+INVs that span the regions between SDs can be simulated using the `"exact"` overlap placement mode given a BED file containing these regions:
 ```yaml
 reference: "{path}/{to}/ref.fa"
 overlap_regions: ["/{path_to}/{regions_between_SDs}.bed"]
@@ -262,4 +256,9 @@ variant_sets:
       number: 5
       length_ranges: [[null, null]]
       overlap_mode: "exact"
+```
+
+To obtain the required BED file, `bedtools complement` can be used to generate regions that are not covered by SDs (note: depending on the use case, the terminal regions should be removed as a post-processing step):
+```
+bedtools complement -i your_sd_regions.bed -g your_reference/ref.fa > regions_between_SDs.bed
 ```
