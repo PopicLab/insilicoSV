@@ -217,9 +217,9 @@ class RegionSet:
                     chk(len(fields) >= 3,
                         f'{loc}: too few fields in line in the BED file {bed_path}', error_type='value')
                     chrom, start_str, end_str = fields[:3]
-                    kind = fields[4] if len(fields) > 3 else 'OVLP_REGION'
-                    chk(all((chrom, start_str, end_str, kind)),
-                        f'{loc}: empty value in first four columns in the BED file {bed_path}', error_type='value')
+                    kind = fields[4] if len(fields) > 3 else 'NA'
+                    chk(all((chrom, start_str, end_str)),
+                        f'{loc}: empty value in first three columns in the BED file {bed_path}', error_type='value')
                     try:
                         start, end = int(start_str), int(end_str)
                     except ValueError:
