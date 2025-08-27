@@ -172,7 +172,7 @@ variant_sets:
 ```
 
 
-### Example 5 - Placing SVs into specific regions of interest (ROIs)
+### Example 5a - Placing SVs into specific regions of interest (ROIs)
 
 To constrain the placement of SVs to specific regions, the path to a single or multiple BED files containing these intervals (e.g.,
 known repetitive elements taken from RepeatMasker) can be provided.  Setting the `overlap_mode` field in a specific 
@@ -215,10 +215,6 @@ The output VCF file will label which SVs were placed at specified intervals with
 chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVLP=L1HS;VSET=0;IN_PLACE=in_place;GRAMMAR=A>AA;SOURCE_LETTER=A  GT  0/1
 ```
 
-### Example 5 - Placing specific SV components at regions of interest
-
-The portion of the SV which participates in overlap with an ROI is termed an _anchor_ 
-and is denoted with () in the supported SV grammar.
 For SVs without dispersions, the anchor defaults to the whole SV.  To constrain the placement of SVs with
 dispersions, or to specify an anchor other than the full SV, the anchor can be specified as part
 of the SV's source grammar definition.  For example:
@@ -246,6 +242,24 @@ can be used to constrain an insertion target for instance.
 
 If an anchor constrains a dispersion, the dispersion will be intrachromosomal even if the SV is set as interchromosomal 
 (In this case, other unconstrained dispersions of the SV will then be interchromosomal). 
+
+
+### Example 5b - Inversions within segmental duplications (SDs)
+INVs that span the regions between SDs can be simulated using the `"exact"` overlap placement mode given a BED file containing these regions:
+```yaml
+reference: "{path}/{to}/ref.fa"
+overlap_regions: ["/{path_to}/{regions_between_SDs}.bed"]
+variant_sets:
+    - type: "INV"
+      number: 5
+      length_ranges: [[null, null]]
+      overlap_mode: "exact"
+```
+
+To obtain the required BED file, `bedtools complement` can be used to generate regions that are not covered by SDs (note: depending on the use case, the terminal regions should be removed as a post-processing step):
+```
+bedtools complement -i your_sd_regions.bed -g your_reference/ref.fa > regions_between_SDs.bed
+```
 
 ### Example 6 - Placing Interchromosomal SVs
 InsilicoSV allows you to simulate interchromosomal SVs by using the `interchromosomal` flag. 
