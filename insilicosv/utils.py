@@ -182,24 +182,35 @@ class RegionSet:
     """A collection of genomic regions"""
 
     chrom2itree: dict[str, IntervalTree]
+    num_hap_tree: int
 
-    def __init__(self, regions=None):
+    def __init__(self, regions=None, enable_hap_overlap=False):
         regions = regions or []
+        self.num_hap_tree = 3 if enable_hap_overlap else 1
         chrom2regions = defaultdict(list)
         for region in regions:
             chrom2regions[region.chrom].append(region)
 
-        self.chrom2itree = defaultdict(IntervalTree)
+        # One tree for each haplotype and one for the combination to check homozygous variants
+        self.chrom2itree = defaultdict(lambda: defaultdict(IntervalTree))
         for chrom, chrom2region in chrom2regions.items():
             if len(chrom2region) > 100000:
                 logger.debug(f'RegionSet init: {chrom=} {len(chrom2region)=}')
-            self.chrom2itree[chrom] = IntervalTree.from_tuples((region.start, region.end, region)
+            for hap in range(self.num_hap_tree):
+                self.chrom2itree[chrom][hap] = IntervalTree.from_tuples((region.start, region.end, region)
                                                                 for region in chrom2region)
 
 
     def __contains__(self, region):
         overlap = list(self.chrom2itree[region.chrom].overlap(region.start, region.end))
         return any([(interval.begin == region.start and interval.end == region.end) for interval in overlap])
+
+    def strictly_contains_point(self, point, chrom):
+        overlap = list(self.chrom2itree[chrom][0].at(point))
+        for interval in overlap:
+            if interval.begin < point < interval.end:
+                return True
+        return False
 
     @staticmethod
     def from_beds(bed_paths, to_region_set, verbose=False):
@@ -237,26 +248,30 @@ class RegionSet:
         if to_region_set:
             logger.info(f'Constructing Interval Tree from {len(regions)} regions...')
             region_set = RegionSet(regions)
-            logger.info(f'Constructed INterval Tree from {len(regions)} regions.')
+            logger.info(f'Constructed Interval Tree from {len(regions)} regions.')
         return region_set
 
     @staticmethod
     def from_vcf(vcf_path):
         regions = []
         with closing(pysam.VariantFile(vcf_path)) as vcf_file:
-            for vcf_rec in vcf_file:
+            for vcf_rec in vcf_file.fetch():
+                vcf_info = dict(vcf_rec.info)
+                kind = 'DEFAULT'
+                if 'REGION_TYPE' in vcf_info:
+                    kind = vcf_info['REGION_TYPE']
                 regions.append(Region(chrom=vcf_rec.chrom, start=vcf_rec.start, end=vcf_rec.stop,
-                                      orig_start=vcf_rec.start, orig_end=vcf_rec.stop))
-                if 'TARGET' in vcf_rec.info and isinstance(vcf_rec.info['TARGET'], int):
-                    target_chrom = vcf_rec.info.get('TARGET_CHROM', vcf_rec.chrom)
-                    target_start = vcf_rec.info['TARGET'] - 1
+                                      orig_start=vcf_rec.start, orig_end=vcf_rec.stop, kind=kind))
+                if 'TARGET' in vcf_info and isinstance(vcf_info['TARGET'], int):
+                    target_chrom = vcf_info.get('TARGET_CHROM', vcf_rec.chrom)
+                    target_start = vcf_info['TARGET'] - 1
                     regions.append(Region(chrom=target_chrom, start=target_start, end=target_start,
-                                          orig_start=target_start, orig_end=target_start))
+                                          orig_start=target_start, orig_end=target_start, kind=kind))
 
         return RegionSet(regions)
 
     @staticmethod
-    def from_fasta(fasta_path, filter_small_chr, region_kind):
+    def from_fasta(fasta_path, filter_small_chr, region_kind, enable_hap_overlap):
         with pysam.FastaFile(fasta_path) as fasta_file:
             regions = []
             for chrom, chrom_length in zip(fasta_file.references, fasta_file.lengths):
@@ -264,10 +279,10 @@ class RegionSet:
                 regions.append(Region(chrom=chrom, start=0, end=chrom_length,
                                       kind=region_kind,
                                       orig_start=0, orig_end=chrom_length))
-            return RegionSet(regions)
+            return RegionSet(regions, enable_hap_overlap=enable_hap_overlap)
 
-    def get_region_list(self):
-        return [ival.data for chrom_itree in self.chrom2itree.values() for ival in chrom_itree]
+    def get_region_list(self, hap=0):
+        return [ival.data for chrom_itree in self.chrom2itree.values() for ival in chrom_itree[hap]]
 
     def filtered(self, region_filter):
         """Construct a RegionSet containing regions from self that meet given filter"""
@@ -277,11 +292,13 @@ class RegionSet:
         def satisfies_filter(region):
             return region_filter.satisfied_for(region)
 
+        # Blacklist affect the three haplotypes
         return RegionSet(filter(satisfies_filter, self.get_region_list()))
 
     def add_region_set(self, other_region_set):
-        for chrom, other_chrom_itree in other_region_set.chrom2itree.items():
-            self.chrom2itree[chrom].update(other_chrom_itree)
+        for chrom, other_chrom_itree_list in other_region_set.chrom2itree.items():
+            for hap, other_chrom_itree in other_chrom_itree_list.items():
+                self.chrom2itree[chrom][hap].update(other_chrom_itree)
 
     def add_region(self, region):
         aux_region = deepcopy(region)
@@ -291,21 +308,24 @@ class RegionSet:
                                end=min(aux_region.end + 0.5, aux_region.orig_end))
         self.add_region_set(RegionSet([aux_region]))
 
-    def chop(self, sv_region):
+    def chop(self, sv_region, genotype):
         # Remove the parts of intervals overlapping sv_region.
+        for hap in range(self.num_hap_tree):
+            # Only chop the intervals of the tree on the same haplotype
+            if hap != self.num_hap_tree - 1 and not genotype[hap]: continue
 
-        chrom_itree = self.chrom2itree[sv_region.chrom]
+            chrom_itree = self.chrom2itree[sv_region.chrom][hap]
 
-        def adjust_region(ival, is_begin):
-            if is_begin:
-                new_region = ival.data.replace(end=sv_region.start)
-            else:
-                new_region = ival.data.replace(start=sv_region.end)
-            if new_region.start == new_region.end:
-                return None
-            return new_region
+            def adjust_region(ival, is_begin):
+                if is_begin:
+                    new_region = ival.data.replace(end=sv_region.start)
+                else:
+                    new_region = ival.data.replace(start=sv_region.end)
+                if new_region.start == new_region.end:
+                    return None
+                return new_region
 
-        chrom_itree.chop(sv_region.start, sv_region.end, datafunc=adjust_region)
+            chrom_itree.chop(sv_region.start, sv_region.end, datafunc=adjust_region)
 # end class RegionSet
 
 def percent_N(seq):

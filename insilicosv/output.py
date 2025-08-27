@@ -119,6 +119,7 @@ class OutputWriter:
         self.svs = svs
         self.reference = reference
         self.chrom_lengths = chrom_lengths
+        self.aneuploidy_chrom_lengths = copy.deepcopy(self.chrom_lengths)
         self.output_path = output_path
         self.config = config
 
@@ -127,17 +128,23 @@ class OutputWriter:
             logger.warning('Skipping haps output')
             return
         for hap_index, hap_fa in enumerate(['sim.hapA.fa', 'sim.hapB.fa']):
-            self.output_hap(os.path.join(self.output_path, hap_fa), hap_index, self.config.get('homozygous_only', False))
+            self.output_hap(os.path.join(self.output_path, hap_fa), hap_index)
 
-    def output_hap(self, hap_fa, hap_index, homozygous):
+    def output_hap(self, hap_fa, hap_index):
         paf_records = []
         hap_chrom_lengths = {}
         with open(hap_fa, 'w') as sim_fa:
             chrom2operations: dict[str, list[Operation]] = self.get_chrom2operations(hap_index)
-            for chrom, chrom_length in zip(self.reference.references, self.reference.lengths):
+
+            for chrom, operations in chrom2operations.items():
+                # Add chromosome copies for aneuploidy
+                if chrom not in self.aneuploidy_chrom_lengths:
+                    self.aneuploidy_chrom_lengths[chrom] = operations[0].source_region.length()
+            for chrom, chrom_length in self.aneuploidy_chrom_lengths.items():
                 hap_str = ['hapA', 'hapB'][hap_index]
                 hap_chrom = f'{chrom}_{hap_str}'
-                sim_fa.write(f'>{hap_chrom}\n')
+
+                first_seq = True
 
                 hap_chrom_pos = 0
                 for operation in chrom2operations[chrom]:
@@ -211,16 +218,13 @@ class OutputWriter:
                                 seq = utils.reverse_complement(seq)
                                 paf_rec = paf_rec._replace(strand='-')
                             if operation.transform.divergence_prob > 0:
-                                orig_seq = seq
-                                if operation.transform.replacement_seq is None or operation.transform.replacement_seq[hap_index] is None:
-                                    haplotypes = operation.transform.replacement_seq
-                                    if haplotypes is None:
-                                        haplotypes = [None, None]
-                                    if homozygous and hap_index == 1:
-                                        replacement_seq = haplotypes[0]
-                                    else:
-                                        replacement_seq = utils.divergence(seq, operation.transform.divergence_prob)
-                                    haplotypes[hap_index] = replacement_seq
+                                orig_seq = self.reference.fetch(reference=operation.source_region.chrom,
+                                                                start=operation.source_region.start,
+                                                                end=operation.source_region.end)
+                                if not operation.transform.replacement_seq:
+                                    replacement_seq = utils.divergence(seq, operation.transform.divergence_prob)
+                                    haplotypes = [replacement_seq if operation.genotype[hap] else None for hap in [0, 1]]
+
                                     operation.transform = Transform(operation.transform_type,
                                                                     is_in_place=operation.transform.is_in_place,
                                                                     n_copies=operation.transform.n_copies,
@@ -229,6 +233,9 @@ class OutputWriter:
                                 seq = operation.transform.replacement_seq[hap_index]
                                 assert len(seq) == len(orig_seq)
                         if seq is not None:
+                            if first_seq:
+                                sim_fa.write(f'>{hap_chrom}\n')
+                                first_seq = False
                             sim_fa.write(seq)
                             hap_chrom_pos += len(seq)
 
@@ -242,9 +249,9 @@ class OutputWriter:
                         paf_records.append(paf_rec)
                     # end: for _ in range(operation.transform.n_copies):
                 # end: for operation in chrom2operations[chrom]
-
-                hap_chrom_lengths[hap_chrom] = hap_chrom_pos
-                sim_fa.write('\n')
+                if not first_seq:
+                    hap_chrom_lengths[hap_chrom] = hap_chrom_pos
+                    sim_fa.write('\n')
             # end: for chrom, chrom_length in zip(...)
         # end: with open(hap_fa, 'w') as sim_fa
         if self.config.get('output_paf', False):
@@ -378,6 +385,8 @@ class OutputWriter:
                     if operation.op_info is None:
                         operation.op_info = dict()
                     operation.op_info['SVID'] = sv.sv_id
+                    if operation.transform.divergence_prob > 0:
+                        operation.genotype = sv.genotype
                     chrom2operations[operation.target_region.chrom].append(operation)
 
         for chrom, chrom_length in self.chrom_lengths.items():
@@ -414,9 +423,9 @@ class OutputWriter:
         vcf_path = os.path.join(self.output_path, 'sim.vcf')
         with open(vcf_path, "w") as vcf:
             vcf.write("##fileformat=VCFv4.2\n")
-            for chrm, chrm_len in zip(self.reference.references,
-                                      self.reference.lengths):
+            for chrm, chrm_len in self.aneuploidy_chrom_lengths.items():
                 vcf.write("##contig=<ID=%s,length=%d>\n" % (chrm, chrm_len))
+
             vcf.write("#%s\n" % "\t".join(["CHROM", "POS", "ID",
                                            "REF", "ALT", "QUAL", "FILTER", "INFO",
                                            "FORMAT", "SAMPLE"]))

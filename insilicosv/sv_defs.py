@@ -61,6 +61,8 @@ class Operation:
 
     motif: Optional[str] = None
 
+    genotype: Optional[tuple] = None
+
     @property
     def transform_type(self):
         return self.transform.transform_type
@@ -160,6 +162,12 @@ class SV(ABC):
     # Fields used while finding a placement
     num_valid_placements: int = 0
 
+    # for arm gain or loss
+    arm_gain_loss: Optional[bool] = False
+    aneuploidy: Optional[bool] = False
+    arm_percent: Optional[int] = 100
+    aneuploid_chrom: Optional[list[str]] = None
+
     def __post_init__(self):
         assert self.sv_id
         assert len(self.breakend_interval_min_lengths) == len(self.breakend_interval_lengths)
@@ -169,32 +177,39 @@ class SV(ABC):
 
         if self.overlap_mode == OverlapMode.CONTAINED:
             chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() > self.roi_filter.region_length_range[0]),
-                f'The anchor length is smaller than the minimum overlap for a contained overlap.')
+                f'The anchor length is smaller than the minimum overlap for a contained overlap.', error_type='syntax')
             chk((self.roi_filter.region_length_range[1] is None) or (self.anchor.length() < self.roi_filter.region_length_range[1]),
-                f'The anchor length is larger than the maximum overlap for a contained overlap.')
+                f'The anchor length is larger than the maximum overlap for a contained overlap.', error_type='syntax')
         if self.overlap_mode == OverlapMode.CONTAINING:
             chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() > self.roi_filter.region_length_range[0]),
-                f'The anchor length is smaller than the minimum overlap for a containing overlap.')
+                f'The anchor length is smaller than the minimum overlap for a containing overlap.', error_type='syntax')
         if self.overlap_mode == OverlapMode.CONTAINING:
             chk((self.roi_filter.region_length_range[0] is None) or (self.anchor.length() >= self.roi_filter.region_length_range[0]),
-                f'The anchor length is smaller than the minimum overlap for a partial overlap.')
+                f'The anchor length is smaller than the minimum overlap for a partial overlap.', error_type='syntax')
 
-        if self.anchor is not None:
-            chk(all(
-                length is not None for idx, length in enumerate(self.breakend_interval_lengths) if
-                (idx not in self.dispersions) and
-                ((self.overlap_mode != OverlapMode.EXACT) or not (
-                            self.anchor.start_breakend <= idx < self.anchor.end_breakend))),
-                f'A length range can onl be [null, null] for dispersions or the anchor for an exact overlap.')
-            chk(all([breakend not in self.dispersions for breakend in range(self.anchor.start_breakend, self.anchor.end_breakend-1)]),
-                f'anchors cannot contain a dispersion: {self.config_descr}')
+        # The letters cannot be unbounded unless the overlap is Exact and they are in the anchor.
+        chk(self.fixed_placement or all(
+            length is not None for idx, length in enumerate(self.breakend_interval_lengths) if
+            (idx not in self.dispersions) and
+            ((not self.anchor) or (self.overlap_mode != OverlapMode.EXACT) or not (
+                    self.anchor.start_breakend <= idx < self.anchor.end_breakend))),
+            f'A length range can only be [null, null] for dispersions or the anchor for an exact overlap. '
+            f'But, {self.config_descr} was provided. Notice that if the SV is defined from the grammar then the length of '
+            f'the dispersions are to be given in order of appearance in the grammar.', error_type='syntax')
+
+        # Interchromosomal dispersions have to be unbounded
+        chk(not self.is_interchromosomal or all(
+            length is None for idx, length in enumerate(self.breakend_interval_lengths) if (idx in self.dispersions)),
+            f'The length ranges of dispersions has to be [null, null] for interchromosomal SVs.', error_type='syntax')
+
+        if not self.anchor:
             chk((self.overlap_mode != OverlapMode.EXACT) or
                 all((self.breakend_interval_lengths[breakend] is None and
                  self.breakend_interval_min_lengths[breakend] is None) for breakend in range(self.anchor.start_breakend, self.anchor.end_breakend)),
-                f'overlap_mode "exact" requires leaving the length of the anchor symbols unspecified: {self}')
+                f'overlap_mode "exact" requires leaving the length of the anchor symbols unspecified: {self}', error_type='syntax')
             chk((self.overlap_mode != OverlapMode.PARTIAL and self.overlap_mode != OverlapMode.CONTAINING)
                 or self.anchor.end_breakend != self.anchor.start_breakend ,
-                f'overlap_mode "partial" and "containing" require non-empty anchor: {self}')
+                f'overlap_mode "partial" and "containing" require non-empty anchor: {self}', error_type='syntax')
 
         assert self.fixed_placement is None or self.overlap_mode is None
         assert self.genotype and sum(self.genotype)
@@ -224,7 +239,6 @@ class SV(ABC):
 
         self.placement = placement
         self.roi = roi
-
         for operation in self.operations:
             operation.placement = placement
 
@@ -288,7 +302,7 @@ class VariantType(Enum):
     SNP = "SNP"
     DIVERGENCE = "DIVERGENCE"
 
-    Custom = "Custom"
+    CUSTOM = "Custom"
 
     trEXP = "trEXP"
     trCON = "trCON"
@@ -420,21 +434,6 @@ class BaseSV(SV):
                     record['alleles'][1] = '<CUT>'
                 combined_recs.append(record)
 
-        # Check if a type provided as grammar is a predefined type
-        if combined_recs[0]['info']['SVTYPE'] == 'Custom':
-            lhs, rhs = combined_recs[0]['info']['GRAMMAR'].split('->')
-            lhs = tuple([letter for letter in lhs if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]])
-            rhs = tuple(rhs)
-            for key, grammar in SV_KEY.items():
-                # Test if the grammar or its symmetric match the grammar of the record
-                if (grammar[0] == lhs and grammar[1] == rhs) or (
-                        grammar[0] == lhs[::-1] and grammar[1] == rhs[::-1]):
-                    combined_recs[0]['info']['SVTYPE'] = key.name
-                    if len(combined_recs) == 1:
-                        combined_recs[0]['info']['OP_TYPE'] = key.name
-                        combined_recs[0]['alleles'][1] = '<%s>' % key.name
-                    break
-
         # Update the records numbering if records have been combined
         if len(combined_recs) == 1:
             combined_recs[0]['id'] = sv_id
@@ -445,15 +444,10 @@ class BaseSV(SV):
             for idx, operation in enumerate(combined_recs):
                 operation['id'] = self.sv_id + f'_{idx}'
         if sv_type_str == 'SNP':
-            try:
-                del combined_recs[0]['info']['OP_TYPE']
-                del combined_recs[0]['info']['SVLEN']
-                del combined_recs[0]['info']['GRAMMAR']
-                del combined_recs[0]['info']['SVTYPE']
-                del combined_recs[0]['info']['SVID']
-                del combined_recs[0]['info']['SYMBOL']
-            except:
-                pass
+            info_to_remove = ['SVTYPE', 'SVID', 'INSORD', 'OP_TYPE', 'SVLEN', 'GRAMMAR', 'SYMBOL']
+            for field in info_to_remove:
+                if field in combined_recs[0]['info']:
+                    del combined_recs[0]['info'][field]
         return combined_recs
 # end: class BaseSV(SV)
 

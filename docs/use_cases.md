@@ -147,6 +147,8 @@ recorded in `blacklist_regions` will be avoided by those variants. In the above 
 which will result in none of the three deletions from being placed in any of the regions in `blacklist_regions`. 
 If `blacklist_regions` is given in BED file format, records can include a fourth column recording `type`, 
 which can then be used to filter the blacklist intervals considered for a given set of SVs.
+If `blacklist_regions` is given in VCF file format, records can include the info field `REGION_TYPE` which can then be used to filter the blacklist intervals considered for a given set of SVs.
+If `REGION_TYPE` is not provided, the name of the region will be `DEFAULT`.
 In this example, the three insertions will be placed randomly regardless of the blacklist regions as the blacklist_region_type
 is not specified.
 
@@ -170,7 +172,7 @@ variant_sets:
 ```
 
 
-### Example 5 - Placing SVs into specific regions of interest (ROIs)
+### Example 5a - Placing SVs into specific regions of interest (ROIs)
 
 To constrain the placement of SVs to specific regions, the path to a single or multiple BED files containing these intervals (e.g.,
 known repetitive elements taken from RepeatMasker) can be provided.  Setting the `overlap_mode` field in a specific 
@@ -213,10 +215,6 @@ The output VCF file will label which SVs were placed at specified intervals with
 chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVLP=L1HS;VSET=0;IN_PLACE=in_place;GRAMMAR=A>AA;SOURCE_LETTER=A  GT  0/1
 ```
 
-### Example 5a - Placing specific SV components at regions of interest
-
-The portion of the SV which participates in overlap with an ROI is termed an _anchor_ 
-and is denoted with () in the supported SV grammar.
 For SVs without dispersions, the anchor defaults to the whole SV.  To constrain the placement of SVs with
 dispersions, or to specify an anchor other than the full SV, the anchor can be specified as part
 of the SV's source grammar definition.  For example:
@@ -235,7 +233,7 @@ variant_sets:
       overlap_region_type: ["L1HS"]
 ```
 
-Parentheses indicate which part(s) of the SV that are constrained to overlap with an ROI according
+Parentheses indicate which part(s) of the SV are constrained to overlap with an ROI according
 to the overlap mode.  The anchor must be placed on the source, and can wrap
 any contiguous sub-sequence of source elements (including an empty one).
 For `"exact"` overlap mode, the length ranges of the constrained SV's part(s) must
@@ -261,4 +259,85 @@ variant_sets:
 To obtain the required BED file, `bedtools complement` can be used to generate regions that are not covered by SDs (note: depending on the use case, the terminal regions should be removed as a post-processing step):
 ```
 bedtools complement -i your_sd_regions.bed -g your_reference/ref.fa > regions_between_SDs.bed
+```
+
+### Example 6 - Placing Interchromosomal SVs
+InsilicoSV allows you to simulate interchromosomal SVs by using the `interchromosomal` flag. 
+This means the SV will involve changes across different chromosomes.
+
+To define an interchromosomal SV, set `interchromosomal: True` within the variant set definition, 
+as shown in the example below:
+```yaml
+reference: "{path}/{to}/ref.fa"
+variant_sets:
+    - type: "nrTRA"  
+      interchromosomal: True
+      number: 5
+      length_ranges:
+        - [500, 1000]
+        - [null, null]
+    - type: "A__ -> A_AB_A"
+      number: 1
+      interchromosomal: True
+      length_ranges:
+         - [500, 1000]
+         - [null, null]
+         - [null, null] 
+         - [500, 1000]
+```
+Key Considerations for Interchromosomal Dispersions
+- Unbounded Lengths: When defining interchromosomal dispersions, their lengths must be unbounded (specified as [null, null]).  
+- Multiple Dispersions: If a custom SV with multiple dispersions is flagged as interchromosomal, each dispersion will involve a change to a different chromosome.
+- Example Scenario: In the second example provided above, where the type is "A__ -> A_AB_A", a possible placement for this interchromosomal SV could be:
+  - The source of A is on chr1.
+  - The AB segment is placed on chr3.
+  - The second copy of A is placed on chr2.
+  
+  Because all dispersions are interchromosomal, the last copy of A cannot be placed back on chr3. 
+  However, it could be placed in a different region of chr1.
+- 
+### Example 7 - Chromosome Gain/Loss
+This section details parameters for simulating chromosome arm gain/loss or whole chromosome aneuploidy.
+
+#### Arm Gain/Loss (`arm_gain_loss: True`)
+To enable the duplication or deletion of entire chromosome arms, set the `arm_gain_loss` parameter to `True`.
+
+##### Centromere File (arms)
+- **Purpose:** A BED file containing the centromere start and end positions for each chromosome of your reference genome. This file is required when arm_gain_loss is True.
+- **File Format:** The first four columns of the BED file must be:
+  - Chromosome name 
+  - Chromosome length 
+  - Beginning of the centromere (start coordinate)
+  - End of the centromere (end coordinate)
+- **Scope:** The file does not need to include all reference chromosomes; only those for which arm gain/loss is intended.
+
+**arm_percent parameter:** specifies a range (e.g., `[60, 80]`) 
+to determine the percentage of the chromosome arm to be duplicated or deleted, starting from the arm's extremity.
+
+#### Aneuploidy (aneuploidy: True)
+**aneuploid_chrom parameter:** You may optionally provide a list of specific chromosome names (e.g., `['chr1', 'chr22']`) 
+on which aneuploidy is permitted. If this parameter is not provided, aneuploidy can occur on any chromosome in the reference.
+
+#### General Considerations
+- **Compatible SV Types:** Only DEL (Deletion) and DUP (Duplication) are compatible with arm_gain_loss and aneuploidy flags.
+- **length_ranges:** When simulating aneuploidy, length_ranges should either not be provided or be set to `[[null, null]]`.
+- **Multiple Aneuploid DUPs:** Multiple aneuploid duplications can target the same chromosomes to increase chromosome copy numbers arbitrarily. In such cases, overlap constraints will be disregarded.
+- **Heterozygous Nature:** Chromosome gain/loss and aneuploidy events are defined as heterozygous, affecting only one of the existing chromosome copies.
+- **New Chromosome Copies (DUP Aneuploidy):** For a DUP with `aneuploidy: True`, new chromosome copies will be created and named chrom_copy_num (where num is the copy number).
+  - If n_copies is not provided or set to 1, a case of trisomy (one additional chromosome copy) will be simulated.
+  - As shown in the example, `n_copies: 3` allows for the creation of three additional chromosome copies.
+
+```yaml
+reference: "{path}/{to}/ref.fa"
+arms: ["/{path_to}/{arm_regions}.bed"] # Required for arm_gain_loss, but not for aneuploidy
+variant_sets:
+    - type: "DUP" 
+      number: 3
+      aneuploidy: True
+      aneuploid_chrom: ['chr1', 'chr22']
+      n_copies: 3 # Simulates 3 additional copies for selected chromosomes
+    - type: "DEL" 
+      number: 5
+      arm_gain_loss: True
+      arm_percent: [60, 80] # Deletes 60-80% of a chromosome arm from its extremity
 ```
