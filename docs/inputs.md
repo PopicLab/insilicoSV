@@ -57,7 +57,7 @@ For trEXP and trCON variants, a BED file of existing repeats must be specified i
 be specified in the variant set. The BED file columns must contain in order the chromosome, the start position, the end position, the region type, and the motif of the repeat.
 
 SNPs and INDELs can be allowed to be overlapped by other SVs with the parameter:
-9. *enable_overlap_sv [optional]*: bool - whether the SVs of this variant set can be overlapped by other SVs (default: False). Setting it to True
+9. *allow_sv_overlap [optional]*: bool - whether the SVs of this variant set can be overlapped by other SVs (default: False). Setting it to True
 for SVs other than SNPs and INDELs will raise an error.
 
 For specifying arm gain/loss or aneuploidy, the following parameters are available:
@@ -76,7 +76,7 @@ The following parameters can be set on the top level of the config file and prov
 7. *heterozygous_only: False [optional]*: bool - if set to True, make all simulated variants heterozygous
 8. *filter_small_chr [optional]*: int - filter out chromosomes of length less than the given integer (if no value is provided then no filtering will occur).
 9. *th_proportion_N: 0.05 [optional]*: The proportion of N and n base pairs an SV is allowed to cover.
-10. *enable_hap_overlap=False [optional]*: Enable heterozygous SVs to overlap across homologous chromosomes.
+10. *allow_hap_overlap=False [optional]*: Allow heterozygous SVs to overlap across homologous chromosomes.
 11. *arms [optional]*: str - A path to a file specifying the centromere positions for the chromosomes. Refer to the  [use_cases](use_cases.md#example-7---chromosome-gainloss)
 for a detailed description of the required file format.
 

@@ -51,7 +51,7 @@ class StatsCollector:
             if (sv.roi is not None) and (sv.roi.kind != '_reference_'):
                 self.region_types[sv.roi.kind] += 1
             assert sv.genotype is not None
-            zygosity = sv.genotype[0] and sv.genotype[1] and (True if sv_type not in [VariantType.SNP] else (
+            zygosity = sv.genotype[0] and sv.genotype[1] and ((sv_type not in [VariantType.SNP]) or (
                     sv.replacement_seq[0] == sv.replacement_seq[1]))
             if zygosity:
                 self.num_homozygous += 1
@@ -121,7 +121,7 @@ PafRecord = namedtuple('PafRecord', [
 
 class OutputWriter:
 
-    def __init__(self, svs, overlap_sv_regions, reference, chrom_lengths, output_path, enable_hap_overlap, config):
+    def __init__(self, svs, overlap_sv_regions, reference, chrom_lengths, output_path, allow_hap_overlap, config):
         self.svs = svs
         self.reference = reference
         self.chrom_lengths = chrom_lengths
@@ -130,7 +130,7 @@ class OutputWriter:
         self.config = config
         self.overlap_sv_regions = overlap_sv_regions
         self.homozygous_only = config.get('homozygous_only', False)
-        self.enable_hap_overlap = enable_hap_overlap
+        self.allow_hap_overlap = allow_hap_overlap
 
     def output_haps(self):
         if self.config.get('output_no_haps', False):
@@ -501,14 +501,14 @@ class OutputWriter:
         chrom2operations = defaultdict(list)
         target_region2transform = {}
         placed_overlap_sv = []
-        # If not self.enable_hap_overlap, there is only one tree per chrom for the sv overlap else three
+        # If not self.allow_hap_overlap, there is only one tree per chrom for the sv overlap else three
         hap_id_overlap = 0
-        if self.enable_hap_overlap:
+        if self.allow_hap_overlap:
             hap_id_overlap = hap_index
 
         for sv in self.svs:
             # If the SV is on the other haplotype or overlapping it will be treated later
-            if not sv.genotype[hap_index] or sv.enable_overlap_sv: continue
+            if not sv.genotype[hap_index] or sv.allow_sv_overlap: continue
 
             for operation in sv.operations:
                 assert operation.target_region is not None

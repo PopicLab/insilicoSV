@@ -1316,7 +1316,7 @@ class TestSVSimulator(unittest.TestCase):
                                     "random_seed": 2,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 1,
-                                                      "enable_overlap_sv": True
+                                                      "allow_sv_overlap": True
                                                       },
                                                      {"import": self.import_del}]}],
                         self.hap1, self.hap2, self.bed),
@@ -1327,7 +1327,7 @@ class TestSVSimulator(unittest.TestCase):
                                     'homozygous_only': True,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 1,
-                                                      "enable_overlap_sv": True
+                                                      "allow_sv_overlap": True
                                                       },
                                                      {"import": self.import_inv}]}],
                         self.hap1, self.hap2, self.bed),
@@ -1337,7 +1337,7 @@ class TestSVSimulator(unittest.TestCase):
                         [self.par, {"reference": self.ref_file, "random_seed": 2,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 1,
-                                                      "enable_overlap_sv": True,
+                                                      "allow_sv_overlap": True,
                                                       },
                                                      {"type": 'DUP',
                                                       "number": 1,
@@ -1350,7 +1350,7 @@ class TestSVSimulator(unittest.TestCase):
                                     'homozygous_only': True,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 1,
-                                                      "enable_overlap_sv": True,
+                                                      "allow_sv_overlap": True,
                                                       },
                                                      {"type": 'DUP',
                                                       "number": 1,
@@ -1373,7 +1373,7 @@ class TestSVSimulator(unittest.TestCase):
                                     'homozygous_only': True,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 1,
-                                                      "enable_overlap_sv": True,
+                                                      "allow_sv_overlap": True,
                                                       },
                                                      {"type": 'dDUP',
                                                       "number": 1,
@@ -1388,7 +1388,7 @@ class TestSVSimulator(unittest.TestCase):
                                     'homozygous_only': True,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 1,
-                                                      "enable_overlap_sv": True,
+                                                      "allow_sv_overlap": True,
                                                       },
                                                      {"type": 'INV',
                                                       "number": 1,
@@ -1401,7 +1401,7 @@ class TestSVSimulator(unittest.TestCase):
                                     'homozygous_only': True,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 1,
-                                                      "enable_overlap_sv": True,
+                                                      "allow_sv_overlap": True,
                                                       },
                                                      {"type": 'INV',
                                                       "number": 1,
@@ -1414,7 +1414,7 @@ class TestSVSimulator(unittest.TestCase):
                                     'homozygous_only': True,
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 1,
-                                                      "enable_overlap_sv": True,
+                                                      "allow_sv_overlap": True,
                                                       },
                                                      {"type": 'A_->A_A+',
                                                       "number": 1,
@@ -1430,7 +1430,7 @@ class TestSVSimulator(unittest.TestCase):
                                     "variant_sets": [{"type": "SNP",
                                                       "number": 1,
                                                       "length_ranges": [[1, 1]],
-                                                      "enable_overlap_sv": True
+                                                      "allow_sv_overlap": True
                                                       },
                                                      {"type": 'A_->_A',
                                                       "number": 1,
@@ -1448,7 +1448,7 @@ class TestSVSimulator(unittest.TestCase):
                                     "variant_sets": [{"type": "DEL",
                                                       "number": 1,
                                                       "length_ranges": [[2, 2]],
-                                                      "enable_overlap_sv": True
+                                                      "allow_sv_overlap": True
                                                       },
                                                      {"type": 'A_->A_A',
                                                       "number": 1,
@@ -1504,7 +1504,7 @@ class TestSVSimulator(unittest.TestCase):
                                     "variant_sets": [{"type": "INDEL",
                                                       "number": 1,
                                                       "length_ranges": [[1, 1]],
-                                                      "enable_overlap_sv": True
+                                                      "allow_sv_overlap": True
                                                       },
                                                      {"import": self.import_del}]}],
                         self.hap1, self.hap2, self.bed),
@@ -1519,7 +1519,7 @@ class TestSVSimulator(unittest.TestCase):
                                     "variant_sets": [{"type": "INDEL",
                                                       "number": 1,
                                                       "length_ranges": [[1, 1]],
-                                                      "enable_overlap_sv": True
+                                                      "allow_sv_overlap": True
                                                       },
                                                      {"type": 'DUP',
                                                       "number": 1,
@@ -1542,7 +1542,7 @@ class TestSVSimulator(unittest.TestCase):
                                         {"type": "INDEL",
                                          "number": 1,
                                          "length_ranges": [[1, 1]],
-                                         "enable_overlap_sv": True
+                                         "allow_sv_overlap": True
                                          }
                                     ]}],
                         self.hap1, self.hap2, self.bed),
@@ -1557,7 +1557,7 @@ class TestSVSimulator(unittest.TestCase):
                                     "variant_sets": [{"type": "INDEL",
                                                       "number": 1,
                                                       "length_ranges": [[1, 1]],
-                                                      "enable_overlap_sv": True
+                                                      "allow_sv_overlap": True
                                                       },
                                                      {"type": 'DUP',
                                                       "number": 1,
@@ -1577,7 +1577,7 @@ class TestSVSimulator(unittest.TestCase):
                                     "variant_sets": [{"type": "INDEL",
                                                       "number": 1,
                                                       "length_ranges": [[1, 1]],
-                                                      "enable_overlap_sv": True
+                                                      "allow_sv_overlap": True
                                                       },
                                                      {"type": 'A_->_A',
                                                       "number": 1,
@@ -1595,7 +1595,7 @@ class TestSVSimulator(unittest.TestCase):
                                     "variant_sets": [{"type": "INDEL",
                                                       "number": 1,
                                                       "length_ranges": [[2, 2]],
-                                                      "enable_overlap_sv": True
+                                                      "allow_sv_overlap": True
                                                       },
                                                      {"type": 'A_->_A',
                                                       "number": 1,
@@ -1616,7 +1616,7 @@ class TestSVSimulator(unittest.TestCase):
                                     "variant_sets": [{"type": "INDEL",
                                                       "number": 1,
                                                       "length_ranges": [[1, 1]],
-                                                      "enable_overlap_sv": True
+                                                      "allow_sv_overlap": True
                                                       },
                                                      {"import": self.import_del},
                                                      {"type": 'INV',

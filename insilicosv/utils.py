@@ -204,9 +204,9 @@ class RegionSet:
     chrom2itree: dict[str, IntervalTree]
     num_hap_tree: int
 
-    def __init__(self, regions=None, enable_hap_overlap=False):
+    def __init__(self, regions=None, allow_hap_overlap=False):
         regions = regions or []
-        self.num_hap_tree = 3 if enable_hap_overlap else 1
+        self.num_hap_tree = 3 if allow_hap_overlap else 1
         chrom2regions = defaultdict(list)
         for region in regions:
             chrom2regions[region.chrom].append(region)
@@ -294,7 +294,7 @@ class RegionSet:
         return RegionSet(regions)
 
     @staticmethod
-    def from_fasta(fasta_path, filter_small_chr, region_kind, enable_hap_overlap):
+    def from_fasta(fasta_path, filter_small_chr, region_kind, allow_hap_overlap):
         with pysam.FastaFile(fasta_path) as fasta_file:
             regions = []
             for chrom, chrom_length in zip(fasta_file.references, fasta_file.lengths):
@@ -302,7 +302,7 @@ class RegionSet:
                 regions.append(Region(chrom=chrom, start=0, end=chrom_length,
                                       kind=region_kind,
                                       orig_start=0, orig_end=chrom_length))
-            return RegionSet(regions, enable_hap_overlap=enable_hap_overlap)
+            return RegionSet(regions, allow_hap_overlap=allow_hap_overlap)
 
     def get_region_list(self, hap=0):
         return [ival.data for chrom_itree in self.chrom2itree.values() for ival in chrom_itree[hap]]
@@ -323,11 +323,11 @@ class RegionSet:
             for hap, other_chrom_itree in other_chrom_itree_list.items():
                 self.chrom2itree[chrom][hap].update(other_chrom_itree)
 
-    def add_region(self, region, sv=None, enable_hap_overlap=None):
+    def add_region(self, region, sv=None, allow_hap_overlap=None):
         aux_region = deepcopy(region)
         if sv:
             aux_region = aux_region.replace(sv=sv)
-        self.add_region_set(RegionSet([aux_region], enable_hap_overlap=enable_hap_overlap))
+        self.add_region_set(RegionSet([aux_region], allow_hap_overlap=allow_hap_overlap))
 
     def chop(self, sv_region, genotype):
         # Remove the parts of intervals overlapping sv_region.

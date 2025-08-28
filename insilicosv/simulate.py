@@ -86,7 +86,7 @@ class SVSimulator:
         self.num_svs = {}
         self.rois_overlap = {}
         self.output_path = os.path.dirname(config_path)
-        self.enable_hap_overlap = self.config.get('enable_hap_overlap', False)
+        self.allow_hap_overlap = self.config.get('allow_hap_overlap', False)
 
         # Tree to keep track of the overlap SV regions with the operation performed to give to the OutputWriter
         self.has_overlap_sv = False
@@ -113,7 +113,7 @@ class SVSimulator:
                       'random_seed', 'output_no_haps', 'output_adjacencies', 'output_paf', 'output_svops_bed',
                       'th_proportion_N',
                       'output_paf_intersv', 'verbose', 'variant_sets', 'overlap_regions', 'blacklist_regions',
-                      'filter_small_chr', 'arms', 'enable_hap_overlap'),
+                      'filter_small_chr', 'arms', 'allow_hap_overlap'),
                 f'invalid top-level config: {k}', error_type='syntax')
 
         chk(utils.is_readable_file(config['reference']), f'reference must be a readable file')
@@ -149,7 +149,7 @@ class SVSimulator:
         self.reference_regions = RegionSet.from_fasta(self.config['reference'],
                                                       self.config.get('filter_small_chr', FILTER_SMALL_CHR),
                                                       region_kind='_reference_',
-                                                      enable_hap_overlap=self.enable_hap_overlap)
+                                                      allow_hap_overlap=self.allow_hap_overlap)
         if self.has_overlap_sv:
             self.reference_sv_overlap_regions = copy.deepcopy(self.reference_regions)
         # Get the ROIs for overlap constraints
@@ -239,7 +239,7 @@ class SVSimulator:
             self.overlap_modes[vset_num] = mode
             self.svs.extend(vset_svs)
 
-            if vset_svs[0].enable_overlap_sv:
+            if vset_svs[0].allow_sv_overlap:
                 self.has_overlap_sv = True
 
             self.num_svs[vset_num] = len(vset_svs)
@@ -294,7 +294,7 @@ class SVSimulator:
 
     def update_overlap_svs(self, sv):
         for region in sv.get_regions():
-            self.overlap_sv_regions.add_region(region, sv=sv, enable_hap_overlap=self.enable_hap_overlap)
+            self.overlap_sv_regions.add_region(region, sv=sv, allow_hap_overlap=self.allow_hap_overlap)
             self.reference_sv_overlap_regions.chop(region, sv.genotype)
 
     def place_svs(self):
@@ -313,7 +313,7 @@ class SVSimulator:
             logger.debug(f'Placed {sv_num=} {sv=} in {time.time() - t_start_placing_sv}s')
             assert sv.is_placed()
 
-            if not sv.enable_overlap_sv:
+            if not sv.allow_sv_overlap:
                 self.update_available_reference(sv)
             else:
                 self.update_overlap_svs(sv)
@@ -329,7 +329,7 @@ class SVSimulator:
         types_order = ['SV OVERLAP', 'FIXED', 'ARMS', OverlapMode.EXACT, OverlapMode.PARTIAL, OverlapMode.CONTAINING,
                        OverlapMode.CONTAINED, None]
         for sv in self.svs:
-            if sv.enable_overlap_sv:
+            if sv.allow_sv_overlap:
                 sv.priority = 0
             elif sv.fixed_placement:
                 sv.priority = 1
@@ -791,7 +791,7 @@ class SVSimulator:
     def place_sv(self, sv, roi_index):
         assert not sv.is_placed()
         reference_regions = self.reference_regions
-        if sv.enable_overlap_sv:
+        if sv.allow_sv_overlap:
             reference_regions = self.reference_sv_overlap_regions
 
         if sv.fixed_placement:
@@ -820,7 +820,7 @@ class SVSimulator:
         blacklist_regions = self.get_relevant_blacklist_regions(sv.blacklist_filter)
         sv_set = sv.info['VSET']
         hap_id = 0
-        if self.enable_hap_overlap:
+        if self.allow_hap_overlap:
             hap_id = 2 if sv.genotype[0] and sv.genotype[1] else sv.genotype[1]
         init_roi = 0
         if sv.overlap_mode in [OverlapMode.CONTAINED, OverlapMode.PARTIAL]:
@@ -917,7 +917,7 @@ class SVSimulator:
     def output_results(self) -> None:
         logger.info('Writing outputs')
         output_writer = OutputWriter(self.svs, self.overlap_sv_regions, self.reference, self.chrom_lengths,
-                                     self.output_path, self.enable_hap_overlap, self.config)
+                                     self.output_path, self.allow_hap_overlap, self.config)
         logger.info('Writing new haplotypes')
         output_writer.output_haps()
         logger.info('Writing VCF file')

@@ -299,15 +299,15 @@ variant_sets:
       number: 10
       length_ranges:
          - [30, 50]
-      enable_overlap_sv: True
+      allow_sv_overlap: True
     - type: "SNP"
       number: 20
-      enable_overlap_sv: True
+      allow_sv_overlap: True
 ```
-The DEL and SNP sets have the `enable_overlap_sv: True` setting, which allows them to be overlapped by the nrTRA variants.
+The DEL and SNP sets have the `allow_sv_overlap: True` setting, which allows them to be overlapped by the nrTRA variants.
 DEL and SNP variants cannot overlap each other.
 
-SVs that are allowed to overlap are always considered as occurring first in the simulation process. 
+SNPs and INDELs that are allowed to overlap SVs are always considered as occurring first in the simulation process. 
 This means they might be modified or even deleted by other SVs that are placed later. 
 Regardless of whether they are ultimately observable in the final genome, all overlapping SVs will be included in the final VCF output.
 

@@ -184,7 +184,7 @@ class SV(ABC):
     num_valid_placements: int = 0
 
     # If a SNP or INDEL can be overlapped by other SVs
-    enable_overlap_sv: Optional[bool] = False
+    allow_sv_overlap: Optional[bool] = False
 
     # for arm gain or loss
     arm_gain_loss: Optional[bool] = False
@@ -443,7 +443,7 @@ class BaseSV(SV):
             sv_info['SVID'] = rec_id
             sv_info['SVTYPE'] = sv_type_str
 
-            if self.enable_overlap_sv:
+            if self.allow_sv_overlap:
                 sv_info['ENABLE_OVERLAP_SV'] = str(True)
 
             for key, value in operation.op_info.items():

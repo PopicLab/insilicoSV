@@ -403,7 +403,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'novel_insertions',
                 'interchromosomal',
                 'config_descr',
-                'enable_overlap_sv',
+                'allow_sv_overlap',
                 'aneuploidy',
                 'arm_gain_loss',
                 'arm_percent',
@@ -483,9 +483,9 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                                                                    'length_ranges' in vset_cfg and
                                                                    vset_cfg['length_ranges'][0][1] and
                                                                    vset_cfg['length_ranges'][0][1] < 50):
-            self.overlap_sv = vset_cfg.get('enable_overlap_sv', False)
+            self.overlap_sv = vset_cfg.get('allow_sv_overlap', False)
         else:
-            chk(not ('enable_overlap_sv' in vset_cfg),
+            chk(not ('allow_sv_overlap' in vset_cfg),
                 f'overlap_sv are only available for SNPs and INDELs, but %s was provided' %
                 vset_cfg['config_descr'], error_type='type')
 
@@ -749,7 +749,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                       fixed_placement=None,
                       info=info,
                       genotype=self.pick_genotype(),
-                      enable_overlap_sv=self.vset_config.get('enable_overlap_sv', False),
+                      allow_sv_overlap=self.vset_config.get('allow_sv_overlap', False),
                       config_descr=self.vset_config['config_descr'],
                       aneuploidy=self.aneuploidy,
                       arm_gain_loss=self.arm_gain_loss,
@@ -1210,7 +1210,7 @@ class ImportedVariantSet(VariantSet):
                       blacklist_filter=None,
                       info=parent_info,
                       genotype=genotype,
-                      enable_overlap_sv=parsed_info['ENABLE_OVERLAP_SV'],
+                      allow_sv_overlap=parsed_info['ENABLE_OVERLAP_SV'],
                       config_descr=f'vcf_record:{vcf_rec}',
                       dispersions=[])
 
