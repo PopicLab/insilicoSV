@@ -285,7 +285,7 @@ Key Considerations for Interchromosomal Dispersions
   However, it could be placed in a different region of chr1.
 
 ### Example 7 - Placing overlapping SVs
-Any SNP or INDEL can be allowed to be overlapped by other, non-overlapping SVs.
+Any SNP or INDEL can be allowed to be overlapped by SVs.
 
 ```yaml
 reference: "{path}/{to}/ref.fa"
