@@ -284,18 +284,17 @@ Key Considerations for Interchromosomal Dispersions
   Because all dispersions are interchromosomal, the last copy of A cannot be placed back on chr3. 
   However, it could be placed in a different region of chr1.
 
-### Example 7 - Placing overlapping SVs
-Any SNP or INDEL can be allowed to be overlapped by SVs.
+### Example 7 - SNP and INDEL placement within SVs
+SNPs and INDELs can be allowed to overlap SVs as follows:
 
 ```yaml
 reference: "{path}/{to}/ref.fa"
 variant_sets:
-    - type: "nrTRA"  
+    - type: "DUP"  
       number: 5
       length_ranges:
-        - [500, 1000]
-        - [500, 1000]
-    - type: "DEL"
+        - [1000, 100000]
+    - type: "INDEL"
       number: 10
       length_ranges:
          - [30, 50]
@@ -304,12 +303,9 @@ variant_sets:
       number: 20
       allow_sv_overlap: True
 ```
-The DEL and SNP sets have the `allow_sv_overlap: True` setting, which allows them to be overlapped by the nrTRA variants.
-DEL and SNP variants cannot overlap each other.
-
-SNPs and INDELs that are allowed to overlap SVs are always considered as occurring first in the simulation process. 
-This means they might be modified or even deleted by other SVs that are placed later. 
-Regardless of whether they are ultimately observable in the final genome, all overlapping SVs will be included in the final VCF output.
+Here the INDEL and SNP definitions have the `allow_sv_overlap` parameter set to `True`, which allows them to be randomly placed within the DUP intervals.
+Note: SNPs and INDELs that are allowed to overlap SVs are always considered as occurring first in the simulation process. 
+As such, they might be modified or even deleted by SVs that are placed later. Regardless of whether they are ultimately observable in the final genome, all simulated variants are included in the final VCF output.
 
 ### Example 8 - Chromosome Gain/Loss
 This section details parameters for simulating chromosome arm gain/loss or whole chromosome aneuploidy.
