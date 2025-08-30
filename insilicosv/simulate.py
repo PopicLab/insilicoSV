@@ -16,12 +16,13 @@ import numpy as np
 from intervaltree import Interval, IntervalTree
 from pysam import FastaFile
 import yaml
+import copy
 from collections import defaultdict
 from math import floor
 
 from insilicosv import utils, __version__
 from insilicosv.utils import (
-    Locus, Region, RegionSet, OverlapMode, chk, error_context,
+    Locus, Region, RegionSet, OverlapMode, chk,
     has_duplicates, if_not_none, pairwise)
 from insilicosv.sv_defs import SV, Breakend, Transform, TransformType, Operation, BreakendRegion
 from insilicosv.variant_set import make_variant_set_from_config
@@ -33,9 +34,11 @@ logging.basicConfig(level=logging.INFO,
 
 DEFAULT_PERCENT_N = 0.05
 DEFAULT_MAX_TRIES = 100
+MIN_INTERSV_DIST = 1
+FILTER_SMALL_CHR = 0
+
 
 class SVSimulator:
-
     """
     Simulates SVs from a given config.
     """
@@ -46,6 +49,8 @@ class SVSimulator:
     rois_overlap: list[Region]
     # Region set defined by the reference updated to keep track of the available regions.
     reference_regions: RegionSet
+    # Region Set defined by the reference regions to keep track of available regions for overlap SVs
+    reference_sv_overlap_regions: RegionSet
     blacklist_regions: RegionSet
     reference: FastaFile
     chrom_lengths: dict[str, int]
@@ -53,7 +58,6 @@ class SVSimulator:
     verbose: bool
 
     def __init__(self, config_path):
-
         try:
             with open(config_path) as config_yaml:
                 self.config = yaml.safe_load(config_yaml)
@@ -69,7 +73,7 @@ class SVSimulator:
                 a_logger.setLevel(logging.DEBUG)
         if 'random_seed' in self.config:
             random_seed = self.config['random_seed']
-            chk(isinstance(random_seed, (type(None), int, float, str)),'invalid random_seed')
+            chk(isinstance(random_seed, (type(None), int, float, str)), 'invalid random_seed')
             if random_seed == 'time':
                 random_seed = time.time_ns() % 1000000000
             logger.info(f'random seed: {random_seed}')
@@ -82,12 +86,16 @@ class SVSimulator:
         self.num_svs = {}
         self.rois_overlap = {}
         self.output_path = os.path.dirname(config_path)
-        self.enable_hap_overlap = self.config.get('enable_hap_overlap', False)
+        self.allow_hap_overlap = self.config.get('allow_hap_overlap', False)
+
+        # Tree to keep track of the overlap SV regions with the operation performed to give to the OutputWriter
+        self.has_overlap_sv = False
+        self.overlap_sv_regions = RegionSet()
 
         self.reference = FastaFile(self.config['reference'])
-        self.chrom_lengths = { chrom: chrom_length
-                               for chrom, chrom_length in zip(self.reference.references,
-                                                              self.reference.lengths) }
+        self.chrom_lengths = {chrom: chrom_length
+                              for chrom, chrom_length in zip(self.reference.references,
+                                                             self.reference.lengths)}
         # Store a dict of the chr arms if any of the sv has the flag arm_gain_loss or aneuploidy
         self.arm_regions = {}
         self.chrom_copies = defaultdict(int)
@@ -100,14 +108,16 @@ class SVSimulator:
         chk(isinstance(config, dict), 'Config must be a dict')
 
         for k in config:
-            chk(k in ('reference', 'max_tries', 'max_random_breakend_tries', 'homozygous_only', 'min_intersv_dist',
-                      'random_seed', 'output_no_haps', 'output_adjacencies', 'output_paf', 'output_svops_bed', 'th_proportion_N'
+            chk(k in ('reference', 'max_tries', 'max_random_breakend_tries', 'homozygous_only', 'heterozygous_only',
+                      'min_intersv_dist',
+                      'random_seed', 'output_no_haps', 'output_adjacencies', 'output_paf', 'output_svops_bed',
+                      'th_proportion_N',
                       'output_paf_intersv', 'verbose', 'variant_sets', 'overlap_regions', 'blacklist_regions',
-                      'filter_small_chr', 'arms', 'enable_hap_overlap'),
-                f'invalid top-level config: {k}')
+                      'filter_small_chr', 'arms', 'allow_hap_overlap'),
+                f'invalid top-level config: {k}', error_type='syntax')
 
         chk(utils.is_readable_file(config['reference']), f'reference must be a readable file')
-        chk(isinstance(config.get('variant_sets'), list),'variant_sets must specify a list')
+        chk(isinstance(config.get('variant_sets'), list), 'variant_sets must specify a list')
 
         if 'overlap_regions' in config:
             config['overlap_regions'] = utils.as_list(config['overlap_regions'])
@@ -119,7 +129,7 @@ class SVSimulator:
             for variant_set in config['variant_sets']:
                 chk(isinstance(variant_set, dict), f'variant set must be a dict: {variant_set}')
                 for key in variant_set.keys():
-                    chk(not key.startswith('overlap_'),
+                    chk(not key.startswith('overlap_') or key == 'overlap_sv',
                         f'Using {key} in {variant_set} requires specifying overlap_regions in global config')
 
     def load_arms(self):
@@ -136,14 +146,20 @@ class SVSimulator:
             self.arm_regions[fields[0]].append(Region(chrom=fields[0], start=int(fields[3]), end=int(fields[1])))
 
     def load_rois(self):
-        self.reference_regions = RegionSet.from_fasta(self.config['reference'], self.config.get('filter_small_chr', 0),
-                                                      region_kind='_reference_', enable_hap_overlap=self.enable_hap_overlap)
+        self.reference_regions = RegionSet.from_fasta(self.config['reference'],
+                                                      self.config.get('filter_small_chr', FILTER_SMALL_CHR),
+                                                      region_kind='_reference_',
+                                                      allow_hap_overlap=self.allow_hap_overlap)
+        if self.has_overlap_sv:
+            self.reference_sv_overlap_regions = copy.deepcopy(self.reference_regions)
         # Get the ROIs for overlap constraints
         if any(mode is not None for mode in self.overlap_modes.values()):
-            rois_overlap = RegionSet.from_beds(utils.as_list(self.config.get('overlap_regions', [])), to_region_set=False)
+            rois_overlap = RegionSet.from_beds(utils.as_list(self.config.get('overlap_regions', [])),
+                                               to_region_set=False)
             min_bounds = [min_bound for min_bound, _ in self.overlap_ranges.values()]
             global_min_bound = 0
-            logger.info(f'Filtering out ROIs not satisfying the overlap constraints from initial {len(rois_overlap)} ROIs')
+            logger.info(
+                f'Filtering out ROIs not satisfying the overlap constraints from initial {len(rois_overlap)} ROIs')
             if None not in min_bounds:
                 global_min_bound = min(min_bounds)
                 rois_overlap = sorted(rois_overlap, key=lambda x: x.length(), reverse=True)
@@ -162,7 +178,7 @@ class SVSimulator:
                     if self.overlap_modes[sv_idx] is None: continue
                     if roi.length() < if_not_none(self.overlap_ranges[sv_category][0], 0): continue
                     if (self.overlap_modes[sv_category] in [OverlapMode.CONTAINING, OverlapMode.EXACT] and
-                            roi.length() > if_not_none(self.overlap_ranges[sv_category][1], roi.length()+1)):
+                            roi.length() > if_not_none(self.overlap_ranges[sv_category][1], roi.length() + 1)):
                         continue
                     if not roi.kind in self.overlap_kinds[sv_category] and not 'all' in self.overlap_kinds[sv_category]:
                         found = False
@@ -174,18 +190,20 @@ class SVSimulator:
                     added_roi = True
                     self.rois_overlap[sv_category].append(roi)
                 if not added_roi: n_removed_rois += 1
+
             for sv_category in self.rois_overlap:
                 # Check if there is enough ROIs to fit all the SVs of one category independently
-                error_message_num_rois= ("Only {} ROIs satisfying the constraints "
-                                         "(overlap mode: {}, type of ROIs: {}, overlap range: {}) of the category {} containing {} SVs").format(
-                    len(self.rois_overlap[sv_category]), self.overlap_modes[sv_category], self.overlap_kinds[sv_category],
+                error_message_num_rois = ("Only {} ROIs satisfying the constraints "
+                                          "(overlap mode: {}, type of ROIs: {}, overlap range: {}) of the category {} containing {} SVs").format(
+                    len(self.rois_overlap[sv_category]), self.overlap_modes[sv_category],
+                    self.overlap_kinds[sv_category],
                     self.overlap_ranges[sv_category], sv_category, self.num_svs[sv_category])
 
                 if self.overlap_modes[sv_category] in [OverlapMode.CONTAINING, OverlapMode.EXACT]:
-                    chk(len(self.rois_overlap[sv_category])>=self.num_svs[sv_category], error_message_num_rois)
+                    chk(len(self.rois_overlap[sv_category]) >= self.num_svs[sv_category], error_message_num_rois)
                 elif self.overlap_modes[sv_category] == OverlapMode.PARTIAL:
                     # We can have two partial SVs per ROI.
-                    chk(self.num_svs[sv_category] <= 2*len(self.rois_overlap[sv_category]), error_message_num_rois)
+                    chk(self.num_svs[sv_category] <= 2 * len(self.rois_overlap[sv_category]), error_message_num_rois)
                 # Shuffle the ROIs so the selection is not biased on their positions in the input bed file
                 random.shuffle(self.rois_overlap[sv_category])
             logger.info(f'{n_removed_rois} ROIs filtered')
@@ -198,9 +216,8 @@ class SVSimulator:
                 self.blacklist_regions.add_region_set(RegionSet.from_vcf(blacklist_region_file))
             else:
                 chk(f'Cannot import blacklist regions from {blacklist_region_file}: '
-                    f'unsupported file type')
+                    f'unsupported file type, please provide a .bed or .vcf file', error_type='type')
             logger.info(f'Blacklist region file {blacklist_region_file} processed.')
-
 
     def run(self):
         self.construct_svs()
@@ -221,10 +238,64 @@ class SVSimulator:
             self.overlap_kinds[vset_num] = kinds
             self.overlap_modes[vset_num] = mode
             self.svs.extend(vset_svs)
+
+            if vset_svs[0].allow_sv_overlap:
+                self.has_overlap_sv = True
+
             self.num_svs[vset_num] = len(vset_svs)
         logger.info(f'Constructed {len(self.svs)} SVs')
         self.rois_overlap = {vset_num: [] for vset_num in range(len(self.config['variant_sets']))}
         assert not has_duplicates(sv.sv_id for sv in self.svs)
+
+    def update_available_reference(self, sv):
+        for region in sv.get_regions():
+            region_padded = region.padded(self.config.get('min_intersv_dist', MIN_INTERSV_DIST))
+            self.reference_regions.chop(region_padded, sv.genotype)
+
+            # We remove used arms from the arm_regions
+            if self.arm_regions:
+                if region.chrom in self.arm_regions:
+                    arm_regions = self.arm_regions[region.chrom]
+                    keep_regions = []
+                    for arm_region in arm_regions:
+                        if not (
+                                arm_region.start <= region.start <= arm_region.end or arm_region.start <= region.end <= arm_region.end):
+                            keep_regions.append(arm_region)
+                    self.arm_regions[region.chrom] = keep_regions
+
+            if sv.aneuploidy and sv.info['OP_TYPE'] == 'DUP':
+                orig_op = sv.operations[0]
+                operations = []
+                for copy_num in range(orig_op.transform.n_copies):
+                    # For the writing of the output, we create an operation per copy to create new chromosome copies
+                    transform = Transform(
+                        transform_type=TransformType.IDENTITY,
+                        is_in_place=False,
+                        divergence_prob=orig_op.transform.divergence_prob,
+                        n_copies=1
+                    )
+                    operations.append(
+                        Operation(transform=transform,
+                                  op_info=orig_op.op_info,
+                                  source_breakend_region=BreakendRegion(start_breakend=Breakend(0),
+                                                                        end_breakend=Breakend(1)),
+                                  target_insertion_breakend=Breakend(2),
+                                  placement=[Locus(chrom=region.chrom, pos=region.start),
+                                             Locus(chrom=region.chrom, pos=region.end),
+                                             Locus(
+                                                 chrom=region.chrom + f'_copy_{self.chrom_copies[region.chrom] + copy_num}',
+                                                 pos=region.start)]
+                                  )
+                    )
+                self.chrom_copies[region.chrom] += orig_op.transform.n_copies
+                sv.operations = operations
+            else:
+                self.used_aneuploid_chrom.add(region.chrom)
+
+    def update_overlap_svs(self, sv):
+        for region in sv.get_regions():
+            self.overlap_sv_regions.add_region(region, sv=sv, allow_hap_overlap=self.allow_hap_overlap)
+            self.reference_sv_overlap_regions.chop(region, sv.genotype)
 
     def place_svs(self):
         # Currently, we place SVs one at a time.
@@ -237,78 +308,47 @@ class SVSimulator:
         for sv_num, sv in enumerate(self.svs):
             t_start_placing_sv = time.time()
             logger.debug(f'Placing {sv_num=} {sv=}')
-            with error_context(sv.config_descr):
-                svset = sv.info['VSET']
-                roi_indexes[svset] = self.place_sv(sv, roi_indexes[svset])
-            logger.debug(f'Placed {sv_num=} {sv=} in {time.time()-t_start_placing_sv}s')
+            svset = sv.info['VSET']
+            roi_indexes[svset] = self.place_sv(sv, roi_indexes[svset])
+            logger.debug(f'Placed {sv_num=} {sv=} in {time.time() - t_start_placing_sv}s')
             assert sv.is_placed()
-            for region in sv.get_regions():
-                region_padded = region.padded(self.config.get('min_intersv_dist', 1))
-                self.reference_regions.chop(region_padded, sv.genotype)
 
-                # We remove used arms from the arm_regions
-                if self.arm_regions:
-                    if region.chrom in self.arm_regions:
-                        arm_regions = self.arm_regions[region.chrom]
-                        keep_regions = []
-                        for arm_region in arm_regions:
-                            if not(arm_region.start <= region.start <= arm_region.end or arm_region.start <= region.end <= arm_region.end):
-                                keep_regions.append(arm_region)
-                        self.arm_regions[region.chrom] = keep_regions
-
-                if sv.aneuploidy and sv.info['OP_TYPE'] == 'DUP':
-                    orig_op = sv.operations[0]
-                    operations = []
-                    for copy_num in range(orig_op.transform.n_copies):
-                        # For the writing of the output, we create an operation per copy to create new chromosome copies
-                        transform = Transform(
-                                                transform_type=TransformType.IDENTITY,
-                                                is_in_place=False,
-                                                divergence_prob=orig_op.transform.divergence_prob,
-                                                n_copies=1
-                                            )
-                        operations.append(
-                            Operation(transform=transform,
-                                      op_info=orig_op.op_info,
-                                      source_breakend_region=BreakendRegion(start_breakend=Breakend(0),
-                                                                            end_breakend=Breakend(1)),
-                                      target_insertion_breakend=Breakend(2),
-                                      placement=[Locus(chrom=region.chrom, pos=region.start),
-                                                 Locus(chrom=region.chrom, pos=region.end),
-                                                 Locus(chrom=region.chrom + f'_copy_{self.chrom_copies[region.chrom] + copy_num}', pos=region.start)]
-                                      )
-                        )
-                    self.chrom_copies[region.chrom] += orig_op.transform.n_copies
-                    sv.operations = operations
-                else:
-                    self.used_aneuploid_chrom.add(region.chrom)
-
+            if not sv.allow_sv_overlap:
+                self.update_available_reference(sv)
+            else:
+                self.update_overlap_svs(sv)
 
             if time.time() - t_last_status > 10:
-                logger.info(f'Placed {sv_num} of {len(self.svs)} SVs in {time.time()-t_start_placing:.1f}s')
+                logger.info(f'Placed {sv_num} of {len(self.svs)} SVs in {time.time() - t_start_placing:.1f}s')
                 t_last_status = time.time()
-        logger.info(f'Placed {len(self.svs)} svs in {time.time()-t_start_placing:.1f}s.')
+        logger.info(f'Placed {len(self.svs)} svs in {time.time() - t_start_placing:.1f}s.')
 
     def determine_sv_placement_order(self) -> None:
         # place most constrained SVs first
         logger.info(f'Deciding placement order for {len(self.svs)} SVs')
-        types_order = ['ARM', OverlapMode.EXACT,  OverlapMode.PARTIAL, OverlapMode.CONTAINING, OverlapMode.CONTAINED, None]
+        types_order = ['SV OVERLAP', 'FIXED', 'ARMS', OverlapMode.EXACT, OverlapMode.PARTIAL, OverlapMode.CONTAINING,
+                       OverlapMode.CONTAINED, None]
         for sv in self.svs:
-            with error_context(sv.config_descr):
-                if sv.fixed_placement:
-                    sv.priority = 0
-                elif sv.arm_gain_loss or sv.aneuploidy:
-                    sv.priority = 1
-                else:
-                    distance = sum([dist for dist in sv.breakend_interval_lengths if dist is not None]) + 2
-                    sv.priority = (types_order.index(sv.overlap_mode) + 1) + 1/distance
+            if sv.allow_sv_overlap:
+                sv.priority = 0
+            elif sv.fixed_placement:
+                sv.priority = 1
+            elif sv.arm_gain_loss or sv.aneuploidy:
+                sv.priority = 2
+            else:
+                distance = sum([dist for dist in sv.breakend_interval_lengths if dist is not None]) + 2
+                sv.priority = (types_order.index(sv.overlap_mode)) + 1 / distance
         self.svs.sort(key=lambda sv: sv.priority)
 
     def is_placement_valid(self, sv, placement):
-        """Returns False if proposed placement of `sv` would run off chromosome or 
+        """Returns False if proposed placement of `sv` would run off chromosome or
         touch blacklisted regions."""
         # The placement does not set all breakend positions
         if not len(placement) == len(sv.breakend_interval_lengths) + 1: return False
+        chk(all([locus.pos <= self.chrom_lengths[locus.chrom] for locus in placement]),
+            'Please make sure that the imported'
+            ' SV positions are within the chromosome length,'
+            f' provided {sv}', error_type='value')
         for breakend1, breakend2 in pairwise(sv.breakends):
             # Ensure the positions are ordered in a same chromosome
             if not (placement[breakend1].chrom != placement[breakend2].chrom or
@@ -323,14 +363,18 @@ class SVSimulator:
                     (placement[breakend2].chrom == placement[breakend1].chrom and
                      placement[breakend2].pos - placement[breakend1].pos
                      >= sv.breakend_interval_min_lengths[breakend1])): return False
-
         for op_region in sv.get_regions(placement):
             # Ensure the regions covered by the SV do not contain a proportion of Ns above th_proportion_N
+            # To ensure that am insertion target is not in between two Ns, the region is padded
+            min_bound = max(0, op_region.start - 1)
+            max_bound = min(self.chrom_lengths[op_region.chrom], op_region.end + 1)
             if utils.percent_N(self.reference.fetch(reference=op_region.chrom,
-                                                    start=op_region.start,
-                                                    end=op_region.end)) > self.config.get('th_proportion_N', DEFAULT_PERCENT_N):
+                                                    start=min_bound,
+                                                    end=max_bound)) > self.config.get('th_proportion_N',
+                                                                                      DEFAULT_PERCENT_N):
                 return False
         return True
+
     # end: def is_placement_valid(...)
 
     @functools.cache
@@ -338,60 +382,61 @@ class SVSimulator:
         return (RegionSet() if blacklist_filter is None else
                 self.blacklist_regions.filtered(region_filter=blacklist_filter))
 
-    # Chop a region to remove blacklisted parts
-    def slice_overlap(self, interval, overlaps):
-        interval_tree = IntervalTree([interval])
-        for overlap in overlaps:
-            interval_tree.chop(overlap.begin, overlap.end)
-        return [interval for interval in interval_tree if interval.length() > 0]
-
-    def get_breakend(self, hap_id, containing_region=None, avoid_chrom=None, blacklist_regions=None,
-                            roi_length=0, total_length=0):
+    def get_breakend(self, hap_id, reference_regions, containing_region=None, avoid_chrom=None, blacklist_regions=None,
+                     roi_length=0, total_length=0):
         max_random_tries = self.config.get("max_random_breakend_tries", DEFAULT_MAX_TRIES)
         num_tries = 0
         breakend = None
         ref_roi = None
         chromosomes = [chrom for chrom in self.reference_regions.chrom2itree if chrom != avoid_chrom]
-        while breakend is None and num_tries < max_random_tries:
-            breakend, ref_roi = self.get_random_breakend(containing_region=containing_region, chromosomes=chromosomes,
-                                                    blacklist_regions=blacklist_regions, roi_length=roi_length,
+        while breakend is None or ref_roi is None and num_tries < max_random_tries:
+            breakend, ref_roi = self.get_random_breakend(reference_regions, containing_region=containing_region,
+                                                         chromosomes=chromosomes,
+                                                         blacklist_regions=blacklist_regions, roi_length=roi_length,
                                                          total_length=total_length, hap_id=hap_id)
             num_tries += 1
+
         if breakend is None:
             # The breakend failed to be assigned by random sampling, look for a region fitting the SV actually available.
-            return self.get_breakend_from_regions(containing_region=containing_region, avoid_chrom=avoid_chrom,
-                                             blacklist_regions=blacklist_regions, roi_length=roi_length,
-                                                  total_length=total_length)
+            return self.get_breakend_from_regions(reference_regions, containing_region=containing_region,
+                                                  avoid_chrom=avoid_chrom,
+                                                  blacklist_regions=blacklist_regions, roi_length=roi_length,
+                                                  total_length=total_length,
+                                                  hap_id=hap_id)
         return breakend, ref_roi
 
-    def get_random_breakend(self, containing_region=None, chromosomes=None, blacklist_regions=None,
-                            roi_length=0, total_length=0, hap_id=2):
+    def get_random_breakend(self, reference_regions, containing_region=None, chromosomes=None, blacklist_regions=None,
+                            roi_length=0, total_length=0, hap_id=0):
         if containing_region is None:
-            chromosomes = [chrom for chrom in chromosomes if self.chrom_lengths[chrom]-total_length >= 0]
-            bounds = {chrom: (0, self.chrom_lengths[chrom]-total_length) for chrom in chromosomes}
-            chrom = chromosomes[random.randint(0, len(chromosomes)-1)]
+            chromosomes = [chrom for chrom in chromosomes if self.chrom_lengths[chrom] - total_length >= 0]
+            bounds = {chrom: (0, self.chrom_lengths[chrom] - total_length) for chrom in chromosomes}
+            chrom = chromosomes[random.randint(0, len(chromosomes) - 1)]
         else:
             chrom = containing_region.chrom
             bounds = {chrom: (containing_region.start, containing_region.end)}
 
         breakend = random.randint(bounds[chrom][0], bounds[chrom][1])
         region = Region(start=breakend, end=breakend, chrom=chrom)
-
-        if (chrom in blacklist_regions.chrom2itree) and (blacklist_regions.strictly_contains_point(region.start, region.chrom) or
-                                                         blacklist_regions.strictly_contains_point(region.end, region.chrom)):
+        if (chrom in blacklist_regions.chrom2itree) and (
+                blacklist_regions.strictly_contains_point(region.start, region.chrom) or
+                blacklist_regions.strictly_contains_point(region.end, region.chrom)):
             return None, None
 
-        ref_roi = self.get_reference_interval(region, hap_id)
-        if (len(ref_roi) != 1) or (breakend + roi_length > ref_roi[0].end):
-            return None, None
+        ref_rois = self.get_reference_interval(region, reference_regions, hap_id)
+        ref_roi = None
+        for roi in ref_rois:
+            # There might be two overlapping ref intervals if there was an insertion target and the min_intersv_dist is 0
+            if breakend + roi_length > roi.data.end: continue
+            ref_roi = roi.data
+            break
+        return region, ref_roi
 
-        return region, ref_roi[0].data
-
-    def get_breakend_from_regions(self, containing_region=None, avoid_chrom=None, blacklist_regions=None,
-                            roi_length=0, total_length=0):
+    def get_breakend_from_regions(self, reference_regions, containing_region=None, avoid_chrom=None,
+                                  blacklist_regions=None,
+                                  roi_length=0, total_length=0, hap_id=0):
         max_random_tries = self.config.get("max_random_breakend_tries", DEFAULT_MAX_TRIES)
         # The region is not constrained, we use the interval tree defined from the reference file
-        chrom_trees = self.reference_regions.chrom2itree
+        chrom_trees = reference_regions.chrom2itree
         rois = []
         weights = []
         for chrom_tree, tree in chrom_trees.items():
@@ -401,17 +446,17 @@ class SVSimulator:
                 # The breakend is after a dispersion and has to satisfy the constraints induced by already placed breakends.
                 if chrom_tree != containing_region.chrom: continue
                 ref_intervals = []
-                overlaps = tree.overlap(containing_region.start, containing_region.end)
+                overlaps = tree[hap_id].overlap(containing_region.start - 0.2, containing_region.end + 0.2)
                 for overlap in overlaps:
                     # Chop the intervals overlapping the containing region
-                    min_interval = min(overlap.begin, containing_region.start)
-                    max_interval = max(overlap.end, containing_region.end)
-                    ref_intervals.append(Interval(begin=min_interval, end=max_interval,
+                    min_interval = min(overlap.data.start, containing_region.start)
+                    max_interval = max(overlap.data.end, containing_region.end)
+                    ref_intervals.append(Interval(begin=min_interval - 0.1, end=max_interval + 0.1,
                                                   data=overlap.data.replace(start=min_interval, end=max_interval)))
             for interval in ref_intervals:
                 # Remove the intervals that are too small or too close to the end of the chromosome
                 if interval.length() < roi_length: continue
-                if interval.begin + total_length > self.chrom_lengths[chrom_tree]: continue
+                if interval.data.start + total_length > self.chrom_lengths[chrom_tree]: continue
                 rois.append((interval, interval))
                 weights.append(interval.length() + 1)
         if not rois:
@@ -428,20 +473,26 @@ class SVSimulator:
             roi_idx = np.random.choice(len(rois), p=[weight / total_weights for weight in weights])
             roi, ref_roi = rois[roi_idx]
             # We are looking for a breakend.
-            max_bound = min(roi.end - roi_length, self.chrom_lengths[roi.data.chrom] - total_length)
-            breakend = random.randint(roi.begin, max_bound)
+            max_bound = min(roi.data.end - roi_length, self.chrom_lengths[roi.data.chrom] - total_length)
+            if roi.data.start > max_bound: continue
+
+            if roi.data.start == max_bound:
+                breakend = max_bound
+            else:
+                breakend = np.random.randint(roi.data.start, max_bound)
+
             invalid = False
-            if blacklist_regions and roi.chrom in blacklist_regions.chrom2itree:
+            if blacklist_regions and roi.data.chrom in blacklist_regions.chrom2itree:
                 invalid = blacklist_regions.strictly_contains_point(breakend, roi.chrom)
             num_iteration += 1
         if invalid:
             return None, None
 
-        roi = Interval(begin=breakend, end=breakend, data=roi.data.replace(start=breakend, end=breakend))
+        roi = Interval(begin=breakend - 0.1, end=breakend + 0.1, data=roi.data.replace(start=breakend, end=breakend))
         return roi.data, ref_roi.data
 
     # Provides a list of valid rois and weights corresponding to their length to uniformly draw from
-    def get_overlap_region(self, sv_category, roi_index, init_roi, hap_id, anchor_length=None,
+    def get_overlap_region(self, sv_category, roi_index, init_roi, reference_regions, hap_id, anchor_length=None,
                            overlap_mode=None, roi_filter=None):
         # The region is constrained we use the interval tree defined from the bed file
         roi_list = self.rois_overlap[sv_category]
@@ -449,14 +500,16 @@ class SVSimulator:
         for region in (roi_list[roi_index:] + roi_list[:init_roi]):
             roi_index = (roi_index + 1) % len(roi_list)
             if not roi_filter.satisfied_for(region): continue
-            valid_region, ref_roi = self.check_interval_overlap(region, roi_filter, anchor_length, overlap_mode, hap_id)
+            valid_region, ref_roi = self.check_interval_overlap(region, reference_regions, roi_filter, anchor_length,
+                                                                overlap_mode, hap_id)
             if valid_region is not None:
-                return valid_region, ref_roi.data, roi_index
+                # A copy of the valid region is returned so we do not change the provided overlap regions (several SVs might overlap it)
+                return copy.deepcopy(valid_region), ref_roi.data, roi_index
         return None, None, None
 
-    def check_interval_overlap(self, region, roi_filter, anchor_length, overlap_mode, hap_id):
+    def check_interval_overlap(self, region, reference_regions, roi_filter, anchor_length, overlap_mode, hap_id):
         # Only keep regions of the interval that are in the reference
-        ref_intervals = self.get_reference_interval(region, hap_id)
+        ref_intervals = self.get_reference_interval(region, reference_regions, hap_id)
         random.shuffle(ref_intervals)
         if not ref_intervals:
             return None, None
@@ -464,12 +517,13 @@ class SVSimulator:
             # Remove too small regions if the overlap is contained
             for ref_interval in ref_intervals:
                 if region.length() <= anchor_length: continue
-                left_bound = max(region.start, ref_interval.begin)
-                right_bound = min(region.end, ref_interval.end)
+                left_bound = max(region.start, ref_interval.data.start)
+                right_bound = min(region.end, ref_interval.data.end)
                 intersection = region.replace(start=left_bound, end=right_bound)
                 if intersection.length() < anchor_length: continue
                 # Discards intervals smaller than the minimum overlap.
-                if (roi_filter.region_length_range[0] is not None) and (intersection.length() < roi_filter.region_length_range[0]): continue
+                if (roi_filter.region_length_range[0] is not None) and (
+                        intersection.length() < roi_filter.region_length_range[0]): continue
                 return intersection, ref_interval
             return None, None
         # If the overlap is exact we disregard the intervals that have already been sliced or are not fully covered by the reference
@@ -490,18 +544,19 @@ class SVSimulator:
             # In case the regions defined by the bed file do not match the  ones defined by the reference we might have no or several containing intervals
             for ref_interval in ref_intervals:
                 # Check that the region is within the limits of the reference
-                left_bound = max(region.start, ref_interval.begin)
-                right_bound = min(region.end, ref_interval.end)
+                left_bound = max(region.start, ref_interval.data.start)
+                right_bound = min(region.end, ref_interval.data.end)
                 if right_bound <= left_bound: continue
                 # Check if the constraint region has an extremity overlapped by the reference, if not there is no possible partial overlap
-                if (right_bound == ref_interval.end) and (left_bound == ref_interval.begin): continue
+                if (right_bound == ref_interval.data.end) and (left_bound == ref_interval.data.start): continue
                 intersection = region.replace(start=left_bound, end=right_bound)
                 # There is at least one valid partial overlap on the left or the right
-                overlap_left = ref_interval.begin + anchor_length < intersection.end - 1
-                overlap_right = ref_interval.end - anchor_length > intersection.start + 1
+                overlap_left = ref_interval.data.start + anchor_length < intersection.end - 1
+                overlap_right = ref_interval.data.end - anchor_length > intersection.start + 1
                 if not (overlap_left or overlap_right): continue
                 # Discards regions smaller than the minimum overlap.
-                if (roi_filter.region_length_range[0] is not None) and (intersection.length() < roi_filter.region_length_range[0]): continue
+                if (roi_filter.region_length_range[0] is not None) and (
+                        intersection.length() < roi_filter.region_length_range[0]): continue
                 return intersection, ref_interval
             return None, None
         # If the overlap is containing remove the intervals that have been sliced or too big to be strictly included on both sides
@@ -513,18 +568,23 @@ class SVSimulator:
             # check that the interval is fully contained in the reference
             if len(ref_intervals) > 1: return None, None
             ref_interval = ref_intervals.pop()
-            if (ref_interval.begin > region.start) or (ref_interval.end < region.end):
+
+            if (ref_interval.data.start > region.start) or (ref_interval.data.end < region.end):
                 return None, None
             return region, ref_interval
         else:
             chk(False, f'Invalid overlap_mode {overlap_mode}')
 
-    def get_reference_interval(self, roi, hap_id):
-        #Get the reference interval overlapping a ROI if any.
-        for chrom_tree, trees in self.reference_regions.chrom2itree.items():
+    def get_reference_interval(self, roi, reference_regions, hap_id):
+        # Get the reference interval overlapping a ROI if any.
+        for chrom_tree, trees in reference_regions.chrom2itree.items():
             if chrom_tree == roi.chrom:
                 # Padding to ensure that intervals reduced to a point are still processed correctly.
-                overlap_interval = list(trees[hap_id].overlap(roi.start-0.1, roi.end+0.1))
+                overlap_interval = list(trees[hap_id].overlap(roi.start - 0.2, roi.end + 0.2))
+                # For determinism as the overlap function output is a set
+                overlap_interval.sort(key=lambda x: (x.begin, x.end))
+                # To prevent biases by always selecting the first interval.
+                random.shuffle(overlap_interval)
                 return overlap_interval
 
     # From input roi and ref_roi, places the anchor in roi such that the overlap constraints are fulfilled  and
@@ -567,7 +627,7 @@ class SVSimulator:
             return anchor_region, ref_roi
 
         if overlap_mode == OverlapMode.PARTIAL:
-            #Looking for the possible positions for the start of the anchor
+            # Looking for the possible positions for the start of the anchor
             possible_starts = []
             # Overlap on the left side
             # The minimum requested overlap has to be satisfied if provided.
@@ -580,7 +640,7 @@ class SVSimulator:
 
             # Overlap on the right side.
             left_overlap = max(roi.end - if_not_none(region_length_range[1], anchor_length) + 1,
-                                     roi.start + 1)
+                               roi.start + 1)
             right_overlap = min(ref_roi.end - anchor_length, roi.end - if_not_none(region_length_range[0], 1))
             if (roi.end == roi.orig_end) and (right_overlap >= left_overlap):
                 possible_starts += list(range(left_overlap, right_overlap + 1))
@@ -612,7 +672,8 @@ class SVSimulator:
 
         if overlap_mode == OverlapMode.CONTAINING:
             left_bound = max(ref_roi.start, roi.end + 1 - anchor_length)
-            right_bound = roi.start - 1
+            right_bound = min(roi.start - 1, ref_roi.end - anchor_length)
+
             if left_bound > right_bound: return None, None
 
             invalid = True
@@ -622,6 +683,8 @@ class SVSimulator:
             while invalid and num_iteration < max_random_tries:
                 start_breakend = random.randint(left_bound, right_bound)
                 end_breakend = start_breakend + anchor_length
+
+                if end_breakend > ref_roi.end: return None, None
 
                 anchor_region = roi.replace(start=start_breakend, end=end_breakend)
 
@@ -647,66 +710,69 @@ class SVSimulator:
     # the traversal can be in forward or backward order.
     def propagate_placement(self, placement_dict, roi, ref_roi, breakends, lengths, min_dist, blacklist_regions,
                             interchromosomal, dispersions, backward, hap_id, anchor_breakends=None):
-            shift = 1 if not backward else -1
-            # In case of exact overlap with several symbols in the anchor
-            anchor_roi = roi
-            for pos, breakend in enumerate(breakends):
-                if breakend+shift in placement_dict:
-                    # If we have an anchor so we do not move its breakend.
-                    locus = placement_dict[breakend+shift]
-                    roi = Region(chrom=locus.chrom, start=locus.pos, end=locus.pos)
-                    continue
-                distance = lengths[pos]
-                if distance is None:
-                    # If we have an interchromosomal dispersion we want to change chromosome otherwise keep the same one.
-                    avoid_chrom = roi.chrom
-                    containing_region = None
-                    in_anchor = (anchor_breakends is not None and
-                                 anchor_breakends.start_breakend <= breakend < anchor_breakends.end_breakend)
-                    contiguous_length = self.sum_lengths(lengths[pos:], breakends[breakend:], dispersions[breakend:])
-                    # If interchromosomal the length is the contiguous length
-                    total_length = contiguous_length
-                    if not interchromosomal or in_anchor:
-                        total_length = sum([length for length in lengths[pos:] if length is not None])
-                        avoid_chrom = None
-                        bound = if_not_none(min_dist[pos], 0)
-                        if in_anchor:
-                            # we add a breakend position between the last breakend placed from th same SV, and the end of the anchor roi
-                            # +1 to ensure the previous symbol in the anchor doesn't have a length of 0
-                            left_bound = roi.start +1
-                            # -1 to ensure the current symbol doesn't have a length of 0
-                            right_bound = anchor_roi.end - 1
-                        else:
-                            left_bound = 0 if backward else (roi.end + bound)
-                            right_bound = (roi.start - bound) if backward else self.chrom_lengths[roi.chrom]
-                        if left_bound > right_bound: return None
-                        containing_region = Region(chrom=roi.chrom, start=left_bound, end=right_bound)
-                    roi, ref_roi = self.get_breakend(avoid_chrom=avoid_chrom,
-                                                            blacklist_regions=blacklist_regions,
-                                                            containing_region=containing_region,
-                                                            roi_length=contiguous_length,
-                                                            total_length=total_length,
-                                                            hap_id=hap_id)
-                    if roi is None: return None
-                    position = roi.start
-                else:
-                    position = roi.start - distance if backward else roi.start + distance
-                    if (blacklist_regions is not None) and (roi.chrom in blacklist_regions.chrom2itree):
-                        # blacklist regions are the same on both haplotypes
-                        if blacklist_regions.strictly_contains_point(position, roi.chrom):
-                            return None
-                    if breakend in dispersions:
-                        # The placement has to be valid on the haplotypes corresponding to the SV's genotype
-                        overlap = self.reference_regions.chrom2itree[roi.chrom][hap_id].overlap(Interval(begin=position - 0.1, end=position + 0.1))
-                        valid = len(overlap) > 0
-                        if valid:
-                            ref_roi = overlap.pop().data
+        shift = 1 if not backward else -1
+        # In case of exact overlap with several symbols in the anchor
+        anchor_roi = roi
+        for pos, breakend in enumerate(breakends):
+            if breakend + shift in placement_dict:
+                # If we have an anchor so we do not move its breakend.
+                locus = placement_dict[breakend + shift]
+                roi = Region(chrom=locus.chrom, start=locus.pos, end=locus.pos, kind=roi.kind, motif=roi.motif)
+                continue
+            distance = lengths[pos]
+            if distance is None:
+                # If we have an interchromosomal dispersion we want to change chromosome otherwise keep the same one.
+                avoid_chrom = roi.chrom
+                containing_region = None
+                in_anchor = (anchor_breakends is not None and
+                             anchor_breakends.start_breakend <= breakend < anchor_breakends.end_breakend)
+                contiguous_length = self.sum_lengths(lengths[pos:], breakends[breakend:], dispersions[breakend:])
+                # If interchromosomal the length is the contiguous length
+                total_length = contiguous_length
+                if not interchromosomal or in_anchor:
+                    total_length = sum([length for length in lengths[pos:] if length is not None])
+                    avoid_chrom = None
+                    bound = if_not_none(min_dist[pos], 0)
+                    if in_anchor:
+                        # we add a breakend position between the last breakend placed from th same SV, and the end of the anchor roi
+                        # +1 to ensure the previous symbol in the anchor doesn't have a length of 0
+                        left_bound = roi.start + 1
+                        # -1 to ensure the current symbol doesn't have a length of 0
+                        right_bound = anchor_roi.end - 1
                     else:
-                        valid = ref_roi.start <= position <= ref_roi.end
-                    if not valid: return None
-                    roi = Region(start=position, end=position, chrom=roi.chrom)
-                placement_dict[breakend + shift] = Locus(chrom=roi.chrom, pos=position)
-            return placement_dict
+                        left_bound = 0 if backward else (roi.end + bound)
+                        right_bound = (roi.start - bound) if backward else self.chrom_lengths[roi.chrom]
+                    if left_bound > right_bound: return None
+                    containing_region = Region(chrom=roi.chrom, start=left_bound, end=right_bound, kind=roi.kind,
+                                               motif=roi.motif)
+                roi, ref_roi = self.get_breakend(reference_regions=self.reference_regions,
+                                                 avoid_chrom=avoid_chrom,
+                                                 blacklist_regions=blacklist_regions,
+                                                 containing_region=containing_region,
+                                                 roi_length=contiguous_length,
+                                                 total_length=total_length,
+                                                 hap_id=hap_id)
+                if roi is None: return None
+                position = roi.start
+            else:
+                position = roi.start - distance if backward else roi.start + distance
+                if (blacklist_regions is not None) and (roi.chrom in blacklist_regions.chrom2itree):
+                    # blacklist regions are the same on both haplotypes
+                    if blacklist_regions.strictly_contains_point(position, roi.chrom):
+                        return None
+                if breakend in dispersions:
+                    # The placement has to be valid on the haplotypes corresponding to the SV's genotype
+                    overlap = self.reference_regions.chrom2itree[roi.chrom][hap_id].overlap(
+                        Interval(begin=position - 0.2, end=position + 0.2))
+                    valid = len(overlap) > 0
+                    if valid:
+                        ref_roi = overlap.pop().data
+                else:
+                    valid = ref_roi.start <= position <= ref_roi.end
+                if not valid: return None
+                roi = Region(start=position, end=position, chrom=roi.chrom)
+            placement_dict[breakend + shift] = Locus(chrom=roi.chrom, pos=position)
+        return placement_dict
 
     def get_arm_region(self, sv):
         # If self.chrom_copies[chrom] > 0, the chromosome has been copied by an aneuploid DUP, it can only be used for aneuploid DUP
@@ -718,14 +784,21 @@ class SVSimulator:
             if not available_chrom:
                 available_chrom = list(self.chrom_lengths.keys())
             available_chrom = [chrom for chrom in available_chrom if chrom not in self.used_aneuploid_chrom]
-            available_regions = [Region(chrom=chrom, start=0, end=self.chrom_lengths[chrom]) for chrom in available_chrom]
+            available_regions = [Region(chrom=chrom, start=0, end=self.chrom_lengths[chrom]) for chrom in
+                                 available_chrom]
         return random.choice(available_regions)
 
     def place_sv(self, sv, roi_index):
         assert not sv.is_placed()
+        reference_regions = self.reference_regions
+        if sv.allow_sv_overlap:
+            reference_regions = self.reference_sv_overlap_regions
+
         if sv.fixed_placement:
             chk(self.is_placement_valid(sv, sv.fixed_placement),
-                f'cannot place imported SV')
+                f'cannot place imported SV {sv}, please check your SVs '
+                f'are non overlapping and try lowering the min_intersv_dist or'
+                f' increasing th_proportion_N.')
             sv.set_placement(placement=sv.fixed_placement, roi=None)
             return
         elif sv.arm_gain_loss or sv.aneuploidy:
@@ -733,7 +806,7 @@ class SVSimulator:
 
             # Only affect the requested arm_percent portion of the arm
             portion_length = floor(region.length() * sv.arm_percent / 100)
-            start = 0  if region.start == 0 else region.end - portion_length
+            start = 0 if region.start == 0 else region.end - portion_length
             end = region.start + portion_length if region.start == 0 else region.end
             region = Region(chrom=region.chrom, start=start, end=end)
 
@@ -747,7 +820,7 @@ class SVSimulator:
         blacklist_regions = self.get_relevant_blacklist_regions(sv.blacklist_filter)
         sv_set = sv.info['VSET']
         hap_id = 0
-        if self.enable_hap_overlap:
+        if self.allow_hap_overlap:
             hap_id = 2 if sv.genotype[0] and sv.genotype[1] else sv.genotype[1]
         init_roi = 0
         if sv.overlap_mode in [OverlapMode.CONTAINED, OverlapMode.PARTIAL]:
@@ -762,14 +835,16 @@ class SVSimulator:
             if sv.anchor is not None:
                 roi, ref_roi, roi_index = self.get_overlap_region(sv_category=sv_set,
                                                                   anchor_length=sv.get_anchor_length(),
+                                                                  reference_regions=reference_regions,
                                                                   overlap_mode=sv.overlap_mode,
                                                                   roi_filter=sv.roi_filter,
                                                                   hap_id=hap_id,
                                                                   roi_index=roi_index,
                                                                   init_roi=init_roi)
+
                 if roi is None or ref_roi is None:
                     chk(False, f'No available ROI satisfying the constraints for {sv}' +
-                        f'of anchor length {sv.get_anchor_length()}'*(sv.get_anchor_length() is not None))
+                        f' of anchor length {sv.get_anchor_length()}' * (sv.get_anchor_length() is not None))
                 anchor_start = sv.anchor.start_breakend
                 anchor_end = sv.anchor.end_breakend
                 roi, ref_roi = (
@@ -780,17 +855,19 @@ class SVSimulator:
                         overlap_mode=sv.overlap_mode,
                         region_length_range=sv.roi_filter.region_length_range,
                         blacklist_regions=blacklist_regions))
+
                 if (roi is None) or (ref_roi is None):
-                    if n_placement_attempts > len(self.rois_overlap[sv_set]): break
                     continue
             else:
                 # Compute the length needed in the ROI to fit the breakends not seperated by dispersions
-                total_length = contiguous_length = self.sum_lengths(breakend_interval_lengths, range(len(breakend_interval_lengths)),
-                                                     sv.dispersions)
+                total_length = contiguous_length = self.sum_lengths(breakend_interval_lengths,
+                                                                    range(len(breakend_interval_lengths)),
+                                                                    sv.dispersions)
                 if not sv.is_interchromosomal:
                     total_length = sum([length for length in breakend_interval_lengths if length is not None])
-                roi, ref_roi = self.get_breakend(hap_id=hap_id, blacklist_regions=blacklist_regions,
-                                                        roi_length=contiguous_length, total_length=total_length)
+                roi, ref_roi = self.get_breakend(reference_regions=reference_regions, hap_id=hap_id,
+                                                 blacklist_regions=blacklist_regions,
+                                                 roi_length=contiguous_length, total_length=total_length)
                 if roi is None or ref_roi is None: break
             placement_dict[anchor_start] = Locus(chrom=roi.chrom, pos=roi.start)
             placement_dict[anchor_end] = Locus(chrom=roi.chrom, pos=roi.end)
@@ -801,8 +878,10 @@ class SVSimulator:
                                                           roi=roi,
                                                           ref_roi=ref_roi,
                                                           breakends=[i for i in range(anchor_start, 0, -1)],
-                                                          lengths=[breakend_interval_lengths[i] for i in range(anchor_start-1, -1, -1)],
-                                                          min_dist=[min_distances[i] for i in range(anchor_start-1, -1, -1)],
+                                                          lengths=[breakend_interval_lengths[i] for i in
+                                                                   range(anchor_start - 1, -1, -1)],
+                                                          min_dist=[min_distances[i] for i in
+                                                                    range(anchor_start - 1, -1, -1)],
                                                           blacklist_regions=blacklist_regions,
                                                           interchromosomal=sv.is_interchromosomal,
                                                           dispersions=sv.dispersions,
@@ -812,11 +891,12 @@ class SVSimulator:
                                                       placement_dict=placement_dict,
                                                       roi=roi,
                                                       ref_roi=ref_roi,
-                                                      breakends=[i for i in range(anchor_start, len(breakend_interval_lengths))],
-                                                      lengths = breakend_interval_lengths[anchor_start:],
-                                                      min_dist = min_distances[anchor_start:],
-                                                      blacklist_regions = blacklist_regions,
-                                                      interchromosomal = sv.is_interchromosomal,
+                                                      breakends=[i for i in
+                                                                 range(anchor_start, len(breakend_interval_lengths))],
+                                                      lengths=breakend_interval_lengths[anchor_start:],
+                                                      min_dist=min_distances[anchor_start:],
+                                                      blacklist_regions=blacklist_regions,
+                                                      interchromosomal=sv.is_interchromosomal,
                                                       dispersions=sv.dispersions,
                                                       backward=False,
                                                       anchor_breakends=sv.anchor)
@@ -836,8 +916,8 @@ class SVSimulator:
 
     def output_results(self) -> None:
         logger.info('Writing outputs')
-        output_writer = OutputWriter(self.svs, self.reference, self.chrom_lengths,
-                                     self.output_path, self.config)
+        output_writer = OutputWriter(self.svs, self.overlap_sv_regions, self.reference, self.chrom_lengths,
+                                     self.output_path, self.allow_hap_overlap, self.config)
         logger.info('Writing new haplotypes')
         output_writer.output_haps()
         logger.info('Writing VCF file')
@@ -862,13 +942,14 @@ class SVSimulator:
         shutil.copyfile(os.path.join(self.output_path, 'sim.hapB.fa'), fasta2_out)
         shutil.copyfile(os.path.join(self.output_path, 'sim.novel_insertions.fa'), ins_fasta)
 
+
 # end: class SVSimulator
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-c', '--config', required=True, help='YAML config file')
-    
+
     return parser.parse_args()
 
 
@@ -878,7 +959,8 @@ def run_simulator():
     args = parse_args()
     simulator = SVSimulator(config_path=args.config)
     simulator.run()
-    logger.info(f'insilicoSV finished in {time.time()-start_time:.1f}s')
+    logger.info(f'insilicoSV finished in {time.time() - start_time:.1f}s')
+
 
 if __name__ == '__main__':
     run_simulator()

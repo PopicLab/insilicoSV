@@ -47,7 +47,9 @@ variant_sets:
   - type: "SNP" 
     number: 10
 ```
-INDELs are not given a unique type label but can be simulated by setting a sufficiently small min and max size for an SV of type DEL or INS.
+An `INDEL` can be defined using the pre-defined INDEL type, or by specifying DEL or INS types with a length range below 50.
+If you choose the pre-defined `INDEL` type, each variant within the set will be randomly assigned as either a DEL or an INS. 
+You can also omit the `length_ranges` parameter for the INDEL type, in which case it will automatically default to a range of `[[1, 50]]`.
 
 ### Example 1c - Unbounded dispersions
 When specifying length ranges for dispersion intervals, `null` can be provided as an upper bound and this will result in
@@ -295,8 +297,31 @@ Key Considerations for Interchromosomal Dispersions
   
   Because all dispersions are interchromosomal, the last copy of A cannot be placed back on chr3. 
   However, it could be placed in a different region of chr1.
-- 
-### Example 7 - Chromosome Gain/Loss
+
+### Example 7 - SNP and INDEL placement within SVs
+SNPs and INDELs can be allowed to overlap SVs as follows:
+
+```yaml
+reference: "{path}/{to}/ref.fa"
+variant_sets:
+    - type: "DUP"  
+      number: 5
+      length_ranges:
+        - [1000, 100000]
+    - type: "INDEL"
+      number: 10
+      length_ranges:
+         - [30, 50]
+      allow_sv_overlap: True
+    - type: "SNP"
+      number: 20
+      allow_sv_overlap: True
+```
+Here the INDEL and SNP definitions have the `allow_sv_overlap` parameter set to `True`, which allows them to be randomly placed within the DUP intervals.
+Note: SNPs and INDELs that are allowed to overlap SVs are always considered as occurring first in the simulation process. 
+As such, they might be modified or even deleted by SVs that are placed later. Regardless of whether they are ultimately observable in the final genome, all simulated variants are included in the final VCF output.
+
+### Example 8 - Chromosome Gain/Loss
 This section details parameters for simulating chromosome arm gain/loss or whole chromosome aneuploidy.
 
 #### Arm Gain/Loss (`arm_gain_loss: True`)
