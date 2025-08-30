@@ -1,12 +1,9 @@
 # Input Description
-insilicoSV takes in a yaml configuration file as input, which specifies the path to the input reference genome and information regarding the SVs that will be simulated. 
-Following the simulation, it outputs two haplotype files, and a VCF file describing the placement of the simulated SVs, a stats file, and a .fasta file containing any novel insertion sequences that were included in the simulation. 
+```insilicoSV``` takes in a YAML configuration file as input, which specifies the path to the input reference genome and information regarding what SVs to simulate. 
 
 ### Parameter File
-The configuration yaml file specifies simulation-wide settings (such as the reference genome) and a list of
-variant sets to simulate.  For each variant set, it specifies the variant type, the range of sizes for each variant part,
-and the number of variants to simulate. All configurations for variant sets should be put under the top-level "variant_sets" key. 
-For example, the following configuration file defines three variant sets:
+The configuration YAML file specifies global parameters (e.g., the reference genome) and the definition of one or multiple variant categories to simulate. The definition of each variant category/set includes the variant type, a list of breakend distance ranges (specifying the minimum and maximum distance allowed between SV breakends), variant placement contraints,
+and the number of such variants to simulate. All variant definitions should be specified under the top-level "variant_sets" parameter. Variant set definitions can specify both randomly simulated variants or variants imported from a VCF. For example, the following configuration file defines three variant categories:
 
 ```yaml
 # YAML config file
@@ -23,22 +20,19 @@ variant_sets:
     - import: {path}/{to}/variants.vcf 
 ```
 
-Variant sets can specify randomly simulated variants, or variants imported from a vcf.
-
-The following parameters can be given for each randomly simulated variant set.  Each parameter is required unless otherwise specified.
+The following parameters can be specified for each randomly-simulated variant set.  Each parameter is required unless otherwise specified.
 1. *type*: str - the variant type or its corresponding grammar.  insilicoSV supports a predefined list of SV types and allows users to enter a custom transformation. Either a [valid grammar](sv_grammar.md) or one of the 26 predefined variant types named in [this figure](sv_grammar.md) should be entered.
 2. *number*: int - describes how many of the specified variant type to simulate for this variant set.
 
-For variants other than those related to tandem repeats (`trEXP` and `trCON`), the following
-parameters must be given:
-3. *length_ranges*: list of breakend distance ranges  - provides the minimum and maximum length for each variant part.  
-SNPs, indels and simple SVs have a single part, while complex SVs
-may have multiple parts; e.g. INVdel variants have two.  The order of part lengths in the list must correspond to the order of appearance
-of part names used when defining the variant type; see [Example 2](use_cases.md#example-2---custom-svs) for an illustration. 
-The values used for the ranges can be integers indicating a length in number of base pairs, or an expression relative to 
-other parts of the SV (e.g., for an `rTRA`, `A_B -> B_A`, we can have `[[500, 1000], [0.5*A, 1.5*A]]` to indicate that interval 
+For variants other than tandem repeats (`trEXP` and `trCON`), the following parameters must be given:
+3. *length_ranges*: list of breakend distance ranges  - provides the minimum and maximum reference interval length allowed between breakends.  
+SNPs, INDELs and simple SVs consist of a single reference interval, while complex SVs may involve multiple intervals; e.g. INVdel variants have two.  
+The order of the interval lengths in the list must correspond to the order of appearance of their corresponding
+letter in the variant type definition; see [Example 2](use_cases.md#example-2---custom-svs) for an illustration. 
+The values used to define the range can be integers indicating the number of base pairs, or an expression relative to 
+other SV intervals (e.g., for an `rTRA`, `A_B -> B_A`, we can have `[[500, 1000], [0.5*A, 1.5*A]]` to indicate that interval 
 B must be of length comprised between half and 1.5 times the length of A).
-For predefined types with a dispersion, the length range of the dispersion will be in last position.
+For predefined types with a dispersion, the length range of the dispersion will be in the last position.
 For Custom types, the length ranges are in order of appearance of the letters and the dispersions.
 4. *overlap_mode [optional]*: str - enforce the SV to overlap a region defined in the files provided in `overlap_regions`. Must be `partial`, `contained`, `containing` or `exact` (see [example config](use_cases.md#example-5---placing-svs-into-specific-regions-of-interest-rois)).
 5. *overlap_region_type [optional]*: list of str - only if an overlap mode is specified. Characterizes the regions to overlap, the name of the region has to contain one of the strings of the list. 
