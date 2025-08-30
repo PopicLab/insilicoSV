@@ -15,6 +15,7 @@ from insilicosv.variant_set import get_vcf_header_infos
 
 logger = logging.getLogger(__name__)
 
+
 class StatsCollector:
 
     def __init__(self, chroms, chrom_lengths):
@@ -34,7 +35,7 @@ class StatsCollector:
         collects all information for stats file after all edits are completed
         """
         self.total_svs = len(svs)
-        
+
         self.min_region_len = None
         self.max_region_len = None
 
@@ -50,7 +51,7 @@ class StatsCollector:
             if (sv.roi is not None) and (sv.roi.kind != '_reference_'):
                 self.region_types[sv.roi.kind] += 1
             assert sv.genotype is not None
-            zygosity = sv.genotype[0] and sv.genotype[1] and (True if sv_type not in [VariantType.SNP] else (
+            zygosity = sv.genotype[0] and sv.genotype[1] and ((sv_type not in [VariantType.SNP]) or (
                     sv.replacement_seq[0] == sv.replacement_seq[1]))
             if zygosity:
                 self.num_homozygous += 1
@@ -75,6 +76,7 @@ class StatsCollector:
         Exports all collected data to entered file
         fileout: Location to export stats file
         """
+
         def write_item(fout, name, item, prefix=""):
             fout.write("{}{}: {}\n".format(prefix, str(name), str(item)))
 
@@ -96,6 +98,8 @@ class StatsCollector:
                 write_item(fout, "Length of sequence", chrom_length)
                 write_item(fout, "Total impacted length of reference chromosome",
                            self.len_frags_chr[chrom])
+
+
 # end: class StatsCollector
 
 PafRecord = namedtuple('PafRecord', [
@@ -114,9 +118,10 @@ PafRecord = namedtuple('PafRecord', [
     "tags",
 ])
 
+
 class OutputWriter:
 
-    def __init__(self, svs, overlap_sv_regions, reference, chrom_lengths, output_path, enable_hap_overlap, config):
+    def __init__(self, svs, overlap_sv_regions, reference, chrom_lengths, output_path, allow_hap_overlap, config):
         self.svs = svs
         self.reference = reference
         self.chrom_lengths = chrom_lengths
@@ -125,7 +130,7 @@ class OutputWriter:
         self.config = config
         self.overlap_sv_regions = overlap_sv_regions
         self.homozygous_only = config.get('homozygous_only', False)
-        self.enable_hap_overlap = enable_hap_overlap
+        self.allow_hap_overlap = allow_hap_overlap
 
     def output_haps(self):
         if self.config.get('output_no_haps', False):
@@ -161,9 +166,9 @@ class OutputWriter:
                         sv_region = overlapping_operations[-1].source_region
 
                     seq = self.reference.fetch(
-                                            reference=sv_region.chrom,
-                                            start=sv_region.start,
-                                            end=sv_region.end)
+                        reference=sv_region.chrom,
+                        start=sv_region.start,
+                        end=sv_region.end)
                     position_shifts = []
                     length_shift = 0
                     # To change the position referential and find the start index of the operation in seq
@@ -186,7 +191,7 @@ class OutputWriter:
                             operation_length += length_shift
 
                         total_shift = 0
-                        position_idx= 0
+                        position_idx = 0
                         # Get the current position of the SV adapted after INS and DEL
                         for idx, (shift_type, shift_start, shift_length) in enumerate(position_shifts):
                             if shift_start < operation_start:
@@ -282,8 +287,7 @@ class OutputWriter:
 
                             if operation.transform.divergence_prob > 0 or operation.transform.replacement_seq:
                                 # There is a divergence
-                                if operation.transform.replacement_seq is None or operation.transform.replacement_seq[
-                                    hap_index] is None:
+                                if operation.transform.replacement_seq is None or operation.transform.replacement_seq[hap_index] is None:
                                     # Insure the haplotypes respect the genotype specified and store it for writing in the VCF
                                     replacement_seq = utils.divergence(modified_seq,
                                                                        operation.transform.divergence_prob)
@@ -297,7 +301,7 @@ class OutputWriter:
                                         haplotypes = [operation.transform.replacement_seq[0],
                                                       operation.transform.replacement_seq[0]]
 
-                                     # Retain the replacement_seq and orig_seq for applying to other copies and to write in the VCF output
+                                    # Retain the replacement_seq and orig_seq for applying to other copies and to write in the VCF output
                                     operation.transform = operation.transform.replace(replacement_seq=haplotypes,
                                                                                       orig_seq=modified_seq)
 
@@ -327,7 +331,7 @@ class OutputWriter:
             new_paf_records = []
             for paf_rec_num, paf_rec in enumerate(paf_records):
                 if (paf_rec.target_start == paf_rec.target_end and
-                    paf_rec.query_start == paf_rec.query_end):
+                        paf_rec.query_start == paf_rec.query_end):
                     continue
                 new_paf_records.append(paf_rec)
 
@@ -349,9 +353,9 @@ class OutputWriter:
             lhs, rhs = sv.info['GRAMMAR'].split('->')
             # Add symbols to represent the bases before and after the SV.
             lhs = ['PR'] + [symbol for symbol in lhs.strip() if
-                              symbol not in [Syntax.ANCHOR_START, Syntax.ANCHOR_END, Syntax.DIVERGENCE]] + ['SU']
+                            symbol not in [Syntax.ANCHOR_START, Syntax.ANCHOR_END, Syntax.DIVERGENCE]] + ['SU']
             rhs = ['PR'] + [symbol for symbol in rhs.strip() if
-                              symbol not in [Syntax.ANCHOR_START, Syntax.ANCHOR_END, Syntax.DIVERGENCE]] + ['SU']
+                            symbol not in [Syntax.ANCHOR_START, Syntax.ANCHOR_END, Syntax.DIVERGENCE]] + ['SU']
 
             # Get the original adjacencies and symbols
             breakends = {'PR': ['NA', sv.placement[0]], 'SU': [sv.placement[-1], 'NA']}
@@ -428,7 +432,7 @@ class OutputWriter:
                 # Novel insertions are disregarded as they are not in the reference.
                 if left_locus == 'INS' or right_locus == 'INS': continue
                 record = [chrom_start, pos_start, pos_next_start, chrom_end, pos_end, pos_next_end,
-                             '/'.join(grammar), sv_grammar, genotype, sv_id]
+                          '/'.join(grammar), sv_grammar, genotype, sv_id]
                 adjacency_file.write('\t'.join(map(str, record)) + '\n')
 
     def group_overlap_operations(self, overlap_sv, is_placed, region_to_overlap_start,
@@ -454,18 +458,20 @@ class OutputWriter:
                         left_sv = copy.deepcopy(sv)
                         placement = {
                             Breakend(0): Locus(pos=overlap.data.start, chrom=overlapping_operation.target_region.chrom),
-                            Breakend(1): Locus(pos=region_to_overlap_start, chrom=overlapping_operation.target_region.chrom)}
+                            Breakend(1): Locus(pos=region_to_overlap_start,
+                                               chrom=overlapping_operation.target_region.chrom)}
 
                         left_sv.operations[0].update_placement(placement)
                         self.overlap_sv_regions.add_region(Region(chrom=overlapping_operation.target_region.chrom,
                                                                   start=overlap.data.start,
                                                                   end=region_to_overlap_start),
-                                                                  sv=left_sv)
+                                                           sv=left_sv)
 
                     if overlapping_end < overlap.data.end:
                         right_sv = copy.deepcopy(sv)
                         placement = {
-                            Breakend(0): Locus(pos=region_to_overlap_end, chrom=overlapping_operation.target_region.chrom),
+                            Breakend(0): Locus(pos=region_to_overlap_end,
+                                               chrom=overlapping_operation.target_region.chrom),
                             Breakend(1): Locus(pos=overlap.data.end, chrom=overlapping_operation.target_region.chrom)}
 
                         right_sv.operations[0].update_placement(placement)
@@ -496,14 +502,14 @@ class OutputWriter:
         chrom2operations = defaultdict(list)
         target_region2transform = {}
         placed_overlap_sv = []
-        # If not self.enable_hap_overlap, there is only one tree per chrom for the sv overlap else three
+        # If not self.allow_hap_overlap, there is only one tree per chrom for the sv overlap else three
         hap_id_overlap = 0
-        if self.enable_hap_overlap:
+        if self.allow_hap_overlap:
             hap_id_overlap = hap_index
 
         for sv in self.svs:
             # If the SV is on the other haplotype or overlapping it will be treated later
-            if not sv.genotype[hap_index] or sv.enable_overlap_sv: continue
+            if not sv.genotype[hap_index] or sv.allow_sv_overlap: continue
 
             for operation in sv.operations:
                 assert operation.target_region is not None
@@ -520,27 +526,31 @@ class OutputWriter:
                 if operation.transform.divergence_prob > 0:
                     operation.genotype = sv.genotype
 
-                overlap_sv = self.overlap_sv_regions.chrom2itree[operation.target_region.chrom][hap_id_overlap].overlap(operation.target_region.start-0.1,
-                                                                                            operation.target_region.end+0.1)
+                overlap_sv = self.overlap_sv_regions.chrom2itree[operation.target_region.chrom][hap_id_overlap].overlap(
+                    operation.target_region.start - 0.1,
+                    operation.target_region.end + 0.1)
                 region_to_overlap_start = operation.target_region.start
                 region_to_overlap_end = operation.target_region.end
                 is_placed = True
                 overlapping_region, placed_overlap_sv_cpt = self.group_overlap_operations(overlap_sv, is_placed,
-                                                                                      region_to_overlap_start,
-                                                                                      region_to_overlap_end, hap_index)
+                                                                                          region_to_overlap_start,
+                                                                                          region_to_overlap_end,
+                                                                                          hap_index)
                 placed_overlap_sv += placed_overlap_sv_cpt
 
                 if operation.source_region and operation.source_region != operation.target_region:
                     # In the case of a duplication, a change in the source has to be reflected on the target
-                    overlap_sv = self.overlap_sv_regions.chrom2itree[operation.target_region.chrom][hap_id_overlap].overlap(operation.source_region.start,
-                                                                                                            operation.source_region.end)
+                    overlap_sv = self.overlap_sv_regions.chrom2itree[operation.target_region.chrom][
+                        hap_id_overlap].overlap(operation.source_region.start,
+                                                operation.source_region.end)
                     region_to_overlap_start = operation.source_region.start
                     region_to_overlap_end = operation.source_region.end
                     # The overlapping SV still has to be placed on the source region
                     is_placed = False
                     overlapping_region_cpt, placed_overlap_sv_cpt = self.group_overlap_operations(overlap_sv, is_placed,
-                                                                                          region_to_overlap_start,
-                                                                                          region_to_overlap_end, hap_index)
+                                                                                                  region_to_overlap_start,
+                                                                                                  region_to_overlap_end,
+                                                                                                  hap_index)
                     placed_overlap_sv += placed_overlap_sv_cpt
                     overlapping_region += overlapping_region_cpt
 
@@ -570,7 +580,7 @@ class OutputWriter:
                            Breakend(1): Locus(chrom, target_region2.start)})]
                 for idx_id, (target_region1, target_region2) in enumerate(utils.pairwise(target_regions))
                 if target_region2.start > target_region1.end]
-            
+
             chrom2operations[chrom].extend(intersv_ops)
 
             def compare_operations(operations1, operations2):
@@ -586,7 +596,6 @@ class OutputWriter:
                 if operation1.target_region.end != operation2.target_region.end:
                     return operation1.target_region.end - operation2.target_region.end
 
-
                 # Tertiary sort: the operation comes from the same SV, the insertion order if provided has to be used
                 if (operation1.target_insertion_order and operation2.target_insertion_order and
                         operation1.target_insertion_order[0] == operation2.target_insertion_order[0]):
@@ -594,7 +603,7 @@ class OutputWriter:
 
                 # Quaternary case, different SVs, the insertion targets are inserted by proximity to the source if any (so DUPs are not separated from their copies)
                 if operation1.source_region:
-                   # Targets belong to the same chrom by design not source regions
+                    # Targets belong to the same chrom by design not source regions
                     if (operation1.source_region.chrom == operation1.target_region.chrom and
                             operation1.source_region.end == operation1.target_region.start):
                         # operation1 is inserted right next to its source, on the right, it has to be first
@@ -615,6 +624,7 @@ class OutputWriter:
                         return -1
                 # None of the operations are inserted at a position adjacent to the source, the order is arbitrary, we choose the svid
                 return 1 if operation1.op_info['SVID'] > operation2.op_info['SVID'] else -1
+
             chrom2operations[chrom].sort(key=cmp_to_key(compare_operations))
         return chrom2operations
 
@@ -663,6 +673,7 @@ class OutputWriter:
                     vcf_out_file.write(vcf_record)
             # end: with closing(VariantFile(vcf_path, 'w', header=vcf_file.header)) as vcf_out_file
         # end: with closing(VariantFile(vcf_path)) as vcf_file
+
     # end: def output_vcf(self)
 
     def check_vcf_record(self, vcf_rec):
@@ -691,12 +702,12 @@ class OutputWriter:
                                             [operation.target_region.chrom,
                                              operation.target_region.start,
                                              max(operation.target_region.end,
-                                                 operation.target_region.start+1),
+                                                 operation.target_region.start + 1),
                                              op_str]))
                               + '\n')
 
                     if (operation.source_region is not None and
-                        operation.source_region != operation.target_region):
+                            operation.source_region != operation.target_region):
                         out.write('\t'.join(map(str,
                                                 [operation.source_region.chrom,
                                                  operation.source_region.start,

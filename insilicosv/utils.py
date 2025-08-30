@@ -15,8 +15,10 @@ from copy import deepcopy
 
 logger = logging.getLogger(__name__)
 
+
 def if_not_none(a, b):
     return a if a is not None else b
+
 
 def chk(cond, msg="Error", error_type='runtime'):
     errors = {'runtime': RuntimeError, 'value': ValueError, 'type': TypeError,
@@ -24,9 +26,11 @@ def chk(cond, msg="Error", error_type='runtime'):
     if not cond:
         raise errors[error_type](f"insilicoSV error: {msg}")
 
+
 def generate_seq(length):
     base_map = {1: "A", 2: "T", 3: "G", 4: "C"}
     return ''.join([base_map[random.randint(1, 4)] for _ in range(length)])
+
 
 def complement(seq):
     output = ""
@@ -39,12 +43,15 @@ def complement(seq):
 
     return output
 
+
 def reverse_complement(seq):
     return complement(seq[::-1])
+
 
 def remove_file(path):
     if os.path.exists(path):
         os.remove(path)
+
 
 def divergence(seq, divergence_prob):
     # apply random base flips to input sequence
@@ -52,11 +59,14 @@ def divergence(seq, divergence_prob):
     assert 0 <= p <= 1
     if p == 0:
         return seq
+
     def mutate_base(b):
         if b not in 'TCGA':
             return b
         return random.choice([allele for allele in 'TCGA' if allele != b])
+
     return ''.join([b if random.random() > p else mutate_base(b) for b in seq.upper()])
+
 
 def is_readable_file(fname):
     try:
@@ -66,21 +76,25 @@ def is_readable_file(fname):
     except:
         return False
 
+
 def as_list(val):
     if isinstance(val, str):
         val = [val]
     return val
 
+
 def is_valid_closed_int_range(val):
     return (
-        isinstance(val, list) and
-        len(val) == 2 and
-        isinstance(val[0], int) and
-        isinstance(val[1], int) and
-        0 <= val[0] <= val[1])
+            isinstance(val, list) and
+            len(val) == 2 and
+            isinstance(val[0], int) and
+            isinstance(val[1], int) and
+            0 <= val[0] <= val[1])
+
 
 def is_list_of(type_, val):
     return isinstance(val, list) and all(isinstance(v, type_) for v in val)
+
 
 @dataclass(order=True, frozen=True)
 class Locus:
@@ -90,10 +104,11 @@ class Locus:
     def shifted(self, delta: int):
         return Locus(chrom=self.chrom, pos=self.pos + delta)
 
+
 @dataclass(order=True, frozen=True)
 class Region:
     """A specific, contiguous genomic region: (chrom, start, end).
-    
+
     The region includes `start` but not `end`.  An empty region with start==end represents
     an insertion point before `start`.  Insertions at the same point are ordered by `order_key`.
     The coordinates `start` and `end` are 0-based.
@@ -141,6 +156,7 @@ class Region:
     def padded(self, padding: int):
         return self.replace(start=self.start - padding, end=self.end + padding)
 
+
 # end: class Region
 
 @dataclass(frozen=True)
@@ -150,12 +166,13 @@ class RegionFilter:
 
     def satisfied_for(self, region) -> bool:
         if (self.region_kinds is not None and
-            (not region.kind or
-             not any((region_kinds.upper() == 'ALL' and region.kind != '_reference_') or
-                     region_kinds in region.kind
-                     for region_kinds in self.region_kinds))):
+                (not region.kind or
+                 not any((region_kinds.upper() == 'ALL' and region.kind != '_reference_') or
+                         region_kinds in region.kind
+                         for region_kinds in self.region_kinds))):
             return False
         return True
+
 
 @dataclass(frozen=True)
 class TandemRepeatRegionFilter(RegionFilter):
@@ -173,13 +190,13 @@ class TandemRepeatRegionFilter(RegionFilter):
 
 
 class OverlapMode(Enum):
-
     """Types of spatial relationship between an anchor (SV sub-region) and an ROI."""
 
-    PARTIAL = "partial"      # exactly one endpoint of anchor in ROI
+    PARTIAL = "partial"  # exactly one endpoint of anchor in ROI
     CONTAINED = "contained"  # both endpoints of anchor in ROI
     EXACT = "exact"  # anchor exactly matches the ROI
-    CONTAINING = "containing" # both endpoints of ROI strictly inside the anchor
+    CONTAINING = "containing"  # both endpoints of ROI strictly inside the anchor
+
 
 class RegionSet:
     """A collection of genomic regions"""
@@ -187,9 +204,9 @@ class RegionSet:
     chrom2itree: dict[str, IntervalTree]
     num_hap_tree: int
 
-    def __init__(self, regions=None, enable_hap_overlap=False):
+    def __init__(self, regions=None, allow_hap_overlap=False):
         regions = regions or []
-        self.num_hap_tree = 3 if enable_hap_overlap else 1
+        self.num_hap_tree = 3 if allow_hap_overlap else 1
         chrom2regions = defaultdict(list)
         for region in regions:
             chrom2regions[region.chrom].append(region)
@@ -230,23 +247,26 @@ class RegionSet:
                     if line.startswith('#') or line.isspace():
                         continue
                     fields = line.strip().split()
-                    chk(len(fields) >= 4,
+                    chk(len(fields) >= 3,
                         f'{loc}: too few fields in line in the BED file {bed_path}', error_type='value')
-                    chrom, start_str, end_str, kind = fields[:4]
-                    chk(all((chrom, start_str, end_str, kind)),
-                        f'{loc}: empty value in first four columns in the BED file {bed_path}', error_type='value')
+                    chrom, start_str, end_str = fields[:3]
+                    kind = fields[4] if len(fields) > 3 else 'NA'
+                    chk(all((chrom, start_str, end_str)),
+                        f'{loc}: empty value in first three columns in the BED file {bed_path}', error_type='value')
                     try:
                         start, end = int(start_str), int(end_str)
                     except ValueError:
-                        chk(False, f'{loc}: invalid start or end of region in the BED file {bed_path}', error_type='value')
-                    chk(start < end, f'{loc}: region start must be less than end in the BED file {bed_path}', error_type='value')
-                    chk(0 <= start, f'{loc}: region start must be non-negative in the BED file {bed_path}', error_type='value')
+                        chk(False, f'{loc}: invalid start or end of region in the BED file {bed_path}',
+                            error_type='value')
+                    chk(start < end, f'{loc}: region start must be less than end in the BED file {bed_path}',
+                        error_type='value')
+                    chk(0 <= start, f'{loc}: region start must be non-negative in the BED file {bed_path}',
+                        error_type='value')
                     motif = fields[4] if len(fields) >= 5 else ''
                     data = len(motif)
                     regions.append(Region(chrom=chrom, start=start,
                                           end=end, kind=kind, data=data,
                                           motif=motif, orig_start=start, orig_end=end))
-
 
         region_set = regions
         if to_region_set:
@@ -275,7 +295,7 @@ class RegionSet:
         return RegionSet(regions)
 
     @staticmethod
-    def from_fasta(fasta_path, filter_small_chr, region_kind, enable_hap_overlap):
+    def from_fasta(fasta_path, filter_small_chr, region_kind, allow_hap_overlap):
         with pysam.FastaFile(fasta_path) as fasta_file:
             regions = []
             for chrom, chrom_length in zip(fasta_file.references, fasta_file.lengths):
@@ -283,7 +303,7 @@ class RegionSet:
                 regions.append(Region(chrom=chrom, start=0, end=chrom_length,
                                       kind=region_kind,
                                       orig_start=0, orig_end=chrom_length))
-            return RegionSet(regions, enable_hap_overlap=enable_hap_overlap)
+            return RegionSet(regions, allow_hap_overlap=allow_hap_overlap)
 
     def get_region_list(self, hap=0):
         return [ival.data for chrom_itree in self.chrom2itree.values() for ival in chrom_itree[hap]]
@@ -304,11 +324,11 @@ class RegionSet:
             for hap, other_chrom_itree in other_chrom_itree_list.items():
                 self.chrom2itree[chrom][hap].update(other_chrom_itree)
 
-    def add_region(self, region, sv=None, enable_hap_overlap=None):
+    def add_region(self, region, sv=None, allow_hap_overlap=None):
         aux_region = deepcopy(region)
         if sv:
             aux_region = aux_region.replace(sv=sv)
-        self.add_region_set(RegionSet([aux_region], enable_hap_overlap=enable_hap_overlap))
+        self.add_region_set(RegionSet([aux_region], allow_hap_overlap=allow_hap_overlap))
 
     def chop(self, sv_region, genotype):
         # Remove the parts of intervals overlapping sv_region.
@@ -328,11 +348,14 @@ class RegionSet:
                 return new_region
 
             # Pad to fully remove insertion target
-            chrom_itree.chop(sv_region.start-0.1, sv_region.end+0.1, datafunc=adjust_region)
+            chrom_itree.chop(sv_region.start - 0.1, sv_region.end + 0.1, datafunc=adjust_region)
+
+
 # end class RegionSet
 
 def percent_N(seq):
     return 0 if len(seq) == 0 else (seq.count('N') + seq.count('n')) / len(seq)
+
 
 def pairwise(iterable):
     # pairwise('ABCD') → [('A', 'B'), ('B', 'C'), ('C', 'D')]
@@ -342,6 +365,7 @@ def pairwise(iterable):
         yield a, b
         a = b
 
+
 def has_duplicates(it):
     items = set()
     for item in it:
@@ -349,6 +373,7 @@ def has_duplicates(it):
             return True
         items.add(item)
     return False
+
 
 @contextmanager
 def error_context(*args):

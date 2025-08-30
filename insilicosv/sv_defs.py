@@ -9,11 +9,12 @@ from typing_extensions import TypeAlias, Optional, Any, cast, override
 from insilicosv.utils import (
     Locus, Region, OverlapMode, RegionFilter, chk, if_not_none)
 
-class TransformType(Enum):
 
+class TransformType(Enum):
     IDENTITY = "IDENTITY"
     INV = "INV"
     DEL = "DEL"
+
 
 @dataclass(frozen=True)
 class Transform:
@@ -28,18 +29,20 @@ class Transform:
     def __post_init__(self):
         assert (self.transform_type != TransformType.DEL or
                 (self.is_in_place and self.divergence_prob == 0 and self.replacement_seq is None))
-        chk(0 <= self.divergence_prob <= 1, f'Invalid divergence probability, please specify a value between 0 and 1 {self.divergence_prob} provided.',
+        chk(0 <= self.divergence_prob <= 1,
+            f'Invalid divergence probability, please specify a value between 0 and 1 {self.divergence_prob} provided.',
             error_type='value')
 
     def replace(self, **kw):
         """Return a copy of self with fields replaced according to `kw`"""
         return dataclasses.replace(self, **kw)
 
+
 Breakend: TypeAlias = int
+
 
 @dataclass(frozen=True)
 class BreakendRegion:
-
     # includes both its ends
 
     start_breakend: Breakend
@@ -47,6 +50,7 @@ class BreakendRegion:
 
     def __post_init__(self) -> None:
         assert 0 <= self.start_breakend <= self.end_breakend
+
 
 @dataclass
 class Operation:
@@ -119,6 +123,7 @@ class Operation:
         if 'source_region' in self.__dict__:
             del self.source_region
 
+
 # end: class Operation
 
 @dataclass
@@ -131,7 +136,7 @@ class SV(ABC):
     # components constrained to exactly coincide with an ROI).
     # the number of breakends of this SV is len(breakend_interval_lengths)+1.
     breakend_interval_lengths: list[Optional[int]]
-    
+
     # minimum breakend interval lengths (for unbounded dispersions with lower length bounds)
     breakend_interval_min_lengths: list[Optional[int]]
 
@@ -185,7 +190,7 @@ class SV(ABC):
     num_valid_placements: int = 0
 
     # If a SNP or INDEL can be overlapped by other SVs
-    enable_overlap_sv: Optional[bool] = False
+    allow_sv_overlap: Optional[bool] = False
 
     # for arm gain or loss
     arm_gain_loss: Optional[bool] = False
@@ -201,15 +206,19 @@ class SV(ABC):
                                                  self.breakend_interval_min_lengths))
 
         if self.overlap_mode == OverlapMode.CONTAINED:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() > self.roi_filter.region_length_range[0]),
+            chk((self.roi_filter.region_length_range[0] is None) or (
+                        self.get_anchor_length() > self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a contained overlap.')
-            chk((self.roi_filter.region_length_range[1] is None) or (self.get_anchor_length() < self.roi_filter.region_length_range[1]),
+            chk((self.roi_filter.region_length_range[1] is None) or (
+                        self.get_anchor_length() < self.roi_filter.region_length_range[1]),
                 f'The anchor length is larger than the maximum overlap for a contained overlap.')
         if self.overlap_mode == OverlapMode.CONTAINING:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() > self.roi_filter.region_length_range[0]),
+            chk((self.roi_filter.region_length_range[0] is None) or (
+                        self.get_anchor_length() > self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a containing overlap.')
         if self.overlap_mode == OverlapMode.PARTIAL:
-            chk((self.roi_filter.region_length_range[0] is None) or (self.get_anchor_length() >= self.roi_filter.region_length_range[0]),
+            chk((self.roi_filter.region_length_range[0] is None) or (
+                        self.get_anchor_length() >= self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a partial overlap.')
 
         # The letters cannot be unbounded unless the overlap is Exact and they are in the anchor.
@@ -230,10 +239,12 @@ class SV(ABC):
         if not self.anchor:
             chk((self.overlap_mode != OverlapMode.EXACT) or
                 all((self.breakend_interval_lengths[breakend] is None and
-                 self.breakend_interval_min_lengths[breakend] is None) for breakend in range(self.anchor.start_breakend, self.anchor.end_breakend)),
-                f'overlap_mode "exact" requires leaving the length of the anchor symbols unspecified: {self}', error_type='syntax')
+                     self.breakend_interval_min_lengths[breakend] is None) for breakend in
+                    range(self.anchor.start_breakend, self.anchor.end_breakend)),
+                f'overlap_mode "exact" requires leaving the length of the anchor symbols unspecified: {self}',
+                error_type='syntax')
             chk((self.overlap_mode != OverlapMode.PARTIAL and self.overlap_mode != OverlapMode.CONTAINING)
-                or self.anchor.end_breakend != self.anchor.start_breakend ,
+                or self.anchor.end_breakend != self.anchor.start_breakend,
                 f'overlap_mode "partial" and "containing" require non-empty anchor: {self}', error_type='syntax')
 
         assert self.fixed_placement is None or self.overlap_mode is None
@@ -266,6 +277,7 @@ class SV(ABC):
 
     def set_placement(self, placement, roi, operation=None):
         placement = copy(placement)
+
         self.placement = placement
         self.roi = roi
         for operation in self.operations:
@@ -288,12 +300,14 @@ class SV(ABC):
                 regions.append(target_region)
         regions_merged = []
         for region in sorted(set(regions)):
-            if regions_merged and (region.chrom == regions_merged[-1].chrom) and (region.start == regions_merged[-1].end):
+            if regions_merged and (region.chrom == regions_merged[-1].chrom) and (
+                    region.start == regions_merged[-1].end):
                 regions_merged[-1] = regions_merged[-1].replace(end=region.end)
             else:
                 regions_merged.append(region)
 
         return regions_merged
+
 
 # end: class SV
 
@@ -329,7 +343,7 @@ class VariantType(Enum):
     dupINVdel = "dupINVdel"
 
     SNP = "SNP"
-    INDEL= "INDEL"
+    INDEL = "INDEL"
     DIVERGENCE = "DIVERGENCE"
 
     CUSTOM = "Custom"
@@ -427,7 +441,7 @@ class BaseSV(SV):
                     # Find the original and altered bases.
                     alts = str(if_not_none(alleles[0], ''))
                     if (alleles[1] is not None) and (alleles[1] != alleles[0]):
-                        alts += ','*(len(alts)) + str(if_not_none(alleles[1], ''))
+                        alts += ',' * (len(alts)) + str(if_not_none(alleles[1], ''))
                     alleles = [operation.transform.orig_seq, '%s' % alts]
                 elif sv_type_str == 'INDEL':
                     alleles = ['N', operation.novel_insertion_seq]
@@ -439,7 +453,7 @@ class BaseSV(SV):
             sv_info['SVID'] = rec_id
             sv_info['SVTYPE'] = sv_type_str
 
-            if self.enable_overlap_sv:
+            if self.allow_sv_overlap:
                 sv_info['ENABLE_OVERLAP_SV'] = str(True)
 
             for key, value in operation.op_info.items():
@@ -507,6 +521,8 @@ class BaseSV(SV):
                 if field in combined_recs[0]['info']:
                     del combined_recs[0]['info'][field]
         return combined_recs
+
+
 # end: class BaseSV(SV)
 
 #############################################
@@ -514,7 +530,6 @@ class BaseSV(SV):
 #############################################
 @dataclass
 class TandemRepeatExpansionContractionSV(BaseSV):
-
     num_repeats_in_placement: int = 0
 
     @override
@@ -544,6 +559,7 @@ class Syntax:
 
     ANCHOR_START = '('
     ANCHOR_END = ')'
+
 
 TR = [VariantType.trCON, VariantType.trEXP]
 
@@ -615,4 +631,3 @@ class RHSItem:
         if self.transform.n_copies > 1:
             rep += Syntax.MULTIPLE_COPIES
         return rep
-

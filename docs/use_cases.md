@@ -174,7 +174,7 @@ variant_sets:
 ```
 
 
-### Example 5 - Placing SVs into specific regions of interest (ROIs)
+### Example 5a - Placing SVs into specific regions of interest (ROIs)
 
 To constrain the placement of SVs to specific regions, the path to a single or multiple BED files containing these intervals (e.g.,
 known repetitive elements taken from RepeatMasker) can be provided.  Setting the `overlap_mode` field in a specific 
@@ -217,10 +217,6 @@ The output VCF file will label which SVs were placed at specified intervals with
 chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVLP=L1HS;VSET=0;IN_PLACE=in_place;GRAMMAR=A>AA;SOURCE_LETTER=A  GT  0/1
 ```
 
-### Example 5 - Placing specific SV components at regions of interest
-
-The portion of the SV which participates in overlap with an ROI is termed an _anchor_ 
-and is denoted with () in the supported SV grammar.
 For SVs without dispersions, the anchor defaults to the whole SV.  To constrain the placement of SVs with
 dispersions, or to specify an anchor other than the full SV, the anchor can be specified as part
 of the SV's source grammar definition.  For example:
@@ -248,6 +244,24 @@ can be used to constrain an insertion target for instance.
 
 If an anchor constrains a dispersion, the dispersion will be intrachromosomal even if the SV is set as interchromosomal 
 (In this case, other unconstrained dispersions of the SV will then be interchromosomal). 
+
+
+### Example 5b - Inversions within segmental duplications (SDs)
+INVs that span the regions between SDs can be simulated using the `"exact"` overlap placement mode given a BED file containing these regions:
+```yaml
+reference: "{path}/{to}/ref.fa"
+overlap_regions: ["/{path_to}/{regions_between_SDs}.bed"]
+variant_sets:
+    - type: "INV"
+      number: 5
+      length_ranges: [[null, null]]
+      overlap_mode: "exact"
+```
+
+To obtain the required BED file, `bedtools complement` can be used to generate regions that are not covered by SDs (note: depending on the use case, the terminal regions should be removed as a post-processing step):
+```
+bedtools complement -i your_sd_regions.bed -g your_reference/ref.fa > regions_between_SDs.bed
+```
 
 ### Example 6 - Interchromosomal Dispersions and Interchromosomal Periods
 You can use the `interchromosomal` and `interchromosomal_period` flags to control how an SV is dispersed across chromosomes. 
@@ -303,46 +317,30 @@ This means some SVs will cycle between two chromosomes, while others will cycle 
   Because all dispersions are interchromosomal, the last copy of A cannot be placed back on chr3. 
   However, it could be placed in a different region of chr1.
 
-### Example 7 - Placing overlapping SVs
-Any SNP or INDEL can be allowed to be overlapped by other, non-overlapping SVs.
+### Example 7 - SNP and INDEL placement within SVs
+SNPs and INDELs can be allowed to overlap SVs as follows:
 
 ```yaml
 reference: "{path}/{to}/ref.fa"
 variant_sets:
-    - type: "nrTRA"  
+    - type: "DUP"  
       number: 5
       length_ranges:
-        - [500, 1000]
-        - [500, 1000]
-    - type: "DEL"
+        - [1000, 100000]
+    - type: "INDEL"
       number: 10
       length_ranges:
          - [30, 50]
-      enable_overlap_sv: True
+      allow_sv_overlap: True
     - type: "SNP"
       number: 20
-      enable_overlap_sv: True
+      allow_sv_overlap: True
 ```
-The DEL and SNP sets have the `enable_overlap_sv: True` setting, which allows them to be overlapped by the nrTRA variants.
-DEL and SNP variants cannot overlap each other.
+Here the INDEL and SNP definitions have the `allow_sv_overlap` parameter set to `True`, which allows them to be randomly placed within the DUP intervals.
+Note: SNPs and INDELs that are allowed to overlap SVs are always considered as occurring first in the simulation process. 
+As such, they might be modified or even deleted by SVs that are placed later. Regardless of whether they are ultimately observable in the final genome, all simulated variants are included in the final VCF output.
 
-SVs that are allowed to overlap are always considered as occurring first in the simulation process. 
-This means they might be modified or even deleted by other SVs that are placed later. 
-Regardless of whether they are ultimately observable in the final genome, all overlapping SVs will be included in the final VCF output.
-
-### Example 8 - Time Point Mutations for Cancer Genome Modeling
-For more complex SV interactions, such as those found in cancer lineages, insilicoSV provides a workflow in the notebook 
-`insilicosv_cancer_genome.ipynb`. This notebook is designed to model cancer evolution, generate genomes for different 
-clonal cell populations, and simulate reads at varying tumor purity levels.
-
-The notebook requires a configuration file that specifies the reference genome, read coverage, and paths to
-`insilicoSV` configuration files. These configuration files describe the SVs at different time points, the clones 
-corresponding to each time point, and the purity of each clone. Example configuration files are available in the 
-`configs/clone_configs/` folder. 
-
-For more detailed information, you should refer to the notebook itself.
-- 
-### Example 9 - Chromosome Gain/Loss
+### Example 8 - Chromosome Gain/Loss
 This section details parameters for simulating chromosome arm gain/loss or whole chromosome aneuploidy.
 
 #### Arm Gain/Loss (`arm_gain_loss: True`)
