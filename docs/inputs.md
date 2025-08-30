@@ -56,9 +56,9 @@ For trEXP and trCON variants, a BED file of existing repeats must be specified i
 *overlap_regions* global setting, and *overlap_region_type* for the existing repeat regions must
 be specified in the variant set. The BED file columns must contain in order the chromosome, the start position, the end position, the region type, and the motif of the repeat.
 
-SNPs and INDELs can be allowed to be overlapped by other SVs with the parameter:
-9. *allow_sv_overlap [optional]*: bool - whether the SVs of this variant set can be overlapped by other SVs (default: False). Setting it to True
-for SVs other than SNPs and INDELs will raise an error.
+SNPs and INDELs can be placed within SVs using the parameter:
+9. *allow_sv_overlap [optional]*: bool - set to `True` to allow this variant set to be overlapped by SVs (default: False). Setting it to True
+for variants other than SNPs and INDELs will raise an error.
 
 For specifying arm gain/loss or aneuploidy, the following parameters are available:
 10. *arm_gain_loss=False [optional]*: bool - set to `True` for the SV to duplicate or delete an entire chromosome arm.
