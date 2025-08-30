@@ -25,16 +25,14 @@ The following parameters can be specified for each randomly-simulated variant se
 2. *number*: int - describes how many of the specified variant type to simulate for this variant set.
 
 For variants other than tandem repeats (`trEXP` and `trCON`), the following parameters must be given:
+
 3. *length_ranges*: list of breakend distance ranges  - provides the minimum and maximum reference interval length allowed between breakends.  
-SNPs, INDELs and simple SVs consist of a single reference interval, while complex SVs may involve multiple intervals; e.g. INVdel variants have two.  
-The order of the interval lengths in the list must correspond to the order of appearance of their corresponding
-letter in the variant type definition; see [Example 2](use_cases.md#example-2---custom-svs) for an illustration. 
-The values used to define the range can be integers indicating the number of base pairs, or an expression relative to 
-other SV intervals (e.g., for an `rTRA`, `A_B -> B_A`, we can have `[[500, 1000], [0.5*A, 1.5*A]]` to indicate that interval 
-B must be of length comprised between half and 1.5 times the length of A).
+SNPs, INDELs and simple SVs consist of a single reference interval, while complex SVs may involve multiple intervals; e.g. INVdel variants have two. The order of the interval lengths in the list must correspond to the order of appearance of their corresponding letter in the variant type definition; see [Example 2](use_cases.md#example-2---custom-svs) for an illustration. The values used to define the range can be integers indicating the number of base pairs, or an expression relative to other SV intervals (e.g., for an `rTRA`, `A_B -> B_A`, we can have `[[500, 1000], [0.5*A, 1.5*A]]` to indicate that interval B must be of length comprised between half and 1.5 times the length of A).
 For predefined types with a dispersion, the length range of the dispersion will be in the last position.
 For Custom types, the length ranges are in order of appearance of the letters and the dispersions.
+
 4. *overlap_mode [optional]*: str - enforce the SV to overlap a region defined in the files provided in `overlap_regions`. Must be `partial`, `contained`, `containing` or `exact` (see [example config](use_cases.md#example-5---placing-svs-into-specific-regions-of-interest-rois)).
+   
 5. *overlap_region_type [optional]*: list of str - only if an overlap mode is specified. Characterizes the regions to overlap, the name of the region has to contain one of the strings of the list. 
 
 6. *interchromosomal: False [for SVs containing dispersions]*: Enable interchromosomal SVs. If True, each dispersion in the SV will be 
@@ -44,6 +42,7 @@ Each element of the list can be a positive number or a range of positive numbers
 The default number of copies for a DUP is [1] and does not need to be specified.
 
 For tandem repeat variants, the following parameters is needed:
+
 8. *repeat_count_change_range*: the range from which to sample the number of repeats added (trEXP) or removed (trEXP).
 
 For trEXP and trCON variants, a BED file of existing repeats must be specified in the 
@@ -51,10 +50,12 @@ For trEXP and trCON variants, a BED file of existing repeats must be specified i
 be specified in the variant set. The BED file columns must contain in order the chromosome, the start position, the end position, the region type, and the motif of the repeat.
 
 SNPs and INDELs can be placed within SVs using the parameter:
+
 9. *allow_sv_overlap [optional]*: bool - set to `True` to allow this variant set to be overlapped by SVs (default: False). Setting it to True
 for variants other than SNPs and INDELs will raise an error.
 
 For specifying arm gain/loss or aneuploidy, the following parameters are available:
+
 10. *arm_gain_loss=False [optional]*: bool - set to `True` for the SV to duplicate or delete an entire chromosome arm.
 11. *arm_percent=[100, 100] [optional]*: [int, int] - a range [min_percent, max_percent] from which to determine the percentage of the chromosome arm to duplicate or delete. The operation starts from the extremity of the arm. 
 12. *aneuploidy=False [optional]*: bool - set to True for the SV to duplicate or delete a whole chromosome copy.
