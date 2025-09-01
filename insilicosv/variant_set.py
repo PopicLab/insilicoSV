@@ -955,7 +955,7 @@ class ImportedVariantSet(VariantSet):
             parsed_info['GENOTYPE'] = random.choice([(True, True), (True, False), (False, True)])
         vcf_info = dict(vcf_rec.info)
 
-        parsed_info['ENABLE_OVERLAP_SV'] = vcf_info.get('ENABLE_OVERLAP_SV', False)
+        parsed_info['ALLOW_SV_OVERLAP'] = vcf_info.get('ALLOW_SV_OVERLAP', False)
 
         if set(''.join(vcf_rec.alleles).upper().replace(' ', '')) <= set('TCGA'):
             if len(vcf_rec.alleles[0]) == 1 and 1 <= len(vcf_rec.alleles[1]) <= 2:
@@ -998,7 +998,7 @@ class ImportedVariantSet(VariantSet):
 
         if not (rec_len <= 50 and (rec_type_str == 'INS' or rec_type_str == 'INV' or vcf_info['SVTYPE'] == 'SNP' or
                               ('SVTYPE' in vcf_info and (vcf_info['SVTYPE'] == 'INS' or vcf_info['SVTYPE'] == 'INV')))):
-            chk(not parsed_info['ENABLE_OVERLAP_SV'], f'ENABLE_OVERLAP_SV only allowed for SNPs or INDELs. But, {vcf_rec} was provided.')
+            chk(not parsed_info['ALLOW_SV_OVERLAP'], f'ALLOW_SV_OVERLAP only allowed for SNPs or INDELs. But, {vcf_rec} was provided.')
 
         rec_target = None
         is_interchromosomal = False
@@ -1230,7 +1230,7 @@ class ImportedVariantSet(VariantSet):
                       blacklist_filter=None,
                       info=parent_info,
                       genotype=genotype,
-                      allow_sv_overlap=parsed_info['ENABLE_OVERLAP_SV'],
+                      allow_sv_overlap=parsed_info['ALLOW_SV_OVERLAP'],
                       config_descr=f'vcf_record:{vcf_rec}',
                       dispersions=[])
 

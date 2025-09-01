@@ -345,7 +345,7 @@ class SVSimulator:
         touch blacklisted regions."""
         # The placement does not set all breakend positions
         if not len(placement) == len(sv.breakend_interval_lengths) + 1: return False
-        chk(all([locus.pos <= self.chrom_lengths[locus.chrom] for locus in placement]),
+        chk(all([locus.pos <= self.chrom_lengths[locus.chrom] for locus in placement.values()]),
             'Please make sure that the imported'
             ' SV positions are within the chromosome length,'
             f' provided {sv}', error_type='value')
@@ -389,7 +389,7 @@ class SVSimulator:
         breakend = None
         ref_roi = None
         chromosomes = [chrom for chrom in self.reference_regions.chrom2itree if not avoid_chrom or chrom not in avoid_chrom]
-        while breakend is None or ref_roi is None and num_tries < max_random_tries:
+        while (breakend is None or ref_roi is None) and num_tries < max_random_tries:
             breakend, ref_roi = self.get_random_breakend(reference_regions, containing_region=containing_region,
                                                          chromosomes=chromosomes,
                                                          blacklist_regions=blacklist_regions, roi_length=roi_length,
@@ -731,9 +731,9 @@ class SVSimulator:
             # In case of exact overlap with several symbols in the anchor
             anchor_roi = roi
             for pos, breakend in enumerate(breakends):
-                if breakend+shift in placement_dict:
+                if breakend + shift in placement_dict:
                     # If we have an anchor so we do not move its breakend.
-                    locus = placement_dict[breakend+shift]
+                    locus = placement_dict[breakend + shift]
                     roi = Region(chrom=locus.chrom, start=locus.pos, end=locus.pos, kind=roi.kind, motif=roi.motif)
                     continue
 

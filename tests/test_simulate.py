@@ -1976,6 +1976,48 @@ class TestSVSimulator(unittest.TestCase):
              ]
         ]
 
+        self.interchromosomal_period = [
+            [("TCGA", "AG"),
+             TestObject([self.ref_file, {"chr21": "TCGA", 'chr5': "AG"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    "homozygous_only": True,
+                                    "variant_sets": [{"type": "A_B_C_->A_B_C_ABC",
+                                                      "number": 1,
+                                                      "interchromosomal_period": 1,
+                                                      "length_ranges": [[2, 2], [None, None],
+                                                                        [2, 2], [None, None], [2, 2], [None, None]]}]}],
+                        self.hap1, self.hap2, self.bed),
+             [("TCGA", "AG"[:insertion_idx] + A + "AG" + C + "AG"[insertion_idx:])
+              for A in ['TC', 'GA']
+              for C in ['TC', 'GA']
+              for insertion_idx in [0, 2] if A != C]],
+
+            [("TC", "AC", "TG"),
+             TestObject([self.ref_file, {"chr21": "TC", 'chr5': "AC", 'chr1': "TG"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    "homozygous_only": True,
+                                    "variant_sets": [{"type": "A_B_C_->A_B_C_ABC",
+                                                      "number": 1,
+                                                      "interchromosomal_period": 2,
+                                                      "length_ranges": [[2, 2], [None, None],
+                                                                        [2, 2], [None, None], [2, 2], [None, None]]}]}],
+                        self.hap1, self.hap2, self.bed),
+             [("TC", "AC"[:insertion_idx] + A + B + C + "AC"[insertion_idx:], "TG")
+              for A in ['AC']
+              for C in ['TC', 'TG']
+              for B in ['TC', 'TG'] for insertion_idx in [0, 2] if C != B] +
+             [("TC"[:insertion_idx] + A + B + C + "TC"[insertion_idx:], "AC", "TG")
+              for A in ['TC']
+              for C in ['AC', 'TG']
+              for B in ['AC', 'TG'] for insertion_idx in [0, 2] if C != B] +
+             [("TC", "AC", "TG"[:insertion_idx] + A + B + C + "TG"[insertion_idx:])
+              for A in ['TG']
+              for C in ['TC', 'AC']
+              for B in ['TC', 'AC'] for insertion_idx in [0, 2] if C != B]]
+        ]
+
     def tearDown(self):
         try:
             shutil.rmtree(self.test_dir)
@@ -2342,8 +2384,8 @@ class TestSVSimulator(unittest.TestCase):
     def test_simple_tests(self):
         self.run_test(self.simple_test_data)
 
-    def test_interchromsomal_period(self):
-        self.run_test(self.interchromsomal_period)
+    def test_interchromosomal_period(self):
+        self.run_test(self.interchromosomal_period)
 
     def test_simple_gain_loss(self):
         self.run_test(self.test_arm)

@@ -454,7 +454,7 @@ class BaseSV(SV):
             sv_info['SVTYPE'] = sv_type_str
 
             if self.allow_sv_overlap:
-                sv_info['ENABLE_OVERLAP_SV'] = str(True)
+                sv_info['ALLOW_SV_OVERLAP'] = str(True)
 
             for key, value in operation.op_info.items():
                 sv_info[key] = value
