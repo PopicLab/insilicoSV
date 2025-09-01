@@ -348,6 +348,8 @@ class OutputWriter:
             return
         novel_adjacencies = []
         for sv in self.svs:
+            breakends = sorted(list(sv.placement.keys()))
+            placement = [sv.placement[breakend] for breakend in breakends]
             # Prevent duplicate adjacencies
             if sv.info['OP_TYPE'] in ['SNP', 'trEXP', 'trCON']: continue
             lhs, rhs = sv.info['GRAMMAR'].split('->')
@@ -358,7 +360,7 @@ class OutputWriter:
                             symbol not in [Syntax.ANCHOR_START, Syntax.ANCHOR_END, Syntax.DIVERGENCE]] + ['SU']
 
             # Get the original adjacencies and symbols
-            breakends = {'PR': ['NA', sv.placement[0]], 'SU': [sv.placement[-1], 'NA']}
+            breakends = {'PR': ['NA', placement[0]], 'SU': [placement[-1], 'NA']}
             lhs_adjacencies = []
             num_dispersion = 0
             prev_symbol = 'PR'
@@ -368,7 +370,7 @@ class OutputWriter:
                     symbol += str(num_dispersion)
                     num_dispersion += 1
                 if symbol != 'SU':
-                    breakends[symbol] = [sv.placement[idx], sv.placement[idx + 1]]
+                    breakends[symbol] = [placement[idx], placement[idx + 1]]
                 # Adjacency between the end of the last symbol and the beginning of the current one.
                 lhs_adjacencies.append([prev_symbol + '^t', symbol + '^h'])
                 prev_symbol = symbol
