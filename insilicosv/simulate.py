@@ -188,7 +188,7 @@ class SVSimulator:
                     self.overlap_kinds[sv_category],
                     self.overlap_ranges[sv_category], sv_category, self.num_svs[sv_category])
 
-                hap_overlap_mult = 2 if self.enable_hap_overlap else 1
+                hap_overlap_mult = 2 if self.allow_hap_overlap else 1
                 if self.overlap_modes[sv_category] in [OverlapMode.CONTAINING, OverlapMode.EXACT]:
                     # We have one containing and exact overlap per ROI and haplotype
                     chk(self.num_svs[sv_category] <= hap_overlap_mult * len(self.rois_overlap[sv_category]),
