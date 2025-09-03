@@ -186,12 +186,6 @@ class SV(ABC):
     # If a SNP or INDEL can be overlapped by other SVs
     allow_sv_overlap: Optional[bool] = False
 
-    # for arm gain or loss
-    arm_gain_loss: Optional[bool] = False
-    aneuploidy: Optional[bool] = False
-    arm_percent: Optional[int] = 100
-    aneuploid_chrom: Optional[list[str]] = None
-
     def __post_init__(self):
         assert self.sv_id
         assert len(self.breakend_interval_min_lengths) == len(self.breakend_interval_lengths)
@@ -199,7 +193,7 @@ class SV(ABC):
                    for bi_len, bi_min_len in zip(self.breakend_interval_lengths,
                                                  self.breakend_interval_min_lengths))
 
-        if self.overlap_mode == OverlapMode.CONTAINED:
+        if self.overlap_mode in [OverlapMode.CONTAINED, OverlapMode.TERMINAL]:
             chk((self.roi_filter.region_length_range[0] is None) or (
                         self.get_anchor_length() > self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a contained overlap.')
@@ -214,14 +208,17 @@ class SV(ABC):
             chk((self.roi_filter.region_length_range[0] is None) or (
                         self.get_anchor_length() >= self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a partial overlap.')
+        if self.overlap_mode in [OverlapMode.TERMINAL, OverlapMode.CHROM]:
+            chk(self.roi_filter.region_kinds == ['all'], 'No overlap_region_kinds can be specified for overlap_mode'
+                                                         f'terminal and chrom. Error in {self}', error_type='syntax')
 
         # The letters cannot be unbounded unless the overlap is Exact and they are in the anchor.
-        chk(self.fixed_placement or self.aneuploidy or self.arm_gain_loss or all(
+        chk(self.fixed_placement or all(
             length is not None for idx, length in enumerate(self.breakend_interval_lengths) if
             (idx not in self.dispersions) and
-            ((not self.anchor) or (self.overlap_mode != OverlapMode.EXACT) or not (
+            ((not self.anchor) or (self.overlap_mode not in [OverlapMode.EXACT, OverlapMode.CHROM]) or not (
                     self.anchor.start_breakend <= idx < self.anchor.end_breakend))),
-            f'A length range can only be [null, null] for dispersions or the anchor for an exact overlap. '
+            f'A length range can only be [null, null] for dispersions or the anchor for an exact/chrom overlap. '
             f'But, {self.config_descr} was provided. Notice that if the SV is defined from the grammar then the length of '
             f'the dispersions are to be given in order of appearance in the grammar.', error_type='syntax')
 
@@ -231,11 +228,11 @@ class SV(ABC):
             f'The length ranges of dispersions has to be [null, null] for interchromosomal SVs.', error_type='syntax')
 
         if not self.anchor:
-            chk((self.overlap_mode != OverlapMode.EXACT) or
+            chk((self.overlap_mode not in [OverlapMode.EXACT, OverlapMode.CHROM]) or
                 all((self.breakend_interval_lengths[breakend] is None and
                      self.breakend_interval_min_lengths[breakend] is None) for breakend in
                     range(self.anchor.start_breakend, self.anchor.end_breakend)),
-                f'overlap_mode "exact" requires leaving the length of the anchor symbols unspecified: {self}',
+                f'overlap_mode "exact" and "chrom" require leaving the length of the anchor symbols unspecified: {self}',
                 error_type='syntax')
             chk((self.overlap_mode != OverlapMode.PARTIAL and self.overlap_mode != OverlapMode.CONTAINING)
                 or self.anchor.end_breakend != self.anchor.start_breakend,
@@ -258,7 +255,7 @@ class SV(ABC):
 
     def get_anchor_length(self):
         anchor = self.anchor
-        if (self.overlap_mode == OverlapMode.EXACT) or (anchor is None):
+        if (self.overlap_mode in [OverlapMode.EXACT, OverlapMode.CHROM]) or (anchor is None):
             return None
         return sum(self.breakend_interval_lengths[anchor.start_breakend:anchor.end_breakend])
 

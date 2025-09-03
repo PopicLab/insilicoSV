@@ -127,7 +127,7 @@ If a sample with a 'GT' field is not specified, the genotype will be chosen at r
 Variant sets imported from VCFs may be combined in the same config file with variant sets specifying
 random variants to simulate.
 
-### Example 4 - Marking genome blacklist intervals
+### Example 4a - Marking genome blacklist intervals
 When initializing a new simulation the user can include a blacklist of genome intervals 
 (i.e., intervals that specified variants will avoid) via a VCF or BED file given (or multiple provided 
 in a comma-separated list) in the `blacklist_regions`
@@ -175,76 +175,72 @@ variant_sets:
 
 
 ### Example 5a - Placing SVs into specific regions of interest (ROIs)
+You can constrain where an SV is placed by providing a list of genomic intervals in one or more **BED files** under the 
+`overlap_regions` parameter.  You can then specify an `overlap_mode` for a given variant set to control how each SV interacts with these regions.
 
-To constrain the placement of SVs to specific regions, the path to a single or multiple BED files containing these intervals (e.g.,
-known repetitive elements taken from RepeatMasker) can be provided.  Setting the `overlap_mode` field in a specific 
-variant set to either `"exact"`, `"partial"`, `"containing"` or `"contained"`, will enforce that each variant of that set 
-will be placed (with the corresponding overlap mode) into a randomly selected interval from `overlap_regions`.  
-An example config with these inputs is:
+### Overlap Modes and Constraints
+There are several ways to define the relationship between an SV and a region of interest (ROI):
+* **`"exact"`**: The constrained breakends of the SV have to exactly match the ROI boundaries. The SV's length is therefore 
+determined by the ROI, so you must use `[null, null]` for the corresponding range in `length_ranges`.
+* **`"partial"`**: The constrained breakends of the SV must overlap with one of the boundaries of a selected ROI.
+* **`"containing"`**: The constrained breakends of the SV must completely contain a selected ROI.
+* **`"contained"`**: The constrained breakends of the SV must be completely contained within a selected ROI.
+* **`"terminal"`**: The constrained breakends of the SV is placed at the extremity of a chromosome arm.
+* **`"chrom"`**: The SV spans an entire chromosome. This mode is only compatible with **Deletions (DEL)** and **Duplications (DUP)**. 
+For Duplications, setting `n_copies` to `1` (or not specifying it) creates a single additional chromosome copy (trisomy).
 
-```yaml
-reference: "{path}/{to}/ref.fa"
-overlap_regions: ["/{path_to}/{candidate_overlap_events}.bed"]
-variant_sets:
-    - type: "DEL"  # "(A)" -> ""
-      number: 5
-      length_ranges: [[null, null]]
-      overlap_mode: "exact"  # <- or "partial" or "contained"
-```
+### Defining and Using Anchors
+To specify which part of a complex SV should overlap with an ROI, you can use an **anchor** defined by parentheses `()` in the SV's source grammar.
 
-In `"exact"` overlap mode, the SV must exactly match the ROI on which it is placed.
-The length of the SV is then determined by the ROI, and must be left unspecified
-in `"length_ranges"`.  In `"partial"` overlap mode, the SV must overlap the ROI
-partially (but not completely). In `"containing"` overlap mode, the SV must strictly contain
-the ROI. In `"contained"` overlap mode, the SV must be strictly contained
-within the ROI.
+For example, in `A(BC) -> b`, the `BC` portion is the anchor. It is the only part of the SV that will be constrained to 
+overlap with a given ROI. The anchor can be any contiguous sub-sequence of the source. For SVs without dispersions, 
+the entire SV defaults to being the anchor.
 
-Multiple BED files (provided as a list of paths) can be given as input and their records will be combined and drawn 
+An **empty anchor** `()` can be used to constrain the target location of an insertion and is only compatible with the `"contained"` overlap mode.
+
+
+### General Considerations
+
+* **Filtering Regions**: You can filter the ROIs from your BED files based on their name (4th column) using `overlap_region_type` 
+or by length using `overlap_region_length_range`.
+* **N-Regions**: By default, InsilicoSV avoids placing SVs in regions with a high proportion of 'N' base pairs (over 10%). 
+This can affect placements in telomeres (`overlap_mode: terminal`). You can adjust this threshold using the global parameter `th_proportion_N`.
+* **Intrachromosomal Constraint**: If a dispersion is part of an anchor, it will be forced to be intrachromosomal, even if the overall SV is marked as interchromosomal.
+The potential remaining dispersions will be interchromosomal.
+* **BED Format**: Multiple BED files (provided as a list of paths) can be given as input and their records will be combined and drawn 
 from during SV placement. Each file is required to have the first four columns of standard BED records 
 (chrom, chromStart, chromEnd, name).  Files specifying known Tandem Repeat regions for expansion/contraction 
 need to have a fifth column specifying the motif of each repeat region.
+* **Output VCF**: The final VCF file will include an `OVLP` field in the `INFO` column for each SV placed within a specified region, indicating the name of the region.
 
-ROIs relevant to placing variants from a given variant set can be filtered down by region type
-and length.  `overlap\_region\_type` specifies a list of identifiers; regions whose name (4th bed
-column) containing one of the identifiers will be used.  `overlap\_region\_length\_range` can be
-specified to give overlap constraints (a 2-element [min, max] list).  Either min or max can
-be `null` to leave that side of the range open.  (Note that specifying an overlap length range is
-entirely separate from specifying length ranges for SV components.)
-
-The output VCF file will label which SVs were placed at specified intervals with the additional INFO field
-`OVLP={region name}', as in this example record:
-```
-chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVLP=L1HS;VSET=0;IN_PLACE=in_place;GRAMMAR=A>AA;SOURCE_LETTER=A  GT  0/1
-```
-
-For SVs without dispersions, the anchor defaults to the whole SV.  To constrain the placement of SVs with
-dispersions, or to specify an anchor other than the full SV, the anchor can be specified as part
-of the SV's source grammar definition.  For example:
+#### Example YAML Configuration
 
 ```yaml
 reference: "{path}/{to}/ref.fa"
 overlap_regions: ["/{path_to}/{candidate_overlap_events_1}.bed"]
 variant_sets:
-    - type: "A(BC) -> b"  # delINVdel
+    - type: "AB(C) -> b"  # delINVdel
       number: 5
       length_ranges:
         - [500, 1000]
-        - [null, null]
-        - [null, null]
+        - [500, 1000] 
+        - [null, null] # Inside the anchor of an `exact` overlap
       overlap_mode: "exact"
-      overlap_region_type: ["L1HS"]
+      overlap_region_type: ["L1HS"] # Allowed regions for overlap
 ```
+In this example, 5 SVs of type `delINVdel` are created. Their `C` region is constrained to overlap with a region from 
+the `candidate_overlap_events_1.bed` file, with the overlap mode set to `"exact"`.
 
-Parentheses indicate which part(s) of the SV are constrained to overlap with an ROI according
-to the overlap mode.  The anchor must be placed on the source, and can wrap
-any contiguous sub-sequence of source elements (including an empty one).
-For `"exact"` overlap mode, the length ranges of the constrained SV's part(s) must
-be left unspecified.  An empty anchor is only compatible with the overlap mode `"contained"` and
-can be used to constrain an insertion target for instance.
-
-If an anchor constrains a dispersion, the dispersion will be intrachromosomal even if the SV is set as interchromosomal 
-(In this case, other unconstrained dispersions of the SV will then be interchromosomal). 
-
+#### Example Output VCF File
+```
+chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVLP=L1HS;VSET=0;IN_PLACE=in_place;GRAMMAR=A>;SOURCE_LETTER=A  GT  0/1
+```
+#### Simulating Chromosome Arm-Level SVs
+You can use overlapping constraints to simulate SVs affecting an entire chromosome arm. 
+This is particularly useful for modeling large-scale genetic events like whole-arm deletions or duplications.
+For this purpose, you need a BED file that defines the precise start and end coordinates for each chromosome arm. 
+Then, you can apply the overlap_mode `exact` to the variant sets of your choice to enforce the resulting SVs to completely
+span a chromosome arm.
 
 ### Example 5b - Inversions within segmental duplications (SDs)
 INVs that span the regions between SDs can be simulated using the `"exact"` overlap placement mode given a BED file containing these regions:
@@ -320,49 +316,3 @@ variant_sets:
 Here the INDEL and SNP definitions have the `allow_sv_overlap` parameter set to `True`, which allows them to be randomly placed within the DUP intervals.
 Note: SNPs and INDELs that are allowed to overlap SVs are always considered as occurring first in the simulation process. 
 As such, they might be modified or even deleted by SVs that are placed later. Regardless of whether they are ultimately observable in the final genome, all simulated variants are included in the final VCF output.
-
-### Example 8 - Chromosome Gain/Loss
-This section details parameters for simulating chromosome arm gain/loss or whole chromosome aneuploidy.
-
-#### Arm Gain/Loss (`arm_gain_loss: True`)
-To enable the duplication or deletion of entire chromosome arms, set the `arm_gain_loss` parameter to `True`.
-
-##### Centromere File (arms)
-- **Purpose:** A BED file containing the centromere start and end positions for each chromosome of your reference genome. This file is required when arm_gain_loss is True.
-- **File Format:** The first four columns of the BED file must be:
-  - Chromosome name 
-  - Chromosome length 
-  - Beginning of the centromere (start coordinate)
-  - End of the centromere (end coordinate)
-- **Scope:** The file does not need to include all reference chromosomes; only those for which arm gain/loss is intended.
-
-**arm_percent parameter:** specifies a range (e.g., `[60, 80]`) 
-to determine the percentage of the chromosome arm to be duplicated or deleted, starting from the arm's extremity.
-
-#### Aneuploidy (aneuploidy: True)
-**aneuploid_chrom parameter:** You may optionally provide a list of specific chromosome names (e.g., `['chr1', 'chr22']`) 
-on which aneuploidy is permitted. If this parameter is not provided, aneuploidy can occur on any chromosome in the reference.
-
-#### General Considerations
-- **Compatible SV Types:** Only DEL (Deletion) and DUP (Duplication) are compatible with arm_gain_loss and aneuploidy flags.
-- **length_ranges:** When simulating aneuploidy, length_ranges should either not be provided or be set to `[[null, null]]`.
-- **Multiple Aneuploid DUPs:** Multiple aneuploid duplications can target the same chromosomes to increase chromosome copy numbers arbitrarily. In such cases, overlap constraints will be disregarded.
-- **Heterozygous Nature:** Chromosome gain/loss and aneuploidy events are defined as heterozygous, affecting only one of the existing chromosome copies.
-- **New Chromosome Copies (DUP Aneuploidy):** For a DUP with `aneuploidy: True`, new chromosome copies will be created and named chrom_copy_num (where num is the copy number).
-  - If n_copies is not provided or set to 1, a case of trisomy (one additional chromosome copy) will be simulated.
-  - As shown in the example, `n_copies: 3` allows for the creation of three additional chromosome copies.
-
-```yaml
-reference: "{path}/{to}/ref.fa"
-arms: ["/{path_to}/{arm_regions}.bed"] # Required for arm_gain_loss, but not for aneuploidy
-variant_sets:
-    - type: "DUP" 
-      number: 3
-      aneuploidy: True
-      aneuploid_chrom: ['chr1', 'chr22']
-      n_copies: 3 # Simulates 3 additional copies for selected chromosomes
-    - type: "DEL" 
-      number: 5
-      arm_gain_loss: True
-      arm_percent: [60, 80] # Deletes 60-80% of a chromosome arm from its extremity
-```
