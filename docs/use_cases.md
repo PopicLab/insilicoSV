@@ -190,7 +190,7 @@ determined by the ROI, so `[null, null]` must be used for the corresponding rang
 For Duplications, setting `n_copies` to `1` (or not specifying it) creates a single additional chromosome copy (trisomy).
 
 ### Defining and using anchors
-An **anchor** defined by parentheses `()` in the SV's source grammar can be used to specify which part of a complex SV should overlap with an ROI
+An **anchor** defined by parentheses `()` in the SV's source grammar can be used to specify which part of a complex SV should overlap with an ROI.
 
 For example, in `A(BC) -> b`, the `BC` portion is the anchor. It is the only part of the SV that will be constrained to 
 overlap with a given ROI. The anchor can be any contiguous sub-sequence of the source. For SVs without dispersions, 
