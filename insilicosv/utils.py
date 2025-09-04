@@ -196,6 +196,8 @@ class OverlapMode(Enum):
     CONTAINED = "contained"  # both endpoints of anchor in ROI
     EXACT = "exact"  # anchor exactly matches the ROI
     CONTAINING = "containing"  # both endpoints of ROI strictly inside the anchor
+    TERMINAL = "terminal"  # One breakpoint at a chromosome extremity
+    CHROM = "whole-chromosome"  # The breakpoints are a chromosome extremities (only for DUP and DEL), for DUP creates chromosome copies
 
 
 class RegionSet:
@@ -250,7 +252,7 @@ class RegionSet:
                     chk(len(fields) >= 3,
                         f'{loc}: too few fields in line in the BED file {bed_path}', error_type='value')
                     chrom, start_str, end_str = fields[:3]
-                    kind = fields[4] if len(fields) > 3 else 'NA'
+                    kind = fields[3] if len(fields) > 3 else 'NA'
                     chk(all((chrom, start_str, end_str)),
                         f'{loc}: empty value in first three columns in the BED file {bed_path}', error_type='value')
                     try:

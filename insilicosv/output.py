@@ -147,7 +147,7 @@ class OutputWriter:
         with open(hap_fa, 'w') as sim_fa:
             chrom2operations: dict[str, list[Operation]] = self.get_chrom2operations(hap_index)
             for chrom, operations in chrom2operations.items():
-                # Add chromosome copies for aneuploidy
+                # Add chromosome copies for aneuploidy, the chromosome name in the operation is added to the aneuploidy_chrom_lengths
                 if chrom not in self.aneuploidy_chrom_lengths:
                     for overlapping_op in operations:
                         self.aneuploidy_chrom_lengths[chrom] = overlapping_op[-1].source_region.length()
