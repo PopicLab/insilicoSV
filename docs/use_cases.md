@@ -48,7 +48,7 @@ variant_sets:
     number: 10
 ```
 An `INDEL` can be defined using the pre-defined INDEL type, or by specifying DEL or INS types with a length range below 50.
-If you choose the pre-defined `INDEL` type, each variant within the set will be randomly assigned as either a DEL or an INS. 
+If the pre-defined `INDEL` type is chosen, each variant within the set will be randomly assigned as either a DEL or an INS. 
 You can also omit the `length_ranges` parameter for the INDEL type, in which case it will automatically default to a range of `[[1, 50]]`.
 
 ### Example 1c - Unbounded dispersions
@@ -178,10 +178,10 @@ variant_sets:
 You can constrain where an SV is placed by providing a list of genomic intervals in one or more **BED files** under the 
 `overlap_regions` parameter.  You can then specify an `overlap_mode` for a given variant set to control how each SV interacts with these regions.
 
-### Overlap Modes and Constraints
+### Overlap modes and constraints
 There are several ways to define the relationship between an SV and a region of interest (ROI):
 * **`"exact"`**: The constrained breakends of the SV have to exactly match the ROI boundaries. The SV's length is therefore 
-determined by the ROI, so you must use `[null, null]` for the corresponding range in `length_ranges`.
+determined by the ROI, so `[null, null]` must be used for the corresponding range in `length_ranges`.
 * **`"partial"`**: The constrained breakends of the SV must overlap with one of the boundaries of a selected ROI.
 * **`"containing"`**: The constrained breakends of the SV must completely contain a selected ROI.
 * **`"contained"`**: The constrained breakends of the SV must be completely contained within a selected ROI.
@@ -189,8 +189,8 @@ determined by the ROI, so you must use `[null, null]` for the corresponding rang
 * **`"whole-chromosome"`**: The SV spans an entire chromosome. This mode is only compatible with **Deletions (DEL)** and **Duplications (DUP)**. 
 For Duplications, setting `n_copies` to `1` (or not specifying it) creates a single additional chromosome copy (trisomy).
 
-### Defining and Using Anchors
-To specify which part of a complex SV should overlap with an ROI, you can use an **anchor** defined by parentheses `()` in the SV's source grammar.
+### Defining and using anchors
+An **anchor** defined by parentheses `()` in the SV's source grammar can be used to specify which part of a complex SV should overlap with an ROI
 
 For example, in `A(BC) -> b`, the `BC` portion is the anchor. It is the only part of the SV that will be constrained to 
 overlap with a given ROI. The anchor can be any contiguous sub-sequence of the source. For SVs without dispersions, 
@@ -199,11 +199,11 @@ the entire SV defaults to being the anchor.
 An **empty anchor** `()` can be used to constrain the target location of an insertion and is only compatible with the `"contained"` overlap mode.
 
 
-### General Considerations
+### General considerations
 
-* **Filtering Regions**: You can filter the ROIs from your BED files based on their name (4th column) using `overlap_region_type` 
+* **Filtering Regions**: To filter the ROIs from BED files based on their name (4th column) using `overlap_region_type` 
 or by length using `overlap_region_length_range`.
-* **N-Regions**: By default, InsilicoSV avoids placing SVs in regions with a high proportion of 'N' base pairs (over 10%). 
+* **N-Regions**: By default, insilicoSV avoids placing SVs in regions with a high proportion of 'N' base pairs (over 10%). 
 This can affect placements in telomeres (`overlap_mode: terminal`). You can adjust this threshold using the global parameter `th_proportion_N`.
 * **Intrachromosomal Constraint**: If a dispersion is part of an anchor, it will be forced to be intrachromosomal, even if the overall SV is marked as interchromosomal.
 The potential remaining dispersions will be interchromosomal.
@@ -213,7 +213,7 @@ from during SV placement. Each file is required to have the first four columns o
 need to have a fifth column specifying the motif of each repeat region.
 * **Output VCF**: The final VCF file will include an `OVLP` field in the `INFO` column for each SV placed within a specified region, indicating the name of the region.
 
-#### Example YAML Configuration
+#### Example YAML configuration
 
 ```yaml
 reference: "{path}/{to}/ref.fa"
@@ -231,15 +231,15 @@ variant_sets:
 In this example, 5 SVs of type `delINVdel` are created. Their `C` region is constrained to overlap with a region from 
 the `candidate_overlap_events_1.bed` file, with the overlap mode set to `"exact"`.
 
-#### Example Output VCF File
+#### Example output VCF file
 ```
 chr21   18870078    DEL N   DEL 100 PASS    END=18876908;SVTYPE=DEL;SVLEN=6831;OVLP=L1HS;VSET=0;IN_PLACE=in_place;GRAMMAR=A>;SOURCE_LETTER=A  GT  0/1
 ```
-#### Simulating Chromosome Arm-Level SVs
-You can use overlapping constraints to simulate SVs affecting an entire chromosome arm. 
+#### Simulating chromosome arm-level SVs
+Overlapping constraints can be used to simulate SVs affecting an entire chromosome arm. 
 This is particularly useful for modeling large-scale genetic events like whole-arm deletions or duplications.
-For this purpose, you need a BED file that defines the precise start and end coordinates for each chromosome arm. 
-Then, you can apply the overlap_mode `exact` to the variant sets of your choice to enforce the resulting SVs to completely
+For this purpose, the precise start and end coordinates for each chromosome arm have to be provided in a BED file. 
+Then, applying the overlap_mode `exact` to a variant set will enforce the resulting SVs to completely
 span a chromosome arm.
 
 ### Example 5b - Inversions within segmental duplications (SDs)
@@ -256,11 +256,11 @@ variant_sets:
 
 To obtain the required BED file, `bedtools complement` can be used to generate regions that are not covered by SDs (note: depending on the use case, the terminal regions should be removed as a post-processing step):
 ```
-bedtools complement -i your_sd_regions.bed -g your_reference/ref.fa > regions_between_SDs.bed
+bedtools complement -i sd_regions.bed -g reference/ref.fa > regions_between_SDs.bed
 ```
 
-### Example 6 - Placing Interchromosomal SVs
-InsilicoSV allows you to simulate interchromosomal SVs by using the `interchromosomal` flag. 
+### Example 6 - Placing interchromosomal SVs
+insilicoSV allows to simulate interchromosomal SVs by using the `interchromosomal` flag. 
 This means the SV will involve changes across different chromosomes.
 
 To define an interchromosomal SV, set `interchromosomal: True` within the variant set definition, 
