@@ -181,7 +181,7 @@ class OverlapMode(Enum):
     EXACT = "exact"  # anchor exactly matches the ROI
     CONTAINING = "containing" # both endpoints of ROI strictly inside the anchor
     TERMINAL = "terminal"
-    CHROM = "chrom"
+    CHROM = "whole-chromosome"
 
 class RegionSet:
     """A collection of genomic regions"""
