@@ -232,7 +232,7 @@ class SV(ABC):
                 all((self.breakend_interval_lengths[breakend] is None and
                      self.breakend_interval_min_lengths[breakend] is None) for breakend in
                     range(self.anchor.start_breakend, self.anchor.end_breakend)),
-                f'overlap_mode "exact" and "chrom" require leaving the length of the anchor symbols unspecified: {self}',
+                f'overlap_mode "exact" and "whole-chromosome" require leaving the length of the anchor symbols unspecified: {self}',
                 error_type='syntax')
             chk((self.overlap_mode != OverlapMode.PARTIAL and self.overlap_mode != OverlapMode.CONTAINING)
                 or self.anchor.end_breakend != self.anchor.start_breakend,

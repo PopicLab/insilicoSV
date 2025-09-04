@@ -125,7 +125,7 @@ class SVSimulator:
                 chk(isinstance(variant_set, dict), f'variant set must be a dict: {variant_set}')
                 for key in variant_set.keys():
                     chk(not key.startswith('overlap_') or key == 'overlap_sv' or
-                        variant_set.get('overlap_mode', None) in ['terminal', 'chrom'],
+                        variant_set.get('overlap_mode', None) in ['terminal', 'whole-chromosome'],
                         f'Using {key} in {variant_set} requires specifying overlap_regions in global config')
 
     def load_rois(self):

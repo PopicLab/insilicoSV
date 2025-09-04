@@ -197,7 +197,7 @@ class OverlapMode(Enum):
     EXACT = "exact"  # anchor exactly matches the ROI
     CONTAINING = "containing"  # both endpoints of ROI strictly inside the anchor
     TERMINAL = "terminal"  # One breakpoint at a chromosome extremity
-    CHROM = "chrom"  # The breakpoints are a chromosome extremities (only for DUP and DEL), for DUP creates chromosome copies
+    CHROM = "whole-chromosome"  # The breakpoints are a chromosome extremities (only for DUP and DEL), for DUP creates chromosome copies
 
 
 class RegionSet:

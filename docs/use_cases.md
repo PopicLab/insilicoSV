@@ -186,7 +186,7 @@ determined by the ROI, so you must use `[null, null]` for the corresponding rang
 * **`"containing"`**: The constrained breakends of the SV must completely contain a selected ROI.
 * **`"contained"`**: The constrained breakends of the SV must be completely contained within a selected ROI.
 * **`"terminal"`**: The constrained breakends of the SV is placed at the extremity of a chromosome arm.
-* **`"chrom"`**: The SV spans an entire chromosome. This mode is only compatible with **Deletions (DEL)** and **Duplications (DUP)**. 
+* **`"whole-chromosome"`**: The SV spans an entire chromosome. This mode is only compatible with **Deletions (DEL)** and **Duplications (DUP)**. 
 For Duplications, setting `n_copies` to `1` (or not specifying it) creates a single additional chromosome copy (trisomy).
 
 ### Defining and Using Anchors
