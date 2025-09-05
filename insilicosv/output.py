@@ -136,7 +136,10 @@ class OutputWriter:
         if self.config.get('output_no_haps', False):
             logger.warning('Skipping haps output')
             return
-        for hap_index, hap_fa in enumerate(['sim.hapA.fa', 'sim.hapB.fa']):
+        haploids = ['sim.hapA.fa', 'sim.hapB.fa']
+        if self.config.get('homozygous_only', False):
+            haploids = ['sim.hapA.fa']
+        for hap_index, hap_fa in enumerate(haploids):
             self.output_hap(os.path.join(self.output_path, hap_fa), hap_index)
 
     def output_hap(self, hap_fa, hap_index):
