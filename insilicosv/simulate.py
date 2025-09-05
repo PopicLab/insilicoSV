@@ -822,19 +822,6 @@ class SVSimulator:
                 f' increasing th_proportion_N.')
             sv.set_placement(placement=sv.fixed_placement, roi=None)
             return
-        elif sv.arm_gain_loss or sv.aneuploidy:
-            region = self.get_arm_region(sv)
-
-            # Only affect the requested arm_percent portion of the arm
-            portion_length = floor(region.length() * sv.arm_percent / 100)
-            start = 0 if region.start == 0 else region.end - portion_length
-            end = region.start + portion_length if region.start == 0 else region.end
-            region = Region(chrom=region.chrom, start=start, end=end)
-
-            placement = {Breakend(0): Locus(chrom=region.chrom, pos=start),
-                         Breakend(1): Locus(chrom=region.chrom, pos=end)}
-            sv.set_placement(placement=placement, roi=region, operation=sv.operations[0])
-            return
 
         n_placement_attempts = 0
         max_tries = self.config.get("max_tries", DEFAULT_MAX_TRIES)

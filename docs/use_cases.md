@@ -286,7 +286,6 @@ even if the `interchromosomal` flag is not explicitly set to True.
 The provided YAML code defines a variant set that places cycles of templated insertions across chromosomes.
 ```yaml
 reference: "{path}/{to}/ref.fa"
-overlap_regions: ["/{path_to}/{candidate_overlap_events_1}.bed"]
 variant_sets:
     - type: "A_B_C -> A_BCAB_C" 
       number: 5
@@ -296,7 +295,7 @@ variant_sets:
         - [500, 1000]
         - [null, null]
         - [500, 1000]
-      interchromsomal: True
+      interchromosomal: True
       interchromosomal_period: 1
 ```
 In this example, for each of the 5 structural variants defined, the `interchromosomal_period` will be set to 1. 
@@ -307,9 +306,16 @@ For instance, a valid placement for one of these SVs would be:
 - B is on chr1.
 - C is on chr2.
 
+The VCF records for this case would be:
+```
+chr1   74348760    sv0_2   N   <COPY-PASTE>    100 PASS    END=74349707;OP_TYPE=COPY-PASTE;GRAMMAR=A_B_C->A_BCAB_C;VSET=0;TARGET_CHROM=chr1;TARGET=74349707;SVLEN=947;INSORD=2;SVID=sv0;SVTYPE=CUSTOM;SYMBOL=B    GT  0|1
+chr2   49674622    sv0_1   N   <COPY-PASTE>    100 PASS    END=49675453;OP_TYPE=COPY-PASTE;GRAMMAR=A_B_C->A_BCAB_C;VSET=0;TARGET_CHROM=chr1;TARGET=74349707;SVLEN=831;INSORD=1;SVID=sv0;SVTYPE=CUSTOM;SYMBOL=A    GT  0|1
+chr2   101202093   sv0_0   N   <COPY-PASTE>    100 PASS    END=101202831;OP_TYPE=COPY-PASTE;GRAMMAR=A_B_C->A_BCAB_C;VSET=0;TARGET_CHROM=chr1;TARGET=74349707;SVLEN=738;INSORD=0;SVID=sv0;SVTYPE=CUSTOM;SYMBOL=C   GT  0|1
+```
+
+Another valid example without period:
 ```yaml
 reference: "{path}/{to}/ref.fa"
-overlap_regions: ["/{path_to}/{candidate_overlap_events_1}.bed"]
 variant_sets:
     - type: "A_B_C -> A_BCAB_C" 
       number: 5
@@ -319,7 +325,7 @@ variant_sets:
         - [500, 1000]
         - [null, null]
         - [500, 1000]
-      interchromsomal: True
+      interchromosomal: True
 ```
 In this case, `interchromosomal` has been set to `True` without providing any `interchromosomal_period`.
 Therefore, the period will be default to 0 and each jump will swictc chromosome without any cycle constraint.

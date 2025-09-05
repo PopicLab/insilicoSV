@@ -1812,7 +1812,7 @@ class TestSVSimulator(unittest.TestCase):
             [["TCGA", "CAT"], {"type": "dDUP", "length_ranges": [[3, 3], [1, None]]},
              [("TCGATCG", "CAT"), ("CGATCGA", "CAT")]],
             [["TCGA", "CAT"], {"type": "dDUP", "length_ranges": [[3, 3], [None, None]],
-                               "interchromosomal_period": 0},
+                               "interchromosomal": True},
              [("TCGA"[:i] + "CAT" + "TCGA"[i:], "CAT") for i in range(0, len("TCGA") + 1)] +
              [("TCGA", "CAT"[:j] + s + "CAT"[j:]) for j in range(0, len("CAT") + 1) for s in ("TCG", "CGA")]],
 
