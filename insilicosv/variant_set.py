@@ -1246,7 +1246,7 @@ VCF_HEADER_INFOS = [
     dict(id='NCOPIES', number=1, type='Integer',
          description="Number of sequence copies to insert at target"),
     dict(id='DIVERGENCE_PROB', number=1, type='Float',
-         description="Divergence probability of the operation."),
+         description="Mutation probability for each nucleotide of a duplicated sequence."),
     dict(id='TARGET', number=1, type='Integer',
          description="Target location for a dispersed duplication or translocation"),
     dict(id='TARGET_CHROM', number=1, type='String',
