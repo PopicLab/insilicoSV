@@ -897,6 +897,8 @@ class SVSimulator:
         output_writer.output_vcf()
         logger.info('Writing novel insertions file')
         output_writer.output_novel_insertions()
+        logger.info('Writing divergence file')
+        output_writer.output_divergence()
         logger.info('Writing novel adjacencies file')
         output_writer.output_novel_adjacencies()
         output_writer.output_stats()
@@ -909,11 +911,13 @@ class SVSimulator:
         logger.info(f'Output path: {self.output_path}')
 
     # for testing only
-    def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta):
+    def produce_variant_genome(self, fasta1_out, fasta2_out, ins_fasta, div_fasta=None):
         self.run()
         shutil.copyfile(os.path.join(self.output_path, 'sim.hapA.fa'), fasta1_out)
         shutil.copyfile(os.path.join(self.output_path, 'sim.hapB.fa'), fasta2_out)
         shutil.copyfile(os.path.join(self.output_path, 'sim.novel_insertions.fa'), ins_fasta)
+        if div_fasta:
+            shutil.copyfile(os.path.join(self.output_path, 'sim.divergence.fa'), div_fasta)
 
 
 # end: class SVSimulator

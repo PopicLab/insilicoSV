@@ -136,7 +136,7 @@ class TestKnownSVs(unittest.TestCase):
         config = config_event_obj
         config.initialize_files()
         fixed_sim = SVSimulator(config.par)
-        fixed_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed, export_to_file=False)
+        fixed_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, config.bed)
         changed_frag_hap1, changed_frag_hap2 = config.get_actual_frag(return_haps='both')
         config.remove_test_files()
         if target_frags is not None:

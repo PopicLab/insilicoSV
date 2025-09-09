@@ -42,7 +42,7 @@ def get_span(sv: SV) -> Region:
 class TestObject():
     __test__ = False
 
-    def __init__(self, ref, par, hap1, hap2, bed):
+    def __init__(self, ref, par, hap1, hap2, bed, divergence_path=None):
         # ref: list, [file location, fasta_contents_as_dictionary]
         # par: list, [file location, yaml_contents_as_dictionary]
         # hap1: str, location to first output fasta file
@@ -56,6 +56,7 @@ class TestObject():
         self.hap2 = hap2
         self.bed = bed
         self.random_seed = 88
+        self.divergence = divergence_path
 
     def initialize_files(self):
         # initialize all files, delete old test files
@@ -88,10 +89,16 @@ class TestObject():
         print(result, fasta.references)
         return result[0] if len(result) == 1 else tuple(result)
 
-    def get_actual_frag(self, return_haps='hap1'):
+    def get_actual_frag(self, return_haps='hap1', divergence=None):
         # return_haps: ['hap1', 'hap2', 'both'] for control over which haplotype we check
         print('return haps', return_haps, self.hap1, self.hap2)
-
+        
+        try:
+            with FastaFile(self.hap1) as fasta_out_1:
+                div = self.get_frag(fasta_out_1)
+        except:
+            div = ''
+        
         try:
             with FastaFile(self.hap1) as fasta_out_1:
                 frags1 = self.get_frag(fasta_out_1)
@@ -108,7 +115,7 @@ class TestObject():
         elif return_haps == 'hap2':
             return frags2
         else:
-            return frags1, frags2
+            return frags1, frags2, div
 
 
 class TestSVSimulator(unittest.TestCase):
@@ -121,6 +128,7 @@ class TestSVSimulator(unittest.TestCase):
         self.hap1 = f"{self.test_dir}/test1.fna"
         self.hap2 = f"{self.test_dir}/test2.fna"
         self.bed = f"{self.test_dir}/out.bed"
+        self.divergence = f"{self.test_dir}/divergence.fna"
 
         self.test_overlap_bed = "tests/inputs/example_overlap_events.bed"
         self.test_overlap_bed_2 = "tests/inputs/example_overlap_events_2.bed"
@@ -971,30 +979,6 @@ class TestSVSimulator(unittest.TestCase):
                                                         self.hap1, self.hap2, self.bed)
                                              ]
 
-        # ---------- test objects for divergence event ------------
-        self.test_objects_divergence_event = [TestObject([self.ref_file, {"chr21": "CTCCGTCGTA"}],
-                                                         [self.par, {"reference": self.ref_file,
-                                                                     "variant_sets": [
-                                                                         {"type": "DIVERGENCE", "number": 1,
-                                                                          'divergence_prob': [0.5],
-                                                                          "length_ranges": [[5, 5]]}]}],
-                                                         self.hap1, self.hap2, self.bed),
-                                              TestObject([self.ref_file, {"chr21": "CTCCGTCGTA"}],
-                                                         [self.par, {"reference": self.ref_file,
-                                                                     "variant_sets": [
-                                                                         {"type": "DIVERGENCE", "number": 1,
-                                                                          'divergence_prob': [1],
-                                                                          "length_ranges": [[10, 10]]}]}],
-                                                         self.hap1, self.hap2, self.bed),
-                                              TestObject([self.ref_file, {"chr21": "CTCCGTCGTA"}],
-                                                         [self.par, {"reference": self.ref_file,
-                                                                     "variant_sets": [
-                                                                         {"type": "DIVERGENCE", "number": 1,
-                                                                          'divergence_prob': [0.2],
-                                                                          "length_ranges": [[10, 10]]}]}],
-                                                         self.hap1, self.hap2, self.bed)
-                                              ]
-
         self.test_objects_filter_chroms = [
             TestObject([self.ref_file, {"chr21": "CTCCGTCGTACTAAGTCGTACTCCGTCGTACTAAGTCGTA",
                                         "chr20": "CTCCGT"}],
@@ -1458,6 +1442,82 @@ class TestSVSimulator(unittest.TestCase):
              ]
 
         ]
+        
+        self.test_divergence_dup = [
+            ["TC",
+             TestObject([self.ref_file, {"chr21": "TC"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    'overlap_regions': self.test_insertion_order_exact,
+                                    "variant_sets": [{"type": "(A)->Aa*",
+                                                      "number": 1,
+                                                      "divergence_prob": 0.5,
+                                                      'overlap_mode': 'exact',
+                                                      "length_ranges": [[1, 1]]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TAC", "TTC", "TGC", "TCC"]],
+            ["TC",
+             TestObject([self.ref_file, {"chr21": "TC"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    'overlap_regions': self.test_insertion_order_exact,
+                                    "variant_sets": [{"type": "(A)->A*a",
+                                                      "number": 1,
+                                                      "divergence_prob": 0.5,
+                                                      'overlap_mode': 'exact',
+                                                      "length_ranges": [[1, 1]]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TAC", "CAC", "GAC", "AAC"]],
+            ["TC",
+             TestObject([self.ref_file, {"chr21": "TC"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'heterozygous_only': True,
+                                    'overlap_regions': self.test_insertion_order_exact,
+                                    "variant_sets": [{"type": "(A)->A*a",
+                                                      "number": 1,
+                                                      "divergence_prob": 0.5,
+                                                      'overlap_mode': 'exact',
+                                                      "length_ranges": [[1, 1]]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TC", "TAC", "CAC", "GAC", "AAC"]],
+            ["TC",
+             TestObject([self.ref_file, {"chr21": "TC"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    'overlap_regions': self.test_insertion_order_exact,
+                                    "variant_sets": [{"type": "(A)_->A_A*",
+                                                      "number": 1,
+                                                      "divergence_prob": 0.5,
+                                                      'overlap_mode': 'exact',
+                                                      "length_ranges": [[1, 1], [1, 1]]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TCT", "TCA", "TCC", "TCG"]],
+            ["TCG",
+             TestObject([self.ref_file, {"chr21": "TCG"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    "variant_sets": [{"type": "A->AA*",
+                                                      "number": 1,
+                                                      "divergence_prob": 0.5,
+                                                      "length_ranges": [[3, 3]]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TCG" + cpt_0 + cpt_1 + cpt_2 for cpt_0 in 'TCGA' for cpt_1 in 'TCGA' for cpt_2 in 'TCGA']]
+        ]
 
         self.test_indel_overlap = [
             ["TC",
@@ -1726,8 +1786,6 @@ class TestSVSimulator(unittest.TestCase):
                      "length_ranges": [[2, 2]]}, ["T", "A"]],
             ["TC", {"type": "mCNV", "n_copies": [3],
                     "length_ranges": [[2, 2]]}, ["TCTCTC"]],
-            ["TC", {"type": "DIVERGENCE", "divergence_prob": [0.6],
-                    "length_ranges": [[2, 2]]}, [i + j for i in ['A', 'T', 'C', 'G'] for j in ['A', 'T', 'C', 'G']]],
             ["TC", {"type": "A->A+", "n_copies": [[2, 3]],
                     "length_ranges": [[2, 2]]}, ["TCTCTC", "TCTC"]],
             ["TCGA", {"type": "AB->ABA+", "n_copies": [3],
@@ -1830,8 +1888,8 @@ class TestSVSimulator(unittest.TestCase):
              [('GT', 'ACCA'), ('GT', 'CAAC'), ('GG', 'AACA'), ('TT', 'CACC')]],
 
             ["T", {"type": "A->AA*", "length_ranges": [[1, 1]],
-                   "divergence_prob": [1.0]},
-             ["TC", "TG", "TA"]],
+                   "divergence_prob": [0.5]},
+             ["TT", "TC", "TG", "TA"]],
 
             [["GGCCTT", "CA"], [{"type": "ABC->AC",
                                  "length_ranges": [[2, 2], [2, 2], [2, 2]]}, ],
@@ -1950,7 +2008,7 @@ class TestSVSimulator(unittest.TestCase):
             print(f'Error removing test dir {self.test_dir}: {exc}')
 
     # helper method for tests where the output will be in a known list of possibilities
-    def helper_test_known_output_svs(self, config_event_obj, target_frags=None, heterozygous=True, test_num=None):
+    def helper_test_known_output_svs(self, config_event_obj, target_frags=None, heterozygous=True, test_num=None, div_check=False):
         # target_frags: optional input frags to be checked for match with output frags
         if test_num:
             print('TEST', test_num)
@@ -1958,11 +2016,16 @@ class TestSVSimulator(unittest.TestCase):
         config.initialize_files()
         print(config.par_content)
         curr_sim = SVSimulator(config.par)
-        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref)
+        curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref, div_fasta=config.divergence)
         print('HELPER', curr_sim.config, config.hap1, config.hap2, config.ref, config.bed)
-        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        changed_frag_1, changed_frag_2, div_parsed = config.get_actual_frag(return_haps='both')
         print('HAP', changed_frag_1, changed_frag_2)
         config.remove_test_files()
+        if div_check:
+            print('DIVERGENCE', config.divergence, div_parsed)
+            div_lines = div_parsed.split('\n')
+            self.assertTrue(div_parsed in target_frags)
+            
         if target_frags is not None:
             statement = (changed_frag_1 in target_frags) or (changed_frag_2 in target_frags)
             if not heterozygous:
@@ -1988,7 +2051,7 @@ class TestSVSimulator(unittest.TestCase):
         curr_sim = SVSimulator(config.par)
         curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref)
         print(curr_sim.config, config.hap1, config.hap2, config.ref, config.bed)
-        changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+        changed_frag_1, changed_frag_2, _ = config.get_actual_frag(return_haps='both')
         config.remove_test_files()
 
         for pred_index in range(len(changed_frag_1)):
@@ -2071,7 +2134,7 @@ class TestSVSimulator(unittest.TestCase):
             config.initialize_files()
             curr_sim = SVSimulator(config.par)
             curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref)
-            changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+            changed_frag_1, changed_frag_2, _ = config.get_actual_frag(return_haps='both')
             if i == 0:
                 print(changed_frag_1, changed_frag_2)
                 self.assertTrue('CTGTCGTA' in [changed_frag_1, changed_frag_2])
@@ -2202,7 +2265,7 @@ class TestSVSimulator(unittest.TestCase):
             curr_sim.produce_variant_genome(config.hap1, config.hap2, config.ref)
             # to simplify checking the different possible outcomes of each test: sorting SVs by start position
             curr_sim.svs.sort(key=lambda x: get_span(x).start)
-            changed_frag_1, changed_frag_2 = config.get_actual_frag(return_haps='both')
+            changed_frag_1, changed_frag_2, _ = config.get_actual_frag(return_haps='both')
             if i == 0:
                 # source: CTCCGTAGTA -> four possible valid del intervals, checking each
                 print(changed_frag_1, changed_frag_2)
@@ -2234,16 +2297,6 @@ class TestSVSimulator(unittest.TestCase):
                 self.assertTrue(
                     is_overlapping([(2, 4)], (get_span(partial_ovl_sv).start, get_span(partial_ovl_sv).end)) or
                     is_overlapping([(22, 25)], (get_span(partial_ovl_sv).start, get_span(partial_ovl_sv).end)))
-
-    def test_divergence_events(self):
-        # the divergence operator will mutate each base in an event interval with probability p
-        # --> going to check for randomized placement of a divergence by checking that the output sequence
-        # --> is not contained in the unedited reference (for event of length 5 and dummy reference: CTCCGTCGTA)
-        for i in range(len(self.test_objects_divergence_event)):
-            changed_frag_1, changed_frag_2, _ = self.helper_test_known_output_svs(self.test_objects_divergence_event[i])
-            self.assertTrue(changed_frag_1 not in self.test_objects_divergence_event[i].ref or
-                            changed_frag_2 not in self.test_objects_divergence_event[i].ref)
-            self.assertTrue(len(changed_frag_1) == len(changed_frag_2) == 10)
 
     def test_flanked_inversions(self):
         # tests for dupINVdup, delINVdel, etc.
@@ -2357,7 +2410,7 @@ class TestSVSimulator(unittest.TestCase):
             assert not [unexpected_result for unexpected_result in results_seen if
                         unexpected_result not in expected_results], f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
 
-    def run_test(self, tests):
+    def run_test(self, tests, div_check=False):
         for test_num, (ref, vs_config, expected_outputs) in enumerate(tests):
             print(ref, vs_config, expected_outputs)
             print('TEST', test_num, 'config', vs_config)
@@ -2374,7 +2427,7 @@ class TestSVSimulator(unittest.TestCase):
                                                      "random_seed": 55,
                                                      "variant_sets": [dict(number=1, **vs_conf)
                                                                       for vs_conf in vs_config]}],
-                                         self.hap1, self.hap2, self.bed)
+                                         self.hap1, self.hap2, self.bed, self.divergence)
             else:
                 heterozygous = True
                 test_object = vs_config
@@ -2391,7 +2444,8 @@ class TestSVSimulator(unittest.TestCase):
 
                 attempt_num += 1
                 results, results2, svs = self.helper_test_known_output_svs(test_object, expected_results,
-                                                                           heterozygous=heterozygous, test_num=test_num)
+                                                                           heterozygous=heterozygous, test_num=test_num,
+                                                                           div_check=div_check)
                 print(test_num, 'RESULTS', results, results2)
                 count_occ[results] += 1
                 results_seen.update([results, results2])
@@ -2410,6 +2464,9 @@ class TestSVSimulator(unittest.TestCase):
 
             assert not [unexpected_result for unexpected_result in results_seen if
                         unexpected_result not in expected_results], f'{test_num=} {vs_config=} {ref=} {results_seen=} {expected_results=}'
+            
+    def test_divergence(self):
+        self.run_test(self.test_divergence_dup, div_check=True)
 
     def test_snp_overlap(self):
         self.run_test(self.test_snp_overlap)

@@ -115,8 +115,20 @@ an additional suffix is appended to denote the specific record number within the
 9. *SVID*: Unique identifier of the SV.
 10. *SVTYPE*: Type of the SV.
 11. *SYMBOL*: The letter from the grammar corresponding to the record source region. 
+12. *DIVERGENCE_PROB*: The probability of mutating each nucleotide in a sequence marked for divergence.
 
 **Note:** For SNPs, VSET is the only reported INFO field.
+
+## Output novel insertion file
+The FASTA file `sim.novel_insertions.fa` contains sequences for novel insertions.
+Each novel insertion is represented by two lines.
+The first line provides a unique identifier. This includes the SV identifier, the operation identifier,
+the target chromosome and the insertion position.
+The second line contains the inserted sequence.
+
+## Output divergence file
+For SVs including divergences, the modified sequences will be reported in the FASTA file `sim.divergence.fa`.
+its format is similar to the novel insertion file, with each entry consisting of an identifier and the corresponding modified sequence.
 
 ## Output PAF file
 The correct whole-genome alignment of the simulated sample haplotypes to the reference can optionally be

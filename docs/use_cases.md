@@ -316,3 +316,21 @@ variant_sets:
 Here the INDEL and SNP definitions have the `allow_sv_overlap` parameter set to `True`, which allows them to be randomly placed within the DUP intervals.
 Note: SNPs and INDELs that are allowed to overlap SVs are always considered as occurring first in the simulation process. 
 As such, they might be modified or even deleted by SVs that are placed later. Regardless of whether they are ultimately observable in the final genome, all simulated variants are included in the final VCF output.
+
+### Example 8 - Divergence
+Divergence can introduce mutations in a copied sequence, causing it to differ from the original reference sequence. 
+We represent this phenomenon using the `*` symbol in conjunction with the `divergence_prob` parameter. 
+This parameter specifies the probability of each nucleotide to undergo a mutation.
+
+```yaml
+reference: "{path}/{to}/ref.fa"
+variant_sets:
+    - type: "A->A_A*"  
+      number: 5
+      divergence_prob: 0.1
+      length_ranges:
+        - [1000, 1000]
+        - [1000, 100000] 
+```
+In the provided example, a dDUP with divergence is defined.
+Each of the 1,000 duplicated nucleotides will have a `10%` chance of being mutated.

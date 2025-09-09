@@ -78,6 +78,7 @@ class VariantSet(ABC):
             self.vset_config['overlap_region_length_range'] if 'overlap_region_length_range' in self.vset_config else
             [None, None])
 
+        self.svtype = None
         if 'type' in self.vset_config:
             self.vset_config['type'] = self.vset_config['type'].replace(" ", "")
             if '->' in self.vset_config['type']:
@@ -212,25 +213,35 @@ class VariantSet(ABC):
             n_copies = 1
             if Syntax.MULTIPLE_COPIES in rhs_str:
                 chk(n_multiple_copies < len(n_copies_list), f'A number of copies must be provided '
-                                                            f'for each `{Syntax.MULTIPLE_COPIES}` symbol used.'
+                                                            f'for each `{Syntax.MULTIPLE_COPIES}` symbol used. '
                                                             f'Error in {vset_config}', error_type='syntax')
                 n_copies = self.get_sampled_int_value(n_copies_list[n_multiple_copies])
                 chk(n_copies >= 1, f'The number of copies must be strictly positive, got {n_copies} for '
-                                   f'the {n_multiple_copies + 1} `{Syntax.MULTIPLE_COPIES}` symbol {symbol}. Error in {vset_config}', error_type='syntax')
+                                   f'the {n_multiple_copies + 1} \'{Syntax.MULTIPLE_COPIES}\' symbol {symbol}. Error in {vset_config}', error_type='syntax')
                 n_multiple_copies += 1
 
+            # Determine the divergence probability for each divergence symbol.
             divergence_prob = 0
             if Syntax.DIVERGENCE in rhs_str:
                 divergence_prob = 1.
 
                 if not replacement_seq:
                     # replacement_seq is used to provide the SNP when loading from vcf
-                    chk(n_divergence_prob < len(divergence_prob_list), f'A number of copies must be provided '
-                                                                       f'for each + symbol used.', error_type='syntax')
+                    chk(n_divergence_prob < len(divergence_prob_list), f'A divergence must be provided '
+                                                                       f'for each \'{Syntax.DIVERGENCE}\' symbol used. '
+                                                                       f'Error in {vset_config}', error_type='syntax')
                     divergence_prob = self.get_sampled_int_value(divergence_prob_list[n_divergence_prob])
                     chk(0 < divergence_prob <= 1,
                         f'The divergence probability must be between 0 (excluded) and 1 (included), got {divergence_prob} for '
-                        f'the {n_divergence_prob + 1}-th \'*\' symbol {symbol}. Error in {vset_config}', error_type='syntax')
+                        f'the {n_divergence_prob + 1}-th \'{Syntax.DIVERGENCE}\' symbol {symbol}. Error in {vset_config}', error_type='syntax')
+
+                if self.svtype and self.svtype != VariantType.SNP:
+                    # A divergence can only be applied to a copied sequence
+                    chk("".join(rhs_strs).upper().count(symbol.name) > 1,
+                        f'{Syntax.DIVERGENCE} can only be applied to a duplicated sequence. '
+                        f'Error in the {n_divergence_prob + 1}-th of {vset_config}', error_type='syntax')
+                    chk(divergence_prob < 1, f'The divergence probability of a divergence must be strictly less than 1. '
+                                             f'Error in the {n_divergence_prob + 1}-th of {vset_config}', error_type='syntax')
                 n_divergence_prob += 1
 
             transform = Transform(
@@ -422,7 +433,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         # Check if a type provided as grammar is a predefined type
         if self.svtype == VariantType.CUSTOM:
             lhs = tuple([letter for letter in self.source if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]])
-            rhs = tuple(self.target)
+            rhs = tuple([letter for letter in self.target if letter != Syntax.DIVERGENCE])
             for key, grammar in SV_KEY.items():
                 # Test if the grammar or its symmetric match the grammar of the record
                 if (grammar[0] == lhs and grammar[1] == rhs) or (
@@ -430,17 +441,17 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                     # we found a match and update the types
                     self.svtype = key
                     # Distinguish between SNP and DIVERGENCE
-                    if key in [VariantType.DIVERGENCE, VariantType.SNP]:
-                        if ((vset_cfg.get('length_ranges') in (None, [[1, 1]])) and
+                    if key == VariantType.SNP and ((vset_cfg.get('length_ranges') in (None, [[1, 1]])) and
                             ('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] in [[1], 1, 1., [1.]])):
                             self.svtype = VariantType.SNP
-                        else:
-                            self.svtype = VariantType.DIVERGENCE
                     self.input_type = VariantType.CUSTOM
 
         chk(self.overlap_mode != OverlapMode.CHROM or self.svtype in [VariantType.DEL, VariantType.DUP],
             'Only DEL and DUP SVs are allowed '
             'to have overlap_mode: chrom. Error in %s' % vset_cfg['config_descr'], error_type='syntax')
+
+        chk('divergence_prob' not in vset_cfg or Syntax.DIVERGENCE not in self.target,
+            f'\'{Syntax.DIVERGENCE}\' is not used but divergence_prob has been provided in {vset_cfg}', error_type='syntax')
 
         if self.svtype == VariantType.SNP:
             chk(vset_cfg.get('length_ranges') in (None, [[1, 1]]),
@@ -967,12 +978,12 @@ class ImportedVariantSet(VariantSet):
 
         parsed_info['NCOPIES'] = vcf_info.get('NCOPIES', 1)
         parsed_info['INSORD'] = vcf_info.get('INSORD', None)
-        parsed_info['DIVERGENCEPROB'] = [0]
+        parsed_info['DIVERGENCE_PROB'] = [0]
         parsed_info['ALT'] = None
         parsed_info['REF'] = None
         parsed_info['SVTYPE'] = vcf_info.get('SVTYPE', 'Custom')
         if parsed_info['OP_TYPE'] == VariantType.SNP:
-            parsed_info['DIVERGENCEPROB'] = [1.0]
+            parsed_info['DIVERGENCE_PROB'] = [1.0]
             if vcf_rec.alts[0] != '<SNP>':
                 parsed_info['ALT'] = vcf_rec.alts
                 chk(len(vcf_rec.alts) == 1, f'Error in the ALT field, biallelic SNPs are not supported {vcf_rec}')
@@ -1077,7 +1088,7 @@ class ImportedVariantSet(VariantSet):
                 operations, _, _, _, _ = self.grammar_to_variant_set(lhs_strs, rhs_strs_list, symbol_lengths,
                                                                      symbol_min_lengths, 1,
                                                                      parsed_info['INSSEQ'], [parsed_info['NCOPIES']],
-                                                                     parsed_info['DIVERGENCEPROB'],
+                                                                     parsed_info['DIVERGENCE_PROB'],
                                                                      replacement_seq=parsed_info['ALT'],
                                                                      orig_seq=parsed_info['REF'],
                                                                      vset_config=vcf_rec)
@@ -1116,7 +1127,7 @@ class ImportedVariantSet(VariantSet):
                 for op_type, op_is_in_place, op_target in op_attributes:
                     transform = Transform(TransformType[op_type], is_in_place=op_is_in_place,
                                           n_copies=parsed_info['NCOPIES'],
-                                          divergence_prob=parsed_info['DIVERGENCEPROB'][0],
+                                          divergence_prob=parsed_info['DIVERGENCE_PROB'][0],
                                           replacement_seq=parsed_info['ALT'])
                     operations.append(Operation(transform, source_breakend_region=source_region,
                                                 novel_insertion_seq=parsed_info['INSSEQ'],
@@ -1208,6 +1219,8 @@ VCF_HEADER_INFOS = [
          description="Length of structural variant"),
     dict(id='NCOPIES', number=1, type='Integer',
          description="Number of sequence copies to insert at target"),
+    dict(id='DIVERGENCE_PROB', number=1, type='Float',
+         description="Divergence probability of the operation."),
     dict(id='TARGET', number=1, type='Integer',
          description="Target location for a dispersed duplication or translocation"),
     dict(id='TARGET_CHROM', number=1, type='String',
