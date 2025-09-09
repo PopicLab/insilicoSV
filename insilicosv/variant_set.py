@@ -99,8 +99,8 @@ class VariantSet(ABC):
                 f'are not allowed in the target, If for instance, you want to constrain the insertion target of a dDUP, '
                 f'write A_(). Error in {vset_config}', error_type='syntax')
 
-    def get_sampled_int_value(self, value, locals_dict=
-    None):
+    @staticmethod
+    def get_sampled_int_value(value, locals_dict=None):
         if isinstance(value, (int, float)):
             return value
         elif isinstance(value, list):
@@ -118,6 +118,17 @@ class VariantSet(ABC):
                 return int(eval(value, eval_dict))
             except Exception as exc:
                 chk(False, f'Error valuating the expression {value}: {exc}', error_type='value')
+
+    @staticmethod
+    def get_sampled_float_value(value):
+        if isinstance(value, (int, float)):
+            return value
+        elif isinstance(value, list):
+            chk(len(value) == 2, f'Expected [min, max] pair: {value}', error_type='value')
+            chk(isinstance(value[0], float) and isinstance(value[1], float) and
+                int(value[0]) <= int(value[1]), f'Invalid [min, max] pair: {value}', error_type='value')
+            return random.uniform(value[0], value[1])
+        chk(False, f'Error valuating the expression {value}', error_type='value')
 
     def grammar_to_variant_set(self, lhs_strs, rhs_strs, symbol_lengths, symbol_min_lengths, num_letters,
                                novel_insertion_seqs, n_copies_list, divergence_prob_list, replacement_seq=None, orig_seq=None,
@@ -230,7 +241,7 @@ class VariantSet(ABC):
                     chk(n_divergence_prob < len(divergence_prob_list), f'A divergence must be provided '
                                                                        f'for each \'{Syntax.DIVERGENCE}\' symbol used. '
                                                                        f'Error in {vset_config}', error_type='syntax')
-                    divergence_prob = self.get_sampled_int_value(divergence_prob_list[n_divergence_prob])
+                    divergence_prob = self.get_sampled_float_value(divergence_prob_list[n_divergence_prob])
                     chk(0 < divergence_prob <= 1,
                         f'The divergence probability must be between 0 (excluded) and 1 (included), got {divergence_prob} for '
                         f'the {n_divergence_prob + 1}-th \'{Syntax.DIVERGENCE}\' symbol {symbol}. Error in {vset_config}', error_type='syntax')
@@ -334,7 +345,9 @@ class SimulatedVariantSet(VariantSet):
             f'divergence_prob must be a float or an int or a list of floats in ]0, 1] or a list of ranges. But, a '
                  f'%s was provided in %s' % (type(self.vset_config.get('divergence_prob', [])), self.vset_config), error_type='value')
 
-        if (self.svtype == VariantType.DUP) and ('n_copies' not in self.vset_config):
+        if ((self.svtype != VariantType.CUSTOM) and (Syntax.MULTIPLE_COPIES in ''.join(self.target))
+                and ('n_copies' not in self.vset_config)):
+            # Default the number of copies to 1 for predefined types with duplications
             self.vset_config['n_copies'] = [1]
 
         chk(isinstance('n_copies' not in self.vset_config or self.vset_config['n_copies'], (list, int)),
@@ -433,8 +446,16 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         # Check if a type provided as grammar is a predefined type
         if self.svtype == VariantType.CUSTOM:
             lhs = tuple([letter for letter in self.source if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]])
-            rhs = tuple([letter for letter in self.target if letter != Syntax.DIVERGENCE])
+            rhs = tuple([letter if Syntax.DIVERGENCE not in letter and Syntax.MULTIPLE_COPIES not in letter
+                         else letter[0] for letter in self.target])
+            print(rhs)
             for key, grammar in SV_KEY.items():
+                grammar = (grammar[0], tuple([letter if Syntax.MULTIPLE_COPIES not in letter
+                                              else letter[0] for letter in grammar[1]]))
+                if key == VariantType.DUP:
+                    print(key, grammar)
+                    print([letter for letter in grammar], Syntax.MULTIPLE_COPIES)
+                    print((grammar[0] == lhs and grammar[1] == rhs), grammar[0] == lhs[::-1] and grammar[1] == rhs[::-1])
                 # Test if the grammar or its symmetric match the grammar of the record
                 if (grammar[0] == lhs and grammar[1] == rhs) or (
                         grammar[0] == lhs[::-1] and grammar[1] == rhs[::-1]):
