@@ -995,11 +995,16 @@ class ImportedVariantSet(VariantSet):
             logger.warning(
                 'SV containing a novel sequence insertion but the sequence was not provided, a random sequence is used')
             novel_insertion_seq = [utils.generate_seq(length=rec_len)]
+
+        if 'DIVERGENCE_PROB' in vcf_info and parsed_info['OP_TYPE'] != VariantType.SNP:
+            logger.warning('InsilicoSV does not support importing specific divergence sequences for now,'
+                           'a new mutated sequence will be created.')
+
         parsed_info['INSSEQ'] = novel_insertion_seq
 
         parsed_info['NCOPIES'] = vcf_info.get('NCOPIES', 1)
         parsed_info['INSORD'] = vcf_info.get('INSORD', None)
-        parsed_info['DIVERGENCE_PROB'] = [0]
+        parsed_info['DIVERGENCE_PROB'] = vcf_info.get('DIVERGENCE_PROB', [0])
         parsed_info['ALT'] = None
         parsed_info['REF'] = None
         parsed_info['SVTYPE'] = vcf_info.get('SVTYPE', 'Custom')
