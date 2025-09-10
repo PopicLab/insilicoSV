@@ -260,13 +260,13 @@ bedtools complement -i sd_regions.bed -g reference/ref.fa > regions_between_SDs.
 ```
 
 ### Example 6 - Interchromosomal dispersions and interchromosomal periods
-The `interchromosomal` and `interchromosomal_period` flags control how an SV is dispersed across chromosomes. 
+The `interchromosomal` and `interchromosomal_period` parameters control how an SV is dispersed across chromosomes. 
 By default, `interchromosomal` is False, which means the SV is intrachromosomal (it stays on the same chromosome).
 
 #### Understanding the `interchromosomal_period` flag
 The `interchromosomal_period` flag gives you fine-grained control over which chromosomes are affected by an interchromosomal SV.
 
-- `interchromosomal_period=0`: This is the default.  Each dispersion of the SV will switch chromosome. 
+- `interchromosomal_period=0`: This is the default if `interchromosomal` is set to True.  Each dispersion of the SV will switch chromosome. 
 This ensures that every part of the SV is placed on a different chromosome than the last.
 
 - `interchromosomal_period > 0`: This creates a cycle of dispersions among a specific number of different chromosomes.
@@ -277,8 +277,8 @@ Any subsequent dispersions will then cycle back through these same chromosomes i
 For each SV in the variant set, a random `interchromosomal_period` value will be chosen from this range.
 
 ##### Key considerations for interchromosomal dispersions
-- `Unbounded Lengths`: When defining interchromosomal dispersions, their lengths must be unbounded (specified as [null, null]).  
-- `Simplified Syntax`: If a non-null `interchromosomal_period` value is provided, the SV will automatically be treated as `interchromosomal`, 
+- Unbounded lengths: When defining interchromosomal dispersions, their lengths must be unbounded (specified as [null, null]).  
+- Simplified syntax: If a non-null `interchromosomal_period` value is provided, the SV will automatically be treated as `interchromosomal`, 
 even if the `interchromosomal` flag is not explicitly set to True.
 - If `interchromosomal_period=0`, a chromosome can be repeated, however a dispersion is ensured to connect two different chromosomes.
 
@@ -299,7 +299,7 @@ variant_sets:
       interchromosomal_period: 1
 ```
 In this example, for each of the 5 structural variants defined, the `interchromosomal_period` will be set to 1. 
-This means SVs will cycle between two chromosomes.
+This means these SVs will cycle between two chromosomes.
 
 For instance, a valid placement for one of these SVs would be:
 - A is on chr2.
@@ -328,15 +328,15 @@ variant_sets:
       interchromosomal: True
 ```
 In this case, `interchromosomal` has been set to `True` without providing any `interchromosomal_period`.
-Therefore, the period will be default to 0 and each jump will swictc chromosome without any cycle constraint.
-A chromosome might be visited several times.
+Therefore, the period will default to 0 and each jump will swicth chromosomes without any cycle constraints.
+Note: a chromosome might be visited several times.
 
 A possible placement for one of these interchromosomal SVs could be:
   - A is on chr1.
   - B is on chr13.
   - C is on chr20.
   
-Because all dispersions are interchromosomal, B cannot be placed back on chr1 and C cannot be placed on chr13. 
+Because all dispersions are interchromosomal, B cannot be placed on chr1 and C cannot be placed on chr13. 
 However, C could be placed in a different region of chr1.
 
 ### Example 7 - SNP and INDEL placement within SVs
