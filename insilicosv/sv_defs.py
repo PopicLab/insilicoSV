@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from copy import copy
 from enum import Enum
 from functools import cached_property
-
-from PIL.ImageOps import scale
 from typing_extensions import TypeAlias, Optional, Any, cast, override
 
 from insilicosv.utils import (
@@ -64,7 +62,7 @@ class Operation:
     target_insertion_breakend: Optional[Breakend] = None
     target_insertion_order: Optional[tuple] = None
 
-    placement: Optional[list[Locus]] = None
+    placement: Optional[dict[Breakend, Locus]] = None
 
     op_info: Optional[dict] = None
 
@@ -84,13 +82,21 @@ class Operation:
 
     def get_source_region(self, placement):
         if self.source_breakend_region is not None:
-            return Region(chrom=placement[self.source_breakend_region.start_breakend].chrom,
-                          start=placement[self.source_breakend_region.start_breakend].pos,
-                          end=placement[self.source_breakend_region.end_breakend].pos)
+            # We adapt for incomplete placement, if only one of the breakends has been placed, we return a point region
+            start = placement[self.source_breakend_region.start_breakend] if self.source_breakend_region.start_breakend in placement else None
+            end = placement[self.source_breakend_region.end_breakend] if self.source_breakend_region.end_breakend in placement else None
+
+            if start is None and end is None:
+                return None
+            if start is None:
+                start = end
+            if end is None:
+                end = start
+            return Region(chrom=start.chrom, start=start.pos, end=end.pos)
         return None
 
     def get_target_region(self, placement):
-        if self.is_in_place:
+        if self.is_in_place or self.target_insertion_breakend not in placement:
             return cast(Region, self.get_source_region(placement))
         else:
             return Region(chrom=placement[self.target_insertion_breakend].chrom,
@@ -138,7 +144,7 @@ class SV(ABC):
     dispersions: list[Optional[int]]
 
     # whether unbounded dispersions in this SV are interchromosomal
-    is_interchromosomal: bool
+    interchromosomal_period: int
 
     # list of operations comprising this SV, specified in terms of its breakends.
     operations: list[Operation]
@@ -160,7 +166,7 @@ class SV(ABC):
     blacklist_filter: Optional[RegionFilter]
 
     # a specific placement prescribed for this SV -- used for SVs imported from a vcf
-    fixed_placement: Optional[Locus]
+    fixed_placement: Optional[dict[Locus]]
 
     #########################
 
@@ -177,7 +183,7 @@ class SV(ABC):
     #
     # Fields set when SV is placed
     #
-    placement: Optional[list[Locus]] = None
+    placement: Optional[dict[Locus]] = None
     roi: Optional[Region] = None
 
     # Fields used while finding a placement
@@ -248,6 +254,10 @@ class SV(ABC):
     @property
     def breakends(self):
         return tuple(range(len(self.breakend_interval_lengths) + 1))
+
+    @property
+    def is_interchromosomal(self):
+        return self.interchromosomal_period is not None
 
     @abstractmethod
     def to_vcf_records(self, config):
@@ -359,13 +369,13 @@ class BaseSV(SV):
                 assert dispersion_target.is_empty()
             sv_info = dict(self.info)
             op_type_str = operation.transform_type.value
-            if (operation.transform_type == TransformType.IDENTITY) and operation.is_in_place:
-                if sv_type_str == 'SNP':
-                    # SNP
-                    op_type_str = 'NA'
+            if sv_type_str == 'SNP':
+                # SNP
+                op_type_str = 'NA'
+                if 'Imported' not in self.sv_id:
                     rec_id = sv_id = 'snp' + self.sv_id.split('sv')[-1]
-                elif operation.transform.divergence_prob > 0:
-                    op_type_str = 'DIVERGENCE'
+            elif operation.transform.divergence_prob > 0:
+                sv_info["DIVERGENCE_PROB"] = operation.transform.divergence_prob
 
             if operation.novel_insertion_seq is not None:
                 op_chrom = operation.target_region.chrom
@@ -441,7 +451,7 @@ class BaseSV(SV):
             sv_info['SVTYPE'] = sv_type_str
 
             if self.allow_sv_overlap:
-                sv_info['ENABLE_OVERLAP_SV'] = str(True)
+                sv_info['ALLOW_SV_OVERLAP'] = str(True)
 
             for key, value in operation.op_info.items():
                 sv_info[key] = value
@@ -520,7 +530,7 @@ class TandemRepeatExpansionContractionSV(BaseSV):
     num_repeats_in_placement: int = 0
 
     @override
-    def set_placement(self, placement, roi, operation):
+    def set_placement(self, placement, roi, operation=None):
         self.roi = roi
         # The operation gets the motif to insert or delete
         operation.motif = roi.motif * self.num_repeats_in_placement * operation.transform.n_copies
@@ -557,12 +567,12 @@ SV_KEY = {
     VariantType.INV: (("A",), ("a",)),
     VariantType.DUP: (("A",), ("A", "A+")),
     VariantType.mCNV: (("A",), ("A+",)),
-    VariantType.INV_DUP: (("A",), ("A", "a")),
-    VariantType.DUP_INV: (("A",), ("a", "a")),
+    VariantType.INV_DUP: (("A",), ("A", "a+")),
+    VariantType.DUP_INV: (("A",), ("a", "a+")),
 
-    VariantType.dDUP: (("A", "_"), ("A", "_", "A")),
-    VariantType.INV_dDUP: (("A", "_"), ("A", "_", "a")),
-    VariantType.dDUP_INV: (("A", "_"), ("a", "_", "a")),
+    VariantType.dDUP: (("A", "_"), ("A", "_", "A+")),
+    VariantType.INV_dDUP: (("A", "_"), ("A", "_", "a+")),
+    VariantType.dDUP_INV: (("A", "_"), ("a", "_", "a+")),
     VariantType.INV_nrTRA: (("A", "_"), ("_", "a")),
     VariantType.nrTRA: (("A", "_"), ("_", "A")),
     VariantType.rTRA: (("A", "_", "B"), ("B", "_", "A")),
@@ -581,7 +591,6 @@ SV_KEY = {
     VariantType.delINVdup: (("A", "B", "C"), ("c", "b", "C")),
     VariantType.dupINVdel: (("A", "B", "C"), ("A", "b", "a")),
 
-    VariantType.DIVERGENCE: (("A",), ("A*",)),
     VariantType.SNP: (("A",), ("A*",)),
     VariantType.INDEL: ((), ()),
 }

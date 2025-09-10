@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "insilicosv"
-version = "0.1.8"
+version = "0.1.9"
 authors = [
   { name="Nick Jiang", email="nickj@berkeley.edu" },
   { name="Chris Rohlicek", email="crohlice@broadinstitute.org" },

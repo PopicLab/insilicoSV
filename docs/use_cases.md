@@ -259,40 +259,85 @@ To obtain the required BED file, `bedtools complement` can be used to generate r
 bedtools complement -i sd_regions.bed -g reference/ref.fa > regions_between_SDs.bed
 ```
 
-### Example 6 - Placing interchromosomal SVs
-insilicoSV allows to simulate interchromosomal SVs by using the `interchromosomal` flag. 
-This means the SV will involve changes across different chromosomes.
+### Example 6 - Interchromosomal dispersions and interchromosomal periods
+The `interchromosomal` and `interchromosomal_period` parameters control how an SV is dispersed across chromosomes. 
+By default, `interchromosomal` is False, which means the SV is intrachromosomal (it stays on the same chromosome).
 
-To define an interchromosomal SV, set `interchromosomal: True` within the variant set definition, 
-as shown in the example below:
+#### Understanding the `interchromosomal_period` flag
+The `interchromosomal_period` flag gives you fine-grained control over which chromosomes are affected by an interchromosomal SV.
+
+- `interchromosomal_period=0`: This is the default if `interchromosomal` is set to True.  Each dispersion of the SV will switch chromosome. 
+This ensures that every part of the SV is placed on a different chromosome than the last.
+
+- `interchromosomal_period > 0`: This creates a cycle of dispersions among a specific number of different chromosomes.
+The first `interchromosomal_period` dispersions will each be placed on a new, unique chromosome.
+Any subsequent dispersions will then cycle back through these same chromosomes in the order they were first visited creating a cycle.
+
+- List of Integers (e.g., [2, 3]): A list of two integers can be provided to define a range. 
+For each SV in the variant set, a random `interchromosomal_period` value will be chosen from this range.
+
+##### Key considerations for interchromosomal dispersions
+- Unbounded lengths: When defining interchromosomal dispersions, their lengths must be unbounded (specified as [null, null]).  
+- Simplified syntax: If a non-null `interchromosomal_period` value is provided, the SV will automatically be treated as `interchromosomal`, 
+even if the `interchromosomal` flag is not explicitly set to True.
+- If `interchromosomal_period=0`, a chromosome can be repeated, however a dispersion is ensured to connect two different chromosomes.
+
+#### Example scenario: cycling between chromosomes
+The provided YAML code defines a variant set that places cycles of templated insertions across chromosomes.
 ```yaml
 reference: "{path}/{to}/ref.fa"
 variant_sets:
-    - type: "nrTRA"  
-      interchromosomal: True
+    - type: "A_B_C -> A_BCAB_C" 
       number: 5
       length_ranges:
         - [500, 1000]
         - [null, null]
-    - type: "A__ -> A_AB_A"
-      number: 1
+        - [500, 1000]
+        - [null, null]
+        - [500, 1000]
       interchromosomal: True
-      length_ranges:
-         - [500, 1000]
-         - [null, null]
-         - [null, null] 
-         - [500, 1000]
+      interchromosomal_period: 1
 ```
-Key Considerations for Interchromosomal Dispersions
-- Unbounded Lengths: When defining interchromosomal dispersions, their lengths must be unbounded (specified as [null, null]).  
-- Multiple Dispersions: If a custom SV with multiple dispersions is flagged as interchromosomal, each dispersion will involve a change to a different chromosome.
-- Example Scenario: In the second example provided above, where the type is "A__ -> A_AB_A", a possible placement for this interchromosomal SV could be:
-  - The source of A is on chr1.
-  - The AB segment is placed on chr3.
-  - The second copy of A is placed on chr2.
+In this example, for each of the 5 structural variants defined, the `interchromosomal_period` will be set to 1. 
+This means these SVs will cycle between two chromosomes.
+
+For instance, a valid placement for one of these SVs would be:
+- A is on chr2.
+- B is on chr1.
+- C is on chr2.
+
+The VCF records for this case would be:
+```
+chr1   74348760    sv0_2   N   <COPY-PASTE>    100 PASS    END=74349707;OP_TYPE=COPY-PASTE;GRAMMAR=A_B_C->A_BCAB_C;VSET=0;TARGET_CHROM=chr1;TARGET=74349707;SVLEN=947;INSORD=2;SVID=sv0;SVTYPE=CUSTOM;SYMBOL=B    GT  0|1
+chr2   49674622    sv0_1   N   <COPY-PASTE>    100 PASS    END=49675453;OP_TYPE=COPY-PASTE;GRAMMAR=A_B_C->A_BCAB_C;VSET=0;TARGET_CHROM=chr1;TARGET=74349707;SVLEN=831;INSORD=1;SVID=sv0;SVTYPE=CUSTOM;SYMBOL=A    GT  0|1
+chr2   101202093   sv0_0   N   <COPY-PASTE>    100 PASS    END=101202831;OP_TYPE=COPY-PASTE;GRAMMAR=A_B_C->A_BCAB_C;VSET=0;TARGET_CHROM=chr1;TARGET=74349707;SVLEN=738;INSORD=0;SVID=sv0;SVTYPE=CUSTOM;SYMBOL=C   GT  0|1
+```
+
+Another valid example without period:
+```yaml
+reference: "{path}/{to}/ref.fa"
+variant_sets:
+    - type: "A_B_C -> A_BCAB_C" 
+      number: 5
+      length_ranges:
+        - [500, 1000]
+        - [null, null]
+        - [500, 1000]
+        - [null, null]
+        - [500, 1000]
+      interchromosomal: True
+```
+In this case, `interchromosomal` has been set to `True` without providing any `interchromosomal_period`.
+Therefore, the period will default to 0 and each jump will swicth chromosomes without any cycle constraints.
+Note: a chromosome might be visited several times.
+
+A possible placement for one of these interchromosomal SVs could be:
+  - A is on chr1.
+  - B is on chr13.
+  - C is on chr20.
   
-  Because all dispersions are interchromosomal, the last copy of A cannot be placed back on chr3. 
-  However, it could be placed in a different region of chr1.
+Because all dispersions are interchromosomal, B cannot be placed on chr1 and C cannot be placed on chr13. 
+However, C could be placed in a different region of chr1.
 
 ### Example 7 - SNP and INDEL placement within SVs
 SNPs and INDELs can be allowed to overlap SVs as follows:
@@ -316,3 +361,18 @@ variant_sets:
 Here the INDEL and SNP definitions have the `allow_sv_overlap` parameter set to `True`, which allows them to be randomly placed within the DUP intervals.
 Note: SNPs and INDELs that are allowed to overlap SVs are always considered as occurring first in the simulation process. 
 As such, they might be modified or even deleted by SVs that are placed later. Regardless of whether they are ultimately observable in the final genome, all simulated variants are included in the final VCF output.
+
+### Example 8 - Divergence
+The divergence `*` symbol can be used to introduce point mutations in a duplicated sequence, causing it to differ from the original reference sequence. 
+The rate of mutations can be configured using the `divergence_prob` parameter, which specifies the probability of each nucleotide in the sequence to undergo a point mutation.
+
+```yaml
+reference: "{path}/{to}/ref.fa"
+variant_sets:
+    - type: "A->AA*"  
+      number: 5
+      divergence_prob: 0.1
+      length_ranges:
+        - [1000, 1000]
+```
+The provided example defines a divergent tandem DUP of 1kbp length. Each of the 1kbp duplicated nucleotides will have a `10%` chance of being mutated.
