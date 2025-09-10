@@ -373,7 +373,8 @@ class BaseSV(SV):
                 if sv_type_str == 'SNP':
                     # SNP
                     op_type_str = 'NA'
-                    rec_id = sv_id = 'snp' + self.sv_id.split('sv')[-1]
+                    if 'Imported' not in self.sv_id:
+                        rec_id = sv_id = 'snp' + self.sv_id.split('sv')[-1]
                 elif operation.transform.divergence_prob > 0:
                     op_type_str = 'DIVERGENCE'
 

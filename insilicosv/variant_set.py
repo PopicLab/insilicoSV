@@ -859,6 +859,8 @@ class ImportedVariantSet(VariantSet):
     op_types = ['IDENTITY', 'COPY-PASTE', 'CUT-PASTE', 'COPYinv-PASTE', 'CUTinv-PASTE', 'NA', 'CUT']
     can_import_types = [v.value for v in VariantType] + op_types
 
+    next_import_id: ClassVar[int] = 0
+
     @override
     @classmethod
     def can_make_from(cls, vset_config):
@@ -871,26 +873,33 @@ class ImportedVariantSet(VariantSet):
         chk(set(vset_config.keys()) <= {'import', 'VSET'}, f'invalid config key in {vset_config}',
             error_type='syntax')
 
+        self.import_id = ImportedVariantSet.make_import_id()
         with FastaFile(config['reference']) as reference:
             self.chrom_lengths = {chrom: chrom_length
                                   for chrom, chrom_length in zip(reference.references,
                                                                  reference.lengths)}
 
+    @staticmethod
+    def make_import_id():
+        import_id = str(ImportedVariantSet.next_import_id)
+        ImportedVariantSet.next_import_id += 1
+        return import_id
+
     @override
     def make_variant_set(self):
         recs = defaultdict(list)
-        num_simple_sv = 0
         with closing(VariantFile(self.vset_config['import'])) as vcf:
             self.header = vcf.header
             for vcf_rec in vcf.fetch():
                 with error_context(vcf_rec):
-                    if vcf_rec.chrom not in self.chrom_lengths: continue
+                    chk(vcf_rec.chrom in self.chrom_lengths, 'An imported SV belong to a chromosome not'
+                                                             'represented in the reference file.', error_type='value')
                     vcf_info = dict(vcf_rec.info)
                     if 'SVID' in vcf_info:
+                        # Use the parent ID
                         recs[vcf_info['SVID']].append(vcf_rec)
                     else:
-                        recs[str(num_simple_sv)].append(vcf_rec)
-                        num_simple_sv += 1
+                        recs[vcf_rec.id].append(vcf_rec)
         svs = []
         for parent_id, sv_recs in recs.items():
             sv = self.import_sv_from_vcf_recs(sv_recs, parent_id)
@@ -991,12 +1000,13 @@ class ImportedVariantSet(VariantSet):
         parsed_info['ALT'] = None
         parsed_info['REF'] = None
         parsed_info['SVTYPE'] = vcf_info.get('SVTYPE', 'Custom')
+
         if parsed_info['OP_TYPE'] == VariantType.SNP:
             parsed_info['DIVERGENCEPROB'] = [1.0]
             if vcf_rec.alts[0] != '<SNP>':
                 parsed_info['ALT'] = vcf_rec.alts
-                chk(len(vcf_rec.alts) == 1, f'Error in the ALT field, biallelic SNPs are not supported {vcf_rec}')
-                parsed_info['ALT'] =[vcf_rec.alts[0] if parsed_info['GENOTYPE'][hap_index] else None for hap_index in [0, 1]]
+                chk(1 <= len(vcf_rec.alts) <= 2, f'Error in the ALT field format {vcf_rec}')
+                parsed_info['ALT'] = [vcf_rec.alts[hap_index] if parsed_info['GENOTYPE'][hap_index] else None for hap_index in [0, -1]]
             if vcf_rec.ref != 'N':
                 parsed_info['REF'] = vcf_rec.ref[0]
         additional_info = {}
@@ -1036,6 +1046,11 @@ class ImportedVariantSet(VariantSet):
                     parsed_info['OP_TYPE'] = VariantType(parsed_info['SVTYPE'])
                 parent_info['OP_TYPE'] = parsed_info['SVTYPE']
 
+            parent_info['GRAMMAR'] = parsed_info.get('GRAMMAR', '')
+            if 'GRAMMAR' not in parsed_info and parsed_info['SVTYPE'] != 'Custom':
+                lhs_strs, rhs_strs = SV_KEY[VariantType(parsed_info['SVTYPE'])]
+                parsed_info['GRAMMAR'] = ''.join(lhs_strs) + '->' + ''.join(rhs_strs)
+
             target_left = False
             source_regions.append([parsed_info['START'], parsed_info['END']])
             placement = [parsed_info['START'], parsed_info['END']]
@@ -1045,12 +1060,12 @@ class ImportedVariantSet(VariantSet):
             insord = (0,)
             if parsed_info['TARGET'] is not None:
                 # We check the relative position of the target compared to start and end
-                if not parsed_info['INTERCHROMOSOMAL'] and parsed_info['TARGET'] <= parsed_info['START']:
+                if parsed_info['END'].chrom == parsed_info['TARGET'].chrom and parsed_info['TARGET'] <= parsed_info['START']:
                     placement = [parsed_info['TARGET'], parsed_info['START'], parsed_info['END']]
                     target_left = True
                 else:
                     placement = [parsed_info['START'], parsed_info['END'], parsed_info['TARGET']]
-                    chk(parsed_info['TARGET'] >= parsed_info['END'],
+                    chk((parsed_info['END'].chrom != parsed_info['TARGET']) or (parsed_info['TARGET'] >= parsed_info['END']),
                         f'The position of the target has to be outside of the source region,'
                         f'{vcf_rec} has a target between the start and end.', error_type='value')
                 if not parsed_info['INTERCHROMOSOMAL']:
@@ -1071,6 +1086,10 @@ class ImportedVariantSet(VariantSet):
                 insord = (parsed_info['INSORD'],) if parsed_info['INSORD'] is not None else (current_insord,)
                 current_insord = insord[0] + 1
 
+            insseq = parsed_info.get('INSSEQ', None)
+            if insseq:
+                insseq = insseq[0]
+
             targets.append(parsed_info['TARGET'])
             positions_per_rec.append(placement)
             operations = []
@@ -1080,7 +1099,7 @@ class ImportedVariantSet(VariantSet):
                     parsed_info['OP_TYPE'] not in [VariantType.DEL, VariantType.INV, VariantType.CUSTOM])):
                 if 'GRAMMAR' in parsed_info:
                     chk(len(parsed_info['GRAMMAR'].split('->')) == 2, f'Unsupported GRAMMAR format {vcf_rec}.')
-                    lhs_strs, rhs_strs =  parsed_info['GRAMMAR'].split('->')
+                    lhs_strs, rhs_strs = parsed_info['GRAMMAR'].split('->')
                 else:
                     lhs_strs, rhs_strs = SV_KEY[parsed_info['OP_TYPE']]
                 if target_left:
@@ -1096,7 +1115,7 @@ class ImportedVariantSet(VariantSet):
                 # Get the operations record by record
                 operations, _, _, _, _ = self.grammar_to_variant_set(lhs_strs, rhs_strs_list, symbol_lengths,
                                                                      symbol_min_lengths, 1,
-                                                                     parsed_info['INSSEQ'], [parsed_info['NCOPIES']],
+                                                                     insseq, [parsed_info['NCOPIES']],
                                                                      parsed_info['DIVERGENCEPROB'],
                                                                      replacement_seq=parsed_info['ALT'],
                                                                      orig_seq=parsed_info['REF'],
@@ -1139,7 +1158,7 @@ class ImportedVariantSet(VariantSet):
                                           divergence_prob=parsed_info['DIVERGENCEPROB'][0],
                                           replacement_seq=parsed_info['ALT'])
                     operations.append(Operation(transform, source_breakend_region=source_region,
-                                                novel_insertion_seq=parsed_info['INSSEQ'],
+                                                novel_insertion_seq=insseq,
                                                 target_insertion_breakend=op_target,
                                                 target_insertion_order=insord, op_info=additional_info))
             sv_operations.append(operations)
@@ -1172,7 +1191,8 @@ class ImportedVariantSet(VariantSet):
             # There is a single record
             sv_operations = sv_operations[0]
             placements = positions_per_rec[0]
-        sv_id = 'Imported_' + str(parent_id)
+
+        sv_id = 'Imported_' + self.import_id + '_' + str(parent_id)
         placement_dict = {breakend: locus for breakend, locus in enumerate(placements)}
 
         return BaseSV(sv_id=sv_id,
