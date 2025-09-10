@@ -293,11 +293,11 @@ class OutputWriter:
                                                                        operation.transform.divergence_prob)
                                     if not operation.transform.replacement_seq:
                                         haplotypes = [replacement_seq if hap == hap_index else None for hap in [0, 1]]
-                                    elif not self.homozygous_only:
+                                    elif not self.homozygous_only and operation.transform.divergence_prob == 1:
                                         # The SNP can be homozygous or heterozygous with two different alleles
                                         haplotypes = [operation.transform.replacement_seq[0], replacement_seq]
                                     else:
-                                        # The SNP is homozygous
+                                        # The SNP/DIVERGENCE is homozygous
                                         haplotypes = [operation.transform.replacement_seq[0],
                                                       operation.transform.replacement_seq[0]]
 
@@ -641,6 +641,20 @@ class OutputWriter:
                             f'{operation.target_region.start}')
                         sim_novel_insertions_fa.write(f'>{seq_id}\n')
                         sim_novel_insertions_fa.write(f'{operation.novel_insertion_seq}\n')
+
+    def output_divergence(self):
+        with open(os.path.join(self.output_path, 'sim.divergence.fa'), 'w') as (
+                sim_novel_insertions_fa):
+            for sv in self.svs:
+                for op_num, operation in enumerate(sv.operations):
+                    if 0 < operation.transform.divergence_prob < 1 and operation.transform.replacement_seq:
+                        for hap_idx, hap in enumerate(['hapA', 'hapB']):
+                            if not operation.transform.replacement_seq[hap_idx]: continue
+                            seq_id = (
+                                f'{sv.sv_id}_{op_num}_{operation.target_region.chrom}_'
+                                f'{operation.target_region.start}_{hap}')
+                            sim_novel_insertions_fa.write(f'>{seq_id}\n')
+                            sim_novel_insertions_fa.write(f'{operation.transform.replacement_seq[hap_idx]}\n')
 
     def output_vcf(self):
         vcf_path = os.path.join(self.output_path, 'sim.vcf')

@@ -369,14 +369,13 @@ class BaseSV(SV):
                 assert dispersion_target.is_empty()
             sv_info = dict(self.info)
             op_type_str = operation.transform_type.value
-            if (operation.transform_type == TransformType.IDENTITY) and operation.is_in_place:
-                if sv_type_str == 'SNP':
-                    # SNP
-                    op_type_str = 'NA'
-                    if 'Imported' not in self.sv_id:
-                        rec_id = sv_id = 'snp' + self.sv_id.split('sv')[-1]
-                elif operation.transform.divergence_prob > 0:
-                    op_type_str = 'DIVERGENCE'
+            if sv_type_str == 'SNP':
+                # SNP
+                op_type_str = 'NA'
+                if 'Imported' not in self.sv_id:
+                    rec_id = sv_id = 'snp' + self.sv_id.split('sv')[-1]
+            elif operation.transform.divergence_prob > 0:
+                sv_info["DIVERGENCE_PROB"] = operation.transform.divergence_prob
 
             if operation.novel_insertion_seq is not None:
                 op_chrom = operation.target_region.chrom
@@ -568,12 +567,12 @@ SV_KEY = {
     VariantType.INV: (("A",), ("a",)),
     VariantType.DUP: (("A",), ("A", "A+")),
     VariantType.mCNV: (("A",), ("A+",)),
-    VariantType.INV_DUP: (("A",), ("A", "a")),
-    VariantType.DUP_INV: (("A",), ("a", "a")),
+    VariantType.INV_DUP: (("A",), ("A", "a+")),
+    VariantType.DUP_INV: (("A",), ("a", "a+")),
 
-    VariantType.dDUP: (("A", "_"), ("A", "_", "A")),
-    VariantType.INV_dDUP: (("A", "_"), ("A", "_", "a")),
-    VariantType.dDUP_INV: (("A", "_"), ("a", "_", "a")),
+    VariantType.dDUP: (("A", "_"), ("A", "_", "A+")),
+    VariantType.INV_dDUP: (("A", "_"), ("A", "_", "a+")),
+    VariantType.dDUP_INV: (("A", "_"), ("a", "_", "a+")),
     VariantType.INV_nrTRA: (("A", "_"), ("_", "a")),
     VariantType.nrTRA: (("A", "_"), ("_", "A")),
     VariantType.rTRA: (("A", "_", "B"), ("B", "_", "A")),
@@ -592,7 +591,6 @@ SV_KEY = {
     VariantType.delINVdup: (("A", "B", "C"), ("c", "b", "C")),
     VariantType.dupINVdel: (("A", "B", "C"), ("A", "b", "a")),
 
-    VariantType.DIVERGENCE: (("A",), ("A*",)),
     VariantType.SNP: (("A",), ("A*",)),
     VariantType.INDEL: ((), ()),
 }
