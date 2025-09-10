@@ -106,13 +106,22 @@ class SVSimulator:
             chk(k in ('reference', 'max_tries', 'max_random_breakend_tries', 'homozygous_only', 'heterozygous_only',
                       'min_intersv_dist',
                       'random_seed', 'output_no_haps', 'output_adjacencies', 'output_paf', 'output_svops_bed',
-                      'th_proportion_N',
+                      'th_proportion_N', 'haploid',
                       'output_paf_intersv', 'verbose', 'variant_sets', 'overlap_regions', 'blacklist_regions',
                       'filter_small_chr', 'allow_hap_overlap'),
                 f'invalid top-level config: {k}', error_type='syntax')
 
         chk(utils.is_readable_file(config['reference']), f'reference must be a readable file')
         chk(isinstance(config.get('variant_sets'), list), 'variant_sets must specify a list')
+
+        chk(isinstance(config.get('haploid', False), bool), 'haploid must be a boolean')
+        if config.get('haploid', False) and not config.get('homozygous_only', False):
+            config['homozygous_only'] = True
+            config['heterozygous_only'] = False
+
+        chk(not config.get('homozygous_only', False) or not config.get('heterozygous_only', False),
+            f'homozygous_only and'
+            f'heterozygous_only cannot be True at the same time')
 
         if 'overlap_regions' in config:
             config['overlap_regions'] = utils.as_list(config['overlap_regions'])
