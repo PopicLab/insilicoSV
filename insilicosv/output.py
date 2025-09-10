@@ -80,7 +80,6 @@ class StatsCollector:
         def write_item(fout, name, item, prefix=""):
             fout.write("{}{}: {}\n".format(prefix, str(name), str(item)))
 
-        os.makedirs(os.path.dirname(fileout), exist_ok=True)
         with open(fileout, "w") as fout:
             fout.write("===== Overview =====\n")
             write_item(fout, "SVs successfully simulated", str(self.placed_svs) + "/" + str(self.total_svs))
