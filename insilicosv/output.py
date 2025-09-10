@@ -10,7 +10,7 @@ from functools import cmp_to_key
 
 from insilicosv import utils
 from insilicosv.utils import Region, Locus, if_not_none
-from insilicosv.sv_defs import Operation, Transform, TransformType, BreakendRegion, VariantType, Syntax
+from insilicosv.sv_defs import Operation, Transform, TransformType, BreakendRegion, VariantType, Syntax, Breakend
 from insilicosv.variant_set import get_vcf_header_infos
 
 logger = logging.getLogger(__name__)
@@ -287,8 +287,7 @@ class OutputWriter:
 
                             if operation.transform.divergence_prob > 0 or operation.transform.replacement_seq:
                                 # There is a divergence
-                                if operation.transform.replacement_seq is None or operation.transform.replacement_seq[
-                                    hap_index] is None:
+                                if operation.transform.replacement_seq is None or operation.transform.replacement_seq[hap_index] is None:
                                     # Insure the haplotypes respect the genotype specified and store it for writing in the VCF
                                     replacement_seq = utils.divergence(modified_seq,
                                                                        operation.transform.divergence_prob)
@@ -349,6 +348,8 @@ class OutputWriter:
             return
         novel_adjacencies = []
         for sv in self.svs:
+            breakends = sorted(list(sv.placement.keys()))
+            placement = [sv.placement[breakend] for breakend in breakends]
             # Prevent duplicate adjacencies
             if sv.info['OP_TYPE'] in ['SNP', 'trEXP', 'trCON']: continue
             lhs, rhs = sv.info['GRAMMAR'].split('->')
@@ -359,7 +360,7 @@ class OutputWriter:
                             symbol not in [Syntax.ANCHOR_START, Syntax.ANCHOR_END, Syntax.DIVERGENCE]] + ['SU']
 
             # Get the original adjacencies and symbols
-            breakends = {'PR': ['NA', sv.placement[0]], 'SU': [sv.placement[-1], 'NA']}
+            breakends = {'PR': ['NA', placement[0]], 'SU': [placement[-1], 'NA']}
             lhs_adjacencies = []
             num_dispersion = 0
             prev_symbol = 'PR'
@@ -369,7 +370,7 @@ class OutputWriter:
                     symbol += str(num_dispersion)
                     num_dispersion += 1
                 if symbol != 'SU':
-                    breakends[symbol] = [sv.placement[idx], sv.placement[idx + 1]]
+                    breakends[symbol] = [placement[idx], placement[idx + 1]]
                 # Adjacency between the end of the last symbol and the beginning of the current one.
                 lhs_adjacencies.append([prev_symbol + '^t', symbol + '^h'])
                 prev_symbol = symbol
@@ -457,9 +458,10 @@ class OutputWriter:
                     # Add potential remaining left and right operations
                     if overlapping_start > overlap.data.start:
                         left_sv = copy.deepcopy(sv)
-                        placement = [
-                            Locus(pos=overlap.data.start, chrom=overlapping_operation.target_region.chrom),
-                            Locus(pos=region_to_overlap_start, chrom=overlapping_operation.target_region.chrom)]
+                        placement = {
+                            Breakend(0): Locus(pos=overlap.data.start, chrom=overlapping_operation.target_region.chrom),
+                            Breakend(1): Locus(pos=region_to_overlap_start,
+                                               chrom=overlapping_operation.target_region.chrom)}
 
                         left_sv.operations[0].update_placement(placement)
                         self.overlap_sv_regions.add_region(Region(chrom=overlapping_operation.target_region.chrom,
@@ -469,9 +471,10 @@ class OutputWriter:
 
                     if overlapping_end < overlap.data.end:
                         right_sv = copy.deepcopy(sv)
-                        placement = [
-                            Locus(pos=region_to_overlap_end, chrom=overlapping_operation.target_region.chrom),
-                            Locus(pos=overlap.data.end, chrom=overlapping_operation.target_region.chrom)]
+                        placement = {
+                            Breakend(0): Locus(pos=region_to_overlap_end,
+                                               chrom=overlapping_operation.target_region.chrom),
+                            Breakend(1): Locus(pos=overlap.data.end, chrom=overlapping_operation.target_region.chrom)}
 
                         right_sv.operations[0].update_placement(placement)
 
@@ -481,9 +484,9 @@ class OutputWriter:
                                    end=overlap.data.end),
                             sv=right_sv)
 
-                    overlapping_operation.placement = [
-                        Locus(pos=overlapping_start, chrom=overlapping_operation.target_region.chrom),
-                        Locus(pos=overlapping_end, chrom=overlapping_operation.target_region.chrom)]
+                    overlapping_operation.placement = {
+                        Breakend(0): Locus(pos=overlapping_start, chrom=overlapping_operation.target_region.chrom),
+                        Breakend(1): Locus(pos=overlapping_end, chrom=overlapping_operation.target_region.chrom)}
 
                     # Keep the information on the original position
                     overlapping_operation.orig_start = overlap.data.start
@@ -574,9 +577,9 @@ class OutputWriter:
                 transform=Transform(transform_type=TransformType.IDENTITY,
                                     is_in_place=True),
                 op_info={'SVID': 'sv' + str(idx_id + len(self.svs))},
-                source_breakend_region=BreakendRegion(0, 1),
-                placement=[Locus(chrom, target_region1.end),
-                           Locus(chrom, target_region2.start)])]
+                source_breakend_region=BreakendRegion(0,1),
+                placement={Breakend(0): Locus(chrom, target_region1.end),
+                           Breakend(1): Locus(chrom, target_region2.start)})]
                 for idx_id, (target_region1, target_region2) in enumerate(utils.pairwise(target_regions))
                 if target_region2.start > target_region1.end]
 

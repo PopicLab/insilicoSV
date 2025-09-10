@@ -11,4 +11,4 @@
 ##INFO=<ID=ENABLE_OVERLAP_SV,Number=1,Type=Boolean,Description="If other SVs can overlap this record">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
-chr21	2	snp_0	C	A	100	PASS	KM=9.5;KFP=0;KFF=0;MTD=bwa_freebayes,bwa_gatk,bwa_platypus;ENABLE_OVERLAP_SV=TRUE	GT	1|0
+chr21	2	snp_0	C	A	100	PASS	KM=9.5;KFP=0;KFF=0;MTD=bwa_freebayes,bwa_gatk,bwa_platypus;ALLOW_SV_OVERLAP=TRUE	GT	1|0
