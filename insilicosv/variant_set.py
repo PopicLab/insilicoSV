@@ -7,7 +7,6 @@ import logging
 import random
 from typing_extensions import ClassVar, Type, override
 import re
-
 from pysam import FastaFile, VariantFile
 
 from insilicosv import utils
@@ -98,9 +97,18 @@ class VariantSet(ABC):
                 f'are not allowed in the target, If for instance, you want to constrain the insertion target of a dDUP, '
                 f'write A_(). Error in {vset_config}', error_type='syntax')
 
-    def get_sampled_int_value(self, value, locals_dict=
-    None):
-        if isinstance(value, (int, float)):
+        self.interchromosomal = self.vset_config.get('interchromosomal', False)
+        chk(isinstance(self.interchromosomal, bool), 'interchromosomal if provided must be a boolean. '
+                                                     'But %s was provided' % vset_config, error_type='syntax')
+        self.interchromosomal_period = self.vset_config.get('interchromosomal_period', None)
+        if self.interchromosomal and self.interchromosomal_period is None:
+            self.interchromosomal_period = 0
+
+        if self.interchromosomal_period is not None:
+            self.interchromosomal = True
+
+    def get_sampled_int_value(self, value, locals_dict=None):
+        if isinstance(value, (int, float)) or value is None:
             return value
         elif isinstance(value, list):
             chk(len(value) == 2, f'Expected [min, max] pair: {value}', error_type='value')
@@ -397,6 +405,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'n_copies',
                 'novel_insertions',
                 'interchromosomal',
+                'interchromosomal_period',
                 'config_descr',
                 'allow_sv_overlap',
                 'VSET'
@@ -498,28 +507,36 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                         f'invalid length_ranges. it must be a list of 2-tuples of str or int. '
                         f'Error in %s' % vset_cfg['config_descr'], error_type='value')
 
-        if 'novel_insertions' in self.vset_config:
+        if 'novel_insertions' in vset_cfg:
             try:
-                with open(self.vset_config['novel_insertions'], 'r') as sequences:
+                with open(vset_cfg['novel_insertions'], 'r') as sequences:
                     self.novel_insertion_seqs = [line.rstrip() for line in sequences]
                     chk(all(bool(re.match('^[TCGA]+$', line)) for line in self.novel_insertion_seqs),
                         f'The file novel_insertions %s' % self.vset_config['novel_insertions'] +
                         f' contains invalid characters. It must be a list of sequences.', error_type='value')
             except:
-                chk(False, f'novel_insertion file %s must be a readable ' % self.vset_config['novel_insertions'] +
+                chk(False, f'novel_insertion file %s must be a readable ' % vset_cfg['novel_insertions'] +
                            f'file containing a sequence per line.', error_type='file not found')
-        chk(isinstance(self.vset_config.get('type'), (type(None), list, str, tuple)),
-            '%s must be a string or list of strings'.format(self.vset_config.get('type')), error_type='syntax')
+        chk(isinstance(vset_cfg.get('type'), (type(None), list, str, tuple)),
+            '%s must be a string or list of strings'.format(vset_cfg.get('type')), error_type='syntax')
 
-    @property
-    def is_interchromosomal(self):
-        return self.vset_config.get('interchromosomal', False)
+        chk('interchromosomal_period' not in vset_cfg or isinstance(vset_cfg['interchromosomal_period'], (int, list)),
+            'interchromosomal_period must be an int or a list of ints. '
+            'Provided %s' % vset_cfg['config_descr'],
+            error_type='syntax')
+        interchromosomal_period = vset_cfg.get('interchromosomal_period', None)
+
+        if isinstance(interchromosomal_period, list):
+            chk(len(interchromosomal_period) == 2 and isinstance(interchromosomal_period[0], int) and
+                isinstance(interchromosomal_period[1], int),
+                'interchromosomal_period when provided as a range must contain two integers. '
+                'Provided %s' % vset_cfg['config_descr'], error_type='syntax')
 
     def symmetrize(self, lhs_strs, rhs_strs, letter_ranges):
         # Enforce the symmetry of the predefined SVs with duplications or dispersions.
         if (("DUP" in self.svtype.name or "TRA" in self.svtype.name or
              "iDEL" in self.svtype.name)
-                and (not self.is_interchromosomal)
+                and (not self.interchromosomal)
                 and (not self.input_type)
                 and random.randint(0, 1)):
             def flip_anchor(val: str) -> str:
@@ -697,10 +714,13 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         #
         info = self.construct_info(lhs_strs, rhs_strs)
         roi_filter = self.get_roi_filter()
+
+        interchromosomal_period = self.get_sampled_int_value(self.interchromosomal_period)
+
         return BaseSV(sv_id=self.make_sv_id(),
                       breakend_interval_lengths=breakend_interval_lengths,
                       breakend_interval_min_lengths=breakend_interval_min_lengths,
-                      is_interchromosomal=self.is_interchromosomal,
+                      interchromosomal_period=interchromosomal_period,
                       operations=operations,
                       anchor=anchor,
                       dispersions=dispersions,
@@ -777,7 +797,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                 sv_id=self.make_sv_id(),
                 breakend_interval_lengths=breakend_interval_lengths,
                 breakend_interval_min_lengths=[None] * len(breakend_interval_lengths),
-                is_interchromosomal=False,
+                interchromosomal_period=None,
                 operations=operations,
                 anchor=anchor,
                 overlap_mode=self.overlap_mode,
@@ -804,7 +824,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                 sv_id=self.make_sv_id(),
                 breakend_interval_lengths=breakend_interval_lengths,
                 breakend_interval_min_lengths=[None],
-                is_interchromosomal=False,
+                interchromosomal_period=False,
                 operations=operations,
                 anchor=anchor,
                 overlap_mode=self.overlap_mode,
@@ -839,6 +859,8 @@ class ImportedVariantSet(VariantSet):
     op_types = ['IDENTITY', 'COPY-PASTE', 'CUT-PASTE', 'COPYinv-PASTE', 'CUTinv-PASTE', 'NA', 'CUT']
     can_import_types = [v.value for v in VariantType] + op_types
 
+    next_import_id: ClassVar[int] = 0
+
     @override
     @classmethod
     def can_make_from(cls, vset_config):
@@ -851,26 +873,33 @@ class ImportedVariantSet(VariantSet):
         chk(set(vset_config.keys()) <= {'import', 'VSET'}, f'invalid config key in {vset_config}',
             error_type='syntax')
 
+        self.import_id = ImportedVariantSet.make_import_id()
         with FastaFile(config['reference']) as reference:
             self.chrom_lengths = {chrom: chrom_length
                                   for chrom, chrom_length in zip(reference.references,
                                                                  reference.lengths)}
 
+    @staticmethod
+    def make_import_id():
+        import_id = str(ImportedVariantSet.next_import_id)
+        ImportedVariantSet.next_import_id += 1
+        return import_id
+
     @override
     def make_variant_set(self):
         recs = defaultdict(list)
-        num_simple_sv = 0
         with closing(VariantFile(self.vset_config['import'])) as vcf:
             self.header = vcf.header
             for vcf_rec in vcf.fetch():
                 with error_context(vcf_rec):
-                    if vcf_rec.chrom not in self.chrom_lengths: continue
+                    chk(vcf_rec.chrom in self.chrom_lengths, 'An imported SV belong to a chromosome not'
+                                                             'represented in the reference file.', error_type='value')
                     vcf_info = dict(vcf_rec.info)
                     if 'SVID' in vcf_info:
+                        # Use the parent ID
                         recs[vcf_info['SVID']].append(vcf_rec)
                     else:
-                        recs[str(num_simple_sv)].append(vcf_rec)
-                        num_simple_sv += 1
+                        recs[vcf_rec.id].append(vcf_rec)
         svs = []
         for parent_id, sv_recs in recs.items():
             sv = self.import_sv_from_vcf_recs(sv_recs, parent_id)
@@ -893,7 +922,7 @@ class ImportedVariantSet(VariantSet):
             parsed_info['GENOTYPE'] = random.choice([(True, True), (True, False), (False, True)])
         vcf_info = dict(vcf_rec.info)
 
-        parsed_info['ENABLE_OVERLAP_SV'] = vcf_info.get('ENABLE_OVERLAP_SV', False)
+        parsed_info['ALLOW_SV_OVERLAP'] = vcf_info.get('ALLOW_SV_OVERLAP', False)
 
         if set(''.join(vcf_rec.alleles).upper().replace(' ', '')) <= set('TCGA'):
             if len(vcf_rec.alleles[0]) == 1 and 1 <= len(vcf_rec.alleles[1]) <= 2:
@@ -936,7 +965,7 @@ class ImportedVariantSet(VariantSet):
 
         if not (rec_len <= 50 and (rec_type_str == 'INS' or rec_type_str == 'INV' or vcf_info['SVTYPE'] == 'SNP' or
                               ('SVTYPE' in vcf_info and (vcf_info['SVTYPE'] == 'INS' or vcf_info['SVTYPE'] == 'INV')))):
-            chk(not parsed_info['ENABLE_OVERLAP_SV'], f'ENABLE_OVERLAP_SV only allowed for SNPs or INDELs. But, {vcf_rec} was provided.')
+            chk(not parsed_info['ALLOW_SV_OVERLAP'], f'ALLOW_SV_OVERLAP only allowed for SNPs or INDELs. But, {vcf_rec} was provided.')
 
         rec_target = None
         is_interchromosomal = False
@@ -971,12 +1000,13 @@ class ImportedVariantSet(VariantSet):
         parsed_info['ALT'] = None
         parsed_info['REF'] = None
         parsed_info['SVTYPE'] = vcf_info.get('SVTYPE', 'Custom')
+
         if parsed_info['OP_TYPE'] == VariantType.SNP:
             parsed_info['DIVERGENCEPROB'] = [1.0]
             if vcf_rec.alts[0] != '<SNP>':
                 parsed_info['ALT'] = vcf_rec.alts
-                chk(len(vcf_rec.alts) == 1, f'Error in the ALT field, biallelic SNPs are not supported {vcf_rec}')
-                parsed_info['ALT'] =[vcf_rec.alts[0] if parsed_info['GENOTYPE'][hap_index] else None for hap_index in [0, 1]]
+                chk(1 <= len(vcf_rec.alts) <= 2, f'Error in the ALT field format {vcf_rec}')
+                parsed_info['ALT'] = [vcf_rec.alts[hap_index] if parsed_info['GENOTYPE'][hap_index] else None for hap_index in [0, -1]]
             if vcf_rec.ref != 'N':
                 parsed_info['REF'] = vcf_rec.ref[0]
         additional_info = {}
@@ -1016,6 +1046,11 @@ class ImportedVariantSet(VariantSet):
                     parsed_info['OP_TYPE'] = VariantType(parsed_info['SVTYPE'])
                 parent_info['OP_TYPE'] = parsed_info['SVTYPE']
 
+            parent_info['GRAMMAR'] = parsed_info.get('GRAMMAR', '')
+            if 'GRAMMAR' not in parsed_info and parsed_info['SVTYPE'] != 'Custom':
+                lhs_strs, rhs_strs = SV_KEY[VariantType(parsed_info['SVTYPE'])]
+                parsed_info['GRAMMAR'] = ''.join(lhs_strs) + '->' + ''.join(rhs_strs)
+
             target_left = False
             source_regions.append([parsed_info['START'], parsed_info['END']])
             placement = [parsed_info['START'], parsed_info['END']]
@@ -1025,12 +1060,12 @@ class ImportedVariantSet(VariantSet):
             insord = (0,)
             if parsed_info['TARGET'] is not None:
                 # We check the relative position of the target compared to start and end
-                if not parsed_info['INTERCHROMOSOMAL'] and parsed_info['TARGET'] <= parsed_info['START']:
+                if parsed_info['END'].chrom == parsed_info['TARGET'].chrom and parsed_info['TARGET'] <= parsed_info['START']:
                     placement = [parsed_info['TARGET'], parsed_info['START'], parsed_info['END']]
                     target_left = True
                 else:
                     placement = [parsed_info['START'], parsed_info['END'], parsed_info['TARGET']]
-                    chk(parsed_info['TARGET'] >= parsed_info['END'],
+                    chk((parsed_info['END'].chrom != parsed_info['TARGET']) or (parsed_info['TARGET'] >= parsed_info['END']),
                         f'The position of the target has to be outside of the source region,'
                         f'{vcf_rec} has a target between the start and end.', error_type='value')
                 if not parsed_info['INTERCHROMOSOMAL']:
@@ -1051,6 +1086,10 @@ class ImportedVariantSet(VariantSet):
                 insord = (parsed_info['INSORD'],) if parsed_info['INSORD'] is not None else (current_insord,)
                 current_insord = insord[0] + 1
 
+            insseq = parsed_info.get('INSSEQ', None)
+            if insseq:
+                insseq = insseq[0]
+
             targets.append(parsed_info['TARGET'])
             positions_per_rec.append(placement)
             operations = []
@@ -1060,7 +1099,7 @@ class ImportedVariantSet(VariantSet):
                     parsed_info['OP_TYPE'] not in [VariantType.DEL, VariantType.INV, VariantType.CUSTOM])):
                 if 'GRAMMAR' in parsed_info:
                     chk(len(parsed_info['GRAMMAR'].split('->')) == 2, f'Unsupported GRAMMAR format {vcf_rec}.')
-                    lhs_strs, rhs_strs =  parsed_info['GRAMMAR'].split('->')
+                    lhs_strs, rhs_strs = parsed_info['GRAMMAR'].split('->')
                 else:
                     lhs_strs, rhs_strs = SV_KEY[parsed_info['OP_TYPE']]
                 if target_left:
@@ -1076,7 +1115,7 @@ class ImportedVariantSet(VariantSet):
                 # Get the operations record by record
                 operations, _, _, _, _ = self.grammar_to_variant_set(lhs_strs, rhs_strs_list, symbol_lengths,
                                                                      symbol_min_lengths, 1,
-                                                                     parsed_info['INSSEQ'], [parsed_info['NCOPIES']],
+                                                                     insseq, [parsed_info['NCOPIES']],
                                                                      parsed_info['DIVERGENCEPROB'],
                                                                      replacement_seq=parsed_info['ALT'],
                                                                      orig_seq=parsed_info['REF'],
@@ -1119,7 +1158,7 @@ class ImportedVariantSet(VariantSet):
                                           divergence_prob=parsed_info['DIVERGENCEPROB'][0],
                                           replacement_seq=parsed_info['ALT'])
                     operations.append(Operation(transform, source_breakend_region=source_region,
-                                                novel_insertion_seq=parsed_info['INSSEQ'],
+                                                novel_insertion_seq=insseq,
                                                 target_insertion_breakend=op_target,
                                                 target_insertion_order=insord, op_info=additional_info))
             sv_operations.append(operations)
@@ -1152,22 +1191,24 @@ class ImportedVariantSet(VariantSet):
             # There is a single record
             sv_operations = sv_operations[0]
             placements = positions_per_rec[0]
-        sv_id = 'Imported_' + str(parent_id)
+
+        sv_id = 'Imported_' + self.import_id + '_' + str(parent_id)
+        placement_dict = {breakend: locus for breakend, locus in enumerate(placements)}
 
         return BaseSV(sv_id=sv_id,
                       breakend_interval_lengths=[None] * (len(placements) - 1),
                       # Positions are known, the lengths are not needed
                       breakend_interval_min_lengths=[None] * (len(placements) - 1),
-                      is_interchromosomal=None,  # The target chromosome is already known from the fixed_placement
+                      interchromosomal_period=None,  # The target chromosome is already known from the fixed_placement
                       operations=sv_operations,
-                      fixed_placement=placements,
+                      fixed_placement=placement_dict,
                       overlap_mode=None,
                       anchor=None,
                       roi_filter=None,
                       blacklist_filter=None,
                       info=parent_info,
                       genotype=genotype,
-                      allow_sv_overlap=parsed_info['ENABLE_OVERLAP_SV'],
+                      allow_sv_overlap=parsed_info['ALLOW_SV_OVERLAP'],
                       config_descr=f'vcf_record:{vcf_rec}',
                       dispersions=[])
 
@@ -1218,7 +1259,7 @@ VCF_HEADER_INFOS = [
          description="Type of ROI on which the insertion target of an SV component was placed"),
     dict(id='OVLP_TYPE', number=1, type='String',
          description="Type of overlap with the ROI"),
-    dict(id='ENABLE_OVERLAP_SV', number=1, type='String',
+    dict(id='ALLOW_SV_OVERLAP', number=1, type='String',
          description="If this record was allowed to overlap with other SVs."),
     dict(id='SVID', number=1, type='String',
          description="ID of parent SV of which this record is one part"),
