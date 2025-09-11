@@ -11,7 +11,7 @@ task MergeBams {
 
   command <<<
     set -e
-    samtools merge ~{outDir}/~{sampleName}.bam ~{sep=" " bams}
+    samtools merge -f ~{outDir}/~{sampleName}.bam ~{sep=" " bams}
     samtools index ~{outDir}/~{sampleName}.bam
   >>>
 
@@ -52,7 +52,7 @@ workflow SimulateReadMix {
                 threads = select_first([threads, 1])
         }
     }
-    if (defined(short)) {
+    if (select_first([short, false])) {
         call MergeBams as mergeShort {
             input:
                 bams  = select_all(ReadSim.srBAM),
@@ -60,7 +60,7 @@ workflow SimulateReadMix {
                 sampleName = "mix_short"
         }
     }
-    if (defined(hifi)) {
+    if (select_first([hifi, false])) {
         call MergeBams as mergeHifi {
             input:
                 bams  = select_all(ReadSim.hifiBAM),
@@ -68,7 +68,7 @@ workflow SimulateReadMix {
                 sampleName = "mix_hifi"
         }
     }
-    if (defined(ont)) {
+    if (select_first([ont, false])) {
         call MergeBams as mergeOnt {
             input:
                 bams  = select_all(ReadSim.ontBAM),

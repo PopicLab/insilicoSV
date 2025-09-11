@@ -60,9 +60,9 @@ task insilicosv {
     set -e
     mkdir -p ~{outDir}
     cp ~{yaml} ~{outDir}/~{yamlBasename}
-    echo "reference: ~{ref}" >> ~{outDir}/~{yamlBasename}
+    echo -e "reference: ~{ref}" >> ~{outDir}/~{yamlBasename}
     if (( ~{treeLevel} > 0 )); then
-      echo "homozygous_only: True" >> ~{outDir}/~{yamlBasename}
+      echo -e "homozygous_only: True" >> ~{outDir}/~{yamlBasename}
     fi
     insilicosv -c ~{outDir}/~{yamlBasename}
     if (( ~{treeLevel} == 0 )); then

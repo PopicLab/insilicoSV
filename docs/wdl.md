@@ -42,8 +42,8 @@ To generate the lineage WDL workflow (for an example depth of N=4):
 
 The resulting WDL pipeline ```insilicosv_lineage_workflow_4.wdl``` will be generated in the ```workflows/``` directory. 
 
-To run the pipeline:
-* Create an output folder: `$> mkdir lineage_exp`
+To run the pipeline (from the top-level `insilicosv` directory):
+* Create an output folder: `$> mkdir lineage_exp` 
 * Create and populate multiple `insilicoSV` YAML config file inside `lineage_exp` - one for each time point (for example, see ```workflows/configs/demo_insilicosv_config.wdl```)
 * Copy the JSON input file: `$> cp workflows/configs/lineage_wdl_config.json lineage_exp/inputs.json`
 * Populate all the input parameters in `lineage_exp/inputs.json` 
@@ -54,15 +54,18 @@ Pipeline parameters (JSON):
 * `GenomeMix.reference` [required]: path to the reference genome FASTA (e.g. hg38)
 * `GenomeMix.configs` [required]: list of `insilicoSV` YAML config files associated with each time point 
 * `GenomeMix.genomes` [required]: list of genomes represented as an ordered list of timepoints (e.g. [[0], [0, 1, 3], [0, 2]]); captures the desired lineage tree
+* `GenomeMix.totalCoverage` [optional]: total coverage of the generated mixed sample
 * `GenomeMix.prevalence` [optional]: list of cellular prevalence values for each genome (e.g. [0.7, 0.1, 0.2]), must add to 1
-* `GenomeMix.totalCoverage` [optional]: total coverage of the generated mixed sample - will trigger read simulation and alignment
-* `GenomeMix.short` [required]: generate Illumina paired-end reads (using DWGSIM)
-* `GenomeMix.hifi` [required]: generate PacBio HiFi reads (using PBSIM3)
-* `GenomeMix.ont` [required]: generate ONT reads (using PBSIM3)
-* `GenomeMix.threads` [required]: number of threads to use for read alignment and sorting
+* `GenomeMix.short` [optional]: generate Illumina paired-end reads (using DWGSIM)
+* `GenomeMix.hifi` [optional]: generate PacBio HiFi reads (using PBSIM3)
+* `GenomeMix.ont` [optional]: generate ONT reads (using PBSIM3)
+* `GenomeMix.threads` [optional]: number of threads to use for read alignment and sorting
+
+Note: setting `totalCoverage` > 0 will trigger read simulation and alignment; in this case the `prevalence` parameter is required, 
+as well as at least one sequencing platform should be enabled by setting its corresponding flag to True.
 
 Note: each intermediate time point will result in the simulation of a new genome using `insilicoSV` and the corresponding YAML file; 
 however, only the leaf/terminal genomes listed in the `genomes` parameter will be mixed in the final sample using the 
-ratios configured in the `prevalence` parameter.
+ratios configured with the `prevalence` parameter.
 
 
