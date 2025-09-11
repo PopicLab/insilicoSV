@@ -60,10 +60,10 @@ To run ```insilicoSV```: ```$> insilicosv -c <path/to/config.yaml>```
 4. Run ```insilicoSV``` providing the path to the config file as input. ```insilicoSV``` will automatically create 
 output files in the YAML file directory.
 
-A customizable WDL pipeline is also provided to automatically simulate reads and produce alignments for 
-downstream analysis from the simulated genome. The pipeline can be configured to (1) simulate the genome, 
+Two customizable WDL pipelines are also provided to automatically simulate synthetic genomes and reads 
+and produce alignments for downstream analysis. Each pipeline can be configured to (1) simulate one or multiple genomes, 
 (2) simulate a single or multiple read datasets (currently supported platforms: Illumina, PacBio, and ONT) 
-from this genome, (4) align the reads, and (5) visualize the alignments at the simulated SV sites. 
+from these genomes, (4) align the reads, and (5) visualize the alignments at the simulated SV sites. 
 See [WDL](docs/wdl.md) for more information.
 
 

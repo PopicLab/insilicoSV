@@ -1,9 +1,0 @@
-{
-	"insilicosv_workflow.configYAML": "/path/to/insilicosv_config/",
-	"insilicosv_workflow.hapCoverage": 5,
-	"insilicosv_workflow.short": true,
-	"insilicosv_workflow.hifi": false,
-	"insilicosv_workflow.ont": false,
-	"insilicosv_workflow.ref": "/path/to/reference_genome",
-	"insilicosv_workflow.threads": 1
-}

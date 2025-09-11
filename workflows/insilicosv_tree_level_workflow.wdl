@@ -52,6 +52,7 @@ task insilicosv {
     String outDir
     String outPrefix
     String ref
+    Int treeLevel
   }
   String yamlBasename = basename(yaml)
 
@@ -60,8 +61,16 @@ task insilicosv {
     mkdir -p ~{outDir}
     cp ~{yaml} ~{outDir}/~{yamlBasename}
     echo "reference: ~{ref}" >> ~{outDir}/~{yamlBasename}
+    if (( ~{treeLevel} > 0 )); then
+      echo "homozygous_only: True" >> ~{outDir}/~{yamlBasename}
+    fi
     insilicosv -c ~{outDir}/~{yamlBasename}
-    cat ~{outDir}/sim.hapA.fa ~{outDir}/sim.hapB.fa > ~{outDir}/sim.fa
+    if (( ~{treeLevel} == 0 )); then
+      cat ~{outDir}/sim.hapA.fa ~{outDir}/sim.hapB.fa > ~{outDir}/sim.fa
+    else
+      mv ~{outDir}/sim.hapA.fa ~{outDir}/sim.fa
+      rm ~{outDir}/sim.hapB.fa
+    fi
     mv  ~{outDir}/sim.fa ~{outDir}/~{outPrefix}.fa
     mv  ~{outDir}/sim.vcf ~{outDir}/~{outPrefix}.vcf
     samtools faidx  ~{outDir}/~{outPrefix}.fa
@@ -101,7 +110,8 @@ workflow SimulateLineageTreeLevel {
                 ref = ref,
                 yaml = insilicoConfigs[configIndex],
                 outDir = outDir + "/" + PathNames.pathName,
-                outPrefix = PathNames.pathName
+                outPrefix = PathNames.pathName,
+                treeLevel = treeLevel
         }
     }
     output {
