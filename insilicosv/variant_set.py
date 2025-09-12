@@ -48,6 +48,7 @@ class VariantSet(ABC):
         self.overlap_kinds = utils.as_list(self.vset_config.get('overlap_region_type', 'all'))
         self.overlap_ranges = []
         self.header = []
+        self.copies = ()
 
         self.vset_config['config_descr'] = ', '.join("%s: %s" % item for item in self.vset_config.items())
         self.novel_insertion_seqs = None
@@ -109,14 +110,18 @@ class VariantSet(ABC):
             self.interchromosomal = True
 
     @staticmethod
-    def get_sampled_int_value(value, locals_dict=None):
+    def get_sampled_int_value(value, locals_dict=None, not_one=False):
         if isinstance(value, (int, float)) or value is None:
             return value
         elif isinstance(value, list):
             chk(len(value) == 2, f'Expected [min, max] pair: {value}', error_type='value')
             chk(isinstance(value[0], int) and isinstance(value[1], int) and
                 int(value[0]) <= int(value[1]), f'Invalid [min, max] pair: {value}', error_type='value')
-            return random.randint(value[0], value[1])
+            drawn_value = random.randint(value[0], value[1])
+            while not_one and drawn_value == 1:
+                # only happens for mCNV, in which case we made sure the range is not [1, 1]
+                drawn_value = random.randint(value[0], value[1])
+            return drawn_value
         elif isinstance(value, str):
             try:
                 eval_dict = dict(
@@ -230,14 +235,14 @@ class VariantSet(ABC):
                 transform_type = TransformType.INV
 
             # Determine the number of copies of a symbol are needed (when "+" appears in the rhs)
-            n_copies = 1
+            n_copies_hap = (1, 1)
             if Syntax.MULTIPLE_COPIES in rhs_str:
                 chk(n_multiple_copies < len(n_copies_list), f'A number of copies must be provided '
                                                             f'for each `{Syntax.MULTIPLE_COPIES}` symbol used. '
                                                             f'Error in {vset_config}', error_type='syntax')
-                n_copies = self.get_sampled_int_value(n_copies_list[n_multiple_copies])
-                chk(n_copies >= 1, f'The number of copies must be strictly positive, got {n_copies} for '
-                                   f'the {n_multiple_copies + 1} \'{Syntax.MULTIPLE_COPIES}\' symbol {symbol}. Error in {vset_config}', error_type='syntax')
+                n_copies_hap = tuple(self.get_sampled_int_value(n_copies_list[i][n_multiple_copies],
+                                                                not_one=(self.svtype == VariantType.mCNV))
+                                     for i in range(len(n_copies_list)))
                 n_multiple_copies += 1
 
             # Determine the divergence probability for each divergence symbol.
@@ -268,18 +273,18 @@ class VariantSet(ABC):
                 transform_type=transform_type,
                 is_in_place=is_in_place,
                 divergence_prob=divergence_prob,
-                n_copies=n_copies,
+                n_copies=n_copies_hap,
                 replacement_seq=replacement_seq,
                 orig_seq=orig_seq
             )
             # We do not add operations for inplace identity transformations without divergence (do not affect the sequence).
             if (
                     transform_type != TransformType.IDENTITY or not is_in_place or divergence_prob > 0 or replacement_seq is not None
-                    or n_copies > 1):
+                    or any([n_copies != 1 for n_copies in n_copies_hap])):
                 # The letter has been involved in an operation and is not a placeholder.
                 identities_to_add[symbol] = False
                 operation = Operation(transform=transform, op_info={'SYMBOL': symbol.name})
-                if is_in_place and not n_copies > 1:
+                if is_in_place and all([n_copies == 1 for n_copies in n_copies_hap]):
                     operation.source_breakend_region = BreakendRegion(current_breakend - 1, current_breakend)
                 else:
                     # The insertion order helps to determine how to order multiple events inserted at the same breakend.
@@ -354,20 +359,35 @@ class SimulatedVariantSet(VariantSet):
             f'divergence_prob must be a float or an int or a list of floats in ]0, 1] or a list of ranges. But, a '
                  f'%s was provided in %s' % (type(self.vset_config.get('divergence_prob', [])), self.vset_config), error_type='value')
 
-        if ((self.svtype != VariantType.CUSTOM) and (Syntax.MULTIPLE_COPIES in ''.join(self.target))
-                and ('n_copies' not in self.vset_config)):
+        self.copies = self.vset_config.get('n_copies', ())
+        if (Syntax.MULTIPLE_COPIES in ''.join(self.target)) and ('n_copies' not in self.vset_config):
+            chk(self.svtype not in [VariantType.mCNV, VariantType.CUSTOM], f'The number of copies must be provided for a {self.svtype}')
             # Default the number of copies to 1 for predefined types with duplications
-            self.vset_config['n_copies'] = [1]
+            self.copies = ([1], [1])
 
-        chk(isinstance('n_copies' not in self.vset_config or self.vset_config['n_copies'], (list, int)),
+        chk('n_copies' not in self.vset_config or isinstance(self.vset_config['n_copies'], (list, int, tuple)),
             f'The number of copies must be an integer or a list of integers or a list of ranges in {self.vset_config}',
             error_type='value')
-        if 'n_copies' in self.vset_config and isinstance(self.vset_config['n_copies'], int):
-            self.vset_config['n_copies'] = [self.vset_config['n_copies']]
+
+        if isinstance(self.copies, int):
+            self.copies = [self.vset_config['n_copies']]
+
+        if isinstance(self.copies, list):
+            self.copies = (self.copies, self.copies)
+
+        if self.overlap_mode == OverlapMode.CHROM:
+            chk(not self.copies or self.copies[0] == self.copies[1], 'Whole chromosome duplications must have the same number of copies on both haplotypes.',
+                error_type='syntax')
 
         if self.svtype == VariantType.mCNV:
-            chk(('n_copies' in self.vset_config) and (self.vset_config['n_copies'][0] > 1),
-                f'n_copies has to be provided and be above 1 for a mCNV in {self.vset_config}', error_type='value')
+            chk(self.copies and all(len(n_copies) == 1 and n_copies[0] not in [1, [1, 1]] for n_copies in self.copies),
+                f'n_copies has to be provided and be different from 1 for a mCNV in {self.vset_config}', error_type='value')
+            copiesB = self.vset_config.get('n_copiesB', self.copies)
+            if isinstance(copiesB, int):
+                copiesB = [copiesB]
+
+            self.copies = (self.copies[0], copiesB)
+            chk('haploid' not in self.config or not self.config['haploid'], f'mCNV are not defined for haploid genomes.')
 
     # end: def preprocess_config(self)
 
@@ -388,7 +408,7 @@ class SimulatedVariantSet(VariantSet):
 
     def pick_genotype(self):
         if (self.config.get('homozygous_only', False) or (random.randint(0, 1) and not
-           self.config.get('heterozygous_only', False))):
+           self.config.get('heterozygous_only', False)) or (self.svtype == VariantType.mCNV)):
             return True, True
         else:
             return random.choice([(True, False), (False, True)])
@@ -428,6 +448,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'blacklist_region_type',
                 'divergence_prob',
                 'n_copies',
+                'n_copiesB',
                 'novel_insertions',
                 'interchromosomal',
                 'interchromosomal_period',
@@ -460,14 +481,13 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                          else letter[0] for letter in self.target])
 
             for key, grammar in SV_KEY.items():
+                if key == VariantType.mCNV: continue
                 grammar = (grammar[0], tuple([letter if Syntax.MULTIPLE_COPIES not in letter and Syntax.DIVERGENCE not in letter
                                               else letter[0] for letter in grammar[1]]))
                 # Test if the grammar or its symmetric match the grammar of the record
                 if (grammar[0] == lhs and grammar[1] == rhs) or (
                         grammar[0] == lhs[::-1] and grammar[1] == rhs[::-1]):
-                    # Distinguish between SNP/mCNV/DIVERGENCE/Identity
-                    if (key == VariantType.mCNV) and (Syntax.MULTIPLE_COPIES not in self.target[0]): continue
-
+                    # Distinguish between SNP/DIVERGENCE/Identity
                     if (key == VariantType.SNP and ((vset_cfg.get('length_ranges') not in (None, [[1, 1]])) or (Syntax.DIVERGENCE not in self.target[0])
                                                     or ('divergence_prob' in vset_cfg and vset_cfg['divergence_prob'] not in [[1], 1, 1., [1.]]))):
                             continue
@@ -728,7 +748,6 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         symbol_lengths, symbol_min_lengths = self.pick_symbol_lengths(letter_ranges, dispersion_ranges, letter_indexes, self.vset_config)
 
         novel_insertion_seqs = self.novel_insertion_seqs
-        n_copies_list = self.vset_config.get('n_copies', [])
 
         divergence_prob_list = self.vset_config.get('divergence_prob', [])
         if not isinstance(divergence_prob_list, list):
@@ -738,7 +757,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         (operations, anchor, dispersions, breakend_interval_lengths,
          breakend_interval_min_lengths) = self.grammar_to_variant_set(lhs_strs, rhs_strs, symbol_lengths,
                                                                       symbol_min_lengths, len(letters),
-                                                                      novel_insertion_seqs, n_copies_list,
+                                                                      novel_insertion_seqs, self.copies,
                                                                       divergence_prob_list, vset_config=self.vset_config)
 
         #
@@ -1036,7 +1055,9 @@ class ImportedVariantSet(VariantSet):
 
         parsed_info['INSSEQ'] = novel_insertion_seq
 
-        parsed_info['NCOPIES'] = vcf_info.get('NCOPIES', 1)
+        parsed_info['NCOPIES'] = vcf_info.get('NCOPIES', ([1], [1]))
+        if isinstance(parsed_info['NCOPIES'], str):
+            parsed_info['NCOPIES'] = [[int(n_copies)]for n_copies in parsed_info['NCOPIES'].split('.')]
         parsed_info['INSORD'] = vcf_info.get('INSORD', None)
         parsed_info['DIVERGENCE_PROB'] = vcf_info.get('DIVERGENCE_PROB', [0])
         parsed_info['ALT'] = None
@@ -1075,12 +1096,10 @@ class ImportedVariantSet(VariantSet):
 
         # Extract the info of all the records of the SV to determine the breakends and placement.
         for vcf_rec in sv_recs:
-            print(vcf_rec)
             parsed_info, additional_info = self.parse_vcf_rec_info(vcf_rec)
 
             if genotype is None:
                 genotype = parsed_info['GENOTYPE']
-            print(genotype, parsed_info)
             assert genotype == parsed_info['GENOTYPE']
 
             if len(sv_recs) > 1:
@@ -1160,7 +1179,7 @@ class ImportedVariantSet(VariantSet):
                 operations, _, _, _, _ = self.grammar_to_variant_set(lhs_strs, rhs_strs_list, symbol_lengths,
                                                                      symbol_min_lengths, 1,
                                                                      insseq,
-                                                                     [parsed_info['NCOPIES']],
+                                                                     parsed_info['NCOPIES'],
                                                                      parsed_info['DIVERGENCE_PROB'],
                                                                      replacement_seq=parsed_info['ALT'],
                                                                      orig_seq=parsed_info['REF'],
@@ -1199,7 +1218,7 @@ class ImportedVariantSet(VariantSet):
                     op_attributes.append(('DEL', True, None))
                 for op_type, op_is_in_place, op_target in op_attributes:
                     transform = Transform(TransformType[op_type], is_in_place=op_is_in_place,
-                                          n_copies=parsed_info['NCOPIES'],
+                                          n_copies=(parsed_info['NCOPIES'][0][0], parsed_info['NCOPIES'][1][0]),
                                           divergence_prob=parsed_info['DIVERGENCE_PROB'][0],
                                           replacement_seq=parsed_info['ALT'])
                     operations.append(Operation(transform, source_breakend_region=source_region,
@@ -1292,7 +1311,7 @@ VCF_HEADER_INFOS = [
          description="Symbol the record considers"),
     dict(id='SVLEN', number=1, type='Integer',
          description="Length of structural variant"),
-    dict(id='NCOPIES', number=1, type='Integer',
+    dict(id='NCOPIES', number=1, type='String',
          description="Number of sequence copies to insert at target"),
     dict(id='DIVERGENCE_PROB', number=1, type='Float',
          description="Mutation probability for each nucleotide of a duplicated sequence."),

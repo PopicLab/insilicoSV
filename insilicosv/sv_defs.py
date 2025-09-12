@@ -20,9 +20,8 @@ class TransformType(Enum):
 class Transform:
     transform_type: TransformType
     is_in_place: bool
-
-    n_copies: int = 1
-    divergence_prob: float = 0
+    divergence_prob: Optional[float] = 0
+    n_copies: Optional[tuple[int]] = (1, 1)
     replacement_seq: Optional[list[str]] = None
     orig_seq: Optional[str] = None
 
@@ -401,8 +400,11 @@ class BaseSV(SV):
                 op_end = op_start + 1
                 svlen = 0
 
-            if operation.transform.n_copies > 1:
-                sv_info['NCOPIES'] = operation.transform.n_copies
+            if any(n_copies != 1 for n_copies in operation.transform.n_copies):
+                if operation.transform.n_copies[0] == operation.transform.n_copies[1]:
+                    sv_info['NCOPIES'] = str(operation.transform.n_copies[0])
+                else:
+                    sv_info['NCOPIES'] = "/".join([str(operation.transform.n_copies[hap_idx]) for hap_idx in range(2)])
 
             sv_info['OP_TYPE'] = op_type_str
             if dispersion_target is not None:

@@ -264,13 +264,13 @@ class SVSimulator:
             if sv.overlap_mode == OverlapMode.CHROM and sv.info['OP_TYPE'] == 'DUP':
                 orig_op = sv.operations[0]
                 operations = []
-                for copy_num in range(orig_op.transform.n_copies):
+                for copy_num in range(orig_op.transform.n_copies[0]):
                     # For the writing of the output, we create an operation per copy to create new chromosome copies
                     transform = Transform(
                         transform_type=TransformType.IDENTITY,
                         is_in_place=False,
                         divergence_prob=orig_op.transform.divergence_prob,
-                        n_copies=1
+                        n_copies=(1, 1)
                     )
                     operations.append(
                         Operation(transform=transform,

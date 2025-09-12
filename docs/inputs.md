@@ -41,10 +41,12 @@ between two different chromosomes. All dispersions must be unbounded i.e. the di
 8. *n_copies: [] [for SVs containing '+' grammar notation]*: specifies the number of copies for each sequence affected by a '+' in order of appearance in the grammar.
 Each element of the list can be a positive number or a range of positive numbers. If a range is provided, a random number of copies included in the range will be used.
 The default number of copies for a DUP is [1] and does not need to be specified.
+9. *n_copiesB: [] [for mCNV]*: specifies number of copies on the second haplotype for mCNVs. It allows to have distinct copy numbers on each haplotype.
+If not specified, n_copies will be used.
 
 For tandem repeat variants, the following parameters is needed:
 
-9. *repeat_count_change_range*: the range from which to sample the number of repeats added (trEXP) or removed (trEXP).
+10. *repeat_count_change_range*: the range from which to sample the number of repeats added (trEXP) or removed (trEXP).
 
 For trEXP and trCON variants, a BED file of existing repeats must be specified in the 
 *overlap_regions* global setting, and *overlap_region_type* for the existing repeat regions must
@@ -52,7 +54,7 @@ be specified in the variant set. The BED file columns must contain in order the 
 
 SNPs and INDELs can be placed within SVs using the parameter:
 
-10. *allow_sv_overlap [optional]*: bool - set to `True` to allow this variant set to be overlapped by SVs (default: False). Setting it to True
+11. *allow_sv_overlap [optional]*: bool - set to `True` to allow this variant set to be overlapped by SVs (default: False). Setting it to True
 for variants other than SNPs and INDELs will raise an error.
 
 The following parameters can be set on the top level of the config file and provide higher-order controls over SV placement:
