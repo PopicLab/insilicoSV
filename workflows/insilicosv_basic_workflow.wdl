@@ -5,15 +5,12 @@ task insilicosv {
     File yaml
     String outDir
   }
- 
+  String yamlBasename = basename(yaml)
   command <<<
     set -e
-    out=$(dirname ~{yaml})
-    echo $out
-    insilicosv -c ~{yaml}
-    cat ${out}/sim.hapA.fa ${out}/sim.hapB.fa > ${out}/sim.fa
-    cp  ${out}/sim.fa ~{outDir}/.
-    cp  ${out}/sim.vcf ~{outDir}/.
+    cp ~{yaml} ~{outDir}/.
+    insilicosv -c ~{outDir}/~{yamlBasename}
+    cat ~{outDir}/sim.hapA.fa ~{outDir}/sim.hapB.fa > ~{outDir}/sim.fa
   >>>
 
   output {
@@ -133,10 +130,12 @@ task igvreports {
   }
 }
 
-workflow insilicosv_workflow {
+workflow insilicosv_basic {
   input {
     # genome simulation
-    File configYAML
+    String outDir
+    File? configYAML
+    File? insilicosvFa
     
     # read simulation
     Int hapCoverage
@@ -165,18 +164,18 @@ workflow insilicosv_workflow {
     Int threads
   }
 
-  String outDir = sub(configYAML, basename(configYAML), "")
-  
-  call insilicosv {
-    input:
-      yaml=configYAML,
-      outDir=outDir
+  if (defined(configYAML)) {
+    call insilicosv {
+        input:
+            yaml=select_first([configYAML]),
+            outDir=outDir
+    }
   }
-
+  File syntheticFa = select_first([insilicosvFa, insilicosv.fa])
   if (short) {
     call dwgsim {
       input:
-          fa = insilicosv.fa,
+          fa = syntheticFa,
           hapCoverage = hapCoverage,
           outDir = outDir,
           customArgs = customSrPreset
@@ -196,7 +195,7 @@ workflow insilicosv_workflow {
   if (hifi) {   
     call pbsim as hifiSim{
       input:
-          fa = insilicosv.fa,
+          fa = syntheticFa,
           hapCoverage = hapCoverage,
           outDir = outDir,
           platform = "hifi"
@@ -215,7 +214,7 @@ workflow insilicosv_workflow {
   if (ont) {   
     call pbsim as ontSim {
       input:
-          fa = insilicosv.fa,
+          fa = syntheticFa,
           hapCoverage = hapCoverage,
           outDir = outDir,
           platform = "ont"
@@ -234,7 +233,7 @@ workflow insilicosv_workflow {
   if (defined(customLrPreset)) {
     call pbsim as customSim{
       input:
-          fa = insilicosv.fa,
+          fa = syntheticFa,
           platform = "custom",
           hapCoverage = hapCoverage,
           outDir = outDir,
@@ -252,19 +251,21 @@ workflow insilicosv_workflow {
     }
   } 
 
-  call igvreports {
-    input:
-        ref = ref,
-        vcf = insilicosv.vcf,
-        bams = [srAln.bam, hifiAln.bam, ontAln.bam, customAln.bam],
-        bai = [srAln.bai, hifiAln.bai, ontAln.bai, customAln.bai],
-        outDir = outDir,
-        args = igvArgs
+  if (defined(configYAML)) {
+      call igvreports {
+        input:
+            ref = ref,
+            vcf = select_first([insilicosv.vcf]),
+            bams = [srAln.bam, hifiAln.bam, ontAln.bam, customAln.bam],
+            bai = [srAln.bai, hifiAln.bai, ontAln.bai, customAln.bai],
+            outDir = outDir,
+            args = igvArgs
+      }
   }
 
   output {
-     File vcf = insilicosv.vcf
-     File genome = insilicosv.fa
+     File? vcf = insilicosv.vcf
+     File? genome = insilicosv.fa
 
      File? srBAM = srAln.bam
      File? srBAI = srAln.bai
@@ -278,6 +279,6 @@ workflow insilicosv_workflow {
      File? customBAM = customAln.bam
      File? customBAI = customAln.bai
 
-     File igvHTML = igvreports.report
+     File? igvHTML = igvreports.report
   }
 }
