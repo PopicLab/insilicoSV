@@ -373,7 +373,7 @@ class SimulatedVariantSet(VariantSet):
             self.copies = [self.vset_config['n_copies']]
 
         if isinstance(self.copies, list):
-            self.copies = (self.copies , self.copies)
+            self.copies = (self.copies, self.copies)
 
         if self.overlap_mode == OverlapMode.CHROM:
             chk(not self.copies or self.copies[0] == self.copies[1], 'Whole chromosome duplications must have the same number of copies on both haplotypes.',
@@ -383,6 +383,9 @@ class SimulatedVariantSet(VariantSet):
             chk(self.copies and all(len(n_copies) == 1 and n_copies[0] not in [1, [1, 1]] for n_copies in self.copies),
                 f'n_copies has to be provided and be different from 1 for a mCNV in {self.vset_config}', error_type='value')
             copiesB = self.vset_config.get('n_copiesB', self.copies)
+            if isinstance(copiesB, int):
+                copiesB = [copiesB]
+
             self.copies = (self.copies[0], copiesB)
             chk('haploid' not in self.config or not self.config['haploid'], f'mCNV are not defined for haploid genomes.')
 
@@ -405,7 +408,7 @@ class SimulatedVariantSet(VariantSet):
 
     def pick_genotype(self):
         if (self.config.get('homozygous_only', False) or (random.randint(0, 1) and not
-           self.config.get('heterozygous_only', False))):
+           self.config.get('heterozygous_only', False)) or (self.svtype == VariantType.mCNV)):
             return True, True
         else:
             return random.choice([(True, False), (False, True)])
@@ -1052,9 +1055,9 @@ class ImportedVariantSet(VariantSet):
 
         parsed_info['INSSEQ'] = novel_insertion_seq
 
-        parsed_info['NCOPIES'] = vcf_info.get('NCOPIES', (1, 1))
+        parsed_info['NCOPIES'] = vcf_info.get('NCOPIES', ([1], [1]))
         if isinstance(parsed_info['NCOPIES'], str):
-            parsed_info['NCOPIES'] = [int(n_copies) for n_copies in parsed_info['NCOPIES'].split('.')]
+            parsed_info['NCOPIES'] = [[int(n_copies)]for n_copies in parsed_info['NCOPIES'].split('.')]
         parsed_info['INSORD'] = vcf_info.get('INSORD', None)
         parsed_info['DIVERGENCE_PROB'] = vcf_info.get('DIVERGENCE_PROB', [0])
         parsed_info['ALT'] = None
@@ -1176,7 +1179,7 @@ class ImportedVariantSet(VariantSet):
                 operations, _, _, _, _ = self.grammar_to_variant_set(lhs_strs, rhs_strs_list, symbol_lengths,
                                                                      symbol_min_lengths, 1,
                                                                      insseq,
-                                                                     [parsed_info['NCOPIES']],
+                                                                     parsed_info['NCOPIES'],
                                                                      parsed_info['DIVERGENCE_PROB'],
                                                                      replacement_seq=parsed_info['ALT'],
                                                                      orig_seq=parsed_info['REF'],
@@ -1215,7 +1218,7 @@ class ImportedVariantSet(VariantSet):
                     op_attributes.append(('DEL', True, None))
                 for op_type, op_is_in_place, op_target in op_attributes:
                     transform = Transform(TransformType[op_type], is_in_place=op_is_in_place,
-                                          n_copies=parsed_info['NCOPIES'],
+                                          n_copies=(parsed_info['NCOPIES'][0][0], parsed_info['NCOPIES'][1][0]),
                                           divergence_prob=parsed_info['DIVERGENCE_PROB'][0],
                                           replacement_seq=parsed_info['ALT'])
                     operations.append(Operation(transform, source_breakend_region=source_region,
