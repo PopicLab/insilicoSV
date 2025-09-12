@@ -177,7 +177,7 @@ class OutputWriter:
                     # To change the position referential and find the start index of the operation in seq
                     for op_idx, operation in enumerate(overlapping_operations):
                         relative_position = sv_region.start
-                        n_copies = operation.transform.n_copies
+                        n_copies = operation.transform.n_copies[hap_index]
                         if operation.motif is not None:
                             # In the trEXP case the number of copies is encoded in the motif
                             n_copies = 1
