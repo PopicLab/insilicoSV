@@ -24,6 +24,7 @@ A $\rightarrow$ AA+
 
 ### mCNV
 A $\rightarrow$ A+
+Here with 3 copies on one haplotype and a deletion on the other one.
 
 ![mCNV](gallery/mCNV.png)
 
