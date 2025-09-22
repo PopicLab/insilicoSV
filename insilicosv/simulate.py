@@ -106,13 +106,22 @@ class SVSimulator:
             chk(k in ('reference', 'max_tries', 'max_random_breakend_tries', 'homozygous_only', 'heterozygous_only',
                       'min_intersv_dist',
                       'random_seed', 'output_no_haps', 'output_adjacencies', 'output_paf', 'output_svops_bed',
-                      'th_proportion_N',
+                      'th_proportion_N', 'haploid',
                       'output_paf_intersv', 'verbose', 'variant_sets', 'overlap_regions', 'blacklist_regions',
                       'filter_small_chr', 'allow_hap_overlap'),
                 f'invalid top-level config: {k}', error_type='syntax')
 
         chk(utils.is_readable_file(config['reference']), f'reference must be a readable file')
         chk(isinstance(config.get('variant_sets'), list), 'variant_sets must specify a list')
+
+        chk(isinstance(config.get('haploid', False), bool), 'haploid must be a boolean')
+        if config.get('haploid', False) and not config.get('homozygous_only', False):
+            config['homozygous_only'] = True
+            config['heterozygous_only'] = False
+
+        chk(not config.get('homozygous_only', False) or not config.get('heterozygous_only', False),
+            f'homozygous_only and'
+            f'heterozygous_only cannot be True at the same time')
 
         if 'overlap_regions' in config:
             config['overlap_regions'] = utils.as_list(config['overlap_regions'])
@@ -255,13 +264,13 @@ class SVSimulator:
             if sv.overlap_mode == OverlapMode.CHROM and sv.info['OP_TYPE'] == 'DUP':
                 orig_op = sv.operations[0]
                 operations = []
-                for copy_num in range(orig_op.transform.n_copies):
+                for copy_num in range(orig_op.transform.n_copies[0]):
                     # For the writing of the output, we create an operation per copy to create new chromosome copies
                     transform = Transform(
                         transform_type=TransformType.IDENTITY,
                         is_in_place=False,
                         divergence_prob=orig_op.transform.divergence_prob,
-                        n_copies=1
+                        n_copies=(1, 1)
                     )
                     operations.append(
                         Operation(transform=transform,

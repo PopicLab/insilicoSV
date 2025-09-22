@@ -1,0 +1,17 @@
+{
+	"GenomeMix.outDir": "/path/to/results",
+	"GenomeMix.reference": "/path/to/reference_genome",
+	"GenomeMix.configs": [
+		"/path/to/insilico_0.yaml",
+		"/path/to/insilico_1.yaml",
+		"/path/to/insilico_2.yaml",
+		"/path/to/insilico_3.yaml",
+		"/path/to/insilico_4.yaml"
+	],
+	"GenomeMix.genomes": [[0], [0, 1, 3, 4], [0, 2]],
+	"GenomeMix.prevalence": [0.7, 0.1, 0.2],
+	"GenomeMix.totalCoverage": 20,
+	"GenomeMix.short": true,
+	"GenomeMix.hifi": false,
+	"GenomeMix.ont": false
+}

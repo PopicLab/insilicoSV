@@ -34,6 +34,15 @@ variant_sets:
         - [5, 10]  # A
         - [10, 15]  # NOTE: B
         - [5, 10]  # NOTE: _
+    - type: "DUP"  # "A" -> "AA+"  with the `+` representing a number of copies determined by the range n_copies.
+      number: 1
+      n_copies: [[5, 10]]
+      length_ranges: [[5, 10]]
+    - type: "mCNV"  # "A" -> "A+" with a different number of copies on each haplotype, potentially 0 (DEL)
+      number: 1
+      n_copies: 0
+      n_copiesB: [[5, 10]]
+      length_ranges: [[5, 10]]
 ```
 
 ### *Example 1a* - Example config with entire insilicoSV vocabulary

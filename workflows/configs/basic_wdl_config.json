@@ -1,0 +1,9 @@
+{
+	"insilicosv_basic.configYAML": "/path/to/insilicosv_config/",
+	"insilicosv_basic.hapCoverage": 5,
+	"insilicosv_basic.short": true,
+	"insilicosv_basic.hifi": false,
+	"insilicosv_basic.ont": false,
+	"insilicosv_basic.ref": "/path/to/reference_genome",
+	"insilicosv_basic.threads": 1
+}
