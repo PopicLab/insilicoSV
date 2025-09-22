@@ -476,7 +476,7 @@ class SVSimulator:
 
             invalid = False
             if blacklist_regions and roi.data.chrom in blacklist_regions.chrom2itree:
-                invalid = blacklist_regions.strictly_contains_point(breakend, roi.chrom)
+                invalid = blacklist_regions.strictly_contains_point(breakend, roi.data.chrom)
 
             if sv_regions:
                 overlaps = sv_regions.chrom2itree[roi.data.chrom][0].overlap(breakend, breakend + roi_length)
