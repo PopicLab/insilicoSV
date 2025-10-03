@@ -157,18 +157,21 @@ variant_sets:
       number: 3
       length_ranges: [[100, 1000]]
 ```
-Each variant set specified in the config can include a `blacklist_region_type` value which will control which intervals
-recorded in `blacklist_regions` will be avoided by those variants. In the above example, `"all"` is specified for the DELs, 
-which will result in none of the three deletions from being placed in any of the regions in `blacklist_regions`. 
-If `blacklist_regions` is given in BED file format, records can include a fourth column recording `type`, 
-which can then be used to filter the blacklist intervals considered for a given set of SVs.
-If `blacklist_regions` is given in VCF file format, records can include the info field `REGION_TYPE` which can then be used to filter the blacklist intervals considered for a given set of SVs.
-If `REGION_TYPE` is not provided, the name of the region will be `DEFAULT`.
-In this example, the three insertions will be placed randomly regardless of the blacklist regions as the blacklist_region_type
-is not specified.
+Each variant set defined in the config may include a blacklist_region_type parameter, which determines which intervals 
+from blacklist_regions are excluded from placement of SV breakpoints.
+* In the example above, blacklist_region_type="all" is specified for the DELs, 
+so none of the three DELs breakpoints will fall within any region listed in blacklist_regions.
+* If blacklist_regions is provided in BED format, an optional fourth column (type) can be used to categorize 
+regions and filter them per variant set.
+* If blacklist_regions is provided in VCF format, the REGION_TYPE INFO field can be used instead. 
+If this field is missing, the default region type will be DEFAULT. Only the CHROM, POS, and END fields are considered from each record.
 
-If blacklist entries are provided in VCF format, only the following parts of the record are used for the blacklist: 
-CHROM, POS and the END INFO field.
+In the example, insertions have no blacklist_region_type specified, so they will be placed randomly without regard to blacklist regions.
+
+**Important:** Blacklists constrain only SV breakpoints, not the full span of the SV. 
+This means an SV may still overlap a blacklist region internally.
+To exclude overlaps entirely, use `overlap_mode` contained together with the complement of the blacklist regions 
+(e.g. obtained via `bedtools complement`).
 
 ### Example 4b - Specifying a minimum inter-variant distance
 Variant placement can also be constrained by enforcing that there be a minimum inter-variant distance between any two
@@ -197,7 +200,7 @@ There are several ways to define the relationship between an SV and a region of 
 determined by the ROI, so `[null, null]` must be used for the corresponding range in `length_ranges`.
 * **`"partial"`**: The constrained breakends of the SV must overlap with one of the boundaries of a selected ROI.
 * **`"containing"`**: The constrained breakends of the SV must completely contain a selected ROI.
-* **`"contained"`**: The constrained breakends of the SV must be completely contained within a selected ROI.
+* **`"contained"`**: The constrained breakends of the SV must be completely contained within a same selected ROI.
 * **`"terminal"`**: The constrained breakends of the SV is placed at the extremity of a chromosome arm.
 * **`"whole-chromosome"`**: The SV spans an entire chromosome. This mode is only compatible with **Deletions (DEL)** and **Duplications (DUP)**. 
 For Duplications, setting `n_copies` to `1` (or not specifying it) creates a single additional chromosome copy (trisomy).

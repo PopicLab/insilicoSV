@@ -1519,6 +1519,22 @@ class TestSVSimulator(unittest.TestCase):
              ["TCG" + cpt_0 + cpt_1 + cpt_2 for cpt_0 in 'TCGA' for cpt_1 in 'TCGA' for cpt_2 in 'TCGA']]
         ]
 
+        self.test_small_chr_filter = [
+            [("TCG", 'TCGATCGATCGA'),
+             TestObject([self.ref_file, {"chr21": "TCG", "chr1": 'TCGATCGATCGA'}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    "filter_small_chr": 4,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    "variant_sets": [{"type": "A->",
+                                                      "number": 1,
+                                                      "length_ranges": [[2, 2]]}
+                                                     ]}],
+                                self.hap1, self.hap2, self.bed),
+             [("TCG", "TCGATCGATCGA"[:idx] + ("TCGATCGATCGA"[idx+2:] if idx < 11 else '')) for idx in range(11)]]
+        ]
+
         self.test_indel_overlap = [
             ["TC",
              TestObject([self.ref_file, {"chr21": "TC"}],
@@ -2423,6 +2439,9 @@ class TestSVSimulator(unittest.TestCase):
 
     def test_indel_overlap(self):
         self.run_test(self.test_indel_overlap)
+
+    def test_small_chr_filter(self):
+        self.run_test(self.test_small_chr_filter)
 
     def run_test(self, data, div_check=False):
         for test_num, (ref, vs_config, expected_outputs) in enumerate(data):

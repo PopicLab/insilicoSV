@@ -8,6 +8,7 @@ from pysam import VariantFile
 import copy
 from functools import cmp_to_key
 
+from insilicosv import __version__
 from insilicosv import utils
 from insilicosv.utils import Region, Locus, if_not_none
 from insilicosv.sv_defs import Operation, Transform, TransformType, BreakendRegion, VariantType, Syntax, Breakend
@@ -662,6 +663,7 @@ class OutputWriter:
         vcf_path = os.path.join(self.output_path, 'sim.vcf')
         with open(vcf_path, "w") as vcf:
             vcf.write("##fileformat=VCFv4.2\n")
+            vcf.write(f"##source=InsilicoSV_v{__version__}\n")
             for chrm, chrm_len in self.aneuploidy_chrom_lengths.items():
                 vcf.write("##contig=<ID=%s,length=%d>\n" % (chrm, chrm_len))
 
