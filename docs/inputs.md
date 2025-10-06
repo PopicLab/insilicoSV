@@ -70,6 +70,7 @@ The following parameters can be set on the top level of the config file and prov
 10. *allow_hap_overlap: False [optional]*: Allow heterozygous SVs to overlap across homologous chromosomes.
 11. *filter_small_chr: 0 [optional]*: Filter reference chromosomes smaller than `filter_small_chr`.
 12. *min_intersv_dist: 0 [optional]*: Ensure that breakpoints from distinct SVs are separated by at least `min_intersv_dist`.
+13. *random_seed: current_time [optional]*: Enables reproducibility by setting a fixed random seed.
 
 Examples of the full set of simulation options available through various config inputs can be found in the [use cases](use_cases) page.
 
