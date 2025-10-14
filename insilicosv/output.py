@@ -376,6 +376,8 @@ class OutputWriter:
                     breakends[symbol] = [placement[idx], placement[idx + 1]]
                 # Adjacency between the end of the last symbol and the beginning of the current one.
                 lhs_adjacencies.append([prev_symbol + '^t', symbol + '^h'])
+                # Symmetric so that the order does not matter
+                lhs_adjacencies.append([symbol + '^h', prev_symbol + '^t'])
                 prev_symbol = symbol
 
             # Get the novel adjacencies after the SV placement
