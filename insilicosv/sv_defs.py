@@ -387,13 +387,13 @@ class BaseSV(SV):
                 # The SV is a DEL partially overlapping another SV
                 op_chrom = operation.source_region.chrom
                 op_start = operation.orig_start
-                op_end = operation.orig_end + 1
-                svlen = op_end - op_start - 1
+                op_end = operation.orig_end
+                svlen = op_end - op_start
             elif operation.source_region is not None:
                 op_chrom = operation.source_region.chrom
                 op_start = operation.source_region.start
                 svlen = operation.source_region.end - operation.source_region.start
-                op_end = operation.source_region.end + 1
+                op_end = operation.source_region.end
             else:
                 op_chrom = operation.target_region.chrom
                 op_start = operation.target_region.start
@@ -409,7 +409,7 @@ class BaseSV(SV):
             sv_info['OP_TYPE'] = op_type_str
             if dispersion_target is not None:
                 sv_info['TARGET_CHROM'] = dispersion_target.chrom
-                sv_info['TARGET'] = dispersion_target.start + 1
+                sv_info['TARGET'] = dispersion_target.start
             sv_info['SVLEN'] = svlen
 
             if operation.target_insertion_order is not None:
