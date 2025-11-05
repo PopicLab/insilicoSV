@@ -45,7 +45,7 @@ class VariantSet(ABC):
             error_type='value')
         self.vset_config = copy.deepcopy(vset_config)
         self.config = config
-        self.overlap_kinds = utils.as_list(self.vset_config.get('overlap_region_type', 'all'))
+        self.overlap_kinds = []
         self.overlap_ranges = []
         self.header = []
         self.copies = ()
@@ -60,6 +60,14 @@ class VariantSet(ABC):
         # For SNPs and INDELs overlap
         self.overlap_sv = False
 
+        overlap_files = utils.as_list(self.vset_config.get('overlap_region_type', ['all']))
+        if self.vset_config.get('overlap_region_type', 'all') == 'all':
+            self.overlap_kinds = [('all',)] * len(overlap_files)
+        else:
+            for overlap_kind in overlap_files:
+                self.overlap_kinds.append(tuple(overlap_kind))
+        self.overlap_kinds = tuple(self.overlap_kinds)
+
         if 'overlap_mode' in self.vset_config:
             chk(isinstance(self.vset_config['overlap_mode'], str) or
                 (isinstance(self.vset_config['overlap_mode'], list) and all(
@@ -69,6 +77,12 @@ class VariantSet(ABC):
                 self.overlap_mode = OverlapMode(self.vset_config['overlap_mode'])
             except ValueError:
                 chk(False, f'Invalid overlap_mode in {vset_config}', error_type='value')
+
+            chk(len(self.overlap_kinds) == len(overlap_files),
+                f'overlap_region_kinds if specified '
+                f'should be \'all\' or a list of length the number of constrain region files in '
+                f'\'overlap_regions\'. {len(self.overlap_kinds)} and '
+                f'{len(overlap_files)} were provided', error_type='syntax')
 
         self.vset_config['overlap_region_type'] = (tuple(utils.as_list(self.vset_config['overlap_region_type']))
                                                    if 'overlap_region_type' in self.vset_config else ('all',))
@@ -404,7 +418,23 @@ class SimulatedVariantSet(VariantSet):
         vset_config = self.vset_config
         if 'blacklist_region_type' not in vset_config:
             return None
-        return RegionFilter(region_kinds=tuple(utils.as_list(self.vset_config['blacklist_region_type'])))
+
+        blacklist_types = []
+        blacklist_files = utils.as_list(self.config.get('blacklist_regions', []))
+        if self.vset_config['blacklist_region_type'] == 'all':
+            blacklist_types = [('all',)] * len(blacklist_files)
+        else:
+            for blacklist_type in blacklist_files:
+                blacklist_types.append(tuple(blacklist_type))
+        blacklist_types = tuple(blacklist_types)
+
+        chk(len(blacklist_types) == len(blacklist_files),
+            f'blacklist_region_type if specified '
+            f'should be \'all\' or a list of length the number of blacklist region files in '
+            f'\'blacklist_regions\'. {len(blacklist_types)} and '
+            f'{len(blacklist_files)} were provided', error_type='syntax')
+
+        return RegionFilter(region_kinds=blacklist_types)
 
     def pick_genotype(self):
         if (self.config.get('homozygous_only', False) or (random.randint(0, 1) and not

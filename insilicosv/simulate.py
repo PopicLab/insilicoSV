@@ -13,12 +13,10 @@ import shutil
 import time
 from typing_extensions import Any
 import numpy as np
-from intervaltree import Interval, IntervalTree
+from intervaltree import Interval
 from pysam import FastaFile
 import yaml
 import copy
-from collections import defaultdict
-from math import floor
 
 from insilicosv import utils, __version__
 from insilicosv.utils import (
@@ -51,7 +49,7 @@ class SVSimulator:
     reference_regions: RegionSet
     # Region Set defined by the reference regions to keep track of available regions for overlap SVs
     reference_sv_overlap_regions: RegionSet
-    blacklist_regions: RegionSet
+    blacklist_regions: list[RegionSet]
     reference: FastaFile
     chrom_lengths: dict[str, int]
     output_path: str
@@ -217,13 +215,13 @@ class SVSimulator:
                 # Shuffle the ROIs so the selection is not biased on their positions in the input bed file
                 random.shuffle(self.rois_overlap[sv_category])
             logger.info(f'{n_removed_rois} ROIs filtered')
-        self.blacklist_regions = RegionSet()
+        self.blacklist_regions = []
         for blacklist_region_file in utils.as_list(self.config.get('blacklist_regions', [])):
             logger.info(f'Processing blacklist region file {blacklist_region_file}')
             if blacklist_region_file.lower().endswith('.bed'):
-                self.blacklist_regions.add_region_set(RegionSet.from_beds([blacklist_region_file], to_region_set=True))
+                self.blacklist_regions.append(RegionSet.from_beds([blacklist_region_file], to_region_set=True))
             elif blacklist_region_file.lower().endswith('.vcf'):
-                self.blacklist_regions.add_region_set(RegionSet.from_vcf(blacklist_region_file))
+                self.blacklist_regions.append(RegionSet.from_vcf(blacklist_region_file))
             else:
                 chk(f'Cannot import blacklist regions from {blacklist_region_file}: '
                     f'unsupported file type, please provide a .bed or .vcf file', error_type='type')
@@ -372,8 +370,11 @@ class SVSimulator:
 
     @functools.cache
     def get_relevant_blacklist_regions(self, blacklist_filter):
-        return (RegionSet() if blacklist_filter is None else
-                self.blacklist_regions.filtered(region_filter=blacklist_filter))
+        if blacklist_filter is None: return RegionSet()
+        filtered_blacklist = RegionSet()
+        for blacklist_idx, blacklist_region in enumerate(self.blacklist_regions):
+            filtered_blacklist.add_region_set(blacklist_region.filtered(region_filter=blacklist_filter, blacklist_idx=blacklist_idx))
+        return filtered_blacklist
 
     def get_breakend(self, hap_id, reference_regions, containing_region=None, avoid_chrom=None, blacklist_regions=None,
                      roi_length=0, total_length=0, sv_regions=None):

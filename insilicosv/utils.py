@@ -161,15 +161,18 @@ class Region:
 
 @dataclass(frozen=True)
 class RegionFilter:
-    region_kinds: Optional[tuple[str, ...]] = None
+    region_kinds: Optional[tuple[tuple[str, ...]]] = None
     region_length_range: tuple[Optional[int], Optional[int]] = (None, None)
 
-    def satisfied_for(self, region) -> bool:
-        if (self.region_kinds is not None and
+    def satisfied_for(self, region, blacklist_idx) -> bool:
+        if self.region_kinds is None: return True
+
+        current_region_kinds = self.region_kinds[blacklist_idx]
+        if (current_region_kinds and
                 (not region.kind or
                  not any((region_kinds.upper() == 'ALL' and region.kind != '_reference_') or
                          region_kinds in region.kind
-                         for region_kinds in self.region_kinds))):
+                         for region_kinds in current_region_kinds))):
             return False
         return True
 
@@ -179,8 +182,8 @@ class TandemRepeatRegionFilter(RegionFilter):
     min_num_repeats: int = 0
 
     @override
-    def satisfied_for(self, region: Region) -> bool:
-        if not super().satisfied_for(region):
+    def satisfied_for(self, region: Region, blacklist_idx) -> bool:
+        if not super().satisfied_for(region, blacklist_idx):
             return False
         try:
             repeat_unit_length: int = int(region.data)
@@ -310,13 +313,13 @@ class RegionSet:
     def get_region_list(self, hap=0):
         return [ival.data for chrom_itree in self.chrom2itree.values() for ival in chrom_itree[hap]]
 
-    def filtered(self, region_filter):
+    def filtered(self, region_filter, blacklist_idx):
         """Construct a RegionSet containing regions from self that meet given filter"""
 
         # TODO: use numpy to filter regions faster
 
         def satisfies_filter(region):
-            return region_filter.satisfied_for(region)
+            return region_filter.satisfied_for(region, blacklist_idx)
 
         # Blacklist affect the three haplotypes
         return RegionSet(filter(satisfies_filter, self.get_region_list()))

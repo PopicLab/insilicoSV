@@ -1042,7 +1042,7 @@ class TestSVSimulator(unittest.TestCase):
                                            "blacklist_regions": "tests/inputs/example_avoid_interval_3.bed",
                                            "variant_sets": [{"type": "DEL", "number": 1,
                                                              "length_ranges": [[6, 6]],
-                                                             "blacklist_region_type": ['TEST1', 'TEST3']}]}],
+                                                             "blacklist_region_type": [['TEST1', 'TEST3']]}]}],
                                          self.hap1, self.hap2, self.bed),
              ['TCTCGAT', 'TCGATCT', 'TCGCGAT', 'TCGATCG', 'TCGATAT', 'GATCGAT']],
             ['TCGATCGATCGAA', TestObject([self.ref_file, {
@@ -1056,8 +1056,9 @@ class TestSVSimulator(unittest.TestCase):
                                                                  "tests/inputs/example_avoid_interval.vcf"],
                                            "variant_sets": [{"type": "A_->A_A", "number": 1,
                                                              "length_ranges": [[6, 6], [5, 5]],
-                                                             "blacklist_region_type": ['TEST1', 'TEST2', 'TEST3',
-                                                                                       'TEST']},
+                                                             "blacklist_region_type": [['TEST'], ['TEST1', 'TEST2', 'TEST3'],
+                                                                                       ['TESTVCF']]
+                                                             },
                                                             {"type": "DEL", "number": 1,
                                                              "length_ranges": [[3, 3]]}
                                                             ]}],
@@ -1140,7 +1141,7 @@ class TestSVSimulator(unittest.TestCase):
                                        {"type": "AB->AA", "number": 1,
                                         "length_ranges": [[5, 5], [5, 5]],
                                         "overlap_mode": "exact",
-                                        "overlap_region_type": [None, "L1HS"]}
+                                        "overlap_region_type": [[None, "L1HS"]]}
                                    ]}],
                        self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {"chr21": "GCAGACTGAC"}],
@@ -1150,7 +1151,7 @@ class TestSVSimulator(unittest.TestCase):
                                        {"type": "AB->AA", "number": 1,
                                         "length_ranges": [[6, 6], [5, 5]],
                                         "overlap_mode": "exact",
-                                        "overlap_region_type": [None, "L1HS"]}
+                                        "overlap_region_type": [[None, "L1HS"]]}
                                    ]}],
                        self.hap1, self.hap2, self.bed),
         ]
@@ -1220,11 +1221,11 @@ class TestSVSimulator(unittest.TestCase):
                                    {"type": "DEL", "number": 2,
                                     "overlap_region_length_range": [1, 10],
                                     "overlap_mode": "exact",
-                                    "overlap_region_type": ["L1HS"]},
+                                    "overlap_region_type": [["L1HS"]]},
                                    {"type": "DEL", "number": 4,
                                     "overlap_region_length_range": [1, 10],
                                     "overlap_mode": "exact",
-                                    "overlap_region_type": ["ALR/Alpha"]}
+                                    "overlap_region_type": [["ALR/Alpha"]]}
                                    ]}],
                 self.hap1, self.hap2, self.bed),
             # type-specific num_overlap param > num available (ALR)
@@ -1236,11 +1237,11 @@ class TestSVSimulator(unittest.TestCase):
                   "variant_sets": [{"type": "DEL", "number": 2,
                                     "overlap_region_length_range": [1, 5],
                                     "overlap_mode": "exact",
-                                    "overlap_region_type": ["L1HS"]},
+                                    "overlap_region_type": [["L1HS"]]},
                                    {"type": "DEL", "number": 3,
                                     "overlap_region_length_range": [1, 5],
                                     "overlap_mode": "exact",
-                                    "overlap_region_type": ["ALR/Alpha"]}
+                                    "overlap_region_type": [["ALR/Alpha"]]}
                                    ]}],
                 self.hap1, self.hap2, self.bed),
             TestObject([self.ref_file, {
@@ -1250,43 +1251,43 @@ class TestSVSimulator(unittest.TestCase):
                                    "variant_sets": [{"type": "DEL", "number": 1,
                                                      "overlap_region_length_range": [2, 4],
                                                      "overlap_mode": "exact",
-                                                     "overlap_region_type": ["Alu"]},
+                                                     "overlap_region_type": [["Alu"]]},
                                                     {"type": "DEL", "number": 1,
                                                      "overlap_region_length_range": [2, 4],
                                                      "overlap_mode": "exact",
-                                                     "overlap_region_type": ["L1"]},
+                                                     "overlap_region_type": [["L1"]]},
                                                     {"type": "DEL", "number": 1,
                                                      "overlap_region_length_range": [2, 4],
                                                      "overlap_mode": "exact",
-                                                     "overlap_region_type": ["L2"]},
+                                                     "overlap_region_type": [["L2"]]},
                                                     {"type": "DEL", "number": 1,
                                                      "overlap_region_length_range": [2, 4],
                                                      "overlap_mode": "exact",
-                                                     "overlap_region_type": ["SVA"]},
+                                                     "overlap_region_type": [["SVA"]]},
                                                     {"type": "DEL", "number": 1,
                                                      "overlap_region_length_range": [2, 4],
                                                      "overlap_mode": "exact",
-                                                     "overlap_region_type": ["HERVK"]},
+                                                     "overlap_region_type": [["HERVK"]]},
                                                     {"type": "DEL", "number": 1,
                                                      "overlap_region_length_range": [6, 8],
                                                      "overlap_mode": "exact",
-                                                     "overlap_region_type": ["Alu"]},
+                                                     "overlap_region_type": [["Alu"]]},
                                                     {"type": "DEL", "number": 1,
                                                      "overlap_region_length_range": [6, 8],
                                                      "overlap_mode": "exact",
-                                                     "overlap_region_type": ["L1"]},
+                                                     "overlap_region_type": [["L1"]]},
                                                     {"type": "DEL", "number": 1,
                                                      "overlap_region_length_range": [6, 8],
                                                      "overlap_mode": "exact",
-                                                     "overlap_region_type": ["L2"]},
+                                                     "overlap_region_type": [["L2"]]},
                                                     {"type": "DEL", "number": 1,
                                                      "overlap_region_length_range": [6, 8],
                                                      "overlap_mode": "exact",
-                                                     "overlap_region_type": ["SVA"]},
+                                                     "overlap_region_type": [["SVA"]]},
                                                     {"type": "DEL", "number": 1,
                                                      "overlap_region_length_range": [6, 8],
                                                      "overlap_mode": "exact",
-                                                     "overlap_region_type": ["HERVK"]}
+                                                     "overlap_region_type": [["HERVK"]]}
                                                     ]}],
                        self.hap1, self.hap2, self.bed)
         ]
@@ -2540,7 +2541,7 @@ variant_sets:
     - type: "INV"  # "A" -> ""
       number: 1
       length_ranges: [[null, null]]
-      overlap_region_type: ["LINE1"]
+      overlap_region_type: [["LINE1"]]
       overlap_mode: exact
     """)
 
@@ -2576,7 +2577,7 @@ variant_sets:
     - type: "INV"  # "A" -> ""
       number: 1
       length_ranges: [[3, 3]]
-      overlap_region_type: ["LINE1"]
+      overlap_region_type: [["LINE1"]]
       overlap_mode: contained
     """)
 
@@ -2612,7 +2613,7 @@ variant_sets:
     - type: "INV"  # "A" -> ""
       number: 1
       length_ranges: [[3, 3]]
-      overlap_region_type: ["LINE1"]
+      overlap_region_type: [["LINE1"]]
       overlap_mode: partial
     """)
 
@@ -2653,7 +2654,7 @@ variant_sets:
     - type: "trEXP"
       number: 1
       repeat_count_change_range: [2, 2]
-      overlap_region_type: ["ALU"]
+      overlap_region_type: [["ALU"]]
     """)
 
     simulator = SVSimulator(config_path=str(cfg))
@@ -2689,7 +2690,7 @@ variant_sets:
     - type: "trCON"
       number: 1
       repeat_count_change_range: [2, 2]
-      overlap_region_type: ["ALU"]
+      overlap_region_type: [["ALU"]]
     """)
 
     simulator = SVSimulator(config_path=str(cfg))

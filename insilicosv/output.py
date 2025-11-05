@@ -665,7 +665,7 @@ class OutputWriter:
         vcf_path = os.path.join(self.output_path, 'sim.vcf')
         with open(vcf_path, "w") as vcf:
             vcf.write("##fileformat=VCFv4.2\n")
-            vcf.write(f"##source=InsilicoSV_v{__version__}\n")
+            vcf.write(f"##source=InsilicoSV_{__version__}\n")
             for chrm, chrm_len in self.aneuploidy_chrom_lengths.items():
                 vcf.write("##contig=<ID=%s,length=%d>\n" % (chrm, chrm_len))
 
