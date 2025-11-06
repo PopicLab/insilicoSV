@@ -64,7 +64,7 @@ class VariantSet(ABC):
         if self.vset_config.get('overlap_region_type', 'all') == 'all':
             self.overlap_kinds = [('all',)] * len(overlap_files)
         else:
-            for overlap_kind in overlap_files:
+            for overlap_kind in self.vset_config.get('overlap_region_type', 'all'):
                 self.overlap_kinds.append(tuple(overlap_kind))
         self.overlap_kinds = tuple(self.overlap_kinds)
 
@@ -421,10 +421,11 @@ class SimulatedVariantSet(VariantSet):
 
         blacklist_types = []
         blacklist_files = utils.as_list(self.config.get('blacklist_regions', []))
+        print('blacklist_files', blacklist_files)
         if self.vset_config['blacklist_region_type'] == 'all':
             blacklist_types = [('all',)] * len(blacklist_files)
         else:
-            for blacklist_type in blacklist_files:
+            for blacklist_type in self.vset_config['blacklist_region_type']:
                 blacklist_types.append(tuple(blacklist_type))
         blacklist_types = tuple(blacklist_types)
 

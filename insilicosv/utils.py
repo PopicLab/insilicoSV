@@ -164,10 +164,16 @@ class RegionFilter:
     region_kinds: Optional[tuple[tuple[str, ...]]] = None
     region_length_range: tuple[Optional[int], Optional[int]] = (None, None)
 
-    def satisfied_for(self, region, blacklist_idx) -> bool:
+    def satisfied_for(self, region, blacklist_idx=None) -> bool:
         if self.region_kinds is None: return True
 
-        current_region_kinds = self.region_kinds[blacklist_idx]
+        if blacklist_idx is not None:
+            current_region_kinds = self.region_kinds[blacklist_idx]
+        else:
+            # For constraint regions, we do not distinguish the names per file
+            current_region_kinds = [kind for tuple_kinds in self.region_kinds for kind in tuple_kinds]
+
+        print('balcklist', self.region_kinds, 'idx', blacklist_idx, current_region_kinds)
         if (current_region_kinds and
                 (not region.kind or
                  not any((region_kinds.upper() == 'ALL' and region.kind != '_reference_') or
@@ -321,7 +327,7 @@ class RegionSet:
         def satisfies_filter(region):
             return region_filter.satisfied_for(region, blacklist_idx)
 
-        # Blacklist affect the three haplotypes
+        # Blacklist affect the three ploidy trees
         return RegionSet(filter(satisfies_filter, self.get_region_list()))
 
     def add_region_set(self, other_region_set):

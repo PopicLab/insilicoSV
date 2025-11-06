@@ -215,6 +215,7 @@ class SVSimulator:
                 # Shuffle the ROIs so the selection is not biased on their positions in the input bed file
                 random.shuffle(self.rois_overlap[sv_category])
             logger.info(f'{n_removed_rois} ROIs filtered')
+
         self.blacklist_regions = []
         for blacklist_region_file in utils.as_list(self.config.get('blacklist_regions', [])):
             logger.info(f'Processing blacklist region file {blacklist_region_file}')
@@ -242,7 +243,7 @@ class SVSimulator:
             for sv in vset_svs:
                 sv.info['VSET'] = vset_num
             self.overlap_ranges[vset_num] = ranges
-            self.overlap_kinds[vset_num] = kinds
+            self.overlap_kinds[vset_num] = [kind for tuple_kinds in kinds for kind in tuple_kinds]
             self.overlap_modes[vset_num] = mode
             self.svs.extend(vset_svs)
 
