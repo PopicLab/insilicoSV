@@ -57,6 +57,7 @@ class Operation:
 
     source_breakend_region: Optional[BreakendRegion] = None
     novel_insertion_seq: Optional[str] = None
+    genotype: Optional[tuple[bool]] = None
 
     target_insertion_breakend: Optional[Breakend] = None
     target_insertion_order: Optional[tuple] = None
@@ -352,12 +353,16 @@ class BaseSV(SV):
 
     @override
     def to_vcf_records(self, config):
-        sv_type_str = self.info['OP_TYPE']
         sv_id = self.sv_id
         assert self.placement is not None
-
+        print('ID', sv_id)
         sv_vcf_recs: list[dict] = []
         for op_idx, operation in enumerate(self.operations):
+            print('to_vcf records', op_idx, operation, self.info)
+            sv_type_str = self.info['SVTYPE'].split('/')
+            if len(sv_type_str) > 1:
+                # One SV on each haplotype, keep the type of the current record
+                sv_type_str = sv_type_str[operation.genotype[1]]
             rec_id = self.sv_id
             dispersion_target = None
 
@@ -458,7 +463,7 @@ class BaseSV(SV):
             for key, value in operation.op_info.items():
                 sv_info[key] = value
 
-            zygosity = tuple(map(int, self.genotype))
+            zygosity = tuple(map(int, operation.genotype))
             vcf_rec = dict(contig=op_chrom, start=op_start, stop=op_end,
                            qual=100, filter='PASS',
                            alleles=alleles,
@@ -467,7 +472,6 @@ class BaseSV(SV):
                            info=sv_info)
             sv_vcf_recs.append(vcf_rec)
         # end: for op_idx, operation in enumerate(self.operations)
-
         # Combined operations for a clearer output
         combined_recs = []
         for record in sv_vcf_recs:
@@ -488,22 +492,7 @@ class BaseSV(SV):
                     record['info']['OP_TYPE'] = 'CUT'
                     record['alleles'][1] = '<CUT>'
                 combined_recs.append(record)
-
-        # Check if a type provided as grammar is a predefined type
-        if '->' in combined_recs[0]['info']['SVTYPE']:
-            lhs, rhs = combined_recs[0]['info']['GRAMMAR'].split('->')
-            lhs = tuple([letter for letter in lhs if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]])
-            rhs = tuple(rhs)
-            for key, grammar in SV_KEY.items():
-                if key.value == 'INDEL': continue
-                # Test if the grammar or its symmetric match the grammar of the record
-                if (grammar[0] == lhs and grammar[1] == rhs) or (
-                        grammar[0] == lhs[::-1] and grammar[1] == rhs[::-1]):
-                    combined_recs[0]['info']['SVTYPE'] = key.name
-                    if len(combined_recs) == 1:
-                        combined_recs[0]['info']['OP_TYPE'] = key.name
-                        combined_recs[0]['alleles'][1] = '<%s>' % key.name
-                    break
+        print('combined recs', combined_recs, self.info)
 
         # Update the records numbering if records have been combined
         if len(combined_recs) == 1:

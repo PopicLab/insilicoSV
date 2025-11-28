@@ -47,6 +47,7 @@ class StatsCollector:
                 continue
             self.placed_svs += 1
             sv_type = sv.info.get('SVTYPE', 'UNKNOWN')
+            sv_type = '/'.join(sv_type)
             self.sv_types[sv_type] += 1
             if (sv.roi is not None) and (sv.roi.kind != '_reference_'):
                 self.region_types[sv.roi.kind] += 1
@@ -513,10 +514,12 @@ class OutputWriter:
             hap_id_overlap = hap_index
 
         for sv in self.svs:
-            # If the SV is on the other haplotype or overlapping it will be treated later
-            if not sv.genotype[hap_index] or sv.allow_sv_overlap: continue
+            # If the SV is overlapping it will be treated later
+            if sv.allow_sv_overlap: continue
 
             for operation in sv.operations:
+                # Only processes operations on this haplotype
+                if not operation.genotype[hap_index]: continue
                 assert operation.target_region is not None
                 if operation.is_in_place:
                     if operation.target_region in target_region2transform:
@@ -700,10 +703,13 @@ class OutputWriter:
                                        'filter', 'alleles', 'samples'}
         assert not any(c.isspace() or c == ';' for c in vcf_rec['id'])
         info = vcf_rec.get('info')
+        print('info', info)
         assert isinstance(info, (type(None), dict))
         for info_key, info_val in vcf_rec.get('info', {}).items():
+            print('check vcf' + f'{info_key}: {info_val}')
             if isinstance(info_val, (str, list)):
                 for val in utils.as_list(info_val):
+                    print('list', val)
                     assert re.search(r'[\s;,=]', val) is None
 
     def output_svops_bed(self):

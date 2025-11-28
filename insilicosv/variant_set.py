@@ -40,6 +40,17 @@ class VariantSet(ABC):
         VariantSet.next_sv_id += 1
         return sv_id
 
+    @staticmethod
+    def parse_type(type_str):
+        type_str = type_str.replace(" ", "")
+        if '->' in type_str:
+            type_sv = VariantType.CUSTOM
+            grammar = type_str.split('->')
+        else:
+            type_sv = VariantType(type_str)
+            grammar = SV_KEY[type_sv]
+        return type_sv, grammar
+
     def __init__(self, vset_config, config):
         chk(isinstance(vset_config, dict), f'Each variant set must be a dict, {vset_config} provided',
             error_type='value')
@@ -49,6 +60,8 @@ class VariantSet(ABC):
         self.overlap_ranges = []
         self.header = []
         self.copies = ()
+        self.homologous_alt = self.vset_config.get('homologous_alt', [])
+        self.targets = []
 
         self.vset_config['config_descr'] = ', '.join("%s: %s" % item for item in self.vset_config.items())
         self.novel_insertion_seqs = None
@@ -78,26 +91,22 @@ class VariantSet(ABC):
             self.vset_config['overlap_region_length_range'] if 'overlap_region_length_range' in self.vset_config else
             [None, None])
 
-        self.svtype = None
+        self.svtypes = []
         if 'type' in self.vset_config:
-            self.vset_config['type'] = self.vset_config['type'].replace(" ", "")
-            if '->' in self.vset_config['type']:
-                self.svtype = VariantType.CUSTOM
-                grammar = self.vset_config['type'].split('->')
-            else:
-                self.svtype = VariantType(self.vset_config['type'])
-                grammar = SV_KEY[self.svtype]
+            type_sv, grammar = self.parse_type(self.vset_config['type'])
+            self.svtypes.append(type_sv)
 
             self.source = grammar[0]
             chk(not Syntax.DIVERGENCE in self.source and not Syntax.MULTIPLE_COPIES in self.source,
                 f'Operators ({Syntax.MULTIPLE_COPIES} and {Syntax.DIVERGENCE}) '
                 f'are not allowed in the source, {vset_config}', error_type='syntax')
 
-            self.target = grammar[1]
-            chk(not Syntax.ANCHOR_START in self.target and not Syntax.ANCHOR_END in self.target,
-                f'Anchors ({Syntax.ANCHOR_START} and {Syntax.ANCHOR_END}) '
-                f'are not allowed in the target, If for instance, you want to constrain the insertion target of a dDUP, '
-                f'write A_(). Error in {vset_config}', error_type='syntax')
+            self.targets = [grammar[1]]
+
+        if self.homologous_alt:
+            type_sv, grammar = self.parse_type(self.vset_config['homologous_alt'])
+            self.svtypes.append(type_sv)
+            self.targets.append(grammar[1])
 
         self.interchromosomal = self.vset_config.get('interchromosomal', False)
         chk(isinstance(self.interchromosomal, bool), 'interchromosomal if provided must be a boolean. '
@@ -108,6 +117,12 @@ class VariantSet(ABC):
 
         if self.interchromosomal_period is not None:
             self.interchromosomal = True
+
+        # Get the possible different targets together
+        chk(all([not Syntax.ANCHOR_START in target and not Syntax.ANCHOR_END in target for target in self.targets]),
+            f'Anchors ({Syntax.ANCHOR_START} and {Syntax.ANCHOR_END}) '
+            f'are not allowed in the target, If for instance, you want to constrain the insertion target of a dDUP, '
+            f'write A_(). Error in {vset_config}', error_type='syntax')
 
     @staticmethod
     def get_sampled_int_value(value, locals_dict=None, not_one=False):
@@ -144,8 +159,8 @@ class VariantSet(ABC):
             return random.uniform(value[0], value[1])
         chk(False, f'Error valuating the expression {value}', error_type='value')
 
-    def grammar_to_variant_set(self, lhs_strs, rhs_strs, symbol_lengths, symbol_min_lengths, num_letters,
-                               novel_insertion_seqs, n_copies_list, divergence_prob_list, replacement_seq=None, orig_seq=None,
+    def grammar_to_variant_set(self, lhs_strs, rhs_str_list, symbol_lengths, symbol_min_lengths, num_letters,
+                               novel_insertion_seqs, n_copies_list, divergence_prob_list, genotype, svtypes, replacement_seq=None, orig_seq=None,
                                vset_config=None,):
         #
         # Parse the LHS strings into Symbols, and RHS strings into RHSItems.
@@ -162,7 +177,7 @@ class VariantSet(ABC):
         lhs_dispersion: list[int] = []
         breakend_interval_lengths = []
         breakend_interval_min_lengths = []
-
+        print('LHS', lhs_strs, 'RHS', rhs_str_list)
         # Parse the left hand side of the  grammar, recover the symbols and the potential anchor.
         # The lhs is used to defined the source breakend regions. Because there is the same number of dispersion in the
         # right and left hand side, no new breakend can appear in the rhs (target insertion breakend will be on source breakends from the lhs).
@@ -191,150 +206,161 @@ class VariantSet(ABC):
         overlap_anchor = None
         if overlap_anchor_bounds[0] is not None and overlap_anchor_bounds[1] is not None:
             overlap_anchor = BreakendRegion(overlap_anchor_bounds[0], overlap_anchor_bounds[1])
-
-        n_dispersions_rhs = 0
-        current_breakend = 0
-        current_insertion_order = 0
-        n_multiple_copies = 0
-        n_divergence_prob = 0
-        # Keep track of the letters that have been deleted or moved for which DEL operations have to be added.
-        delete_letters = {letter: True for letter in lhs if letter.name != Syntax.DISPERSION}
-        # If a custom event specifies letters that are not modified and only use for placing constraints, we want ot keep track of them
-        identities_to_add = {letter: True for letter in lhs if letter.name != Syntax.DISPERSION}
+        print('rhs_strs', rhs_str_list)
         # Parse the rhs to define the operations.
-        for rhs_str in rhs_strs:
-            if rhs_str == Syntax.DISPERSION:
-                n_dispersions_rhs += 1
-                chk(n_dispersions_rhs - 1 < len(lhs_dispersion),
-                    f'The number of dispersions needs to be the same in the left and right hand sides. {lhs_strs} -> {rhs_strs}'
-                    f' in {vset_config}',
-                    error_type='syntax')
-                # The dispersions are in place and used to determine what moved.
-                # When finding a dispersion in the rhs we move the current breakend
-                # after the right breakend of the dispersion.
-                current_breakend = lhs_dispersion[n_dispersions_rhs - 1] + 1
-                continue
-            symbol = Symbol(rhs_str[0].upper())
-            # The operation is not in place if the symbol does not appear in the lhs or there is a "+".
-            is_in_place = symbol in lhs
-            if is_in_place:
-                source_position = lhs.index(symbol)
-                # If there is a different number of dispersions before the symbol in the lhs and rhs then the symbol
-                # has been moved.
-                is_in_place *= n_dispersions_rhs == len([disp for disp in lhs_dispersion if disp < source_position])
-                # If it is still in place we check if the current_breakend is higher or lower to the symbol's
-                # source breakend. If it is lower we arbitrarily say it is in place. For contiguous letters it is equivalent.
-                is_in_place *= current_breakend <= source_position
-            if is_in_place:
-                current_breakend = source_position + 1
-                # This letter has an inplace version, it should not be deleted.
-                delete_letters[symbol] = False
+        for grammar_idx, rhs_strs in enumerate(rhs_str_list):
+            n_dispersions_rhs = 0
+            current_breakend = 0
+            current_insertion_order = 0
+            n_multiple_copies = 0
+            n_divergence_prob = 0
+            # Keep track of the letters that have been deleted or moved for which DEL operations have to be added.
+            delete_letters = {letter: True for letter in lhs if letter.name != Syntax.DISPERSION}
+            # If a custom event specifies letters that are not modified and only used for placing constraints, we want ot keep track of them
+            identities_to_add = {letter: True for letter in lhs if letter.name != Syntax.DISPERSION}
 
-            transform_type = TransformType.IDENTITY
-            if rhs_str[0].islower():
-                transform_type = TransformType.INV
+            # Dtermine the genotype of the operation
+            op_genotype = genotype
+            if len(rhs_str_list) > 1:
+                # the SV is on both haplotypes, this operation applied to the current haplotype only
+                op_genotype = (True, False) if grammar_idx == 0 else (False, True)
 
-            # Determine the number of copies of a symbol are needed (when "+" appears in the rhs)
-            n_copies_hap = (1, 1)
-            if Syntax.MULTIPLE_COPIES in rhs_str:
-                chk(n_multiple_copies < len(n_copies_list), f'A number of copies must be provided '
-                                                            f'for each `{Syntax.MULTIPLE_COPIES}` symbol used. '
-                                                            f'Error in {vset_config}', error_type='syntax')
-                n_copies_hap = tuple(self.get_sampled_int_value(n_copies_list[i][n_multiple_copies],
-                                                                not_one=(self.svtype == VariantType.mCNV))
-                                     for i in range(len(n_copies_list)))
-                n_multiple_copies += 1
+            for rhs_str in rhs_strs:
+                if rhs_str == Syntax.DISPERSION:
+                    n_dispersions_rhs += 1
+                    chk(n_dispersions_rhs - 1 < len(lhs_dispersion),
+                        f'The number of dispersions needs to be the same in the left and right hand sides. {lhs_strs} -> {rhs_strs}'
+                        f' in {vset_config}',
+                        error_type='syntax')
+                    # The dispersions are in place and used to determine what moved.
+                    # When finding a dispersion in the rhs we move the current breakend
+                    # after the right breakend of the dispersion.
+                    current_breakend = lhs_dispersion[n_dispersions_rhs - 1] + 1
+                    continue
+                symbol = Symbol(rhs_str[0].upper())
+                # The operation is not in place if the symbol does not appear in the lhs or there is a "+".
+                is_in_place = symbol in lhs
+                if is_in_place:
+                    source_position = lhs.index(symbol)
+                    # If there is a different number of dispersions before the symbol in the lhs and rhs then the symbol
+                    # has been moved.
+                    is_in_place *= n_dispersions_rhs == len([disp for disp in lhs_dispersion if disp < source_position])
+                    # If it is still in place we check if the current_breakend is higher or lower to the symbol's
+                    # source breakend. If it is lower we arbitrarily say it is in place. For contiguous letters it is equivalent.
+                    is_in_place *= current_breakend <= source_position
+                    print('in place', symbol in lhs, lhs.index(symbol), n_dispersions_rhs == len([disp for disp in lhs_dispersion if disp < source_position]),
+                          current_breakend <= source_position)
+                if is_in_place:
+                    current_breakend = source_position + 1
+                    # This letter has an inplace version, it should not be deleted.
+                    delete_letters[symbol] = False
 
-            # Determine the divergence probability for each divergence symbol.
-            divergence_prob = 0
-            if Syntax.DIVERGENCE in rhs_str:
-                divergence_prob = 1.
+                transform_type = TransformType.IDENTITY
+                if rhs_str[0].islower():
+                    transform_type = TransformType.INV
 
-                if not replacement_seq:
-                    # replacement_seq is used to provide the SNP when loading from vcf
-                    chk(n_divergence_prob < len(divergence_prob_list), f'A divergence must be provided '
-                                                                       f'for each \'{Syntax.DIVERGENCE}\' symbol used. '
-                                                                       f'Error in {vset_config}', error_type='syntax')
-                    divergence_prob = self.get_sampled_float_value(divergence_prob_list[n_divergence_prob])
-                    chk(0 < divergence_prob <= 1,
-                        f'The divergence probability must be between 0 (excluded) and 1 (included), got {divergence_prob} for '
-                        f'the {n_divergence_prob + 1}-th \'{Syntax.DIVERGENCE}\' symbol {symbol}. Error in {vset_config}', error_type='syntax')
+                # Determine the number of copies of a symbol are needed (when "+" appears in the rhs)
+                n_copies_hap = (1, 1)
+                if Syntax.MULTIPLE_COPIES in rhs_str:
+                    chk(n_multiple_copies < len(n_copies_list), f'A number of copies must be provided '
+                                                                f'for each `{Syntax.MULTIPLE_COPIES}` symbol used. '
+                                                                f'Error in {vset_config}', error_type='syntax')
+                    n_copies_hap = tuple(self.get_sampled_int_value(n_copies_list[i][n_multiple_copies],
+                                                                    not_one=(svtypes[grammar_idx] == VariantType.mCNV))
+                                         for i in range(len(n_copies_list)))
+                    n_multiple_copies += 1
 
-                if self.svtype and self.svtype != VariantType.SNP:
-                    # A divergence can only be applied to a copied sequence
-                    chk("".join(rhs_strs).upper().count(symbol.name) > 1,
-                        f'{Syntax.DIVERGENCE} can only be applied to a duplicated sequence. '
-                        f'Error in the {n_divergence_prob + 1}-th {Syntax.DIVERGENCE} of {vset_config}', error_type='syntax')
-                    chk(divergence_prob < 1, f'The divergence probability of a divergence must be strictly less than 1. '
-                                             f'Error in the {n_divergence_prob + 1}-th of {vset_config}', error_type='syntax')
-                n_divergence_prob += 1
+                # Determine the divergence probability for each divergence symbol.
+                divergence_prob = 0
+                if Syntax.DIVERGENCE in rhs_str:
+                    divergence_prob = 1.
 
-            transform = Transform(
-                transform_type=transform_type,
-                is_in_place=is_in_place,
-                divergence_prob=divergence_prob,
-                n_copies=n_copies_hap,
-                replacement_seq=replacement_seq,
-                orig_seq=orig_seq
-            )
-            # We do not add operations for inplace identity transformations without divergence (do not affect the sequence).
-            if (
-                    transform_type != TransformType.IDENTITY or not is_in_place or divergence_prob > 0 or replacement_seq is not None
-                    or any([n_copies != 1 for n_copies in n_copies_hap])):
-                # The letter has been involved in an operation and is not a placeholder.
-                identities_to_add[symbol] = False
-                operation = Operation(transform=transform, op_info={'SYMBOL': symbol.name})
-                if is_in_place and all([n_copies == 1 for n_copies in n_copies_hap]):
-                    operation.source_breakend_region = BreakendRegion(current_breakend - 1, current_breakend)
-                else:
-                    # The insertion order helps to determine how to order multiple events inserted at the same breakend.
-                    operation.target_insertion_order = (current_insertion_order,)
-                    current_insertion_order += 1
-                    operation.target_insertion_breakend = current_breakend
-                    if symbol in lhs:
-                        operation.source_breakend_region = BreakendRegion(source_position, source_position + 1)
+                    if not replacement_seq:
+                        # replacement_seq is used to provide the SNP when loading from vcf
+                        chk(n_divergence_prob < len(divergence_prob_list), f'A divergence must be provided '
+                                                                           f'for each \'{Syntax.DIVERGENCE}\' symbol used. '
+                                                                           f'Error in {vset_config}', error_type='syntax')
+                        divergence_prob = self.get_sampled_float_value(divergence_prob_list[n_divergence_prob])
+                        chk(0 < divergence_prob <= 1,
+                            f'The divergence probability must be between 0 (excluded) and 1 (included), got {divergence_prob} for '
+                            f'the {n_divergence_prob + 1}-th \'{Syntax.DIVERGENCE}\' symbol {symbol}. Error in {vset_config}', error_type='syntax')
+
+                    if svtypes[grammar_idx] and svtypes[grammar_idx] != VariantType.SNP:
+                        # A divergence can only be applied to a copied sequence
+                        print(svtypes[grammar_idx], rhs_strs)
+                        chk("".join(rhs_strs).upper().count(symbol.name) > 1,
+                            f'{Syntax.DIVERGENCE} can only be applied to a duplicated sequence. '
+                            f'Error in the {n_divergence_prob + 1}-th {Syntax.DIVERGENCE} of {vset_config}', error_type='syntax')
+                        chk(divergence_prob < 1, f'The divergence probability of a divergence must be strictly less than 1. '
+                                                 f'Error in the {n_divergence_prob + 1}-th of {vset_config}', error_type='syntax')
+                    n_divergence_prob += 1
+
+                transform = Transform(
+                    transform_type=transform_type,
+                    is_in_place=is_in_place,
+                    divergence_prob=divergence_prob,
+                    n_copies=n_copies_hap,
+                    replacement_seq=replacement_seq,
+                    orig_seq=orig_seq
+                )
+                # We do not add operations for inplace identity transformations without divergence (do not affect the sequence).
+                if (
+                        transform_type != TransformType.IDENTITY or not is_in_place or divergence_prob > 0 or replacement_seq is not None
+                        or any([n_copies != 1 for n_copies in n_copies_hap])):
+                    # The letter has been involved in an operation and is not a placeholder.
+                    identities_to_add[symbol] = False
+                    operation = Operation(transform=transform, genotype=op_genotype, op_info={'SYMBOL': symbol.name})
+                    if is_in_place and all([n_copies == 1 for n_copies in n_copies_hap]):
+                        operation.source_breakend_region = BreakendRegion(current_breakend - 1, current_breakend)
                     else:
-                        if symbol not in novel_insertions:
-                            # The position of the length of a new letter is after all the letters in the lhs (non dispersion)
-                            # and in order of appearance in the rhs
-                            chk(len(symbol_lengths) >= len(lhs) - len(lhs_dispersion) + len(novel_insertions),
-                                f'Missing length_ranges for {symbol} in {lhs_strs}', error_type='syntax')
-                            novel_insertion = None
-                            if novel_insertion_seqs is not None:
-                                chk(len(novel_insertion_seqs) > len(novel_insertions),
-                                    f'If a novel_insertions field is provided, it must '
-                                    f'contain the sequences for each novel insertion or None.', error_type='syntax')
-                                if novel_insertion_seqs[len(novel_insertions)] is not None:
-                                    novel_insertion = novel_insertion_seqs[len(novel_insertions)]
-                            if novel_insertion is None:
-                                novel_insertion = utils.generate_seq(
-                                    length=symbol_lengths[len(lhs) - len(lhs_dispersion) + len(novel_insertions)])
-                            novel_insertions[symbol] = novel_insertion
-                        operation.novel_insertion_seq = novel_insertions[symbol]
-                operations.append(operation)
-        # Add the deletions
-        for letter, delete in delete_letters.items():
-            if delete:
-                # The symbol is involved in a DEL, it is not a placeholder.
-                identities_to_add[letter] = False
-                source_index = lhs.index(letter)
-                # The symbol was deleted, we add a DEL operation.
-                transform = Transform(transform_type=TransformType.DEL, is_in_place=True)
-                operation = Operation(transform=transform, op_info={'SYMBOL': letter.name})
-                operation.source_breakend_region = BreakendRegion(source_index, source_index + 1)
-                operations.append(operation)
-        # Add the identities for place holder letters
-        for letter, identity in identities_to_add.items():
-            if identity:
-                source_index = lhs.index(letter)
-                # The symbol was deleted, we add a DEL operation.
-                transform = Transform(transform_type=TransformType.IDENTITY, is_in_place=True)
-                operation = Operation(transform=transform, op_info={'SYMBOL': letter.name})
-                operation.source_breakend_region = BreakendRegion(source_index, source_index + 1)
-                operations.append(operation)
-        chk(len(lhs_dispersion) == n_dispersions_rhs, f'Dispersions cannot be altered, the same dispersions must '
-                                                      f'be present on the left and right sides. lhs: {len(lhs_dispersion)} dispersions,'
-                                                      f'rhs: {n_dispersions_rhs} dispersions.', error_type='syntax')
+                        # The insertion order helps to determine how to order multiple events inserted at the same breakend.
+                        operation.target_insertion_order = (current_insertion_order,)
+                        current_insertion_order += 1
+                        operation.target_insertion_breakend = current_breakend
+                        if symbol in lhs:
+                            operation.source_breakend_region = BreakendRegion(source_position, source_position + 1)
+                        else:
+                            if symbol not in novel_insertions:
+                                # The position of the length of a new letter is after all the letters in the lhs (non dispersion)
+                                # and in order of appearance in the rhs
+                                chk(len(symbol_lengths) >= len(lhs) - len(lhs_dispersion) + len(novel_insertions),
+                                    f'Missing length_ranges for {symbol} in {lhs_strs}', error_type='syntax')
+                                novel_insertion = None
+                                if novel_insertion_seqs is not None:
+                                    chk(len(novel_insertion_seqs) > len(novel_insertions),
+                                        f'If a novel_insertions field is provided, it must '
+                                        f'contain the sequences for each novel insertion or None.', error_type='syntax')
+                                    if novel_insertion_seqs[len(novel_insertions)] is not None:
+                                        novel_insertion = novel_insertion_seqs[len(novel_insertions)]
+                                if novel_insertion is None:
+                                    novel_insertion = utils.generate_seq(
+                                        length=symbol_lengths[len(lhs) - len(lhs_dispersion) + len(novel_insertions)])
+                                novel_insertions[symbol] = novel_insertion
+                            operation.novel_insertion_seq = novel_insertions[symbol]
+                    operations.append(operation)
+            # Add the deletions
+            for letter, delete in delete_letters.items():
+                if delete:
+                    # The symbol is involved in a DEL, it is not a placeholder.
+                    identities_to_add[letter] = False
+                    source_index = lhs.index(letter)
+                    # The symbol was deleted, we add a DEL operation.
+                    transform = Transform(transform_type=TransformType.DEL, is_in_place=True)
+                    operation = Operation(transform=transform, genotype=op_genotype, op_info={'SYMBOL': letter.name})
+                    operation.source_breakend_region = BreakendRegion(source_index, source_index + 1)
+                    operations.append(operation)
+            # Add the identities for place holder letters
+            for letter, identity in identities_to_add.items():
+                if identity:
+                    source_index = lhs.index(letter)
+                    # The symbol was deleted, we add a DEL operation.
+                    transform = Transform(transform_type=TransformType.IDENTITY, is_in_place=True)
+                    operation = Operation(transform=transform, genotype=op_genotype, op_info={'SYMBOL': letter.name})
+                    operation.source_breakend_region = BreakendRegion(source_index, source_index + 1)
+                    operations.append(operation)
+            chk(len(lhs_dispersion) == n_dispersions_rhs, f'Dispersions cannot be altered, the same dispersions must '
+                                                          f'be present on the left and right sides. lhs: {len(lhs_dispersion)} dispersions,'
+                                                          f'rhs: {n_dispersions_rhs} dispersions.', error_type='syntax')
         # If overlap_anchor is not specified, infer "full SV" as the anchor if no dispersion
         if (overlap_anchor is None) and (self.overlap_mode is not None) and (not lhs_dispersion):
             overlap_anchor = BreakendRegion(0, len(lhs) - 1)
@@ -360,8 +386,8 @@ class SimulatedVariantSet(VariantSet):
                  f'%s was provided in %s' % (type(self.vset_config.get('divergence_prob', [])), self.vset_config), error_type='value')
 
         self.copies = self.vset_config.get('n_copies', ())
-        if (Syntax.MULTIPLE_COPIES in ''.join(self.target)) and ('n_copies' not in self.vset_config):
-            chk(self.svtype not in [VariantType.mCNV, VariantType.CUSTOM], f'The number of copies must be provided for a {self.svtype}')
+        if any([(Syntax.MULTIPLE_COPIES in ''.join(target)) and ('n_copies' not in self.vset_config) for target in self.targets]):
+            chk(all([svtype not in [VariantType.mCNV, VariantType.CUSTOM] for svtype in self.svtypes]), f'The number of copies must be provided for a {self.svtypes}.')
             # Default the number of copies to 1 for predefined types with duplications
             self.copies = ([1], [1])
 
@@ -379,7 +405,7 @@ class SimulatedVariantSet(VariantSet):
             chk(not self.copies or self.copies[0] == self.copies[1], 'Whole chromosome duplications must have the same number of copies on both haplotypes.',
                 error_type='syntax')
 
-        if self.svtype == VariantType.mCNV:
+        if any(type_sv == VariantType.mCNV for type_sv in self.svtypes):
             chk(self.copies and all(len(n_copies) == 1 and n_copies[0] not in [1, [1, 1]] for n_copies in self.copies),
                 f'n_copies has to be provided and be different from 1 for a mCNV in {self.vset_config}', error_type='value')
             copiesB = self.vset_config.get('n_copiesB', self.copies)
@@ -408,7 +434,7 @@ class SimulatedVariantSet(VariantSet):
 
     def pick_genotype(self):
         if (self.config.get('homozygous_only', False) or (random.randint(0, 1) and not
-           self.config.get('heterozygous_only', False)) or (self.svtype == VariantType.mCNV)):
+           self.config.get('heterozygous_only', False)) or (self.svtypes[0] == VariantType.mCNV)):
             return True, True
         else:
             return random.choice([(True, False), (False, True)])
@@ -458,106 +484,111 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             ), f'invalid SV config key {vset_config_key}', error_type='syntax')
 
         vset_cfg = self.vset_config
-        rhs_strs_list: list[str] = []
-        for c in self.target:
-            if c in (Syntax.DIVERGENCE, Syntax.MULTIPLE_COPIES):
-                chk(rhs_strs_list and rhs_strs_list[-1] and rhs_strs_list[-1][0].isalpha(),
-                    f'{c} must modify a letter {rhs_strs_list}.', error_type='syntax')
-                rhs_strs_list[-1] += c
-            else:
-                rhs_strs_list.append(c)
+        rhs_strs_lists: list[list[str]] = []
+        for target in self.targets:
+            rhs_strs_list = []
+            for c in target:
+                if c in (Syntax.DIVERGENCE, Syntax.MULTIPLE_COPIES):
+                    chk(rhs_strs_list and rhs_strs_list[-1] and rhs_strs_list[-1][0].isalpha(),
+                        f'{c} must modify a letter {rhs_strs_list}.', error_type='syntax')
+                    rhs_strs_list[-1] += c
+                else:
+                    rhs_strs_list.append(c)
+            rhs_strs_lists.append(rhs_strs_list)
 
-        self.target = rhs_strs_list
+        self.targets = rhs_strs_lists
 
         # Anchor the whole SV if overlap mode is specified, no anchor is provided and there is no dispersion.
         if ((self.overlap_mode is not None) and (Syntax.DISPERSION not in self.source) and
                 (Syntax.ANCHOR_START not in self.source)):
             self.source = tuple([Syntax.ANCHOR_START, *self.source, Syntax.ANCHOR_END])
 
-        # Check if a type provided as grammar is a predefined type
-        if self.svtype == VariantType.CUSTOM:
-            lhs = tuple([letter for letter in self.source if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]])
-            rhs = tuple([letter if Syntax.DIVERGENCE not in letter and Syntax.MULTIPLE_COPIES not in letter
-                         else letter[0] for letter in self.target])
+        for target_idx, target in enumerate(self.targets):
+            # Check if a type provided as grammar is a predefined type
+            if self.svtypes[target_idx] == VariantType.CUSTOM:
+                lhs = tuple([letter for letter in self.source if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]])
 
-            for key, grammar in SV_KEY.items():
-                if key == VariantType.mCNV: continue
-                grammar = (grammar[0], tuple([letter if Syntax.MULTIPLE_COPIES not in letter and Syntax.DIVERGENCE not in letter
-                                              else letter[0] for letter in grammar[1]]))
-                # Test if the grammar or its symmetric match the grammar of the record
-                if (grammar[0] == lhs and grammar[1] == rhs) or (
-                        grammar[0] == lhs[::-1] and grammar[1] == rhs[::-1]):
-                    # Distinguish between SNP/DIVERGENCE/Identity
-                    if (key == VariantType.SNP and ((vset_cfg.get('length_ranges') not in (None, [[1, 1]])) or (Syntax.DIVERGENCE not in self.target[0])
-                                                    or ('divergence_prob' in vset_cfg and vset_cfg['divergence_prob'] not in [[1], 1, 1., [1.]]))):
-                            continue
-                    # we found a match and update the types
-                    self.svtype = key
-                    self.input_type = VariantType.CUSTOM
-                    break
+                rhs = tuple([letter if Syntax.DIVERGENCE not in letter and Syntax.MULTIPLE_COPIES not in letter
+                             else letter[0] for letter in target])
 
-        chk(self.overlap_mode != OverlapMode.CHROM or self.svtype in [VariantType.DEL, VariantType.DUP],
-            'Only DEL and DUP SVs are allowed '
-            'to have overlap_mode: chrom. Error in %s' % vset_cfg['config_descr'], error_type='syntax')
+                for key, grammar in SV_KEY.items():
+                    if key == VariantType.mCNV: continue
+                    grammar = (grammar[0], tuple([letter if Syntax.MULTIPLE_COPIES not in letter and Syntax.DIVERGENCE not in letter
+                                                  else letter[0] for letter in grammar[1]]))
+                    # Test if the grammar or its symmetric match the grammar of the record
+                    if (grammar[0] == lhs and grammar[1] == rhs) or (grammar[0] == lhs[::-1] and grammar[1] == rhs[::-1]):
+                        # Distinguish between SNP/DIVERGENCE/Identity
+                        if (key == VariantType.SNP and ((vset_cfg.get('length_ranges') not in (None, [[1, 1]])) or (Syntax.DIVERGENCE not in target[0])
+                                                        or ('divergence_prob' in vset_cfg and vset_cfg['divergence_prob'] not in [[1], 1, 1., [1.]]))):
+                                continue
+                        # we found a match and update the types
+                        self.svtypes[target_idx] = key
+                        self.input_type = VariantType.CUSTOM
+                        break
 
-        chk('divergence_prob' not in vset_cfg or Syntax.DIVERGENCE not in self.target,
-            f'\'{Syntax.DIVERGENCE}\' is not used but divergence_prob has been provided in {vset_cfg}', error_type='syntax')
+            chk(self.overlap_mode != OverlapMode.CHROM or (len(self.svtypes) == 1 and self.svtypes[0] in [VariantType.DEL, VariantType.DUP]),
+                'Only DEL and DUP SVs are allowed '
+                'to have overlap_mode: chrom. Error in %s' % vset_cfg['config_descr'], error_type='syntax')
 
-        if self.svtype == VariantType.SNP:
-            chk(vset_cfg.get('length_ranges') in (None, [[1, 1]]),
-                f'length_ranges for SNP can only be [[1, 1]]. Error in %s' % vset_cfg['config_descr'], error_type='value')
-            chk('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] in [[1], 1],
-                f'divergence prob for SNP can only be 1. Error in %s' % vset_cfg['config_descr'], error_type='value')
-            vset_cfg['length_ranges'] = [[1, 1]]
-            vset_cfg['divergence_prob'] = [1.0]
-        elif vset_cfg['type'] == 'INDEL':
-            # INDELS have to be of size <= 50
-            chk(not vset_cfg.get('length_ranges', False) or (1 <= if_not_none(vset_cfg['length_ranges'][0][0], 1) <=
-                                                          if_not_none(vset_cfg['length_ranges'][0][1], 50) <= 50 ),
-                f'length_ranges for INDEL must be included in [0, 50]. Error in %s' % vset_cfg['config_descr'],
-                error_type='value')
-            chk(not vset_cfg.get('overlap_region_length_range', False) or (if_not_none(vset_cfg['overlap_region_length_range'][0], 0) <=
-                                                          if_not_none(vset_cfg['overlap_region_length_range'][1], 50) <= 50 ),
-                f'overlap_region_length_range for INDEL must be included in [0, 50]. Error in %s' % vset_cfg['config_descr'],
-                error_type='value')
+            chk('divergence_prob' not in vset_cfg or any([Syntax.DIVERGENCE not in target for target in target]),
+                f'\'{Syntax.DIVERGENCE}\' is not used but divergence_prob has been provided in {vset_cfg}', error_type='syntax')
 
-            # In case the max length_range was null, set it to 50 as it is the maximum for INDEL
-            if vset_cfg.get('length_ranges', False) and not vset_cfg['length_ranges'][0][1]:
-                vset_cfg['length_ranges'][0][1] = 50
-                if not vset_cfg['length_ranges'][0][0]:
-                    vset_cfg['length_ranges'][0][0] = 1
+            if self.svtypes[target_idx] == VariantType.SNP:
+                print('***SNP***')
+                chk(vset_cfg.get('length_ranges') in (None, [[1, 1]]),
+                    f'length_ranges for SNP can only be [[1, 1]]. Error in %s' % vset_cfg['config_descr'], error_type='value')
+                chk('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] in [[1], 1],
+                    f'divergence prob for SNP can only be 1. Error in %s' % vset_cfg['config_descr'], error_type='value')
+                vset_cfg['length_ranges'] = [[1, 1]]
+                vset_cfg['divergence_prob'] = [1.0]
+            elif vset_cfg['type'] == 'INDEL':
+                # INDELS have to be of size <= 50
+                chk(not vset_cfg.get('length_ranges', False) or (1 <= if_not_none(vset_cfg['length_ranges'][0][0], 1) <=
+                                                              if_not_none(vset_cfg['length_ranges'][0][1], 50) <= 50 ),
+                    f'length_ranges for INDEL must be included in [0, 50]. Error in %s' % vset_cfg['config_descr'],
+                    error_type='value')
+                chk(not vset_cfg.get('overlap_region_length_range', False) or (if_not_none(vset_cfg['overlap_region_length_range'][0], 0) <=
+                                                              if_not_none(vset_cfg['overlap_region_length_range'][1], 50) <= 50 ),
+                    f'overlap_region_length_range for INDEL must be included in [0, 50]. Error in %s' % vset_cfg['config_descr'],
+                    error_type='value')
 
-            if not vset_cfg.get('length_ranges'):
-                vset_cfg['length_ranges'] = [[1, 50]]
+                # In case the max length_range was null, set it to 50 as it is the maximum for INDEL
+                if vset_cfg.get('length_ranges', False) and not vset_cfg['length_ranges'][0][1]:
+                    vset_cfg['length_ranges'][0][1] = 50
+                    if not vset_cfg['length_ranges'][0][0]:
+                        vset_cfg['length_ranges'][0][0] = 1
 
-            if vset_cfg.get('overlap_mode', False):
-                if not vset_cfg.get('overlap_region_length_range', False):
-                    vset_cfg['overlap_region_length_range'] = [[1, 50]]
+                if not vset_cfg.get('length_ranges'):
+                    vset_cfg['length_ranges'] = [[1, 50]]
+
+                if vset_cfg.get('overlap_mode', False):
+                    if not vset_cfg.get('overlap_region_length_range', False):
+                        vset_cfg['overlap_region_length_range'] = [[1, 50]]
 
 
-        if self.svtype in [VariantType.SNP, VariantType.INDEL] or (self.svtype in [VariantType.INS, VariantType.DEL] and
-                                                                   'length_ranges' in vset_cfg and
-                                                                   vset_cfg['length_ranges'][0][1] and
-                                                                   vset_cfg['length_ranges'][0][1] < 50):
-            self.overlap_sv = vset_cfg.get('allow_sv_overlap', False)
-        else:
-            chk(not ('allow_sv_overlap' in vset_cfg),
-                f'overlap_sv are only available for SNPs and INDELs, but %s was provided' %
-                vset_cfg['config_descr'], error_type='type')
+            if self.svtypes[target_idx] in [VariantType.SNP, VariantType.INDEL] or (self.svtypes[target_idx] in [VariantType.INS, VariantType.DEL] and
+                                                                       'length_ranges' in vset_cfg and
+                                                                       vset_cfg['length_ranges'][0][1] and
+                                                                       vset_cfg['length_ranges'][0][1] < 50):
+                self.overlap_sv = vset_cfg.get('allow_sv_overlap', False)
+            else:
+                chk(not ('allow_sv_overlap' in vset_cfg),
+                    f'overlap_sv are only available for SNPs and INDELs, but %s was provided' %
+                    vset_cfg['config_descr'], error_type='type')
 
-            chk('length_ranges' in vset_cfg or 'novel_insertions' in self.vset_config,
-                f'Please specify length ranges in %s' % (vset_cfg['config_descr']), error_type='syntax')
+                chk('length_ranges' in vset_cfg or 'novel_insertions' in self.vset_config,
+                    f'Please specify length ranges in %s' % (vset_cfg['config_descr']), error_type='syntax')
 
-            if 'length_ranges' in vset_cfg:
-                chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list for %s' % vset_cfg['config_descr'],
-                    error_type='syntax')
-                for length_range in vset_cfg['length_ranges']:
-                    chk(isinstance(length_range, str) or
-                        (isinstance(length_range, list) and len(length_range) == 2 and
-                         isinstance(length_range[0], (type(None), int, str)) and
-                         isinstance(length_range[1], (type(None), int, str))),
-                        f'invalid length_ranges. it must be a list of 2-tuples of str or int. '
-                        f'Error in %s' % vset_cfg['config_descr'], error_type='value')
+                if 'length_ranges' in vset_cfg:
+                    chk(isinstance(vset_cfg['length_ranges'], list), f'length_ranges must be a list for %s' % vset_cfg['config_descr'],
+                        error_type='syntax')
+                    for length_range in vset_cfg['length_ranges']:
+                        chk(isinstance(length_range, str) or
+                            (isinstance(length_range, list) and len(length_range) == 2 and
+                             isinstance(length_range[0], (type(None), int, str)) and
+                             isinstance(length_range[1], (type(None), int, str))),
+                            f'invalid length_ranges. it must be a list of 2-tuples of str or int. '
+                            f'Error in %s' % vset_cfg['config_descr'], error_type='value')
 
         if 'novel_insertions' in vset_cfg:
             try:
@@ -584,12 +615,12 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 'interchromosomal_period when provided as a range must contain two integers. '
                 'Provided %s' % vset_cfg['config_descr'], error_type='syntax')
 
-    def symmetrize(self, lhs_strs, rhs_strs, letter_ranges):
+    def symmetrize(self, lhs_strs, rhs_str_list, letter_ranges):
         # Enforce the symmetry of the predefined SVs with duplications or dispersions.
-        if (("DUP" in self.svtype.name or "TRA" in self.svtype.name or
-             "iDEL" in self.svtype.name)
+        if (all([("DUP" in self.svtypes[idx].name or "TRA" in self.svtypes[idx].name or
+             "iDEL" in self.svtypes[idx].name)
                 and (not self.interchromosomal)
-                and (not self.input_type)
+                and (not self.input_type) for idx in range(len(self.svtypes))])
                 and random.randint(0, 1)):
             def flip_anchor(val: str) -> str:
                 if val == Syntax.ANCHOR_START:
@@ -598,14 +629,16 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                     return Syntax.ANCHOR_START
                 return val
 
+            print('pre symmetrize', lhs_strs, rhs_str_list)
             lhs_strs = tuple(map(flip_anchor, lhs_strs))[::-1]
-            rhs_strs = tuple(map(flip_anchor, rhs_strs))[::-1]
+            rhs_str_list = [tuple(map(flip_anchor, rhs_str_list[idx]))[::-1] for idx in range(len(self.svtypes))]
+            print('symmetrize', lhs_strs, rhs_str_list)
             if "length_ranges" in self.vset_config:
                 letter_ranges = letter_ranges[::-1]
-        chk(all(len(rhs) < 3 for rhs in rhs_strs),
-            f'The operators + and * cannot be used at the same time {rhs_strs}.',
+        chk(all(len(rhs) < 3 for rhs_strs in rhs_str_list for rhs in rhs_strs),
+            f'The operators + and * cannot be used at the same time {rhs_str_list}.',
             error_type='syntax')
-        return lhs_strs, rhs_strs, letter_ranges
+        return lhs_strs, rhs_str_list, letter_ranges
 
     # Randomly pick distances withing the ranges defined for each symbol
     @staticmethod
@@ -702,23 +735,34 @@ class FromGrammarVariantSet(SimulatedVariantSet):
     @override
     def simulate_sv(self) -> SV:
         lhs_strs = self.source
-        rhs_strs = self.target
-        svtype = self.svtype
-        if self.vset_config['type'] == 'INDEL':
-            anchor = Syntax.ANCHOR_START in lhs_strs
-            svtype = VariantType('DEL' if random.randint(0, 1) else 'INS')
-            lhs_strs, rhs_strs = SV_KEY[svtype]
-            if anchor:
-                lhs_strs = tuple(Syntax.ANCHOR_START) + lhs_strs + tuple(Syntax.ANCHOR_END)
+        rhs_str_list = self.targets
+        svtypes = self.svtypes
+        for idx_target, svtype in enumerate(svtypes):
+            print(idx_target, svtype)
+            if svtype == VariantType.INDEL:
+                chk(len(svtypes) == 1, f'INDEL cannot be used jointly with another type, provided %s' % self.vset_config, error_type='syntax')
+                anchor = Syntax.ANCHOR_START in lhs_strs
+                svtypes[idx_target] = VariantType('DEL' if random.randint(0, 1) else 'INS')
+                lhs_strs, rhs_str_list[idx_target] = SV_KEY[svtypes[idx_target]]
+                print(lhs_strs, rhs_str_list, SV_KEY[svtype])
+                if anchor:
+                    lhs_strs = tuple(Syntax.ANCHOR_START) + lhs_strs + tuple(Syntax.ANCHOR_END)
+                print('INDEL', lhs_strs, rhs_str_list[idx_target], svtypes[idx_target])
         length_ranges = self.vset_config['length_ranges'] if 'length_ranges' in self.vset_config else []
         letter_ranges = length_ranges
         dispersion_ranges = []
         lhs_strs_no_anchor = [letter for letter in lhs_strs if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]]
 
+        # Determine the genotype of the SV
+        genotype = self.pick_genotype()
+        if len(rhs_str_list) > 1:
+            # The SV has a different grammar on each haplotype
+            genotype = (True, True)
+
         # Find the length ranges corresponding to dispersions and those corresponding to letters
         dispersions = [idx for idx, letter in enumerate(lhs_strs_no_anchor) if letter == Syntax.DISPERSION]
         if dispersions:
-            if svtype != VariantType.CUSTOM and not self.input_type:
+            if all([svtype != VariantType.CUSTOM for svtype in svtypes]) and not self.input_type:
                 # The SV was provided from a predefined type, the dispersion lengths are last
                 letter_ranges = length_ranges[:-1]
                 dispersion_ranges = [length_ranges[-1]]
@@ -729,16 +773,19 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 dispersion_ranges = [length_range for idx, length_range in enumerate(length_ranges) if
                                      idx in dispersions]
 
-        lhs_strs, rhs_strs, letter_ranges = self.symmetrize(lhs_strs, rhs_strs, letter_ranges)
+        lhs_strs, rhs_str_list, letter_ranges = self.symmetrize(lhs_strs, rhs_str_list, letter_ranges)
         letters = [letter for letter in lhs_strs if
                    letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START, Syntax.DISPERSION]]
         chk(len(letters) == len(set(letters)), f'Duplicate LHS symbol {letters} in {lhs_strs} for {self.vset_config}', error_type='syntax')
 
         # Add novel insertion letters only appearing in the rhs.
-        for letter in rhs_strs:
-            if letter[0].upper() not in letters + [Syntax.ANCHOR_END, Syntax.ANCHOR_START, Syntax.DISPERSION]:
-                chk(letter[0].isupper(), 'A novel insertion letter has to be uppercase. But, %s was provided' % self.vset_config)
-                letters.append(letter[0].upper())
+        print('rhs str list', rhs_str_list, lhs_strs)
+        for rhs_strs in rhs_str_list:
+            for letter in rhs_strs:
+                print(rhs_str_list, lhs_strs, letters, letter)
+                if letter[0].upper() not in letters + [Syntax.ANCHOR_END, Syntax.ANCHOR_START, Syntax.DISPERSION]:
+                    chk(letter[0].isupper(), 'A novel insertion letter has to be uppercase. But, %s was provided' % self.vset_config)
+                    letters.append(letter[0].upper())
         chk(len(length_ranges) == len(letters) + len(dispersions),
             f'Mismatched length ranges, expected {len(letters) + len(dispersions)} provided {len(length_ranges)} for '
             f'{self.vset_config}', error_type='syntax')
@@ -755,18 +802,22 @@ class FromGrammarVariantSet(SimulatedVariantSet):
 
         # Build the different operations and anchor, determine the breakends and the distance between them.
         (operations, anchor, dispersions, breakend_interval_lengths,
-         breakend_interval_min_lengths) = self.grammar_to_variant_set(lhs_strs, rhs_strs, symbol_lengths,
+         breakend_interval_min_lengths) = self.grammar_to_variant_set(lhs_strs, rhs_str_list, symbol_lengths,
                                                                       symbol_min_lengths, len(letters),
                                                                       novel_insertion_seqs, self.copies,
-                                                                      divergence_prob_list, vset_config=self.vset_config)
+                                                                      divergence_prob_list,
+                                                                      genotype=genotype,
+                                                                      svtypes=self.svtypes,
+                                                                      vset_config=self.vset_config)
 
         #
         # construct the SV object
         #
-        info = self.construct_info(lhs_strs, rhs_strs)
+        info = self.construct_info(lhs_strs, rhs_str_list)
         roi_filter = self.get_roi_filter()
 
         interchromosomal_period = self.get_sampled_int_value(self.interchromosomal_period)
+        print('INFO*****', info, operations)
 
         return BaseSV(sv_id=self.make_sv_id(),
                       breakend_interval_lengths=breakend_interval_lengths,
@@ -780,16 +831,18 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                       blacklist_filter=self.get_blacklist_filter(),
                       fixed_placement=None,
                       info=info,
-                      genotype=self.pick_genotype(),
+                      genotype=genotype,
                       allow_sv_overlap=self.vset_config.get('allow_sv_overlap', False),
                       config_descr=self.vset_config['config_descr'])
 
-    def construct_info(self, lhs_strs, rhs_strs):
-        sv_type_str = self.svtype.name
+    def construct_info(self, lhs_strs, rhs_str_list):
+        print('CONSTRUCT INFO', lhs_strs, rhs_str_list, self.svtypes)
+        sv_type_str = '/'.join([svtype.name for svtype in self.svtypes])
         source_str = ''.join(lhs_strs)
-        target_str = ''.join(rhs_strs)
+        target_str = '/'.join([''.join(rhs_strs) for rhs_strs in rhs_str_list])
         grammar = f'{source_str}->{target_str}'
-        return {'OP_TYPE': sv_type_str, 'GRAMMAR': grammar}
+        print(sv_type_str, grammar)
+        return {'SVTYPE': sv_type_str, 'GRAMMAR': grammar}
 
 
 # end: class FromGrammarVariantSetMaker
@@ -822,7 +875,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
 
     @override
     def simulate_sv(self):
-
+        genotype = self.pick_genotype()
         repeat_count_change = random.randint(*self.vset_config['repeat_count_change_range'])
         info = dict(SVTYPE=self.svtype.value, TR_CHANGE=repeat_count_change)
         overlap_region_type = (tuple(utils.as_list(self.vset_config['overlap_region_type']))
@@ -840,6 +893,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                                     source_breakend_region=BreakendRegion(start_breakend=0, end_breakend=1),
                                     target_insertion_breakend=0,
                                     target_insertion_order=(0,),
+                                    genotype=genotype,
                                     op_info={'SYMBOL': 'A'})]
             # We only need the repeat motif to be present once.
             roi_filter = TandemRepeatRegionFilter(min_num_repeats=1,
@@ -856,7 +910,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                 blacklist_filter=self.get_blacklist_filter(),
                 fixed_placement=None,
                 info=info,
-                genotype=self.pick_genotype(),
+                genotype=genotype,
                 config_descr=self.vset_config['config_descr'],
                 num_repeats_in_placement=1,
                 dispersions=[])
@@ -865,6 +919,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
             operations = [Operation(transform=Transform(transform_type=TransformType.DEL,
                                                         is_in_place=True, n_copies=1),
                                     source_breakend_region=BreakendRegion(0, 1),
+                                    genotype=genotype,
                                     op_info={'SYMBOL': 'A'})]
 
             # ensure there are enough existing repeats to delete.
@@ -883,7 +938,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                 blacklist_filter=self.get_blacklist_filter(),
                 fixed_placement=None,
                 info=info,
-                genotype=self.pick_genotype(),
+                genotype=genotype,
                 config_descr=self.vset_config['config_descr'],
                 num_repeats_in_placement=repeat_count_change,
                 dispersions=[])
@@ -986,6 +1041,7 @@ class ImportedVariantSet(VariantSet):
                     # SNP
                     vcf_info['OP_TYPE'] = 'SNP'
                     vcf_info['SVTYPE'] = 'SNP'
+                    print('VCF REC SNP*********')
 
         chk('OP_TYPE' in vcf_info or 'SVTYPE' in vcf_info,
             f'Need an SVTYPE or OP_TYPE to import from vcf records for {vcf_rec}', error_type='syntax')
@@ -1017,7 +1073,7 @@ class ImportedVariantSet(VariantSet):
         parsed_info['SVLEN'] = rec_len
 
         if 'GRAMMAR' in vcf_info:
-            parsed_info['GRAMMAR'] = vcf_info['GRAMMAR']
+            parsed_info['GRAMMAR'] = vcf_info['GRAMMAR'].split('/')
 
         if not (rec_len <= 50 and (rec_type_str == 'INS' or rec_type_str == 'INV' or vcf_info['SVTYPE'] == 'SNP' or
                               ('SVTYPE' in vcf_info and (vcf_info['SVTYPE'] == 'INS' or vcf_info['SVTYPE'] == 'INV')))):
@@ -1063,8 +1119,10 @@ class ImportedVariantSet(VariantSet):
         parsed_info['ALT'] = None
         parsed_info['REF'] = None
         parsed_info['SVTYPE'] = vcf_info.get('SVTYPE', 'Custom')
-
+        parsed_info['SVTYPE'] = parsed_info['SVTYPE'].split('/')
+        print('OPERATION TYPE', parsed_info['OP_TYPE'])
         if parsed_info['OP_TYPE'] == VariantType.SNP:
+            print('CHANGING TYPE')
             parsed_info['DIVERGENCE_PROB'] = [1.0]
             if vcf_rec.alts[0] != '<SNP>':
                 parsed_info['ALT'] = vcf_rec.alts
@@ -1101,18 +1159,19 @@ class ImportedVariantSet(VariantSet):
             if genotype is None:
                 genotype = parsed_info['GENOTYPE']
             assert genotype == parsed_info['GENOTYPE']
-
-            if len(sv_recs) > 1:
-                parent_info['OP_TYPE'] = parsed_info['SVTYPE']
-            else:
-                if parsed_info['SVTYPE'] not in [VariantType.SNP, VariantType.CUSTOM]:
-                    parsed_info['OP_TYPE'] = VariantType(parsed_info['SVTYPE'])
-                parent_info['OP_TYPE'] = parsed_info['SVTYPE']
+            print('REC', parsed_info['OP_TYPE'], vcf_rec)
+            if (len(sv_recs) == 1) and (parsed_info['OP_TYPE'] not in [VariantType.SNP, VariantType.CUSTOM]):
+                # Simple SV that is not a SNP or Custom
+                parsed_info['OP_TYPE'] = VariantType(parsed_info['SVTYPE'][0])
+            parent_info['SVTYPE'] = '/'.join(parsed_info['SVTYPE'])
 
             parent_info['GRAMMAR'] = parsed_info.get('GRAMMAR', '')
-            if 'GRAMMAR' not in parsed_info and parsed_info['SVTYPE'] != 'Custom':
-                lhs_strs, rhs_strs = SV_KEY[VariantType(parsed_info['SVTYPE'])]
-                parsed_info['GRAMMAR'] = ''.join(lhs_strs) + '->' + ''.join(rhs_strs)
+            for idx_grammar, sv_type in enumerate(parsed_info['SVTYPE']):
+                grammar = []
+                if 'GRAMMAR' not in parsed_info and parsed_info['SVTYPE'][idx_grammar] != 'Custom':
+                    lhs_strs, rhs_strs = SV_KEY[VariantType(parsed_info['SVTYPE'][idx_grammar])]
+                    grammar.append(''.join(lhs_strs) + '->' + ''.join(rhs_strs))
+                    parsed_info['GRAMMAR'] = grammar
 
             target_left = False
             source_regions.append([parsed_info['START'], parsed_info['END']])
@@ -1161,29 +1220,43 @@ class ImportedVariantSet(VariantSet):
             if ('GRAMMAR' in parsed_info and len(sv_recs) == 1) or (isinstance(parsed_info['OP_TYPE'], VariantType) and (
                     parsed_info['OP_TYPE'] not in [VariantType.DEL, VariantType.INV, VariantType.CUSTOM])):
                 if 'GRAMMAR' in parsed_info:
-                    chk(len(parsed_info['GRAMMAR'].split('->')) == 2, f'Unsupported GRAMMAR format {vcf_rec}.')
-                    lhs_strs, rhs_strs = parsed_info['GRAMMAR'].split('->')
+                    chk(all([len(grammar.split('->')) == 2 for grammar in parsed_info['GRAMMAR']]), f'Unsupported GRAMMAR format {vcf_rec}.')
+                    rhs_str_list = []
+                    for grammar in parsed_info['GRAMMAR']:
+                        lhs_strs, rhs_strs = grammar.split('->')
+                        rhs_str_list.append(rhs_strs)
                 else:
                     lhs_strs, rhs_strs = SV_KEY[parsed_info['OP_TYPE']]
+                    rhs_str_list = [rhs_strs]
                 if target_left:
                     # The symmetrical of the SV grammar has been used
                     lhs_strs = lhs_strs[::-1]
-                    rhs_strs = rhs_strs[::-1]
-                rhs_strs_list = []
-                for c in rhs_strs:
-                    if c in (Syntax.DIVERGENCE, Syntax.MULTIPLE_COPIES):
-                        rhs_strs_list[-1] += c
-                    else:
-                        rhs_strs_list.append(c)
+                    for idx in range(len(rhs_str_list)):
+                        rhs_str_list[idx] = rhs_str_list[idx][::-1]
+                print(parsed_info['OP_TYPE'], lhs_strs, rhs_str_list)
+
+                for idx in range(len(rhs_str_list)):
+                    rhs_strs = rhs_str_list[idx]
+                    aux_rhs = []
+                    for c in rhs_strs:
+                        if c in (Syntax.DIVERGENCE, Syntax.MULTIPLE_COPIES):
+                            aux_rhs[-1] += c
+                        else:
+                            aux_rhs.append(c)
+                    rhs_str_list[idx] = aux_rhs
+                print('before parsing', parsed_info['SVTYPE'])
                 # Get the operations record by record
-                operations, _, _, _, _ = self.grammar_to_variant_set(lhs_strs, rhs_strs_list, symbol_lengths,
+                operations, _, _, _, _ = self.grammar_to_variant_set(lhs_strs, rhs_str_list, symbol_lengths,
                                                                      symbol_min_lengths, 1,
                                                                      insseq,
                                                                      parsed_info['NCOPIES'],
                                                                      parsed_info['DIVERGENCE_PROB'],
+                                                                     genotype=genotype,
+                                                                     svtypes=[parsed_info['OP_TYPE']],
                                                                      replacement_seq=parsed_info['ALT'],
                                                                      orig_seq=parsed_info['REF'],
                                                                      vset_config=vcf_rec)
+                print('PARSING', operations, genotype)
                 for operation in operations:
                     operation.op_info = additional_info
                     operation.target_insertion_order = insord
@@ -1223,8 +1296,10 @@ class ImportedVariantSet(VariantSet):
                                           replacement_seq=parsed_info['ALT'])
                     operations.append(Operation(transform, source_breakend_region=source_region,
                                                 novel_insertion_seq=insseq,
+                                                genotype=genotype,
                                                 target_insertion_breakend=op_target,
                                                 target_insertion_order=insord, op_info=additional_info))
+                print('ATOMIC', operations)
             sv_operations.append(operations)
         # If we have more than one record we unify the breakends and their positions through the different operations
         if len(sv_recs) > 1:
@@ -1258,6 +1333,7 @@ class ImportedVariantSet(VariantSet):
 
         sv_id = 'Imported_' + self.import_id + '_' + str(parent_id)
         placement_dict = {breakend: locus for breakend, locus in enumerate(placements)}
+        print('parent', parent_info)
 
         return BaseSV(sv_id=sv_id,
                       breakend_interval_lengths=[None] * (len(placements) - 1),

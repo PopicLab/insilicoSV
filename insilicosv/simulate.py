@@ -261,7 +261,7 @@ class SVSimulator:
             region_padded = region.padded(self.config.get('min_intersv_dist', MIN_INTERSV_DIST))
             self.reference_regions.chop(region_padded, sv.genotype)
 
-            if sv.overlap_mode == OverlapMode.CHROM and sv.info['OP_TYPE'] == 'DUP':
+            if sv.overlap_mode == OverlapMode.CHROM and sv.info['SVTYPE'] == 'DUP':
                 orig_op = sv.operations[0]
                 operations = []
                 for copy_num in range(orig_op.transform.n_copies[0]):
@@ -278,6 +278,7 @@ class SVSimulator:
                                   source_breakend_region=BreakendRegion(start_breakend=Breakend(0),
                                                                         end_breakend=Breakend(1)),
                                   target_insertion_breakend=Breakend(2),
+                                  genotype=orig_op.genotype,
                                   placement={Breakend(0): Locus(chrom=region.chrom, pos=region.start),
                                              Breakend(1): Locus(chrom=region.chrom, pos=region.end),
                                              Breakend(2): Locus(
