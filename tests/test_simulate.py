@@ -2657,19 +2657,18 @@ def test_trCON(tmp_path):
 
     a_bed = d / "a.bed"
     a_bed.write_text("""
-    chrA\t0\t5\tALU\tTCG
     chrA\t4\t16\tALU\tTCG
     """)
     cfg = d / "a.yaml"
     cfg.write_text(f"""
-reference: "tests/inputs/test_tr.fa"
-max_tries: 1
-homozygous_only: true
-overlap_regions: ["{a_bed}"]
-variant_sets:
+    reference: "tests/inputs/test_tr.fa"
+    max_tries: 1
+    homozygous_only: true
+    overlap_regions: ["{a_bed}"]
+    variant_sets:
     - type: "trCON"
       number: 1
-      repeat_count_change_range: [2, 2]
+      repeat_count_change_range: [3, 3]
       overlap_region_type: ["ALU"]
     """)
 
@@ -2683,7 +2682,7 @@ variant_sets:
     assert len(svs) == 1
     with FastaFile(sim_fa) as fasta_file:
         hap = fasta_file.fetch(fasta_file.references[0])
-    assert hap == 'AAAATCGTCGAAAA'
+    assert hap == 'AAAATCGAAAA'
 
 
 if __name__ == "__main__":

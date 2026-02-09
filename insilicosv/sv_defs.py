@@ -529,13 +529,19 @@ class BaseSV(SV):
 #############################################
 @dataclass
 class TandemRepeatExpansionContractionSV(BaseSV):
-    num_repeats_in_placement: int = 0
+    num_contractions: int = 0
 
     @override
     def set_placement(self, placement, roi, operation=None):
         self.roi = roi
         # The operation gets the motif to insert or delete
-        operation.motif = roi.motif * self.num_repeats_in_placement * operation.transform.n_copies
+        if self.num_contractions:
+            # We adapt the roi to fit the number of motifs
+            length_roi = len(roi.motif) * self.num_contractions
+            roi = roi.replace(end=roi.start + length_roi)
+            placement[1] = Locus(chrom=placement[1], pos=roi.end)
+
+        operation.motif = roi.motif * operation.transform.n_copies[0]
         super().set_placement(placement=placement, roi=roi)
 
     @override
@@ -595,6 +601,9 @@ SV_KEY = {
 
     VariantType.SNP: (("A",), ("A*",)),
     VariantType.INDEL: ((), ()),
+
+    VariantType.trCON: ((), ()),
+    VariantType.trEXP: ((), ()),
 }
 
 
