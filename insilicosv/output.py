@@ -221,7 +221,6 @@ class OutputWriter:
                         start_in_region = operation_start - relative_position
 
                         if operation.transform_type == TransformType.DEL:
-                            print('is DEL', operation)
                             if operation_length <= 50:
                                 # INDEL we report the original sequence
                                 orig_seq = self.reference.fetch(
@@ -264,10 +263,8 @@ class OutputWriter:
                                     mapping_quality=paf_mapq,
                                     tags=f'cg:Z:{len(seq)}I')
                             else:
-                                print('operation', operation, seq)
                                 if operation.motif:
                                     # TR
-                                    print(operation.motif, seq)
                                     modified_seq = operation.motif
 
                                 strand = '+'

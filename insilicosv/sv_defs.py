@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from copy import copy
 from enum import Enum
 from functools import cached_property
+from operator import length_hint
+
 from typing_extensions import TypeAlias, Optional, Any, cast, override
 
 from insilicosv.utils import (
@@ -535,11 +537,12 @@ class TandemRepeatExpansionContractionSV(BaseSV):
     def set_placement(self, placement, roi, operation=None):
         self.roi = roi
         # The operation gets the motif to insert or delete
+        length_roi = len(roi.motif)
         if self.num_contractions:
             # We adapt the roi to fit the number of motifs
-            length_roi = len(roi.motif) * self.num_contractions
-            roi = roi.replace(end=roi.start + length_roi)
-            placement[1] = Locus(chrom=placement[1], pos=roi.end)
+            length_roi *= self.num_contractions
+        roi = roi.replace(end=roi.start + length_roi)
+        placement[1] = Locus(chrom=placement[1], pos=roi.end)
 
         operation.motif = roi.motif * operation.transform.n_copies[0]
         super().set_placement(placement=placement, roi=roi)
