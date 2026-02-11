@@ -537,14 +537,7 @@ class TandemRepeatExpansionContractionSV(BaseSV):
     def set_placement(self, placement, roi, operation=None):
         self.roi = roi
         # The operation gets the motif to insert or delete
-        length_roi = len(roi.motif)
-        if self.num_contractions:
-            # We adapt the roi to fit the number of motifs
-            length_roi *= self.num_contractions
-        roi = roi.replace(end=roi.start + length_roi)
-        placement[1] = Locus(chrom=placement[1], pos=roi.end)
-
-        operation.motif = roi.motif * operation.transform.n_copies[0]
+        operation.motif = roi.motif * operation.transform.n_copies[0] * self.num_contractions
         super().set_placement(placement=placement, roi=roi)
 
     @override
@@ -554,8 +547,11 @@ class TandemRepeatExpansionContractionSV(BaseSV):
         vcf_rec['info']['OP_TYPE'] = op_type_str
         vcf_rec['alleles'] = ['N', '<%s>' % op_type_str]
         assert self.roi is not None
-        vcf_rec['info']['SVLEN'] = self.roi.length()
-        vcf_rec['stop'] = self.roi.end
+
+        # Adapt the coordinates to the motif size
+        length = self.num_contractions * len(self.roi.motif)
+        vcf_rec['info']['SVLEN'] = length
+        vcf_rec['stop'] = self.roi.start + length
         return [vcf_rec]
 
 

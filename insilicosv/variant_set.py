@@ -859,7 +859,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                 info=info,
                 genotype=self.pick_genotype(),
                 config_descr=self.vset_config['config_descr'],
-                num_contractions=0,
+                num_contractions=1,
                 dispersions=[])
         elif self.svtype == VariantType.trCON:
             breakend_interval_lengths = [None]

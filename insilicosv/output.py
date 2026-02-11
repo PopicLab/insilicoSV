@@ -221,6 +221,11 @@ class OutputWriter:
                         start_in_region = operation_start - relative_position
 
                         if operation.transform_type == TransformType.DEL:
+                            if operation.motif:
+                                # trCON: Adapt the DEL range to the motif
+                                operation_length = len(operation.motif)
+                                operation_end = operation_start + operation_length
+
                             if operation_length <= 50:
                                 # INDEL we report the original sequence
                                 orig_seq = self.reference.fetch(
