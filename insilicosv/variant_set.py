@@ -61,12 +61,18 @@ class VariantSet(ABC):
         self.overlap_sv = False
 
         overlap_files = utils.as_list(self.vset_config.get('overlap_region_type', ['all']))
-        if self.vset_config.get('overlap_region_type', 'all') == 'all':
+        number_overlap_files = len(utils.as_list(config.get('overlap_regions', None)))
+        chk(len(overlap_files) == number_overlap_files,
+            f'overlap_region_type if specified '
+            f'should be \'all\' or a list of length the number of constrain region files in '
+            f'\'overlap_regions\'. {len(overlap_files)} and '
+            f'{number_overlap_files} were provided', error_type='syntax')
+
+        if overlap_files == ['all']:
             self.overlap_kinds = [('all',)] * len(overlap_files)
         else:
-            for overlap_kind in self.vset_config.get('overlap_region_type', 'all'):
-                self.overlap_kinds.append(tuple(overlap_kind))
-        self.overlap_kinds = tuple(self.overlap_kinds)
+            for idx_file, overlap_file in enumerate(overlap_files):
+                self.overlap_kinds += [overlap_name + '_' + str(idx_file) for overlap_name in overlap_file]
 
         if 'overlap_mode' in self.vset_config:
             chk(isinstance(self.vset_config['overlap_mode'], str) or
@@ -77,12 +83,6 @@ class VariantSet(ABC):
                 self.overlap_mode = OverlapMode(self.vset_config['overlap_mode'])
             except ValueError:
                 chk(False, f'Invalid overlap_mode in {vset_config}', error_type='value')
-
-            chk(len(self.overlap_kinds) == len(overlap_files),
-                f'overlap_region_kinds if specified '
-                f'should be \'all\' or a list of length the number of constrain region files in '
-                f'\'overlap_regions\'. {len(self.overlap_kinds)} and '
-                f'{len(overlap_files)} were provided', error_type='syntax')
 
         self.vset_config['overlap_region_type'] = (tuple(utils.as_list(self.vset_config['overlap_region_type']))
                                                    if 'overlap_region_type' in self.vset_config else ('all',))

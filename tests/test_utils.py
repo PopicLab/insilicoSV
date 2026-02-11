@@ -196,11 +196,11 @@ def test_region_set_large_region_handling():
     assert region_length(region_set) == 1
     assert large_region in region_set
 
-def test_region_set_from_beds(tmpdir):
+def test_region_set_from_bed(tmpdir):
     bed_file = tmpdir.join("test.bed")
     bed_file.write("chr1\t100\t200\tkind1\nchr1\t300\t400\tkind2\n")
 
-    region_set = RegionSet.from_beds([str(bed_file)], True)
+    region_set = RegionSet.from_bed(str(bed_file), True)
 
     assert region_length(region_set) == 2
     assert Region(chrom="chr1", start=100, end=200, kind="kind1", orig_start=100, orig_end=200) in region_set

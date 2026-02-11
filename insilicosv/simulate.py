@@ -49,7 +49,7 @@ class SVSimulator:
     reference_regions: RegionSet
     # Region Set defined by the reference regions to keep track of available regions for overlap SVs
     reference_sv_overlap_regions: RegionSet
-    blacklist_regions: list[RegionSet]
+    blacklist_regions: RegionSet
     reference: FastaFile
     chrom_lengths: dict[str, int]
     output_path: str
@@ -144,8 +144,9 @@ class SVSimulator:
             self.reference_sv_overlap_regions = copy.deepcopy(self.reference_regions)
         # Get the ROIs for overlap constraints
         if any(mode is not None for mode in self.overlap_modes.values()):
-            rois_overlap = RegionSet.from_beds(utils.as_list(self.config.get('overlap_regions', [])),
-                                               to_region_set=False)
+            rois_overlap = RegionSet.from_files(utils.as_list(self.config.get('overlap_regions', [])),
+                                                'overlap')
+
             min_bounds = [min_bound for min_bound, _ in self.overlap_ranges.values()]
             global_min_bound = 0
             logger.info(
@@ -216,17 +217,8 @@ class SVSimulator:
                 random.shuffle(self.rois_overlap[sv_category])
             logger.info(f'{n_removed_rois} ROIs filtered')
 
-        self.blacklist_regions = []
-        for blacklist_region_file in utils.as_list(self.config.get('blacklist_regions', [])):
-            logger.info(f'Processing blacklist region file {blacklist_region_file}')
-            if blacklist_region_file.lower().endswith('.bed'):
-                self.blacklist_regions.append(RegionSet.from_beds([blacklist_region_file], to_region_set=True))
-            elif blacklist_region_file.lower().endswith('.vcf'):
-                self.blacklist_regions.append(RegionSet.from_vcf(blacklist_region_file))
-            else:
-                chk(f'Cannot import blacklist regions from {blacklist_region_file}: '
-                    f'unsupported file type, please provide a .bed or .vcf file', error_type='type')
-            logger.info(f'Blacklist region file {blacklist_region_file} processed.')
+        self.blacklist_regions = RegionSet(RegionSet.from_files(utils.as_list(self.config.get('blacklist_regions', [])),
+                                                                'blacklist'))
 
     def run(self):
         self.construct_svs()
