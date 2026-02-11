@@ -11,7 +11,7 @@ from pysam import FastaFile, VariantFile
 
 from insilicosv import utils
 from insilicosv.utils import RegionFilter, OverlapMode, Locus, error_context, chk, TandemRepeatRegionFilter, if_not_none
-from insilicosv.sv_defs import (Transform, TransformType, BreakendRegion, Operation, SV, VariantType, BaseSV,
+from insilicosv.sv_defs import (Transform, TransformType, BreakendRegion, Operation, SV, VariantType, BaseSV, TR,
                                 Syntax, Symbol, SV_KEY, TandemRepeatExpansionContractionSV)
 
 logger = logging.getLogger(__name__)
@@ -432,7 +432,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
     @override
     @classmethod
     def can_make_from(cls, vset_config):
-        return ((vset_config.get("type") is not None) and
+        return ((vset_config.get("type") is not None) and (vset_config.get("type") not in [tr.value for tr in TR]) and
                 (vset_config.get("type") in [k.value for k in SV_KEY.keys()] or '->' in vset_config.get("type")))
 
     @override
@@ -443,7 +443,8 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             chk(vset_config_key in (
                 'type', 'number',
                 'length_ranges',
-                'overlap_region_type', 'overlap_region_length_range',
+                'overlap_region_type',
+                'overlap_region_length_range',
                 'overlap_mode',
                 'blacklist_region_type',
                 'divergence_prob',
@@ -799,7 +800,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
     @override
     @classmethod
     def can_make_from(cls, vset_config):
-        return vset_config.get("type") in ('trEXP', 'trCON')
+        return vset_config.get("type") in [tr.value for tr in TR]
 
     def __init__(self, vset_config, config):
         super().__init__(vset_config, config)
@@ -812,7 +813,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
     def preprocess_config(self):
         for vset_config_key in self.vset_config:
             chk(vset_config_key in (
-                'type', 'number',
+                'type', 'number', 'VSET',
                 'repeat_count_change_range',
                 'overlap_region_type', 'overlap_region_length_range',
                 'overlap_mode',
@@ -824,7 +825,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
     def simulate_sv(self):
 
         repeat_count_change = random.randint(*self.vset_config['repeat_count_change_range'])
-        info = dict(SVTYPE=self.svtype.value, TR_CHANGE=repeat_count_change)
+        info = dict(SVTYPE=self.svtype.value, TR_CHANGE=repeat_count_change, OP_TYPE=self.sv_type.value)
         overlap_region_type = (tuple(utils.as_list(self.vset_config['overlap_region_type']))
                                if 'overlap_region_type' in self.vset_config else 'all')
         anchor = BreakendRegion(0, 1)
@@ -836,7 +837,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
             breakend_interval_lengths = [None]
             operations = [Operation(transform=Transform(transform_type=TransformType.IDENTITY,
                                                         is_in_place=False,
-                                                        n_copies=repeat_count_change),
+                                                        n_copies=[repeat_count_change, repeat_count_change]),
                                     source_breakend_region=BreakendRegion(start_breakend=0, end_breakend=1),
                                     target_insertion_breakend=0,
                                     target_insertion_order=(0,),
@@ -858,12 +859,13 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                 info=info,
                 genotype=self.pick_genotype(),
                 config_descr=self.vset_config['config_descr'],
-                num_repeats_in_placement=1,
+                num_contractions=1,
                 dispersions=[])
         elif self.svtype == VariantType.trCON:
             breakend_interval_lengths = [None]
             operations = [Operation(transform=Transform(transform_type=TransformType.DEL,
-                                                        is_in_place=True, n_copies=1),
+                                                        is_in_place=True,
+                                                        n_copies=[1, 1]),
                                     source_breakend_region=BreakendRegion(0, 1),
                                     op_info={'SYMBOL': 'A'})]
 
@@ -885,7 +887,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                 info=info,
                 genotype=self.pick_genotype(),
                 config_descr=self.vset_config['config_descr'],
-                num_repeats_in_placement=repeat_count_change,
+                num_contractions=repeat_count_change,
                 dispersions=[])
         else:
             assert False

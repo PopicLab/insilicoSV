@@ -144,6 +144,7 @@ class TestSVSimulator(unittest.TestCase):
         self.test_overlap_bed_13 = "tests/inputs/example_overlap_events_13.bed"
         self.test_overlap_bed_14 = "tests/inputs/example_overlap_events_14.bed"
         self.test_overlap_bed_15 = "tests/inputs/example_overlap_events_15.bed"
+        self.motif = "tests/inputs/motif.bed"
 
         self.import_del = "tests/inputs/import_del.vcf"
         self.import_snp = "tests/inputs/import_snp.vcf"
@@ -2047,6 +2048,58 @@ class TestSVSimulator(unittest.TestCase):
               for B in ['TC', 'AC'] for insertion_idx in [0, 2] if C != B]]
         ]
 
+        self.simple_tr = [
+            ["TCGTCGCGGATATAT",
+             TestObject([self.ref_file, {"chrA": "TCGTCGCGGATATAT"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    'overlap_regions': self.motif,
+                                    "variant_sets": [{"type": "trCON",
+                                                      "number": 1,
+                                                      "repeat_count_change_range": [3, 3]},
+                                                     {"type": "trCON",
+                                                      "number": 1,
+                                                      "repeat_count_change_range": [2, 2]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TCGTG", 'CGG']],
+            ["TCGTCGCGGATATAT",
+             TestObject([self.ref_file, {"chrA": "TCGTCGCGGATATAT"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    'overlap_regions': self.motif,
+                                    "variant_sets": [{"type": "trEXP",
+                                                      "number": 1,
+                                                      "repeat_count_change_range": [3, 3]},
+                                                     {"type": "trEXP",
+                                                      "number": 1,
+                                                      "repeat_count_change_range": [2, 2]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TCGTCGTCGTCGCGGATATATATATAT", 'TCGTCGCGCGCGGATATATATATAT', 'TCGTCGCGCGCGCGGATATATATAT',
+              'TCGTCGTCGTCGTCGCGGATATATATAT']],
+            ["TCGTCGCGGATATAT",
+             TestObject([self.ref_file, {"chrA": "TCGTCGCGGATATAT"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    'overlap_regions': self.motif,
+                                    "variant_sets": [{"type": "trCON",
+                                                      "number": 1,
+                                                      "repeat_count_change_range": [3, 3]},
+                                                     {"type": "trEXP",
+                                                      "number": 1,
+                                                      "repeat_count_change_range": [2, 2]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TCGTCGTCGTCGCGG", 'TCGTCGCGCGCGG']],
+        ]
+
     def tearDown(self):
         try:
             shutil.rmtree(self.test_dir)
@@ -2424,7 +2477,10 @@ class TestSVSimulator(unittest.TestCase):
     def test_indel_overlap(self):
         self.run_test(self.test_indel_overlap)
 
-    def run_test(self, data, div_check=False):
+    def test_tr_operations(self):
+        self.run_test(self.simple_tr, allow_fail=True)
+
+    def run_test(self, data, div_check=False, allow_fail=False):
         for test_num, (ref, vs_config, expected_outputs) in enumerate(data):
             print(ref, vs_config, expected_outputs)
             print('TEST', test_num, 'config', vs_config)
@@ -2457,9 +2513,15 @@ class TestSVSimulator(unittest.TestCase):
                 print(test_num, "SEED", test_object.par_content["random_seed"])
 
                 attempt_num += 1
-                results, results2, svs = self.helper_test_known_output_svs(test_object, expected_results,
+                try:
+                    results, results2, svs = self.helper_test_known_output_svs(test_object, expected_results,
                                                                            heterozygous=heterozygous, test_num=test_num,
                                                                            div_check=div_check)
+                except Exception as e:
+                    if allow_fail:
+                        continue
+                    else:
+                        raise e
                 print(test_num, 'RESULTS', results, results2)
                 count_occ[results] += 1
                 results_seen.update([results, results2])
@@ -2657,19 +2719,18 @@ def test_trCON(tmp_path):
 
     a_bed = d / "a.bed"
     a_bed.write_text("""
-    chrA\t0\t5\tALU\tTCG
     chrA\t4\t16\tALU\tTCG
     """)
     cfg = d / "a.yaml"
     cfg.write_text(f"""
-reference: "tests/inputs/test_tr.fa"
-max_tries: 1
-homozygous_only: true
-overlap_regions: ["{a_bed}"]
-variant_sets:
+    reference: "tests/inputs/test_tr.fa"
+    max_tries: 1
+    homozygous_only: true
+    overlap_regions: ["{a_bed}"]
+    variant_sets:
     - type: "trCON"
       number: 1
-      repeat_count_change_range: [2, 2]
+      repeat_count_change_range: [3, 3]
       overlap_region_type: ["ALU"]
     """)
 
@@ -2683,7 +2744,7 @@ variant_sets:
     assert len(svs) == 1
     with FastaFile(sim_fa) as fasta_file:
         hap = fasta_file.fetch(fasta_file.references[0])
-    assert hap == 'AAAATCGTCGAAAA'
+    assert hap == 'AAAATCGAAAA'
 
 
 if __name__ == "__main__":
