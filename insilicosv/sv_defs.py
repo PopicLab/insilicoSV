@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from copy import copy
 from enum import Enum
 from functools import cached_property
+from operator import length_hint
+
 from typing_extensions import TypeAlias, Optional, Any, cast, override
 
 from insilicosv.utils import (
@@ -529,13 +531,13 @@ class BaseSV(SV):
 #############################################
 @dataclass
 class TandemRepeatExpansionContractionSV(BaseSV):
-    num_repeats_in_placement: int = 0
+    num_contractions: int = 0
 
     @override
     def set_placement(self, placement, roi, operation=None):
         self.roi = roi
         # The operation gets the motif to insert or delete
-        operation.motif = roi.motif * self.num_repeats_in_placement * operation.transform.n_copies
+        operation.motif = roi.motif * operation.transform.n_copies[0] * self.num_contractions
         super().set_placement(placement=placement, roi=roi)
 
     @override
@@ -545,8 +547,11 @@ class TandemRepeatExpansionContractionSV(BaseSV):
         vcf_rec['info']['OP_TYPE'] = op_type_str
         vcf_rec['alleles'] = ['N', '<%s>' % op_type_str]
         assert self.roi is not None
-        vcf_rec['info']['SVLEN'] = self.roi.length()
-        vcf_rec['stop'] = self.roi.end
+
+        # Adapt the coordinates to the motif size
+        length = self.num_contractions * len(self.roi.motif)
+        vcf_rec['info']['SVLEN'] = length
+        vcf_rec['stop'] = self.roi.start + length
         return [vcf_rec]
 
 
@@ -595,6 +600,9 @@ SV_KEY = {
 
     VariantType.SNP: (("A",), ("A*",)),
     VariantType.INDEL: ((), ()),
+
+    VariantType.trCON: ((), ()),
+    VariantType.trEXP: ((), ()),
 }
 
 
