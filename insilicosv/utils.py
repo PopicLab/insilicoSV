@@ -128,6 +128,8 @@ class Region:
     # additional per-region data, such as repeat unit info for tandem repeats
     data: int = 0
     motif: str = ''
+    # Idx of the source file the region is coming from form overlapping and blacklist
+    source_file_idx: int = 0
 
     # if this region is derived from an ROI, start/end of the original ROI
     orig_start: int = -1
@@ -162,6 +164,7 @@ class Region:
 @dataclass(frozen=True)
 class RegionFilter:
     region_kinds: Optional[tuple[str, ...]] = None
+    region_file_idx: Optional[tuple[int, ...]] = None
     region_length_range: tuple[Optional[int], Optional[int]] = (None, None)
 
     def satisfied_for(self, region) -> bool:
@@ -169,8 +172,8 @@ class RegionFilter:
 
         if (not region.kind or
                  not any((region_kinds.upper() == 'ALL' and region.kind != '_reference_') or
-                         region_kinds in region.kind
-                         for region_kinds in self.region_kinds)):
+                         (region_kinds in region.kind and file_idx == region.source_file_idx)
+                         for region_kinds, file_idx in zip(self.region_kinds, self.region_file_idx))):
             return False
         return True
 
@@ -243,7 +246,7 @@ class RegionSet:
         for file_idx, region_file in enumerate(file_paths):
             logger.info(f'Processing {region_type} region file {region_file}')
             if region_file.lower().endswith('.bed'):
-                regions += RegionSet.from_bed([region_file], file_idx=file_idx)
+                regions += RegionSet.from_bed(region_file, file_idx=file_idx)
             elif region_file.lower().endswith('.vcf'):
                 regions += RegionSet.from_vcf(region_file, file_idx=file_idx)
             else:
@@ -256,6 +259,7 @@ class RegionSet:
     def from_bed(bed_path, file_idx=0, verbose=False):
         regions = []
         logger.info(f'Reading bed file {bed_path}')
+
         with open(bed_path) as bed:
             for line_num, line in enumerate(bed):
                 if (verbose and (line_num % 500000) == 0):
@@ -282,9 +286,8 @@ class RegionSet:
                 motif = fields[4] if len(fields) >= 5 else ''
                 data = len(motif)
                 regions.append(Region(chrom=chrom, start=start,
-                                      end=end, kind=kind + '_' + str(file_idx), data=data,
+                                      end=end, kind=kind, source_file_idx=file_idx, data=data,
                                       motif=motif, orig_start=start, orig_end=end))
-
         return regions
 
     @staticmethod
@@ -296,9 +299,9 @@ class RegionSet:
                 kind = 'NA'
                 if 'REGION_TYPE' in vcf_info:
                     kind = vcf_info['REGION_TYPE']
-                kind += '_' + str(file_idx)
                 regions.append(Region(chrom=vcf_rec.chrom, start=vcf_rec.start, end=vcf_rec.stop,
-                                      orig_start=vcf_rec.start, orig_end=vcf_rec.stop, kind=kind))
+                                      orig_start=vcf_rec.start, orig_end=vcf_rec.stop, kind=kind,
+                                      source_file_idx=file_idx))
                 data = 0
                 motif = ''
                 if 'motif' in vcf_info:
@@ -309,7 +312,7 @@ class RegionSet:
                     target_chrom = vcf_info.get('TARGET_CHROM', vcf_rec.chrom)
                     target_start = vcf_info['TARGET'] - 1
                     regions.append(Region(chrom=target_chrom, start=target_start, end=target_start,
-                                          data=data, motif=motif,
+                                          data=data, motif=motif, source_file_idx=file_idx,
                                           orig_start=target_start, orig_end=target_start, kind=kind))
 
         return regions

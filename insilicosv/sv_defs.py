@@ -216,7 +216,7 @@ class SV(ABC):
                         self.get_anchor_length() >= self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a partial overlap.')
         if self.overlap_mode in [OverlapMode.TERMINAL, OverlapMode.CHROM]:
-            chk(self.roi_filter.region_kinds == ['all'], 'No overlap_region_kinds can be specified for overlap_mode'
+            chk(list(self.roi_filter.region_kinds) == ['all'], 'No overlap_region_kinds can be specified for overlap_mode '
                                                          f'terminal and chrom. Error in {self}', error_type='syntax')
 
         # The letters cannot be unbounded unless the overlap is Exact and they are in the anchor.

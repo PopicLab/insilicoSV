@@ -463,7 +463,7 @@ class TestSVSimulator(unittest.TestCase):
                                                                                      "length_ranges": [[None, None]],
                                                                                      "overlap_mode": "exact",
                                                                                      "overlap_region_type": [
-                                                                                         "L1PA15"]}]}],
+                                                                                         ["L1PA15"], ["L1PA15"]]}]}],
                                                        self.hap1, self.hap2, self.bed),
                                             ]
         self.test_objects_overlap_cplx = [TestObject([self.ref_file, {"chr21": "CTGAT"}],
@@ -476,7 +476,7 @@ class TestSVSimulator(unittest.TestCase):
                                                                                    "overlap_region_length_range": [2,
                                                                                                                    2],
                                                                                    "overlap_mode": "exact",
-                                                                                   "overlap_region_type": ["L1HS"]}]}],
+                                                                                   "overlap_region_type": [["L1HS"], ['L1HS']]}]}],
                                                      self.hap1, self.hap2, self.bed),
                                           TestObject([self.ref_file, {"chr21": "CTGATATGGAC"}],
                                                      [self.par, {"reference": self.ref_file,
@@ -488,14 +488,14 @@ class TestSVSimulator(unittest.TestCase):
                                                                                    "overlap_mode": "exact",
                                                                                    "overlap_region_length_range": [4,
                                                                                                                    6],
-                                                                                   "overlap_region_type": ["L1HS"]},
+                                                                                   "overlap_region_type": [["L1HS"], ['L1HS']]},
                                                                                   {"type": "(A)_->A_a", "number": 1,
                                                                                    "length_ranges": [[None, None],
                                                                                                      [1, 1]],
                                                                                    "overlap_mode": "exact",
                                                                                    "overlap_region_length_range": [1,
                                                                                                                    1],
-                                                                                   "overlap_region_type": ["AluSz6"]
+                                                                                   "overlap_region_type": [["AluSz6"], ['AluSz6']]
                                                                                    }]}],
                                                      self.hap1, self.hap2, self.bed),
                                           TestObject(
@@ -517,7 +517,7 @@ class TestSVSimulator(unittest.TestCase):
                                                                   "length_ranges": [[None, None], [3, 3]],
                                                                   "overlap_mode": "exact",
                                                                   "overlap_region_length_range": [3, 3],
-                                                                  "overlap_region_type": ["ALR"]},
+                                                                  "overlap_region_type": "ALR"},
                                                                  {"type": "(A)B->a", "number": 1,
                                                                   "length_ranges": [[None, None], [2, 2]],
                                                                   "overlap_region_length_range": [2, 2],
@@ -539,7 +539,7 @@ class TestSVSimulator(unittest.TestCase):
                                                                                      self.test_overlap_bed_2],
                                                                  "variant_sets": [{"type": "A_()->A_A", "number": 1,
                                                                                    "length_ranges": [[2, 2], [1, 1]],
-                                                                                   "overlap_region_type": ["L1PA15"],
+                                                                                   "overlap_region_type": [["L1PA15"], ["L1PA15"]],
                                                                                    "overlap_mode": "contained"
                                                                                    }]}],
                                                      self.hap1, self.hap2, self.bed),
@@ -549,7 +549,7 @@ class TestSVSimulator(unittest.TestCase):
                                                                                      self.test_overlap_bed_2],
                                                                  "variant_sets": [{"type": "A_()->A_a", "number": 1,
                                                                                    "length_ranges": [[2, 2], [1, 1]],
-                                                                                   "overlap_region_type": ["L1PA15"],
+                                                                                   "overlap_region_type": [["L1PA15"], ["L1PA15"]],
                                                                                    "overlap_mode": "contained"
                                                                                    }]}],
                                                      self.hap1, self.hap2, self.bed),
@@ -559,7 +559,7 @@ class TestSVSimulator(unittest.TestCase):
                                                                                      self.test_overlap_bed_2],
                                                                  "variant_sets": [{"type": "A(_)->_A", "number": 1,
                                                                                    "length_ranges": [[2, 2], [1, 1]],
-                                                                                   "overlap_region_type": ["L1PA15"],
+                                                                                   "overlap_region_type": [["L1PA15"], ["L1PA15"]],
                                                                                    "overlap_mode": "contained"
                                                                                    }]}],
                                                      self.hap1, self.hap2, self.bed),
@@ -570,7 +570,7 @@ class TestSVSimulator(unittest.TestCase):
                                                                                      self.test_overlap_bed_2],
                                                                  "variant_sets": [{"type": "A_()->A_a", "number": 1,
                                                                                    "length_ranges": [[2, 2], [3, 3]],
-                                                                                   "overlap_region_type": ["ALR"],
+                                                                                   "overlap_region_type": [["ALR"], ["ALR"]],
                                                                                    "overlap_mode": "contained"},
                                                                                   {"type": "nrTRA", "number": 1,
                                                                                    "length_ranges": [[4, 6], [1, 1]]}
@@ -951,7 +951,7 @@ class TestSVSimulator(unittest.TestCase):
                                                      "overlap_region_type": "Alu"},
                                                     {"type": "dDUP", "number": 1,
                                                      "length_ranges": [[2, 2], [1, 1]],
-                                                     "overlap_region_type": "L1PA15",
+                                                     "overlap_region_type": [["L1PA15"], ["L1PA15"]],
                                                      "overlap_component": "target"}]}],
                        self.hap1, self.hap2, self.bed)
         ]

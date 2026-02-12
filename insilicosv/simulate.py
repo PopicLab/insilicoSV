@@ -146,7 +146,6 @@ class SVSimulator:
         if any(mode is not None for mode in self.overlap_modes.values()):
             rois_overlap = RegionSet.from_files(utils.as_list(self.config.get('overlap_regions', [])),
                                                 'overlap')
-
             min_bounds = [min_bound for min_bound, _ in self.overlap_ranges.values()]
             global_min_bound = 0
             logger.info(
@@ -154,6 +153,7 @@ class SVSimulator:
             if None not in min_bounds:
                 global_min_bound = min(min_bounds)
                 rois_overlap = sorted(rois_overlap, key=lambda x: x.length(), reverse=True)
+
             # Get the reference regions
             n_removed_rois = 0
             for roi_index, roi in enumerate(rois_overlap):
@@ -165,6 +165,7 @@ class SVSimulator:
                     n_removed_rois += 1
                     continue
                 added_roi = False
+
                 for sv_idx, sv_category in enumerate(self.overlap_ranges):
                     if self.overlap_modes[sv_idx] in [None, OverlapMode.TERMINAL, OverlapMode.CHROM]: continue
                     if roi.length() < if_not_none(self.overlap_ranges[sv_category][0], 0): continue
@@ -187,7 +188,6 @@ class SVSimulator:
                 for chrom, chrom_length in self.chrom_lengths.items():
                     self.rois_overlap[sv_category].append(Region(chrom=chrom, start=0, end=chrom_length, kind='chr',
                                                                  orig_start=0, orig_end=chrom_length))
-
             for sv_category in self.rois_overlap:
                 # Check if there is enough ROIs to fit all the SVs of one category independently
                 error_message_num_rois = ("Only {} ROIs satisfying the constraints "
@@ -235,7 +235,7 @@ class SVSimulator:
             for sv in vset_svs:
                 sv.info['VSET'] = vset_num
             self.overlap_ranges[vset_num] = ranges
-            self.overlap_kinds[vset_num] = [kind for tuple_kinds in kinds for kind in tuple_kinds]
+            self.overlap_kinds[vset_num] = kinds
             self.overlap_modes[vset_num] = mode
             self.svs.extend(vset_svs)
 
@@ -363,11 +363,8 @@ class SVSimulator:
 
     @functools.cache
     def get_relevant_blacklist_regions(self, blacklist_filter):
-        if blacklist_filter is None: return RegionSet()
-        filtered_blacklist = RegionSet()
-        for blacklist_idx, blacklist_region in enumerate(self.blacklist_regions):
-            filtered_blacklist.add_region_set(blacklist_region.filtered(region_filter=blacklist_filter, blacklist_idx=blacklist_idx))
-        return filtered_blacklist
+        return (RegionSet() if blacklist_filter is None else
+                self.blacklist_regions.filtered(region_filter=blacklist_filter))
 
     def get_breakend(self, hap_id, reference_regions, containing_region=None, avoid_chrom=None, blacklist_regions=None,
                      roi_length=0, total_length=0, sv_regions=None):
@@ -500,6 +497,7 @@ class SVSimulator:
                            overlap_mode=None, roi_filter=None):
         # The region is constrained we use the interval tree defined from the bed file
         roi_list = self.rois_overlap[sv_category]
+
         # Add the beginning of the ROIs list at the end of the list of ROIs to check to ensure all are checked in case we run out.
         for region in (roi_list[roi_index:] + roi_list[:init_roi]):
             roi_index = (roi_index + 1) % len(roi_list)
@@ -830,9 +828,11 @@ class SVSimulator:
         max_tries = self.config.get("max_tries", DEFAULT_MAX_TRIES)
         blacklist_regions = self.get_relevant_blacklist_regions(sv.blacklist_filter)
         sv_set = sv.info['VSET']
+
         hap_id = 0
         if self.allow_hap_overlap:
             hap_id = 2 if sv.genotype[0] and sv.genotype[1] else sv.genotype[1]
+
         init_roi = 0
         if sv.overlap_mode in [OverlapMode.CONTAINED, OverlapMode.PARTIAL]:
             # Where to start checking the ROIs, prevent the bias of checking the first ROIs over and over

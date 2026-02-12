@@ -46,6 +46,7 @@ class VariantSet(ABC):
         self.vset_config = copy.deepcopy(vset_config)
         self.config = config
         self.overlap_kinds = []
+        self.overlap_source_idx = []
         self.overlap_ranges = []
         self.header = []
         self.copies = ()
@@ -60,19 +61,26 @@ class VariantSet(ABC):
         # For SNPs and INDELs overlap
         self.overlap_sv = False
 
-        overlap_files = utils.as_list(self.vset_config.get('overlap_region_type', ['all']))
-        number_overlap_files = len(utils.as_list(config.get('overlap_regions', None)))
-        chk(len(overlap_files) == number_overlap_files,
+        overlap_region_per_files = utils.as_list(self.vset_config.get('overlap_region_type', [['all']]))
+        if not isinstance(overlap_region_per_files[0], list):
+            # If there is only one file and the input wasn't a list of lists
+            overlap_region_per_files = [overlap_region_per_files]
+
+        number_overlap_files = len(utils.as_list(config.get('overlap_regions', [None])))
+        chk((overlap_region_per_files == [['all']]) or (len(overlap_region_per_files) == number_overlap_files),
             f'overlap_region_type if specified '
             f'should be \'all\' or a list of length the number of constrain region files in '
-            f'\'overlap_regions\'. {len(overlap_files)} and '
+            f'\'overlap_regions\'. {len(overlap_region_per_files)} and '
             f'{number_overlap_files} were provided', error_type='syntax')
 
-        if overlap_files == ['all']:
-            self.overlap_kinds = [('all',)] * len(overlap_files)
+
+        if overlap_region_per_files == [['all']]:
+            self.overlap_kinds = ['all']
+            self.overlap_source_idx = [0]
         else:
-            for idx_file, overlap_file in enumerate(overlap_files):
-                self.overlap_kinds += [overlap_name + '_' + str(idx_file) for overlap_name in overlap_file]
+            for idx_file, overlap_file in enumerate(overlap_region_per_files):
+                self.overlap_kinds += [overlap_name for overlap_name in overlap_file]
+                self.overlap_source_idx += [idx_file for _ in overlap_file]
 
         if 'overlap_mode' in self.vset_config:
             chk(isinstance(self.vset_config['overlap_mode'], str) or
@@ -84,8 +92,8 @@ class VariantSet(ABC):
             except ValueError:
                 chk(False, f'Invalid overlap_mode in {vset_config}', error_type='value')
 
-        self.vset_config['overlap_region_type'] = (tuple(utils.as_list(self.vset_config['overlap_region_type']))
-                                                   if 'overlap_region_type' in self.vset_config else ('all',))
+        self.vset_config['overlap_region_type'] = (utils.as_list(self.vset_config['overlap_region_type'])
+                                                   if 'overlap_region_type' in self.vset_config else ['all'])
         if self.overlap_mode is not None and 'overlap_region_type' not in self.vset_config:
             logger.warning(f'overlap_region_type is not specified for {self} all provided ROIs will be considered')
         self.overlap_ranges = tuple(
@@ -412,30 +420,37 @@ class SimulatedVariantSet(VariantSet):
     def get_roi_filter(self):
         if self.overlap_mode is None:
             return None
-        return RegionFilter(region_kinds=self.overlap_kinds, region_length_range=self.overlap_ranges)
+        return RegionFilter(region_kinds=tuple(self.overlap_kinds),
+                            region_file_idx=tuple(self.overlap_source_idx),
+                            region_length_range=self.overlap_ranges)
 
     def get_blacklist_filter(self):
         vset_config = self.vset_config
         if 'blacklist_region_type' not in vset_config:
             return None
 
-        blacklist_types = []
         blacklist_files = utils.as_list(self.config.get('blacklist_regions', []))
-        print('blacklist_files', blacklist_files)
-        if self.vset_config['blacklist_region_type'] == 'all':
-            blacklist_types = [('all',)] * len(blacklist_files)
-        else:
-            for blacklist_type in self.vset_config['blacklist_region_type']:
-                blacklist_types.append(tuple(blacklist_type))
-        blacklist_types = tuple(blacklist_types)
+        blacklist_lists = utils.as_list(self.vset_config['blacklist_region_type'])
+        if not isinstance(blacklist_lists[0], list):
+            blacklist_lists = [blacklist_lists]
 
-        chk(len(blacklist_types) == len(blacklist_files),
+        chk(len(blacklist_lists) == len(blacklist_files),
             f'blacklist_region_type if specified '
             f'should be \'all\' or a list of length the number of blacklist region files in '
-            f'\'blacklist_regions\'. {len(blacklist_types)} and '
+            f'\'blacklist_regions\'. {len(blacklist_lists)} and '
             f'{len(blacklist_files)} were provided', error_type='syntax')
 
-        return RegionFilter(region_kinds=blacklist_types)
+        blacklist_type_list = []
+        source_file_idx = []
+        if self.vset_config['blacklist_region_type'] == ['all']:
+            blacklist_type_list = ['all']
+            source_file_idx = [0]
+        else:
+            for idx_file, blacklist_types in enumerate(blacklist_lists):
+                for blacklist_type in blacklist_types:
+                    blacklist_type_list.append(blacklist_type)
+                    source_file_idx.append(idx_file)
+        return RegionFilter(region_kinds=tuple(blacklist_type_list), region_file_idx=tuple(source_file_idx))
 
     def pick_genotype(self):
         if (self.config.get('homozygous_only', False) or (random.randint(0, 1) and not
@@ -857,8 +872,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
 
         repeat_count_change = random.randint(*self.vset_config['repeat_count_change_range'])
         info = dict(SVTYPE=self.svtype.value, TR_CHANGE=repeat_count_change, OP_TYPE=self.sv_type.value)
-        overlap_region_type = (tuple(utils.as_list(self.vset_config['overlap_region_type']))
-                               if 'overlap_region_type' in self.vset_config else 'all')
+
         anchor = BreakendRegion(0, 1)
         self.overlap_mode = OverlapMode.EXACT
 
@@ -875,7 +889,8 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
                                     op_info={'SYMBOL': 'A'})]
             # We only need the repeat motif to be present once.
             roi_filter = TandemRepeatRegionFilter(min_num_repeats=1,
-                                                  region_kinds=overlap_region_type)
+                                                  region_file_idx=self.overlap_source_idx,
+                                                  region_kinds=self.overlap_kinds)
             return TandemRepeatExpansionContractionSV(
                 sv_id=self.make_sv_id(),
                 breakend_interval_lengths=breakend_interval_lengths,
@@ -902,7 +917,8 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
 
             # ensure there are enough existing repeats to delete.
             roi_filter = TandemRepeatRegionFilter(min_num_repeats=repeat_count_change,
-                                                  region_kinds=overlap_region_type)
+                                                  region_file_idx=self.overlap_source_idx,
+                                                  region_kinds=self.overlap_kinds)
 
             return TandemRepeatExpansionContractionSV(
                 sv_id=self.make_sv_id(),
