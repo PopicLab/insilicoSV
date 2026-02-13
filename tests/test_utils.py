@@ -68,8 +68,8 @@ def test_region():
 
     assert Reg(start=0, end=5).length() == 5
 
-    assert Reg(start=5, end=10, kind='ALU') != Reg(start=5, end=10)
-    assert Reg(start=5, end=10, kind='ALU', data='3') != Reg(start=5, end=10)
+    assert Reg(start=5, end=10, region_type='ALU') != Reg(start=5, end=10)
+    assert Reg(start=5, end=10, region_type='ALU', data='3') != Reg(start=5, end=10)
 
     with pytest.raises(Exception):
         Region(chrom='', start=10, end=15)
@@ -109,11 +109,11 @@ def test_region_set():
 
     # regions with extra data
     assert Region('chrA', 8, 10) in rs1
-    rs1.add_region_set(RegionSet([Region('chrA', 8, 10, kind='L1')]))
-    assert Region('chrA', 8, 10, kind='L1') in rs1
+    rs1.add_region_set(RegionSet([Region('chrA', 8, 10, region_type='L1')]))
+    assert Region('chrA', 8, 10, region_type='L1') in rs1
     assert Region('chrA', 8, 10) in rs1
 
-    rs1.chop(Region('chrA', 9, 12, kind='ALU'))
+    rs1.chop(Region('chrA', 9, 12, region_type='ALU'))
 
     
 
@@ -163,13 +163,13 @@ def test_region_set_filtered():
     regions = create_regions()
     region_set = RegionSet(regions)
     
-    region_filter = RegionFilter(region_kinds=("L1",), region_length_range=(100, 300))
+    region_filter = RegionFilter(region_types=("L1",), region_length_range=(100, 300))
     filtered_set = region_set.filtered(region_filter)
     
     assert region_length(filtered_set)== 0  # No regions in `regions` satisfy the filter
 
     # Add a region that matches the filter
-    matching_region = Region(chrom="chr1", start=100, end=300, kind="L1")
+    matching_region = Region(chrom="chr1", start=100, end=300, region_type="L1")
     region_set.add_region(matching_region)
     
     filtered_set = region_set.filtered(region_filter)
@@ -198,13 +198,13 @@ def test_region_set_large_region_handling():
 
 def test_region_set_from_bed(tmpdir):
     bed_file = tmpdir.join("test.bed")
-    bed_file.write("chr1\t100\t200\tkind1\nchr1\t300\t400\tkind2\n")
+    bed_file.write("chr1\t100\t200\tregion_type1\nchr1\t300\t400\tregion_type2\n")
 
     region_set = RegionSet.from_bed(str(bed_file), True)
 
     assert region_length(region_set) == 2
-    assert Region(chrom="chr1", start=100, end=200, kind="kind1", orig_start=100, orig_end=200) in region_set
-    assert Region(chrom="chr1", start=300, end=400, kind="kind2", orig_start=300, orig_end=400) in region_set
+    assert Region(chrom="chr1", start=100, end=200, region_type="region_type1", orig_start=100, orig_end=200) in region_set
+    assert Region(chrom="chr1", start=300, end=400, region_type="region_type2", orig_start=300, orig_end=400) in region_set
 
 def test_region_set_from_vcf(tmpdir):
     vcf_file = tmpdir.join("test.vcf")
@@ -228,8 +228,8 @@ def test_region_set_from_fasta(tmpdir):
     
     assert region_length(region_set) == 2
 
-    assert Region(chrom="chr1", start=0, end=100, kind="genome", orig_start=0, orig_end=100) in region_set
-    assert Region(chrom="chr2", start=0, end=200, kind="genome", orig_start=0, orig_end=200) in region_set
+    assert Region(chrom="chr1", start=0, end=100, region_type="genome", orig_start=0, orig_end=100) in region_set
+    assert Region(chrom="chr2", start=0, end=200, region_type="genome", orig_start=0, orig_end=200) in region_set
 
 def test_has_duplicates():
     assert not has_duplicates([])

@@ -49,8 +49,8 @@ class StatsCollector:
             self.placed_svs += 1
             sv_type = sv.info.get('SVTYPE', 'UNKNOWN')
             self.sv_types[sv_type] += 1
-            if (sv.roi is not None) and (sv.roi.kind != '_reference_'):
-                self.region_types[sv.roi.kind] += 1
+            if (sv.roi is not None) and (sv.roi.region_type != '_reference_'):
+                self.region_types[sv.roi.region_type] += 1
             assert sv.genotype is not None
             zygosity = sv.genotype[0] and sv.genotype[1] and ((sv_type not in [VariantType.SNP]) or (
                     sv.replacement_seq[0] == sv.replacement_seq[1]))

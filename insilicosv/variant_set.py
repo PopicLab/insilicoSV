@@ -45,7 +45,7 @@ class VariantSet(ABC):
             error_type='value')
         self.vset_config = copy.deepcopy(vset_config)
         self.config = config
-        self.overlap_kinds = []
+        self.overlap_types = []
         self.overlap_source_idx = []
         self.overlap_ranges = []
         self.header = []
@@ -75,11 +75,11 @@ class VariantSet(ABC):
 
 
         if overlap_region_per_files == [['all']]:
-            self.overlap_kinds = ['all']
+            self.overlap_types = ['all']
             self.overlap_source_idx = [0]
         else:
             for idx_file, overlap_file in enumerate(overlap_region_per_files):
-                self.overlap_kinds += [overlap_name for overlap_name in overlap_file]
+                self.overlap_types += [overlap_name for overlap_name in overlap_file]
                 self.overlap_source_idx += [idx_file for _ in overlap_file]
 
         if 'overlap_mode' in self.vset_config:
@@ -420,7 +420,7 @@ class SimulatedVariantSet(VariantSet):
     def get_roi_filter(self):
         if self.overlap_mode is None:
             return None
-        return RegionFilter(region_kinds=tuple(self.overlap_kinds),
+        return RegionFilter(region_types=tuple(self.overlap_types),
                             region_file_idx=tuple(self.overlap_source_idx),
                             region_length_range=self.overlap_ranges)
 
@@ -450,7 +450,7 @@ class SimulatedVariantSet(VariantSet):
                 for blacklist_type in blacklist_types:
                     blacklist_type_list.append(blacklist_type)
                     source_file_idx.append(idx_file)
-        return RegionFilter(region_kinds=tuple(blacklist_type_list), region_file_idx=tuple(source_file_idx))
+        return RegionFilter(region_types=tuple(blacklist_type_list), region_file_idx=tuple(source_file_idx))
 
     def pick_genotype(self):
         if (self.config.get('homozygous_only', False) or (random.randint(0, 1) and not
@@ -890,7 +890,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
             # We only need the repeat motif to be present once.
             roi_filter = TandemRepeatRegionFilter(min_num_repeats=1,
                                                   region_file_idx=self.overlap_source_idx,
-                                                  region_kinds=self.overlap_kinds)
+                                                  region_types=self.overlap_types)
             return TandemRepeatExpansionContractionSV(
                 sv_id=self.make_sv_id(),
                 breakend_interval_lengths=breakend_interval_lengths,
@@ -918,7 +918,7 @@ class TandemRepeatVariantSet(SimulatedVariantSet):
             # ensure there are enough existing repeats to delete.
             roi_filter = TandemRepeatRegionFilter(min_num_repeats=repeat_count_change,
                                                   region_file_idx=self.overlap_source_idx,
-                                                  region_kinds=self.overlap_kinds)
+                                                  region_types=self.overlap_types)
 
             return TandemRepeatExpansionContractionSV(
                 sv_id=self.make_sv_id(),
@@ -1341,7 +1341,7 @@ def make_variant_set_from_config(vset_config, config) -> list[SV]:  # type: igno
     for variant_set_class in VARIANT_SET_CLASSES:
         if variant_set_class.can_make_from(vset_config):
             variant_set = variant_set_class(vset_config, config)
-            return variant_set.make_variant_set(), variant_set.overlap_ranges, variant_set.overlap_kinds, variant_set.overlap_mode, variant_set.header
+            return variant_set.make_variant_set(), variant_set.overlap_ranges, variant_set.overlap_types, variant_set.overlap_mode, variant_set.header
     chk(False, f"The format of the config or the sv_type is not supported {vset_config}")
 
 

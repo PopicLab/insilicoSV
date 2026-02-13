@@ -79,7 +79,7 @@ class SVSimulator:
             np.random.seed(random_seed)
         # Variables used to prefilter ROIs according to the constraints of each category of SV
         self.overlap_ranges = {}
-        self.overlap_kinds = {}
+        self.overlap_types = {}
         self.overlap_modes = {}
         self.num_svs = {}
         self.rois_overlap = {}
@@ -138,7 +138,7 @@ class SVSimulator:
     def load_rois(self):
         self.reference_regions = RegionSet.from_fasta(self.config['reference'],
                                                       self.config.get('filter_small_chr', FILTER_SMALL_CHR),
-                                                      region_kind='_reference_',
+                                                      region_region_type='_reference_',
                                                       allow_hap_overlap=self.allow_hap_overlap)
         if self.has_overlap_sv:
             self.reference_sv_overlap_regions = copy.deepcopy(self.reference_regions)
@@ -172,10 +172,10 @@ class SVSimulator:
                     if (self.overlap_modes[sv_category] in [OverlapMode.CONTAINING, OverlapMode.EXACT] and
                             roi.length() > if_not_none(self.overlap_ranges[sv_category][1], roi.length() + 1)):
                         continue
-                    if not roi.kind in self.overlap_kinds[sv_category] and not 'all' in self.overlap_kinds[sv_category]:
+                    if not roi.region_type in self.overlap_types[sv_category] and not 'all' in self.overlap_types[sv_category]:
                         found = False
-                        for kind in self.overlap_kinds[sv_category]:
-                            if kind in roi.kind:
+                        for region_type in self.overlap_types[sv_category]:
+                            if region_type in roi.region_type:
                                 found = True
                                 break
                         if not found: continue
@@ -186,14 +186,14 @@ class SVSimulator:
             for sv_idx, sv_category in enumerate(self.overlap_ranges):
                 if self.overlap_modes[sv_idx] not in [OverlapMode.TERMINAL, OverlapMode.CHROM]: continue
                 for chrom, chrom_length in self.chrom_lengths.items():
-                    self.rois_overlap[sv_category].append(Region(chrom=chrom, start=0, end=chrom_length, kind='chr',
+                    self.rois_overlap[sv_category].append(Region(chrom=chrom, start=0, end=chrom_length, region_type='chr',
                                                                  orig_start=0, orig_end=chrom_length))
             for sv_category in self.rois_overlap:
                 # Check if there is enough ROIs to fit all the SVs of one category independently
                 error_message_num_rois = ("Only {} ROIs satisfying the constraints "
                                           "(overlap mode: {}, type of ROIs: {}, overlap range: {}) of the variant_set {} containing {} SVs").format(
                     len(self.rois_overlap[sv_category]), self.overlap_modes[sv_category],
-                    self.overlap_kinds[sv_category],
+                    self.overlap_types[sv_category],
                     self.overlap_ranges[sv_category], sv_category, self.num_svs[sv_category])
 
                 hap_overlap_mult = 2 if self.allow_hap_overlap else 1
@@ -231,11 +231,11 @@ class SVSimulator:
         logger.info('Constructing SVs from {} categories'.format(len(self.config['variant_sets'])))
         for vset_num, variant_set_config in enumerate(self.config['variant_sets']):
             variant_set_config['VSET'] = vset_num
-            vset_svs, ranges, kinds, mode, header = make_variant_set_from_config(variant_set_config, self.config)
+            vset_svs, ranges, region_types, mode, header = make_variant_set_from_config(variant_set_config, self.config)
             for sv in vset_svs:
                 sv.info['VSET'] = vset_num
             self.overlap_ranges[vset_num] = ranges
-            self.overlap_kinds[vset_num] = kinds
+            self.overlap_types[vset_num] = region_types
             self.overlap_modes[vset_num] = mode
             self.svs.extend(vset_svs)
 
@@ -731,7 +731,7 @@ class SVSimulator:
                 if breakend + shift in placement_dict:
                     # If we have an anchor so we do not move its breakend.
                     locus = placement_dict[breakend + shift]
-                    roi = Region(chrom=locus.chrom, start=locus.pos, end=locus.pos, kind=roi.kind, motif=roi.motif)
+                    roi = Region(chrom=locus.chrom, start=locus.pos, end=locus.pos, region_type=roi.region_type, motif=roi.motif)
                     continue
 
                 distance = lengths[pos]
@@ -776,7 +776,7 @@ class SVSimulator:
                             left_bound = 0 if backward else (roi.end + bound)
                             right_bound = (roi.start - bound) if backward else self.chrom_lengths[roi.chrom]
                         if left_bound > right_bound: return None
-                        containing_region = Region(chrom=roi.chrom, start=left_bound, end=right_bound, kind=roi.kind, motif=roi.motif)
+                        containing_region = Region(chrom=roi.chrom, start=left_bound, end=right_bound, region_type=roi.region_type, motif=roi.motif)
 
                     roi, ref_roi = self.get_breakend(reference_regions=self.reference_regions,
                                                      avoid_chrom=avoid_chrom,

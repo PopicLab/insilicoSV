@@ -201,7 +201,7 @@ There are several ways to define the relationship between an SV and a region of 
 determined by the ROI, so `[null, null]` must be used for the corresponding range in `length_ranges`.
 * **`"partial"`**: The constrained breakends of the SV must overlap with one of the boundaries of a selected ROI.
 * **`"containing"`**: The constrained breakends of the SV must completely contain a selected ROI.
-* **`"contained"`**: The constrained breakends of the SV must be completely contained within a same selected ROI.
+* **`"contained"`**: The constrained breakends of the SV must be completely contained within the same selected ROI.
 * **`"terminal"`**: The constrained breakends of the SV is placed at the extremity of a chromosome arm.
 * **`"whole-chromosome"`**: The SV spans an entire chromosome. This mode is only compatible with **Deletions (DEL)** and **Duplications (DUP)**. 
 For Duplications, setting `n_copies` to `1` (or not specifying it) creates a single additional chromosome copy (trisomy).

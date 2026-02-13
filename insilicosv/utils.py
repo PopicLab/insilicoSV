@@ -123,7 +123,7 @@ class Region:
     # ROIs or pieces of ROIs:
 
     # region type (e.g. L1, Alu, etc)
-    kind: str = ''
+    region_type: str = ''
 
     # additional per-region data, such as repeat unit info for tandem repeats
     data: int = 0
@@ -163,16 +163,16 @@ class Region:
 
 @dataclass(frozen=True)
 class RegionFilter:
-    region_kinds: Optional[tuple[str, ...]] = None
+    region_types: Optional[tuple[str, ...]] = None
     region_file_idx: Optional[tuple[int, ...]] = None
     region_length_range: tuple[Optional[int], Optional[int]] = (None, None)
 
     def satisfied_for(self, region) -> bool:
-        if self.region_kinds is None: return True
-        if (not region.kind or
-                 not any((region_kinds.upper() == 'ALL' and region.kind != '_reference_') or
-                         ((region_kinds in region.kind or region_kinds=='all') and file_idx == region.source_file_idx)
-                         for region_kinds, file_idx in zip(self.region_kinds, self.region_file_idx))):
+        if self.region_types is None: return True
+        if (not region.region_type or
+                 not any((region_types.upper() == 'ALL' and region.region_type != '_reference_') or
+                         ((region_types in region.region_type or region_types=='all') and file_idx == region.source_file_idx)
+                         for region_types, file_idx in zip(self.region_types, self.region_file_idx))):
             return False
         return True
 
@@ -270,7 +270,7 @@ class RegionSet:
                 chk(len(fields) >= 3,
                     f'{loc}: too few fields in line in the BED file {bed_path}', error_type='value')
                 chrom, start_str, end_str = fields[:3]
-                kind = fields[3] if len(fields) > 3 else 'NA'
+                region_type = fields[3] if len(fields) > 3 else 'NA'
                 chk(all((chrom, start_str, end_str)),
                     f'{loc}: empty value in first three columns in the BED file {bed_path}', error_type='value')
                 try:
@@ -285,7 +285,7 @@ class RegionSet:
                 motif = fields[4] if len(fields) >= 5 else ''
                 data = len(motif)
                 regions.append(Region(chrom=chrom, start=start,
-                                      end=end, kind=kind, source_file_idx=file_idx, data=data,
+                                      end=end, region_type=region_type, source_file_idx=file_idx, data=data,
                                       motif=motif, orig_start=start, orig_end=end))
         return regions
 
@@ -295,11 +295,11 @@ class RegionSet:
         with closing(pysam.VariantFile(vcf_path)) as vcf_file:
             for vcf_rec in vcf_file.fetch():
                 vcf_info = dict(vcf_rec.info)
-                kind = 'NA'
+                region_type = 'NA'
                 if 'REGION_TYPE' in vcf_info:
-                    kind = vcf_info['REGION_TYPE']
+                    region_type = vcf_info['REGION_TYPE']
                 regions.append(Region(chrom=vcf_rec.chrom, start=vcf_rec.start, end=vcf_rec.stop,
-                                      orig_start=vcf_rec.start, orig_end=vcf_rec.stop, kind=kind,
+                                      orig_start=vcf_rec.start, orig_end=vcf_rec.stop, region_type=region_type,
                                       source_file_idx=file_idx))
                 data = 0
                 motif = ''
@@ -312,18 +312,18 @@ class RegionSet:
                     target_start = vcf_info['TARGET'] - 1
                     regions.append(Region(chrom=target_chrom, start=target_start, end=target_start,
                                           data=data, motif=motif, source_file_idx=file_idx,
-                                          orig_start=target_start, orig_end=target_start, kind=kind))
+                                          orig_start=target_start, orig_end=target_start, region_type=region_type))
 
         return regions
 
     @staticmethod
-    def from_fasta(fasta_path, filter_small_chr, region_kind, allow_hap_overlap):
+    def from_fasta(fasta_path, filter_small_chr, region_region_type, allow_hap_overlap):
         with pysam.FastaFile(fasta_path) as fasta_file:
             regions = []
             for chrom, chrom_length in zip(fasta_file.references, fasta_file.lengths):
                 if chrom_length < filter_small_chr: continue
                 regions.append(Region(chrom=chrom, start=0, end=chrom_length,
-                                      kind=region_kind,
+                                      region_type=region_region_type,
                                       orig_start=0, orig_end=chrom_length))
             return RegionSet(regions, allow_hap_overlap=allow_hap_overlap)
 
