@@ -164,7 +164,8 @@ so none of the three DELs breakpoints will fall within any region listed in blac
 * If blacklist_regions is provided in BED format, an optional fourth column (type) can be used to categorize 
 regions and filter them per variant set.
 * If blacklist_regions is provided in VCF format, the REGION_TYPE INFO field can be used instead. 
-If this field is missing, the default region type will be DEFAULT. Only the CHROM, POS, and END fields are considered from each record.
+* When providing multiple VCF or BED files, blacklist_region_type must be set to "all" or a list of lists 
+where each sub-list specifies the region names (or "all") to blacklist for its corresponding file.
 
 In the example, insertions have no blacklist_region_type specified, so they will be placed randomly without regard to blacklist regions.
 
@@ -223,11 +224,13 @@ or by length using `overlap_region_length_range`.
 This can affect placements in telomeres (`overlap_mode: terminal`). You can adjust this threshold using the global parameter `th_proportion_N`.
 * **Intrachromosomal Constraint**: If a dispersion is part of an anchor, it will be forced to be intrachromosomal, even if the overall SV is marked as interchromosomal.
 The potential remaining dispersions will be interchromosomal.
-* **BED Format**: Multiple BED files (provided as a list of paths) can be given as input and their records will be combined and drawn 
-from during SV placement. Each file is required to have the first four columns of standard BED records 
-(chrom, chromStart, chromEnd, name).  Files specifying known Tandem Repeat regions for expansion/contraction 
-need to have a fifth column specifying the motif of each repeat region.
+* **Input Format**: Multiple BED and/or VCF files (provided as a list of paths) can be combined for SV placement. 
+BED files must include the standard coordinates (chrom, start, end) with an optional name column. 
+VCF files require standard fields with an optional REGION_TYPE in the INFO field. 
+**Note that for Tandem Repeat Regions, the repeat motif must be explicitly provided—via a fifth column in BED files or a MOTIF INFO field in VCF files.**
 * **Output VCF**: The final VCF file will include an `OVLP` field in the `INFO` column for each SV placed within a specified region, indicating the name of the region.
+* When providing multiple VCF or BED files, overlap_region_type must be set to "all" or a list of lists 
+where each sub-list specifies the region names (or "all") to overlap for its corresponding file.
 
 #### Example YAML configuration
 

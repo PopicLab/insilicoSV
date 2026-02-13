@@ -169,10 +169,9 @@ class RegionFilter:
 
     def satisfied_for(self, region) -> bool:
         if self.region_kinds is None: return True
-
         if (not region.kind or
                  not any((region_kinds.upper() == 'ALL' and region.kind != '_reference_') or
-                         (region_kinds in region.kind and file_idx == region.source_file_idx)
+                         ((region_kinds in region.kind or region_kinds=='all') and file_idx == region.source_file_idx)
                          for region_kinds, file_idx in zip(self.region_kinds, self.region_file_idx))):
             return False
         return True
@@ -304,8 +303,8 @@ class RegionSet:
                                       source_file_idx=file_idx))
                 data = 0
                 motif = ''
-                if 'motif' in vcf_info:
-                    motif = vcf_info['motif']
+                if 'MOTIF' in vcf_info:
+                    motif = vcf_info['MOTIF']
                     data = len(motif)
 
                 if 'TARGET' in vcf_info and isinstance(vcf_info['TARGET'], int):

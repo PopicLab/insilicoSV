@@ -33,20 +33,26 @@ For Custom types, the length ranges are in order of appearance of the letters an
 
 4. *overlap_mode [optional]*: str - enforce the SV to overlap a region defined in the files provided in `overlap_regions`. Must be `partial`, `contained`, `containing`, `exact`, `terminal` or `whole-chromosome` (see [example config](use_cases.md#example-5---placing-svs-into-specific-regions-of-interest-rois)).
 
-5. *overlap_region_type [optional]*: list of str - only if an overlap mode is specified. Characterizes the regions to overlap, the name of the region has to contain one of the strings of the list. 
+5. *overlap_region_type [optional]*: list of str - only if an overlap mode is specified. Characterizes the regions to overlap, the name of the region has to contain one of the strings of the list.
 
-6. *interchromosomal: False [for SVs containing dispersions]*: Enable interchromosomal SVs. If True, each dispersion in the SV will be 
+6. *overlap_region_length_range [optional]*: A list specifying the minimum and maximum required overlap between an SV and a region to overlap; either boundary can be left unconstrained using None.
+The default is [None, None].
+
+7. *interchromosomal: False [for SVs containing dispersions]*: Enable interchromosomal SVs. If True, each dispersion in the SV will be 
 between two different chromosomes. All dispersions must be unbounded i.e. the dispersion range must be [null, null].
-7. *interchromosomal_period: 0*: A value of `interchromosomal_period: 0` means each dispersion jumps to a different, randomly selected chromosome, while a value greater than 0 creates a cycle where the SV returns to the same set of chromosomes every `interchromosomal_period` dispersions.
-8. *n_copies: [] [for SVs containing '+' grammar notation]*: specifies the number of copies for each sequence affected by a '+' in order of appearance in the grammar.
+
+8. *interchromosomal_period: 0*: A value of `interchromosomal_period: 0` means each dispersion jumps to a different, randomly selected chromosome, while a value greater than 0 creates a cycle where the SV returns to the same set of chromosomes every `interchromosomal_period` dispersions.
+
+9. *n_copies: [] [for SVs containing '+' grammar notation]*: specifies the number of copies for each sequence affected by a '+' in order of appearance in the grammar.
 Each element of the list can be a positive number or a range of positive numbers. If a range is provided, a random number of copies included in the range will be used.
 The default number of copies for a DUP is [1] and does not need to be specified.
-9. *n_copiesB: [] [for mCNV]*: specifies number of copies on the second haplotype for mCNVs. It allows to have distinct copy numbers on each haplotype.
+
+10. *n_copiesB: [] [for mCNV]*: specifies number of copies on the second haplotype for mCNVs. It allows to have distinct copy numbers on each haplotype.
 If not specified, n_copies will be used.
 
 For tandem repeat variants, the following parameters is needed:
 
-10. *repeat_count_change_range*: the range from which to sample the number of repeats added (trEXP) or removed (trEXP).
+11. *repeat_count_change_range*: the range from which to sample the number of repeats added (trEXP) or removed (trEXP).
 
 For trEXP and trCON variants, a BED file of existing repeats must be specified in the 
 *overlap_regions* global setting, and *overlap_region_type* for the existing repeat regions must
@@ -54,13 +60,13 @@ be specified in the variant set. The BED file columns must contain in order the 
 
 SNPs and INDELs can be placed within SVs using the parameter:
 
-11. *allow_sv_overlap [optional]*: bool - set to `True` to allow this variant set to be overlapped by SVs (default: False). Setting it to True
+12. *allow_sv_overlap [optional]*: bool - set to `True` to allow this variant set to be overlapped by SVs (default: False). Setting it to True
 for variants other than SNPs and INDELs will raise an error.
 
 The following parameters can be set on the top level of the config file and provide higher-order controls over SV placement:
 1. *reference*: str - path to input reference used as template for simulation.
 2. *blacklist_regions*: list[str] - list of paths to BED or VCF files containing intervals to be ignored during SV placement (see [example config](use_cases#example-4---marking-banned-intervals-of-the-genome)).
-3. *overlap_regions*: list[str] - list of paths to BED files containing genome elements to be used for overlapping SV placement (see [example config](use_cases#example-5---placing-svs-at-known-repetitive-element-intervals)).
+3. *overlap_regions*: list[str] - list of paths to BED or VCF files containing genome elements to be used for overlapping SV placement (see [example config](use_cases#example-5---placing-svs-at-known-repetitive-element-intervals)).
 4. *max_tries: 100 [optional]*: int - number of tries to find a valid position to simulate each SV.
 5. *max_random_breakend_tries: 100 [optional]*: int - number of tries to find a breakend by taking a random position in the genome before checking available regions.
 6. *homozygous_only: False [optional]*: bool - if set to True, make all simulated variants homozygous

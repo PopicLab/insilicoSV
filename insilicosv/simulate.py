@@ -164,8 +164,8 @@ class SVSimulator:
                 if not roi.chrom in self.reference_regions.chrom2itree:
                     n_removed_rois += 1
                     continue
-                added_roi = False
 
+                added_roi = False
                 for sv_idx, sv_category in enumerate(self.overlap_ranges):
                     if self.overlap_modes[sv_idx] in [None, OverlapMode.TERMINAL, OverlapMode.CHROM]: continue
                     if roi.length() < if_not_none(self.overlap_ranges[sv_category][0], 0): continue
@@ -198,7 +198,7 @@ class SVSimulator:
 
                 hap_overlap_mult = 2 if self.allow_hap_overlap else 1
                 if self.overlap_modes[sv_category] in [OverlapMode.CONTAINING, OverlapMode.EXACT]:
-                    # We have one containing and exact overlap per ROI and haplotype
+                    # We have one containing or exact overlap per ROI and haplotype
                     chk(self.num_svs[sv_category] <= hap_overlap_mult * len(self.rois_overlap[sv_category]),
                         error_message_num_rois)
                 elif self.overlap_modes[sv_category] == OverlapMode.PARTIAL:

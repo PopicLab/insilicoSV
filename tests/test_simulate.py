@@ -144,6 +144,7 @@ class TestSVSimulator(unittest.TestCase):
         self.test_overlap_bed_13 = "tests/inputs/example_overlap_events_13.bed"
         self.test_overlap_bed_14 = "tests/inputs/example_overlap_events_14.bed"
         self.test_overlap_bed_15 = "tests/inputs/example_overlap_events_15.bed"
+        self.test_overlap_vcf = "tests/inputs/example_overlap.vcf"
         self.motif = "tests/inputs/motif.bed"
 
         self.import_del = "tests/inputs/import_del.vcf"
@@ -2117,6 +2118,84 @@ class TestSVSimulator(unittest.TestCase):
              ["TCGTCGTCGTCGCGG", 'TCGTCGCGCGCGG']],
         ]
 
+        self.test_multiple_ov_blck_file_data = [
+            ["TCGATCGATCGATCGA",
+             TestObject([self.ref_file, {"chr21": "TCGATCGATCGATCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    'overlap_regions': [self.test_overlap_vcf, self.test_overlap_bed_2],
+                                    "variant_sets": [{"type": "DEL",
+                                                      "number": 1,
+                                                      "overlap_mode": "contained",
+                                                      "overlap_region_type": [["all"], ['Alu']],
+                                                      "length_ranges": [[4, 4]]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TCGATCGATCGA", 'TCGATCGATCGA', 'TCGATCGATCGA']],
+            ["TCGATCGATCGATCGA",
+             TestObject([self.ref_file, {"chr21": "TCGATCGATCGATCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    'overlap_regions': [self.test_overlap_vcf, self.test_overlap_bed_2],
+                                    "variant_sets": [{"type": "DEL",
+                                                      "number": 1,
+                                                      "overlap_mode": "exact",
+                                                      "overlap_region_length_range": [None, 1],
+                                                      "overlap_region_type": [["all"], ['Alu']],
+                                                      "length_ranges": [[None, None]]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TGATCGATCGATCGA"]],
+            ["TCGATCGATCGATCGA",
+             TestObject([self.ref_file, {"chr21": "TCGATCGATCGATCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    'overlap_regions': [self.test_overlap_vcf, self.test_overlap_bed_2],
+                                    "variant_sets": [{"type": "DEL",
+                                                      "number": 1,
+                                                      "overlap_mode": "contained",
+                                                      "overlap_region_type": [["TEST2"], ['Alu']],
+                                                      "length_ranges": [[3, 3]]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TCGATCCGATCGA", 'TCGATCGGATCGA', 'TCGATCGAATCGA', 'TCGATCGATTCGA']],
+            ["TCGATCGATCGATCGA",
+             TestObject([self.ref_file, {"chr21": "TCGATCGATCGATCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    'overlap_regions': [self.test_overlap_vcf, self.test_overlap_bed_2],
+                                    "variant_sets": [{"type": "DEL",
+                                                      "number": 1,
+                                                      "overlap_mode": "exact",
+                                                      "overlap_region_type": [["TEST", "TEST2"], ['Alu', 'L1']],
+                                                      "length_ranges": [[None, None]]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["TGATCGATCGATCGA", 'TCGCGATCGATCGA', 'TCGATCTCGA', 'TCGATCGATCGATA']],
+            ["TCGATCGATCGATCGA",
+             TestObject([self.ref_file, {"chr21": "TCGATCGATCGATCGA"}],
+                        [self.par, {"reference": self.ref_file,
+                                    "random_seed": 2,
+                                    'min_intersv_dist': 0,
+                                    'homozygous_only': True,
+                                    'blacklist_regions': [self.test_overlap_vcf, self.test_overlap_bed_2],
+                                    "variant_sets": [{"type": "DEL",
+                                                      "number": 1,
+                                                      "blacklist_region_type": [["TEST", "TEST2"], ['Alu', 'L1']],
+                                                      "length_ranges": [[3, 3]]}
+                                                     ]}],
+                        self.hap1, self.hap2, self.bed),
+             ["ATCGATCGATCGA", "TCGATCGATCGAT", "TCCGATCGATCGA", "TCGATCGATCGAA", "TCGGATCGATCGA"]],
+        ]
+
     def tearDown(self):
         try:
             shutil.rmtree(self.test_dir)
@@ -2498,6 +2577,9 @@ class TestSVSimulator(unittest.TestCase):
 
     def test_small_chr_filter(self):
         self.run_test(self.test_small_chr_filter)
+
+    def test_multiple_ov_blck_files(self):
+        self.run_test(self.test_multiple_ov_blck_file_data)
 
     def run_test(self, data, div_check=False, allow_fail=False):
         for test_num, (ref, vs_config, expected_outputs) in enumerate(data):
