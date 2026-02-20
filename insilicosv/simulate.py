@@ -13,12 +13,10 @@ import shutil
 import time
 from typing_extensions import Any
 import numpy as np
-from intervaltree import Interval, IntervalTree
+from intervaltree import Interval
 from pysam import FastaFile
 import yaml
 import copy
-from collections import defaultdict
-from math import floor
 
 from insilicosv import utils, __version__
 from insilicosv.utils import (
@@ -81,7 +79,7 @@ class SVSimulator:
             np.random.seed(random_seed)
         # Variables used to prefilter ROIs according to the constraints of each category of SV
         self.overlap_ranges = {}
-        self.overlap_kinds = {}
+        self.overlap_types = {}
         self.overlap_modes = {}
         self.num_svs = {}
         self.rois_overlap = {}
@@ -140,14 +138,14 @@ class SVSimulator:
     def load_rois(self):
         self.reference_regions = RegionSet.from_fasta(self.config['reference'],
                                                       self.config.get('filter_small_chr', FILTER_SMALL_CHR),
-                                                      region_kind='_reference_',
+                                                      region_region_type='_reference_',
                                                       allow_hap_overlap=self.allow_hap_overlap)
         if self.has_overlap_sv:
             self.reference_sv_overlap_regions = copy.deepcopy(self.reference_regions)
         # Get the ROIs for overlap constraints
         if any(mode is not None for mode in self.overlap_modes.values()):
-            rois_overlap = RegionSet.from_beds(utils.as_list(self.config.get('overlap_regions', [])),
-                                               to_region_set=False)
+            rois_overlap = RegionSet.from_files(utils.as_list(self.config.get('overlap_regions', [])),
+                                                'overlap')
             min_bounds = [min_bound for min_bound, _ in self.overlap_ranges.values()]
             global_min_bound = 0
             logger.info(
@@ -155,6 +153,7 @@ class SVSimulator:
             if None not in min_bounds:
                 global_min_bound = min(min_bounds)
                 rois_overlap = sorted(rois_overlap, key=lambda x: x.length(), reverse=True)
+
             # Get the reference regions
             n_removed_rois = 0
             for roi_index, roi in enumerate(rois_overlap):
@@ -165,6 +164,7 @@ class SVSimulator:
                 if not roi.chrom in self.reference_regions.chrom2itree:
                     n_removed_rois += 1
                     continue
+
                 added_roi = False
                 for sv_idx, sv_category in enumerate(self.overlap_ranges):
                     if self.overlap_modes[sv_idx] in [None, OverlapMode.TERMINAL, OverlapMode.CHROM]: continue
@@ -172,10 +172,10 @@ class SVSimulator:
                     if (self.overlap_modes[sv_category] in [OverlapMode.CONTAINING, OverlapMode.EXACT] and
                             roi.length() > if_not_none(self.overlap_ranges[sv_category][1], roi.length() + 1)):
                         continue
-                    if not roi.kind in self.overlap_kinds[sv_category] and not 'all' in self.overlap_kinds[sv_category]:
+                    if not roi.region_type in self.overlap_types[sv_category] and not 'all' in self.overlap_types[sv_category]:
                         found = False
-                        for kind in self.overlap_kinds[sv_category]:
-                            if kind in roi.kind:
+                        for region_type in self.overlap_types[sv_category]:
+                            if region_type in roi.region_type:
                                 found = True
                                 break
                         if not found: continue
@@ -186,20 +186,19 @@ class SVSimulator:
             for sv_idx, sv_category in enumerate(self.overlap_ranges):
                 if self.overlap_modes[sv_idx] not in [OverlapMode.TERMINAL, OverlapMode.CHROM]: continue
                 for chrom, chrom_length in self.chrom_lengths.items():
-                    self.rois_overlap[sv_category].append(Region(chrom=chrom, start=0, end=chrom_length, kind='chr',
+                    self.rois_overlap[sv_category].append(Region(chrom=chrom, start=0, end=chrom_length, region_type='chr',
                                                                  orig_start=0, orig_end=chrom_length))
-
             for sv_category in self.rois_overlap:
                 # Check if there is enough ROIs to fit all the SVs of one category independently
                 error_message_num_rois = ("Only {} ROIs satisfying the constraints "
                                           "(overlap mode: {}, type of ROIs: {}, overlap range: {}) of the variant_set {} containing {} SVs").format(
                     len(self.rois_overlap[sv_category]), self.overlap_modes[sv_category],
-                    self.overlap_kinds[sv_category],
+                    self.overlap_types[sv_category],
                     self.overlap_ranges[sv_category], sv_category, self.num_svs[sv_category])
 
                 hap_overlap_mult = 2 if self.allow_hap_overlap else 1
                 if self.overlap_modes[sv_category] in [OverlapMode.CONTAINING, OverlapMode.EXACT]:
-                    # We have one containing and exact overlap per ROI and haplotype
+                    # We have one containing or exact overlap per ROI and haplotype
                     chk(self.num_svs[sv_category] <= hap_overlap_mult * len(self.rois_overlap[sv_category]),
                         error_message_num_rois)
                 elif self.overlap_modes[sv_category] == OverlapMode.PARTIAL:
@@ -217,17 +216,9 @@ class SVSimulator:
                 # Shuffle the ROIs so the selection is not biased on their positions in the input bed file
                 random.shuffle(self.rois_overlap[sv_category])
             logger.info(f'{n_removed_rois} ROIs filtered')
-        self.blacklist_regions = RegionSet()
-        for blacklist_region_file in utils.as_list(self.config.get('blacklist_regions', [])):
-            logger.info(f'Processing blacklist region file {blacklist_region_file}')
-            if blacklist_region_file.lower().endswith('.bed'):
-                self.blacklist_regions.add_region_set(RegionSet.from_beds([blacklist_region_file], to_region_set=True))
-            elif blacklist_region_file.lower().endswith('.vcf'):
-                self.blacklist_regions.add_region_set(RegionSet.from_vcf(blacklist_region_file))
-            else:
-                chk(f'Cannot import blacklist regions from {blacklist_region_file}: '
-                    f'unsupported file type, please provide a .bed or .vcf file', error_type='type')
-            logger.info(f'Blacklist region file {blacklist_region_file} processed.')
+
+        self.blacklist_regions = RegionSet(RegionSet.from_files(utils.as_list(self.config.get('blacklist_regions', [])),
+                                                                'blacklist'))
 
     def run(self):
         self.construct_svs()
@@ -240,11 +231,11 @@ class SVSimulator:
         logger.info('Constructing SVs from {} categories'.format(len(self.config['variant_sets'])))
         for vset_num, variant_set_config in enumerate(self.config['variant_sets']):
             variant_set_config['VSET'] = vset_num
-            vset_svs, ranges, kinds, mode, header = make_variant_set_from_config(variant_set_config, self.config)
+            vset_svs, ranges, region_types, mode, header = make_variant_set_from_config(variant_set_config, self.config)
             for sv in vset_svs:
                 sv.info['VSET'] = vset_num
             self.overlap_ranges[vset_num] = ranges
-            self.overlap_kinds[vset_num] = kinds
+            self.overlap_types[vset_num] = region_types
             self.overlap_modes[vset_num] = mode
             self.svs.extend(vset_svs)
 
@@ -485,7 +476,7 @@ class SVSimulator:
 
             invalid = False
             if blacklist_regions and roi.data.chrom in blacklist_regions.chrom2itree:
-                invalid = blacklist_regions.strictly_contains_point(breakend, roi.chrom)
+                invalid = blacklist_regions.strictly_contains_point(breakend, roi.data.chrom)
 
             if sv_regions:
                 overlaps = sv_regions.chrom2itree[roi.data.chrom][0].overlap(breakend, breakend + roi_length)
@@ -506,6 +497,7 @@ class SVSimulator:
                            overlap_mode=None, roi_filter=None):
         # The region is constrained we use the interval tree defined from the bed file
         roi_list = self.rois_overlap[sv_category]
+
         # Add the beginning of the ROIs list at the end of the list of ROIs to check to ensure all are checked in case we run out.
         for region in (roi_list[roi_index:] + roi_list[:init_roi]):
             roi_index = (roi_index + 1) % len(roi_list)
@@ -739,7 +731,7 @@ class SVSimulator:
                 if breakend + shift in placement_dict:
                     # If we have an anchor so we do not move its breakend.
                     locus = placement_dict[breakend + shift]
-                    roi = Region(chrom=locus.chrom, start=locus.pos, end=locus.pos, kind=roi.kind, motif=roi.motif)
+                    roi = Region(chrom=locus.chrom, start=locus.pos, end=locus.pos, region_type=roi.region_type, motif=roi.motif)
                     continue
 
                 distance = lengths[pos]
@@ -784,7 +776,7 @@ class SVSimulator:
                             left_bound = 0 if backward else (roi.end + bound)
                             right_bound = (roi.start - bound) if backward else self.chrom_lengths[roi.chrom]
                         if left_bound > right_bound: return None
-                        containing_region = Region(chrom=roi.chrom, start=left_bound, end=right_bound, kind=roi.kind, motif=roi.motif)
+                        containing_region = Region(chrom=roi.chrom, start=left_bound, end=right_bound, region_type=roi.region_type, motif=roi.motif)
 
                     roi, ref_roi = self.get_breakend(reference_regions=self.reference_regions,
                                                      avoid_chrom=avoid_chrom,
@@ -836,9 +828,11 @@ class SVSimulator:
         max_tries = self.config.get("max_tries", DEFAULT_MAX_TRIES)
         blacklist_regions = self.get_relevant_blacklist_regions(sv.blacklist_filter)
         sv_set = sv.info['VSET']
+
         hap_id = 0
         if self.allow_hap_overlap:
             hap_id = 2 if sv.genotype[0] and sv.genotype[1] else sv.genotype[1]
+
         init_roi = 0
         if sv.overlap_mode in [OverlapMode.CONTAINED, OverlapMode.PARTIAL]:
             # Where to start checking the ROIs, prevent the bias of checking the first ROIs over and over

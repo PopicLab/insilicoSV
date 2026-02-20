@@ -123,11 +123,13 @@ class Region:
     # ROIs or pieces of ROIs:
 
     # region type (e.g. L1, Alu, etc)
-    kind: str = ''
+    region_type: str = ''
 
     # additional per-region data, such as repeat unit info for tandem repeats
-    data: str = 0
+    data: int = 0
     motif: str = ''
+    # Idx of the source file the region is coming from form overlapping and blacklist
+    source_file_idx: int = 0
 
     # if this region is derived from an ROI, start/end of the original ROI
     orig_start: int = -1
@@ -161,15 +163,16 @@ class Region:
 
 @dataclass(frozen=True)
 class RegionFilter:
-    region_kinds: Optional[tuple[str, ...]] = None
+    region_types: Optional[tuple[str, ...]] = None
+    region_file_idx: Optional[tuple[int, ...]] = None
     region_length_range: tuple[Optional[int], Optional[int]] = (None, None)
 
     def satisfied_for(self, region) -> bool:
-        if (self.region_kinds is not None and
-                (not region.kind or
-                 not any((region_kinds.upper() == 'ALL' and region.kind != '_reference_') or
-                         region_kinds in region.kind
-                         for region_kinds in self.region_kinds))):
+        if self.region_types is None: return True
+        if (not region.region_type or
+                 not any((region_types.upper() == 'ALL' and region.region_type != '_reference_') or
+                         ((region_types in region.region_type or region_types=='all') and file_idx == region.source_file_idx)
+                         for region_types, file_idx in zip(self.region_types, self.region_file_idx))):
             return False
         return True
 
@@ -237,73 +240,90 @@ class RegionSet:
         return False
 
     @staticmethod
-    def from_beds(bed_paths, to_region_set, verbose=False):
+    def from_files(file_paths, region_type):
         regions = []
-        for bed_path in bed_paths:
-            logger.info(f'Reading bed file {bed_path}')
-            with open(bed_path) as bed:
-                for line_num, line in enumerate(bed):
-                    if (verbose and (line_num % 500000) == 0):
-                        logger.debug(f'line {line_num}')
-                    loc = f'file {bed_path}, line {line_num}'
-                    if line.startswith('#') or line.isspace():
-                        continue
-                    fields = line.strip().split()
-                    chk(len(fields) >= 3,
-                        f'{loc}: too few fields in line in the BED file {bed_path}', error_type='value')
-                    chrom, start_str, end_str = fields[:3]
-                    kind = fields[3] if len(fields) > 3 else 'NA'
-                    chk(all((chrom, start_str, end_str)),
-                        f'{loc}: empty value in first three columns in the BED file {bed_path}', error_type='value')
-                    try:
-                        start, end = int(start_str), int(end_str)
-                    except ValueError:
-                        chk(False, f'{loc}: invalid start or end of region in the BED file {bed_path}',
-                            error_type='value')
-                    chk(start < end, f'{loc}: region start must be less than end in the BED file {bed_path}',
-                        error_type='value')
-                    chk(0 <= start, f'{loc}: region start must be non-negative in the BED file {bed_path}',
-                        error_type='value')
-                    motif = fields[4] if len(fields) >= 5 else ''
-                    data = len(motif)
-                    regions.append(Region(chrom=chrom, start=start,
-                                          end=end, kind=kind, data=data,
-                                          motif=motif, orig_start=start, orig_end=end))
-
-        region_set = regions
-        if to_region_set:
-            logger.info(f'Constructing Interval Tree from {len(regions)} regions...')
-            region_set = RegionSet(regions)
-            logger.info(f'Constructed Interval Tree from {len(regions)} regions.')
-        return region_set
+        for file_idx, region_file in enumerate(file_paths):
+            logger.info(f'Processing {region_type} region file {region_file}')
+            if region_file.lower().endswith('.bed'):
+                regions += RegionSet.from_bed(region_file, file_idx=file_idx)
+            elif region_file.lower().endswith('.vcf'):
+                regions += RegionSet.from_vcf(region_file, file_idx=file_idx)
+            else:
+                chk(f'Cannot import {region_type} regions from {region_file}: '
+                    f'unsupported file type, please provide a .bed or .vcf file', error_type='type')
+            logger.info(f'{region_type} region file {region_file} processed.')
+        return regions
 
     @staticmethod
-    def from_vcf(vcf_path):
+    def from_bed(bed_path, file_idx=0, verbose=False):
+        regions = []
+        logger.info(f'Reading bed file {bed_path}')
+
+        with open(bed_path) as bed:
+            for line_num, line in enumerate(bed):
+                if (verbose and (line_num % 500000) == 0):
+                    logger.debug(f'line {line_num}')
+                loc = f'file {bed_path}, line {line_num}'
+                if line.startswith('#') or line.isspace():
+                    continue
+                fields = line.strip().split()
+                chk(len(fields) >= 3,
+                    f'{loc}: too few fields in line in the BED file {bed_path}', error_type='value')
+                chrom, start_str, end_str = fields[:3]
+                region_type = fields[3] if len(fields) > 3 else 'NA'
+                chk(all((chrom, start_str, end_str)),
+                    f'{loc}: empty value in first three columns in the BED file {bed_path}', error_type='value')
+                try:
+                    start, end = int(start_str), int(end_str)
+                except ValueError:
+                    chk(False, f'{loc}: invalid start or end of region in the BED file {bed_path}',
+                        error_type='value')
+                chk(start < end, f'{loc}: region start must be less than end in the BED file {bed_path}',
+                    error_type='value')
+                chk(0 <= start, f'{loc}: region start must be non-negative in the BED file {bed_path}',
+                    error_type='value')
+                motif = fields[4] if len(fields) >= 5 else ''
+                data = len(motif)
+                regions.append(Region(chrom=chrom, start=start,
+                                      end=end, region_type=region_type, source_file_idx=file_idx, data=data,
+                                      motif=motif, orig_start=start, orig_end=end))
+        return regions
+
+    @staticmethod
+    def from_vcf(vcf_path, file_idx=0):
         regions = []
         with closing(pysam.VariantFile(vcf_path)) as vcf_file:
             for vcf_rec in vcf_file.fetch():
                 vcf_info = dict(vcf_rec.info)
-                kind = 'DEFAULT'
+                region_type = 'NA'
                 if 'REGION_TYPE' in vcf_info:
-                    kind = vcf_info['REGION_TYPE']
+                    region_type = vcf_info['REGION_TYPE']
                 regions.append(Region(chrom=vcf_rec.chrom, start=vcf_rec.start, end=vcf_rec.stop,
-                                      orig_start=vcf_rec.start, orig_end=vcf_rec.stop, kind=kind))
+                                      orig_start=vcf_rec.start, orig_end=vcf_rec.stop, region_type=region_type,
+                                      source_file_idx=file_idx))
+                data = 0
+                motif = ''
+                if 'MOTIF' in vcf_info:
+                    motif = vcf_info['MOTIF']
+                    data = len(motif)
+
                 if 'TARGET' in vcf_info and isinstance(vcf_info['TARGET'], int):
                     target_chrom = vcf_info.get('TARGET_CHROM', vcf_rec.chrom)
                     target_start = vcf_info['TARGET'] - 1
                     regions.append(Region(chrom=target_chrom, start=target_start, end=target_start,
-                                          orig_start=target_start, orig_end=target_start, kind=kind))
+                                          data=data, motif=motif, source_file_idx=file_idx,
+                                          orig_start=target_start, orig_end=target_start, region_type=region_type))
 
-        return RegionSet(regions)
+        return regions
 
     @staticmethod
-    def from_fasta(fasta_path, filter_small_chr, region_kind, allow_hap_overlap):
+    def from_fasta(fasta_path, filter_small_chr, region_region_type, allow_hap_overlap):
         with pysam.FastaFile(fasta_path) as fasta_file:
             regions = []
             for chrom, chrom_length in zip(fasta_file.references, fasta_file.lengths):
                 if chrom_length < filter_small_chr: continue
                 regions.append(Region(chrom=chrom, start=0, end=chrom_length,
-                                      kind=region_kind,
+                                      region_type=region_region_type,
                                       orig_start=0, orig_end=chrom_length))
             return RegionSet(regions, allow_hap_overlap=allow_hap_overlap)
 
@@ -318,7 +338,7 @@ class RegionSet:
         def satisfies_filter(region):
             return region_filter.satisfied_for(region)
 
-        # Blacklist affect the three haplotypes
+        # Blacklist affect the three ploidy trees
         return RegionSet(filter(satisfies_filter, self.get_region_list()))
 
     def add_region_set(self, other_region_set):

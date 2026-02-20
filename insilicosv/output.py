@@ -8,6 +8,7 @@ from pysam import VariantFile
 import copy
 from functools import cmp_to_key
 
+from insilicosv import __version__
 from insilicosv import utils
 from insilicosv.utils import Region, Locus, if_not_none
 from insilicosv.sv_defs import Operation, Transform, TransformType, BreakendRegion, VariantType, Syntax, Breakend
@@ -48,8 +49,8 @@ class StatsCollector:
             self.placed_svs += 1
             sv_type = sv.info.get('SVTYPE', 'UNKNOWN')
             self.sv_types[sv_type] += 1
-            if (sv.roi is not None) and (sv.roi.kind != '_reference_'):
-                self.region_types[sv.roi.kind] += 1
+            if (sv.roi is not None) and (sv.roi.region_type != '_reference_'):
+                self.region_types[sv.roi.region_type] += 1
             assert sv.genotype is not None
             zygosity = sv.genotype[0] and sv.genotype[1] and ((sv_type not in [VariantType.SNP]) or (
                     sv.replacement_seq[0] == sv.replacement_seq[1]))
@@ -80,7 +81,6 @@ class StatsCollector:
         def write_item(fout, name, item, prefix=""):
             fout.write("{}{}: {}\n".format(prefix, str(name), str(item)))
 
-        os.makedirs(os.path.dirname(fileout), exist_ok=True)
         with open(fileout, "w") as fout:
             fout.write("===== Overview =====\n")
             write_item(fout, "SVs successfully simulated", str(self.placed_svs) + "/" + str(self.total_svs))
@@ -380,6 +380,8 @@ class OutputWriter:
                     breakends[symbol] = [placement[idx], placement[idx + 1]]
                 # Adjacency between the end of the last symbol and the beginning of the current one.
                 lhs_adjacencies.append([prev_symbol + '^t', symbol + '^h'])
+                # Symmetric so that the order does not matter
+                lhs_adjacencies.append([symbol + '^h', prev_symbol + '^t'])
                 prev_symbol = symbol
 
             # Get the novel adjacencies after the SV placement
@@ -667,6 +669,7 @@ class OutputWriter:
         vcf_path = os.path.join(self.output_path, 'sim.vcf')
         with open(vcf_path, "w") as vcf:
             vcf.write("##fileformat=VCFv4.2\n")
+            vcf.write(f"##source=InsilicoSV_{__version__}\n")
             for chrm, chrm_len in self.aneuploidy_chrom_lengths.items():
                 vcf.write("##contig=<ID=%s,length=%d>\n" % (chrm, chrm_len))
 

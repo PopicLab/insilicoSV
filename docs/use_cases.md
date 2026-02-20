@@ -8,7 +8,7 @@ use cases with matching config files are provided below.
 
 To incorporate SVs from the built-in library of types, a configuration file of the following form can be
 provided with parameters provided for the count and length ranges for each set of SVs to be included in the
-output genome. Note that the length of the dispersion must always be the last entry in length_ranges.
+output genome. Note that, for predefined SV types, the length of the dispersion must be the last entry in length_ranges.
 
 ```yaml
 # YAML config file
@@ -77,7 +77,7 @@ Unbounded dispersions can be used with predefined or custom SVs.
 Custom SVs can be specified by manually describing the desired variant with the grammatical notation described 
 in [SV grammar](sv_grammar.md). Note that for custom SVs the length_ranges of the letters AND the dispersions must be provided
 in their order of appearance from left to right.
-Note that the same number of dispersions must appear in the lhs and the rhs.
+The same number of dispersions must appear in the lhs and the rhs.
 An example input config is given below:
 ```yaml
 # YAML config file
@@ -97,6 +97,10 @@ variant_sets:
 
 The source and target must have the same numbers of dispersions, with the i'th dispersion in the source
 corresponding to the i'th dispersion in the target.  
+
+*Careful:* The ordering of `length_ranges` differs between predefined and custom SV types.
+* For custom SV types, `length_ranges` must exactly match the order of all symbols as they appear in the SV's grammar.
+* For predefined SV types, `length_ranges` are ordered by the letters, and any potential unique dispersion is always listed last.
 
 N.B. the grammar is not symmetrical, for instance, in the example below:
 ```yaml
@@ -153,18 +157,22 @@ variant_sets:
       number: 3
       length_ranges: [[100, 1000]]
 ```
-Each variant set specified in the config can include a `blacklist_region_type` value which will control which intervals
-recorded in `blacklist_regions` will be avoided by those variants. In the above example, `"all"` is specified for the DELs, 
-which will result in none of the three deletions from being placed in any of the regions in `blacklist_regions`. 
-If `blacklist_regions` is given in BED file format, records can include a fourth column recording `type`, 
-which can then be used to filter the blacklist intervals considered for a given set of SVs.
-If `blacklist_regions` is given in VCF file format, records can include the info field `REGION_TYPE` which can then be used to filter the blacklist intervals considered for a given set of SVs.
-If `REGION_TYPE` is not provided, the name of the region will be `DEFAULT`.
-In this example, the three insertions will be placed randomly regardless of the blacklist regions as the blacklist_region_type
-is not specified.
+Each variant set defined in the config may include a blacklist_region_type parameter, which determines which intervals 
+from blacklist_regions are excluded from placement of SV breakpoints.
+* In the example above, blacklist_region_type="all" is specified for the DELs, 
+so none of the three DELs breakpoints will fall within any region listed in blacklist_regions.
+* If blacklist_regions is provided in BED format, an optional fourth column (type) can be used to categorize 
+regions and filter them per variant set.
+* If blacklist_regions is provided in VCF format, the REGION_TYPE INFO field can be used instead. 
+* When providing multiple VCF or BED files, blacklist_region_type must be set to "all" or a list of lists 
+where each sub-list specifies the region names (or "all") to blacklist for its corresponding file.
 
-If blacklist entries are provided in VCF format, only the following parts of the record are used for the blacklist: 
-CHROM, POS and the END INFO field.
+In the example, insertions have no blacklist_region_type specified, so they will be placed randomly without regard to blacklist regions.
+
+**Important:** Blacklists constrain only SV breakpoints, not the full span of the SV. 
+This means an SV may still overlap a blacklist region internally.
+To exclude overlaps entirely, use `overlap_mode` contained together with the complement of the blacklist regions 
+(e.g. obtained via `bedtools complement`).
 
 ### Example 4b - Specifying a minimum inter-variant distance
 Variant placement can also be constrained by enforcing that there be a minimum inter-variant distance between any two
@@ -193,7 +201,7 @@ There are several ways to define the relationship between an SV and a region of 
 determined by the ROI, so `[null, null]` must be used for the corresponding range in `length_ranges`.
 * **`"partial"`**: The constrained breakends of the SV must overlap with one of the boundaries of a selected ROI.
 * **`"containing"`**: The constrained breakends of the SV must completely contain a selected ROI.
-* **`"contained"`**: The constrained breakends of the SV must be completely contained within a selected ROI.
+* **`"contained"`**: The constrained breakends of the SV must be completely contained within the same selected ROI.
 * **`"terminal"`**: The constrained breakends of the SV is placed at the extremity of a chromosome arm.
 * **`"whole-chromosome"`**: The SV spans an entire chromosome. This mode is only compatible with **Deletions (DEL)** and **Duplications (DUP)**. 
 For Duplications, setting `n_copies` to `1` (or not specifying it) creates a single additional chromosome copy (trisomy).
@@ -216,11 +224,13 @@ or by length using `overlap_region_length_range`.
 This can affect placements in telomeres (`overlap_mode: terminal`). You can adjust this threshold using the global parameter `th_proportion_N`.
 * **Intrachromosomal Constraint**: If a dispersion is part of an anchor, it will be forced to be intrachromosomal, even if the overall SV is marked as interchromosomal.
 The potential remaining dispersions will be interchromosomal.
-* **BED Format**: Multiple BED files (provided as a list of paths) can be given as input and their records will be combined and drawn 
-from during SV placement. Each file is required to have the first four columns of standard BED records 
-(chrom, chromStart, chromEnd, name).  Files specifying known Tandem Repeat regions for expansion/contraction 
-need to have a fifth column specifying the motif of each repeat region.
+* **Input Format**: Multiple BED and/or VCF files (provided as a list of paths) can be combined for SV placement. 
+BED files must include the standard coordinates (chrom, start, end) with an optional name column. 
+VCF files require standard fields with an optional REGION_TYPE in the INFO field. 
+**Note that for Tandem Repeat Regions, the repeat motif must be explicitly provided—via a fifth column in BED files or a MOTIF INFO field in VCF files.**
 * **Output VCF**: The final VCF file will include an `OVLP` field in the `INFO` column for each SV placed within a specified region, indicating the name of the region.
+* When providing multiple VCF or BED files, overlap_region_type must be set to "all" or a list of lists 
+where each sub-list specifies the region names (or "all") to overlap for its corresponding file.
 
 #### Example YAML configuration
 

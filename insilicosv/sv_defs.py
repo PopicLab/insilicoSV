@@ -216,7 +216,7 @@ class SV(ABC):
                         self.get_anchor_length() >= self.roi_filter.region_length_range[0]),
                 f'The anchor length is smaller than the minimum overlap for a partial overlap.')
         if self.overlap_mode in [OverlapMode.TERMINAL, OverlapMode.CHROM]:
-            chk(self.roi_filter.region_kinds == ['all'], 'No overlap_region_kinds can be specified for overlap_mode'
+            chk(list(self.roi_filter.region_types) == ['all'], 'No overlap_region_types can be specified for overlap_mode '
                                                          f'terminal and chrom. Error in {self}', error_type='syntax')
 
         # The letters cannot be unbounded unless the overlap is Exact and they are in the anchor.
@@ -389,13 +389,13 @@ class BaseSV(SV):
                 # The SV is a DEL partially overlapping another SV
                 op_chrom = operation.source_region.chrom
                 op_start = operation.orig_start
-                op_end = operation.orig_end + 1
-                svlen = op_end - op_start - 1
+                op_end = operation.orig_end
+                svlen = op_end - op_start
             elif operation.source_region is not None:
                 op_chrom = operation.source_region.chrom
                 op_start = operation.source_region.start
                 svlen = operation.source_region.end - operation.source_region.start
-                op_end = operation.source_region.end + 1
+                op_end = operation.source_region.end
             else:
                 op_chrom = operation.target_region.chrom
                 op_start = operation.target_region.start
@@ -411,7 +411,7 @@ class BaseSV(SV):
             sv_info['OP_TYPE'] = op_type_str
             if dispersion_target is not None:
                 sv_info['TARGET_CHROM'] = dispersion_target.chrom
-                sv_info['TARGET'] = dispersion_target.start + 1
+                sv_info['TARGET'] = dispersion_target.start
             sv_info['SVLEN'] = svlen
 
             if operation.target_insertion_order is not None:
@@ -422,11 +422,11 @@ class BaseSV(SV):
                 # If the operation breakend are within the anchor we give the overlap information.
                 if (operation.source_breakend_region is not None and
                         self.anchor.start_breakend <= operation.source_breakend_region.start_breakend <= self.anchor.end_breakend):
-                    sv_info['OVLP'] = self.roi.kind
+                    sv_info['OVLP'] = self.roi.region_type
                 # Here the target is in the anchor.
                 if (operation.target_insertion_breakend is not None and
                         self.anchor.start_breakend <= operation.target_insertion_breakend <= self.anchor.end_breakend):
-                    sv_info['OVLP_TARGET'] = self.roi.kind
+                    sv_info['OVLP_TARGET'] = self.roi.region_type
             alleles = ['N', '<%s>' % sv_type_str]
 
             if len(self.operations) > 1:
