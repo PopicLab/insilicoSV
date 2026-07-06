@@ -47,6 +47,8 @@ class SVSimulator:
     rois_overlap: dict[list[Region]]
     # Region set defined by the reference updated to keep track of the available regions.
     reference_regions: RegionSet
+    # Region set defined by the reference updated to keep track of the available regions for imported SVs.
+    imported_regions: RegionSet
     # Region Set defined by the reference regions to keep track of available regions for overlap SVs
     reference_sv_overlap_regions: RegionSet
     blacklist_regions: RegionSet
@@ -301,6 +303,10 @@ class SVSimulator:
 
             if not sv.allow_sv_overlap:
                 self.update_available_reference(sv)
+                
+                if sv.fixed_placement is not None:
+                    for region in sv.get_regions():
+                        self.imported_regions.add_region(region, sv=sv, allow_hap_overlap=self.allow_hap_overlap)
             else:
                 self.update_overlap_svs(sv)
 
@@ -312,15 +318,17 @@ class SVSimulator:
     def determine_sv_placement_order(self) -> None:
         # place most constrained SVs first
         logger.info(f'Deciding placement order for {len(self.svs)} SVs')
-        types_order = ['SV OVERLAP', 'FIXED', OverlapMode.CHROM, OverlapMode.TERMINAL, OverlapMode.EXACT,
+        types_order = ['SV OVERLAP and FIXED','SV OVERLAP', 'FIXED', OverlapMode.CHROM, OverlapMode.TERMINAL, OverlapMode.EXACT,
                        OverlapMode.PARTIAL, OverlapMode.CONTAINING, OverlapMode.CONTAINED, None]
         for sv in self.svs:
-            if sv.allow_sv_overlap:
+            if sv.allow_sv_overlap and sv.fixed_placement is not None:
                 sv.priority = 0
-            elif sv.fixed_placement:
+            if sv.allow_sv_overlap:
                 sv.priority = 1
+            elif sv.fixed_placement:
+                sv.priority = 2
             else:
-                distance = sum([dist for dist in sv.breakend_interval_lengths if dist is not None]) + 2
+                distance = sum([dist for dist in sv.breakend_interval_lengths if dist is not None]) + 1
                 sv.priority = (types_order.index(sv.overlap_mode)) + 1 / distance
         self.svs.sort(key=lambda sv: sv.priority)
 
@@ -330,8 +338,7 @@ class SVSimulator:
         # The placement does not set all breakend positions
         if not len(placement) == len(sv.breakend_interval_lengths) + 1: return False
         chk(all([locus.pos <= self.chrom_lengths[locus.chrom] for locus in placement.values()]),
-            'Please make sure that the imported'
-            ' SV positions are within the chromosome length,'
+            'Please make sure that the imported SV positions are within the chromosome length,'
             f' provided {sv}', error_type='value')
         for breakend1, breakend2 in pairwise(sv.breakends):
             # Ensure the positions are ordered in a same chromosome
@@ -347,16 +354,18 @@ class SVSimulator:
                     (placement[breakend2].chrom == placement[breakend1].chrom and
                      placement[breakend2].pos - placement[breakend1].pos
                      >= sv.breakend_interval_min_lengths[breakend1])): return False
-        for op_region in sv.get_regions(placement):
-            # Ensure the regions covered by the SV do not contain a proportion of Ns above th_proportion_N
-            # To ensure that am insertion target is not in between two Ns, the region is padded
-            min_bound = max(0, op_region.start - 1)
-            max_bound = min(self.chrom_lengths[op_region.chrom], op_region.end + 1)
-            if utils.percent_N(self.reference.fetch(reference=op_region.chrom,
-                                                    start=min_bound,
-                                                    end=max_bound)) > self.config.get('th_proportion_N',
-                                                                                      DEFAULT_PERCENT_N):
-                return False
+        
+        if sv.fixed_placement is None:
+            for op_region in sv.get_regions(placement):
+                # Ensure the regions covered by the SV do not contain a proportion of Ns above th_proportion_N
+                # To ensure that am insertion target is not in between two Ns, the region is padded
+                min_bound = max(0, op_region.start - 1)
+                max_bound = min(self.chrom_lengths[op_region.chrom], op_region.end + 1)
+                if utils.percent_N(self.reference.fetch(reference=op_region.chrom,
+                                                        start=min_bound,
+                                                        end=max_bound)) > self.config.get('th_proportion_N',
+                                                                                        DEFAULT_PERCENT_N):
+                    return False
         return True
 
     # end: def is_placement_valid(...)
@@ -818,10 +827,12 @@ class SVSimulator:
 
         if sv.fixed_placement:
             chk(self.is_placement_valid(sv, sv.fixed_placement),
-                f'cannot place imported SV {sv}, please check your SVs '
-                f'are non overlapping and try lowering the min_intersv_dist or'
-                f' increasing th_proportion_N.')
+                f'cannot place imported SV {sv}, please check your SVs are well defined.')
             sv.set_placement(placement=sv.fixed_placement, roi=None)
+            if not sv.allow_sv_overlap:
+                chk(not self.imported_regions.overlaps_sv_placement(sv, sv.genotype), f'Imported SV {sv} overlaps with another imported SV, please check your SVs are well defined.')
+            else:
+                chk(not self.overlap_sv_regions.overlaps_sv_placement(sv, sv.genotype), f'Imported SV {sv} overlaps with another overlapping imported SV, please check your SVs are well defined.')
             return
 
         n_placement_attempts = 0
@@ -856,7 +867,7 @@ class SVSimulator:
 
                 if roi is None or ref_roi is None:
                     chk(False, f'No available ROI satisfying the constraints for {sv}' +
-                        f' of anchor length {sv.get_anchor_length()}' * (sv.get_anchor_length() is not None))
+                               f' of anchor length {sv.get_anchor_length()}' * (sv.get_anchor_length() is not None))
                 anchor_start = sv.anchor.start_breakend
                 anchor_end = sv.anchor.end_breakend
                 roi, ref_roi = (

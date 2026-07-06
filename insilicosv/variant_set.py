@@ -10,7 +10,7 @@ import re
 from pysam import FastaFile, VariantFile
 
 from insilicosv import utils
-from insilicosv.utils import RegionFilter, OverlapMode, Locus, error_context, chk, TandemRepeatRegionFilter, if_not_none
+from insilicosv.utils import RegionFilter, OverlapMode, Locus, error_context, chk, TandemRepeatRegionFilter, if_not_none, parse_copies
 from insilicosv.sv_defs import (Transform, TransformType, BreakendRegion, Operation, SV, VariantType, BaseSV, TR,
                                 Syntax, Symbol, SV_KEY, TandemRepeatExpansionContractionSV)
 
@@ -381,32 +381,14 @@ class SimulatedVariantSet(VariantSet):
             f'divergence_prob must be a float or an int or a list of floats in ]0, 1] or a list of ranges. But, a '
                  f'%s was provided in %s' % (type(self.vset_config.get('divergence_prob', [])), self.vset_config), error_type='value')
 
-        self.copies = self.vset_config.get('n_copies', ())
-        if (Syntax.MULTIPLE_COPIES in ''.join(self.target)) and ('n_copies' not in self.vset_config):
-            chk(self.svtype not in [VariantType.mCNV, VariantType.CUSTOM], f'The number of copies must be provided for a {self.svtype}')
-            # Default the number of copies to 1 for predefined types with duplications
-            self.copies = ([1], [1])
-
-        chk('n_copies' not in self.vset_config or isinstance(self.vset_config['n_copies'], (list, int, tuple)),
-            f'The number of copies must be an integer or a list of integers or a list of ranges in {self.vset_config}',
-            error_type='value')
-
-        if isinstance(self.copies, int):
-            self.copies = [self.vset_config['n_copies']]
-
-        if isinstance(self.copies, list):
-            self.copies = (self.copies, self.copies)
-
+        self.copies = parse_copies(self.vset_config.get('n_copies', ()), self.target, self.svtype, self.vset_config, 'n_copies')
+        
         if self.overlap_mode == OverlapMode.CHROM:
             chk(not self.copies or self.copies[0] == self.copies[1], 'Whole chromosome duplications must have the same number of copies on both haplotypes.',
                 error_type='syntax')
 
-        if self.svtype == VariantType.mCNV:
-            chk(self.copies and all(len(n_copies) == 1 and n_copies[0] not in [1, [1, 1]] for n_copies in self.copies),
-                f'n_copies has to be provided and be different from 1 for a mCNV in {self.vset_config}', error_type='value')
-            copiesB = self.vset_config.get('n_copiesB', self.copies)
-            if isinstance(copiesB, int):
-                copiesB = [copiesB]
+        if self.svtype == VariantType.mCNV:            
+            copiesB = parse_copies(self.vset_config.get('n_copiesB', ()), self.target, self.svtype, self.vset_config, 'n_copiesB')
 
             self.copies = (self.copies[0], copiesB)
             chk('haploid' not in self.config or not self.config['haploid'], f'mCNV are not defined for haploid genomes.')
@@ -999,8 +981,6 @@ class ImportedVariantSet(VariantSet):
                     if 'SVID' in vcf_info:
                         # Use the parent ID
                         recs[vcf_info['SVID']].append(vcf_rec)
-                    elif vcf_rec.id:
-                        recs[vcf_rec.id].append(vcf_rec)
                     else:
                         recs[str(num_simple_sv)].append(vcf_rec)
                         num_simple_sv += 1
