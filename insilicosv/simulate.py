@@ -44,13 +44,15 @@ class SVSimulator:
     config: dict[str, Any]
     svs: list[SV]
     # Dictionary which keys are variant set idx that have overlap constrained and containing a list of ROIs
-    rois_overlap: dict[list[Region]]
+    rois_overlap: dict[int, list[Region]]
     # Region set defined by the reference updated to keep track of the available regions.
     reference_regions: RegionSet
     # Region set defined by the reference updated to keep track of the available regions for imported SVs.
     imported_regions: RegionSet
     # Region Set defined by the reference regions to keep track of available regions for overlap SVs
     reference_sv_overlap_regions: RegionSet
+    # RegionSet of the imported SVs to check if they overlap each other (regions without the padding)
+    imported_regions: RegionSet
     blacklist_regions: RegionSet
     reference: FastaFile
     chrom_lengths: dict[str, int]
@@ -96,6 +98,7 @@ class SVSimulator:
         self.chrom_lengths = {chrom: chrom_length
                               for chrom, chrom_length in zip(self.reference.references,
                                                              self.reference.lengths)}
+        self.imported_regions = RegionSet(allow_hap_overlap=self.allow_hap_overlap)
 
     def pre_check_config(self):
         config = self.config
@@ -185,8 +188,8 @@ class SVSimulator:
                     self.rois_overlap[sv_category].append(roi)
                 if not added_roi: n_removed_rois += 1
 
-            for sv_idx, sv_category in enumerate(self.overlap_ranges):
-                if self.overlap_modes[sv_idx] not in [OverlapMode.TERMINAL, OverlapMode.CHROM]: continue
+            for sv_category in self.overlap_ranges:
+                if self.overlap_modes[sv_category] not in [OverlapMode.TERMINAL, OverlapMode.CHROM]: continue
                 for chrom, chrom_length in self.chrom_lengths.items():
                     self.rois_overlap[sv_category].append(Region(chrom=chrom, start=0, end=chrom_length, region_type='chr',
                                                                  orig_start=0, orig_end=chrom_length))
@@ -195,8 +198,8 @@ class SVSimulator:
                 error_message_num_rois = ("Only {} ROIs satisfying the constraints "
                                           "(overlap mode: {}, type of ROIs: {}, overlap range: {}) of the variant_set {} containing {} SVs").format(
                     len(self.rois_overlap[sv_category]), self.overlap_modes[sv_category],
-                    self.overlap_types[sv_category],
-                    self.overlap_ranges[sv_category], sv_category, self.num_svs[sv_category])
+                        self.overlap_types[sv_category], self.overlap_ranges[sv_category], 
+                        sv_category, self.num_svs[sv_category])
 
                 hap_overlap_mult = 2 if self.allow_hap_overlap else 1
                 if self.overlap_modes[sv_category] in [OverlapMode.CONTAINING, OverlapMode.EXACT]:
@@ -303,7 +306,7 @@ class SVSimulator:
 
             if not sv.allow_sv_overlap:
                 self.update_available_reference(sv)
-                
+
                 if sv.fixed_placement is not None:
                     for region in sv.get_regions():
                         self.imported_regions.add_region(region, sv=sv, allow_hap_overlap=self.allow_hap_overlap)
@@ -602,7 +605,7 @@ class SVSimulator:
 
     # From input roi and ref_roi, places the anchor in roi such that the overlap constraints are fulfilled  and
     # the anchor fits in ref_roi which represents a region non used by another SV.
-    def choose_anchor_placement(self, roi, ref_roi, anchor_length, overlap_mode, region_length_range=[None, None],
+    def choose_anchor_placement(self, roi, ref_roi, anchor_length, overlap_mode, region_length_range=(None, None),
                                 blacklist_regions=None):
         """Finds the next ROI that meets `roi_filter` (if given) and on which at least
         one anchor placement of `anchor_length` satisfying `overlap_mode` is possible,
@@ -842,7 +845,7 @@ class SVSimulator:
 
         hap_id = 0
         if self.allow_hap_overlap:
-            hap_id = 2 if sv.genotype[0] and sv.genotype[1] else sv.genotype[1]
+            hap_id = 2 if sv.genotype[0] and sv.genotype[1] else int(sv.genotype[1])
 
         init_roi = 0
         if sv.overlap_mode in [OverlapMode.CONTAINED, OverlapMode.PARTIAL]:
@@ -866,8 +869,8 @@ class SVSimulator:
                                                                   init_roi=init_roi)
 
                 if roi is None or ref_roi is None:
-                    chk(False, f'No available ROI satisfying the constraints for {sv}' +
-                               f' of anchor length {sv.get_anchor_length()}' * (sv.get_anchor_length() is not None))
+                    len_str = f" of anchor length {sv.get_anchor_length()}" if sv.get_anchor_length() is not None else ""
+                    chk(False, f'No available ROI satisfying the constraints for {sv}{len_str}.')
                 anchor_start = sv.anchor.start_breakend
                 anchor_end = sv.anchor.end_breakend
                 roi, ref_roi = (
