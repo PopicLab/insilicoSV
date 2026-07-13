@@ -53,8 +53,9 @@ class StatsCollector:
             if (sv.roi is not None) and (sv.roi.region_type != '_reference_'):
                 self.region_types[sv.roi.region_type] += 1
             assert sv.genotype is not None
+            snp_transform = sv.operations[0].transform
             zygosity = sv.genotype[0] and sv.genotype[1] and ((sv_type not in [VariantType.SNP]) or (
-                    sv.replacement_seq[0] == sv.replacement_seq[1]))
+                    snp_transform.get_replacement(0) == snp_transform.get_replacement(1)))
             if zygosity:
                 self.num_homozygous += 1
             else:
@@ -132,6 +133,29 @@ class OutputWriter:
         self.overlap_sv_regions = overlap_sv_regions
         self.homozygous_only = config.get('homozygous_only', False)
         self.allow_hap_overlap = allow_hap_overlap
+
+    def resolve_divergence_haplotypes(self, transform, hap_index, new_seq):
+        """
+        Determine the sequenceof. a SNP or a divergence.
+        It is performed on hap0 first and then hap1.
+        If homozygous, the same mutation is used otherwise we reuse the previously computed change.
+        """
+        other_index = 1 - hap_index
+        other_seq = transform.get_replacement(other_index)
+
+        haplotypes = [None, None]
+        haplotypes[hap_index] = new_seq
+        if other_seq is None:
+            # This is the first haplotype resolved for this operation; the other stays pending.
+            return haplotypes
+        if transform.divergence_prob == 1 and not self.homozygous_only:
+            # Heterozygous SNP: each haplotype keeps its own independently mutated allele.
+            haplotypes[other_index] = other_seq
+            return haplotypes
+        # Homozygous divergence: both haplotypes share the sequence already resolved for the other one.
+        haplotypes[hap_index] = other_seq
+        haplotypes[other_index] = other_seq
+        return haplotypes
 
     def output_haps(self):
         if self.config.get('output_no_haps', False):
@@ -293,27 +317,18 @@ class OutputWriter:
                                 # For a DUP or an mCNV apply the correct number of copies
                                 modified_seq = modified_seq * n_copies
 
-                            if operation.transform.divergence_prob > 0 or operation.transform.replacement_seq:
+                            if operation.transform.has_divergence:
                                 # There is a divergence
-                                if operation.transform.replacement_seq is None or operation.transform.replacement_seq[hap_index] is None:
-                                    # Insure the haplotypes respect the genotype specified and store it for writing in the VCF
-                                    replacement_seq = utils.divergence(modified_seq,
-                                                                       operation.transform.divergence_prob)
-                                    if not operation.transform.replacement_seq:
-                                        haplotypes = [replacement_seq if hap == hap_index else None for hap in [0, 1]]
-                                    elif not self.homozygous_only and operation.transform.divergence_prob == 1:
-                                        # The SNP can be homozygous or heterozygous with two different alleles
-                                        haplotypes = [operation.transform.replacement_seq[0], replacement_seq]
-                                    else:
-                                        # The SNP/DIVERGENCE is homozygous
-                                        haplotypes = [operation.transform.replacement_seq[0],
-                                                      operation.transform.replacement_seq[0]]
+                                if operation.transform.get_replacement(hap_index) is None:
+                                    # Compute the modified sequence according to the genotype.
+                                    new_seq = utils.divergence(modified_seq, operation.transform.divergence_prob)
+                                    haplotypes = self.resolve_divergence_haplotypes(operation.transform, hap_index, new_seq)
 
                                     # Retain the replacement_seq and orig_seq for applying to other copies and to write in the VCF output
                                     operation.transform = operation.transform.replace(replacement_seq=haplotypes,
                                                                                       orig_seq=modified_seq)
 
-                                modified_seq = operation.transform.replacement_seq[hap_index]
+                                modified_seq = operation.transform.get_replacement(hap_index)
 
                             if operation.op_info and operation.op_info.get('SVID'):
                                 sv_id = operation.op_info['SVID']
@@ -657,14 +672,15 @@ class OutputWriter:
                 sim_novel_insertions_fa):
             for sv in self.svs:
                 for op_num, operation in enumerate(sv.operations):
-                    if 0 < operation.transform.divergence_prob < 1 and operation.transform.replacement_seq:
+                    if operation.transform.has_divergence:
                         for hap_idx, hap in enumerate(['hapA', 'hapB']):
-                            if not operation.transform.replacement_seq[hap_idx]: continue
+                            replacement_seq = operation.transform.get_replacement(hap_idx)
+                            if not replacement_seq: continue
                             seq_id = (
                                 f'{sv.sv_id}_{op_num}_{operation.target_region.chrom}_'
                                 f'{operation.target_region.start}_{hap}')
                             sim_novel_insertions_fa.write(f'>{seq_id}\n')
-                            sim_novel_insertions_fa.write(f'{operation.transform.replacement_seq[hap_idx]}\n')
+                            sim_novel_insertions_fa.write(f'{replacement_seq}\n')
 
     def output_vcf(self):
         vcf_path = os.path.join(self.output_path, 'sim.vcf')

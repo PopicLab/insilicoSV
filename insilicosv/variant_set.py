@@ -168,7 +168,7 @@ class VariantSet(ABC):
         chk(False, f'Error valuating the expression {value}', error_type='value')
 
     def grammar_to_variant_set(self, lhs_strs, rhs_strs, symbol_lengths, symbol_min_lengths, num_letters,
-                               novel_insertion_seqs, n_copies_list, divergence_prob_list, genotype, replacement_seq=None, orig_seq=None,
+                               novel_insertion_seqs, n_copies_list, divergence_prob_list, replacement_seq=None, orig_seq=None,
                                vset_config=None,):
         #
         # Parse the LHS strings into Symbols, and RHS strings into RHSItems.
@@ -185,10 +185,6 @@ class VariantSet(ABC):
         lhs_dispersion: list[int] = []
         breakend_interval_lengths = []
         breakend_interval_min_lengths = []
-
-        # Format the replacement seq to be per haplotype if provided
-        if replacement_seq:
-                replacement_seq = [replacement_seq if genotype[hap_idx] else None for hap_idx in range(2)]
 
         # Parse the left hand side of the  grammar, recover the symbols and the potential anchor.
         # The lhs is used to defined the source breakend regions. Because there is the same number of dispersion in the
@@ -790,14 +786,12 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         if not isinstance(divergence_prob_list, list):
             divergence_prob_list = [divergence_prob_list]
 
-        genotype = self.pick_genotype()
-
         # Build the different operations and anchor, determine the breakends and the distance between them.
         (operations, anchor, dispersions, breakend_interval_lengths,
          breakend_interval_min_lengths) = self.grammar_to_variant_set(lhs_strs, rhs_strs, symbol_lengths,
                                                                       symbol_min_lengths, len(letters),
                                                                       novel_insertion_seqs, self.copies,
-                                                                      divergence_prob_list, genotype=genotype, 
+                                                                      divergence_prob_list,
                                                                       vset_config=self.vset_config)
 
         #
@@ -820,7 +814,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                       blacklist_filter=self.get_blacklist_filter(),
                       fixed_placement=None,
                       info=info,
-                      genotype=genotype,
+                      genotype=self.pick_genotype(),
                       allow_sv_overlap=self.vset_config.get('allow_sv_overlap', False),
                       config_descr=self.vset_config['config_descr'])
 
@@ -986,7 +980,7 @@ class ImportedVariantSet(VariantSet):
             self.header = vcf.header
             for vcf_rec in vcf.fetch():
                 with error_context(vcf_rec):
-                    chk(vcf_rec.chrom in self.chrom_lengths, 'An imported SV belong to a chromosome not'
+                    chk(vcf_rec.chrom in self.chrom_lengths, 'An imported SV belong to a chromosome not '
                                                              'represented in the reference file.', error_type='value')
                     vcf_info = dict(vcf_rec.info)
                     if 'SVID' in vcf_info:
@@ -1107,12 +1101,14 @@ class ImportedVariantSet(VariantSet):
         if parsed_info['OP_TYPE'] == VariantType.SNP:
             parsed_info['DIVERGENCE_PROB'] = [1.0]
             if vcf_rec.alts[0] != '<SNP>':
-                parsed_info['ALT'] = vcf_rec.alts
                 chk(1 <= len(vcf_rec.alts) <= 2, f'Error in the ALT field format {vcf_rec}')
+                # Build the [hap0, hap1] replacement pair directly, keeping each haplotype's own
+                # allele (or None if it does not carry the variant) instead of collapsing them
+                # into a single filtered list.
                 parsed_info['ALT'] = [
-                                        vcf_rec.alts[0] if len(vcf_rec.alts) == 1 else vcf_rec.alts[hap_index]
+                                        (vcf_rec.alts[0] if len(vcf_rec.alts) == 1 else vcf_rec.alts[hap_index])
+                                        if parsed_info['GENOTYPE'][hap_index] else None
                                         for hap_index in (0, 1)
-                                        if parsed_info['GENOTYPE'][hap_index]
                                     ]
             if vcf_rec.ref != 'N':
                 parsed_info['REF'] = vcf_rec.ref[0]
@@ -1228,7 +1224,6 @@ class ImportedVariantSet(VariantSet):
                                                                      insseq,
                                                                      parsed_info['NCOPIES'],
                                                                      parsed_info['DIVERGENCE_PROB'],
-                                                                     genotype=genotype,
                                                                      replacement_seq=parsed_info['ALT'],
                                                                      orig_seq=parsed_info['REF'],
                                                                      vset_config=vcf_rec)
