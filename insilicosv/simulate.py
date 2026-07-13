@@ -98,7 +98,7 @@ class SVSimulator:
         self.chrom_lengths = {chrom: chrom_length
                               for chrom, chrom_length in zip(self.reference.references,
                                                              self.reference.lengths)}
-        self.imported_regions = RegionSet(allow_hap_overlap=self.allow_hap_overlap)
+        self.imported_regions = RegionSet(allow_hap_overlap=True)
 
     def pre_check_config(self):
         config = self.config
