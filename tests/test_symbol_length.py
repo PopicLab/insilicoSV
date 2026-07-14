@@ -2,21 +2,20 @@ import copy
 import math
 import pytest
 
-# Adjust this import based on your exact project structure. 
-# It targets the class where pick_symbol_lengths is defined.
+
 from insilicosv.variant_set import FromGrammarVariantSet 
 
-# A dummy config required by the function to format error messages
+# Dummy config to format error messages
 DUMMY_VSET_CONFIG = {"config_descr": "test_sv_config"}
 
 class TestPickSymbolLengths:
 
     def test_complex_dependencies_variance_and_isolation(self):
         """
-        Tests that when called multiple times (simulating multiple SVs):
-        1. The generated lengths strictly adhere to the mathematical dependencies.
-        2. The values VARY between iterations (randomness works).
-        3. The original configuration object is NEVER mutated (state isolation).
+        Tests that when simulating multiple SVs:
+        1. The generated lengths are correct.
+        2. Randomness works.
+        3. The bounds are not modified from one iteration to the next.
         """
         # A: [10, 20]
         # B: [A + 5, 2 * A]
@@ -25,43 +24,35 @@ class TestPickSymbolLengths:
         dispersion_ranges = []
         letter_indexes = {"A": 0, "B": 1, "C": 2}
         
-        # Deepcopy to ensure we can verify the function doesn't mutate inputs
         input_ranges = copy.deepcopy(original_ranges)
 
         results_A = set()
         results_B = set()
 
-        for _ in range(100): # Simulate generating 100 SVs
+        for _ in range(100):
             lengths, min_lengths = FromGrammarVariantSet.pick_symbol_lengths(
                 input_ranges, dispersion_ranges, letter_indexes, DUMMY_VSET_CONFIG
             )
             
-            # 1. Assert original state was NOT mutated
             assert input_ranges == original_ranges, "Function mutated the original length_ranges!"
 
-            # 2. Assert constraints are perfectly maintained
             A, B, C = lengths
             
             assert 10 <= A <= 20
             assert A + 5 <= B <= 2 * A
-            
-            # Fractional limits use ceil for min and floor for max
             assert math.ceil(B / 2) <= C <= math.floor(B)
 
-            # Store for variance check
             results_A.add(A)
             results_B.add(B)
 
-        # 3. Assert variance (Values shouldn't be identical across 100 runs)
         assert len(results_A) > 1, "Randomness failed: Symbol A was identical across 100 iterations."
         assert len(results_B) > 1, "Randomness failed: Symbol B was identical across 100 iterations."
 
     def test_transitive_and_implicit_math(self):
         """
-        Tests that the deque processes out-of-order transitive dependencies 
-        (A depends on B, B depends on C, C is known) and parses implicit multiplication (2A = 2*A).
+        Tests that the deque processes the order of the know variable doesn't matter.
+        Test implicit math notations
         """
-        # A depends on 2B. B depends on C + 1. C is exactly 5.
         length_ranges = [["2B", "2B"], ["C+1", "C+1"], [5, 5]]
         letter_indexes = {"A": 0, "B": 1, "C": 2}
 
@@ -69,13 +60,11 @@ class TestPickSymbolLengths:
             length_ranges, [], letter_indexes, DUMMY_VSET_CONFIG
         )
 
-        assert lengths == [12, 6, 5] # C=5, B=(5+1)=6, A=(2*6)=12
+        assert lengths == [12, 6, 5]
 
     def test_fractional_bounds_rounding(self):
         """
-        Ensures that fractional math expressions round correctly:
-        Min bounds should round UP (ceil), Max bounds should round DOWN (floor)
-        to ensure the integer stays strictly inside the fraction constraint.
+        Check the rounding of math expressions
         """
         # 10/3 = 3.33 -> ceil -> 4
         # 10/2 = 5.0  -> floor -> 5
@@ -89,40 +78,34 @@ class TestPickSymbolLengths:
         assert lengths[0] == 10
         assert lengths[1] in [4, 5]
 
-
-    # ==========================================
-    # EXHAUSTIVE FAILURE MODE TESTING
-    # ==========================================
-
     @pytest.mark.parametrize("length_ranges, letter_indexes, expected_error, match_text", [
-        
-        # 1. Malformed bounds format (List of 1 instead of 2)
-        # CHANGED: Expected SyntaxError instead of ValueError, and used raw string r"..."
+        #Check failure modes.
+
+        # Missing bounds
         ([[10]], {"A": 0}, SyntaxError, r"must be a list of \[min, max\] pairs"),
         
-        # 2. Hardcoded Min > Max
+        # Min > Max
         ([[20, 10]], {"A": 0}, SyntaxError, "max bound less than min bound"),
         
-        # 3. Evaluated Min > Max (e.g., A=10 -> B in [10, 5])
+        # Min > Max from math expression
         ([[10, 10], ["A", "A/2"]], {"A": 0, "B": 1}, SyntaxError, "max bound less than min bound"),
         
-        # 4. Hardcoded Negative length
+        # Negative length
         ([[-5, 5]], {"A": 0}, ValueError, "min length cannot be negative"),
         
-        # 5. Evaluated Negative Length (A=10, B = A-20 = -10)
-        # CHANGED: Expected SyntaxError instead of ValueError because the code wraps it in a try/except
+        # Negative length from math expression
         ([[10, 10], ["A-20", "A"]], {"A": 0, "B": 1}, SyntaxError, "yielded negative bound"),
         
-        # 6. Missing Dependency / Undefined Symbol ("Z" doesn't exist)
+        # Missing Dependency
         ([[10, 10], ["Z", "Z"]], {"A": 0, "B": 1}, ValueError, "one of which is not define"),
         
-        # 7. Cyclic Dependency (A depends on B, B depends on A)
+        # Cyclic Dependency
         ([["B", "B"], ["A", "A"]], {"A": 0, "B": 1}, SyntaxError, "cyclic dependency"),
         
-        # 8. Invalid Math execution (Division by Zero)
+        # Invalid Math
         ([[10, 10], ["A/0", "A"]], {"A": 0, "B": 1}, SyntaxError, "Invalid math operation"),
         
-        # 9. Dependency on an Unbounded Symbol (A is [None, None])
+        # Dependency on an Unbounded Symbol
         ([[None, None], ["A", "A"]], {"A": 0, "B": 1}, SyntaxError, "cannot depend on an unbounded symbol"),
 
     ], ids=[
