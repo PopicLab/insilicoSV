@@ -13,13 +13,10 @@ class TestPickSymbolLengths:
     def test_complex_dependencies_variance_and_isolation(self):
         """
         Tests that when simulating multiple SVs:
-        1. The generated lengths are correct.
-        2. Randomness works.
-        3. The bounds are not modified from one iteration to the next.
+        - The generated lengths are correct.
+        - Randomness works.
+        - The bounds are not modified from one iteration to the next.
         """
-        # A: [10, 20]
-        # B: [A + 5, 2 * A]
-        # C: [B / 2, B]
         original_ranges = [[10, 20], ["A + 5", "2A"], ["B/2", "B"]]
         dispersion_ranges = []
         letter_indexes = {"A": 0, "B": 1, "C": 2}

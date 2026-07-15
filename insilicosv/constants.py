@@ -100,8 +100,10 @@ class Symbol:
 
     Examples:
 
-    A
-    _1
+    A*
+    B+
+    (C)
+    _
 
     """
 

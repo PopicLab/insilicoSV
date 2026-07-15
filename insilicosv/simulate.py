@@ -363,7 +363,7 @@ class SVSimulator:
             # Imported SVs ignore the th_proportion_N parameter
             for op_region in sv.get_regions(placement):
                 # Ensure the regions covered by the SV do not contain a proportion of Ns above th_proportion_N
-                # To ensure that am insertion target is not in between two Ns, the region is padded
+                # To ensure that an insertion target is not in between two Ns, the region is padded
                 min_bound = max(0, op_region.start - 1)
                 max_bound = min(self.chrom_lengths[op_region.chrom], op_region.end + 1)
                 if utils.percent_N(self.reference.fetch(reference=op_region.chrom,
@@ -873,8 +873,8 @@ class SVSimulator:
                                                                   init_roi=init_roi)
 
                 if roi is None or ref_roi is None:
-                    len_str = f" of anchor length {sv.get_anchor_length()}" if sv.get_anchor_length() is not None else ""
-                    chk(False, f'No available ROI satisfying the constraints for {sv}{len_str}.')
+                    chk_str = f" of anchor length {sv.get_anchor_length()}" if sv.get_anchor_length() is not None else ""
+                    chk(False, f'No available ROI satisfying the constraints for {sv}{chk_str}.')
                 anchor_start = sv.anchor.start_breakend
                 anchor_end = sv.anchor.end_breakend
                 roi, ref_roi = (

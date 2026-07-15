@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections import defaultdict, deque
+from collections import defaultdict
 from contextlib import closing
 import copy
 import math
@@ -10,7 +10,7 @@ import re
 from pysam import FastaFile, VariantFile
 
 from insilicosv import utils
-from insilicosv.utils import RegionFilter, OverlapMode, Locus, error_context, chk, TandemRepeatRegionFilter, if_not_none, parse_copies
+from insilicosv.utils import RegionFilter, OverlapMode, Locus, error_context, chk, TandemRepeatRegionFilter, if_not_none, parse_copies, pick_symbol_lengths
 from insilicosv.sv_defs import (Transform, TransformType, BreakendRegion, Operation, SV, BaseSV,
                                 Syntax, Symbol, TandemRepeatExpansionContractionSV)
 from insilicosv.constants import VariantType, TR, SV_KEY
@@ -637,100 +637,6 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             f'The operators + and * cannot be used at the same time {rhs_strs}.',
             error_type='syntax')
         return lhs_strs, rhs_strs, letter_ranges
-    
-    # Randomly pick distances within the ranges defined for each symbol
-    @staticmethod
-    def pick_symbol_lengths(length_ranges, dispersion_ranges, letter_indexes, vset_config= None):
-        ranges = copy.deepcopy(length_ranges + dispersion_ranges)
-        remaining_symbols = deque(range(len(ranges)))
-        chk(all(isinstance(length_range, str) or (isinstance(length_range, list) and (len(length_range) == 2))
-                for length_range in ranges), f'length_ranges must be a list of [min, max] pairs {ranges} in %s' % vset_config['config_descr'], error_type='syntax')
-        
-        def _assign_length(min_range, max_range, is_dispersion, ranges, vset_config):
-            if max_range is None:
-                length = None
-                if min_range is not None:
-                    chk(is_dispersion, f'Only dispersions can have min but not max length {ranges} in %s' % vset_config['config_descr'], error_type='syntax')
-                min_length = min_range
-            else:
-                chk(min_range is not None, f'max_length given but not min_length {ranges} in %s' % vset_config['config_descr'], error_type='syntax')
-                chk(min_range <= max_range, f'max bound less than min bound {ranges} in %s' % vset_config['config_descr'], error_type='syntax')
-                chk(min_range >= 0, f'min length cannot be negative {ranges} in %s' % vset_config['config_descr'], error_type='value')
-                length = random.randint(min_range, max_range)
-                min_length = None
-            return length, min_length
-    
-        # Keep track of the dependencies between the symbols length ranges.
-        # A dependency is the index of the letter the range is depending on (possibly a different letter for the min and max bounds)
-        # and the offset to those letter lengths.
-        dependencies = {}
-        symbol_lengths = {}
-        symbol_min_lengths = {}
-        while remaining_symbols:
-            idx = remaining_symbols.popleft()
-            min_range, max_range = ranges[idx]
-            if (isinstance(min_range, int) or min_range is None) and \
-                (isinstance(max_range, int) or max_range is None):
-                # Both bounds are independent to other letter lengths.
-                is_dispersion = (idx >= len(length_ranges))
-                length, min_length = _assign_length(min_range, max_range, is_dispersion, ranges, vset_config)
-                
-                symbol_lengths[idx] = length
-                symbol_min_lengths[idx] = min_length
-            else:
-                all_resolved = True
-                for pos, bound in enumerate([min_range, max_range]):
-                    if isinstance(bound, str):
-                        # The bound is dependent of another letter
-                        expr = bound.strip()
-
-                        dependent_letters = set(re.findall(r'[A-Za-z]+', expr))
-                        chk(all(letter in letter_indexes for letter in dependent_letters),
-                            f'The length of a symbol depends on {dependent_letters} '
-                            f'one of which is not define in neither the source nor target in %s' % vset_config['config_descr'], error_type='value')
-                        
-                        eval_context = {}
-                        for letter in dependent_letters:
-                            # Gets the index of the letter in the list of length ranges.
-                            letter_idx = letter_indexes[letter]
-                            if letter_idx in symbol_lengths:
-                                chk(symbol_lengths[letter_idx] is not None,
-                                    f'A symbol length cannot depend on an unbounded symbol in %s' % vset_config['config_descr'], error_type='syntax')
-                                eval_context[letter] = symbol_lengths[letter_idx]
-                            else:
-                                if not idx in dependencies:
-                                    dependencies[idx] = []
-                                dependencies[idx].append(letter_idx)
-                                if letter_idx in dependencies:
-                                    chk(not idx in dependencies[letter_idx],
-                                        f'There is a cyclic dependency in the length definitions {letter} in %s' % vset_config['config_descr'],
-                                        error_type='syntax')
-                                    dependencies[idx] += dependencies[letter_idx]
-                                dependencies[idx] = list(set(dependencies[idx]))
-                                all_resolved = False
-                                break
-
-                        if all_resolved:
-                            # All the dependencies are satisfied
-                            try:
-                                op_expr = re.sub(r'(\d)([A-Za-z]+)', r'\1*\2', expr)
-                                
-                                # Evaluate using math context and our resolved variables
-                                eval_bound = eval(op_expr, {"__builtins__": None, "math": math}, eval_context)
-                                eval_bound = math.ceil(eval_bound) if pos == 0 else math.floor(eval_bound)
-                                
-                                chk(eval_bound >= 0, 
-                                    f"Length calculation yielded negative bound for symbol {idx}", 
-                                    error_type='value')
-                                    
-                                ranges[idx][pos] = eval_bound
-                            except Exception as e:
-                                chk(False, f"Invalid math operation '{op_expr}' for symbol {idx}: {e}", error_type='syntax')
-                    
-                remaining_symbols.append(idx)
-        lengths = sorted(symbol_lengths.items(), key=lambda x: x[0])
-        min_lengths = sorted(symbol_min_lengths.items(), key=lambda x: x[0])
-        return [l[1] for l in lengths], [m_l[1] for m_l in min_lengths]
 
     @override
     def simulate_sv(self) -> SV:
@@ -778,7 +684,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         letter_indexes = {letter: index for index, letter in enumerate(letters)}
 
         # Compute the lengths of the different symbols and dispersions from the length ranges.
-        symbol_lengths, symbol_min_lengths = self.pick_symbol_lengths(letter_ranges, dispersion_ranges, letter_indexes, self.vset_config)
+        symbol_lengths, symbol_min_lengths = pick_symbol_lengths(letter_ranges, dispersion_ranges, letter_indexes, self.vset_config)
 
         novel_insertion_seqs = self.novel_insertion_seqs
 

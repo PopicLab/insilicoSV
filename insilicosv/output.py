@@ -316,7 +316,7 @@ class OutputWriter:
                             if operation.transform.has_divergence:
                                 # There is a divergence
                                 if operation.transform.get_replacement(hap_index) is None:
-                                    # Compute the modified sequence according to the genotype.
+                                    # Compute the modified sequence according to the genotype (only if not already define from import)
                                     haplotypes = self.resolve_divergence_haplotypes(operation.transform, hap_index, modified_seq)
 
                                     # Retain the replacement_seq and orig_seq for applying to other copies and to write in the VCF output
