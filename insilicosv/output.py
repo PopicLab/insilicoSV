@@ -310,7 +310,7 @@ class OutputWriter:
                                     mapping_quality=paf_mapq,
                                     tags=f'cg:Z:{len(modified_seq)}M')
 
-                                # For a DUP or an mCNV apply the correct number of copies
+                                # For a multiple copy signs, apply the correct number of copies
                                 modified_seq = modified_seq * n_copies
 
                             if operation.transform.has_divergence:

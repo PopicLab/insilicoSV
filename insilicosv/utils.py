@@ -12,6 +12,7 @@ from intervaltree import IntervalTree
 import pysam
 from copy import deepcopy
 from collections import deque
+import re, math
 
 from insilicosv.constants import Syntax, VariantType
 
@@ -47,10 +48,10 @@ def complement(seq):
 
 
 def parse_copies(copies, target, svtype, vset_config, field_name):
-    if (Syntax.MULTIPLE_COPIES in ''.join(target)) and copies is None:
+    if (Syntax.MULTIPLE_COPIES in ''.join(target)) and not copies:
         chk(svtype not in [VariantType.mCNV, VariantType.CUSTOM], f'{field_name} must be provided for a {svtype}: {vset_config}', error_type='value')
-        # Default the number of copies to 1 on each haplotype for other predefined types with duplications
-        return ([1], [1])
+        # Default the number of copies to 2 on each haplotype for other predefined types with duplications
+        copies = ([1], [1])
 
     chk(not copies or isinstance(copies, (list, int, tuple)),
         f'{field_name} must be an integer or a list of integers or a list of ranges in {vset_config}', error_type='value')

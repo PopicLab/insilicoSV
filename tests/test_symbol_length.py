@@ -3,7 +3,7 @@ import math
 import pytest
 
 
-from insilicosv.variant_set import FromGrammarVariantSet 
+from insilicosv.utils import pick_symbol_lengths 
 
 # Dummy config to format error messages
 DUMMY_VSET_CONFIG = {"config_descr": "test_sv_config"}
@@ -27,7 +27,7 @@ class TestPickSymbolLengths:
         results_B = set()
 
         for _ in range(100):
-            lengths, min_lengths = FromGrammarVariantSet.pick_symbol_lengths(
+            lengths, min_lengths = pick_symbol_lengths(
                 input_ranges, dispersion_ranges, letter_indexes, DUMMY_VSET_CONFIG
             )
             
@@ -53,7 +53,7 @@ class TestPickSymbolLengths:
         length_ranges = [["2B", "2B"], ["C+1", "C+1"], [5, 5]]
         letter_indexes = {"A": 0, "B": 1, "C": 2}
 
-        lengths, _ = FromGrammarVariantSet.pick_symbol_lengths(
+        lengths, _ = pick_symbol_lengths(
             length_ranges, [], letter_indexes, DUMMY_VSET_CONFIG
         )
 
@@ -63,12 +63,10 @@ class TestPickSymbolLengths:
         """
         Check the rounding of math expressions
         """
-        # 10/3 = 3.33 -> ceil -> 4
-        # 10/2 = 5.0  -> floor -> 5
         length_ranges = [[10, 10], ["A/3", "A/2"]] 
         letter_indexes = {"A": 0, "B": 1}
 
-        lengths, _ = FromGrammarVariantSet.pick_symbol_lengths(
+        lengths, _ = pick_symbol_lengths(
             length_ranges, [], letter_indexes, DUMMY_VSET_CONFIG
         )
 
@@ -114,7 +112,7 @@ class TestPickSymbolLengths:
         """Tests that all invalid configurations safely crash."""
         
         with pytest.raises(expected_error, match=match_text):
-            FromGrammarVariantSet.pick_symbol_lengths(
+            pick_symbol_lengths(
                 length_ranges, 
                 dispersion_ranges=[], 
                 letter_indexes=letter_indexes, 

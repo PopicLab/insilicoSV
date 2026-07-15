@@ -260,9 +260,10 @@ class VariantSet(ABC):
             # Determine the number of copies of a symbol are needed (when "+" appears in the rhs)
             n_copies_hap = (1, 1)
             if Syntax.MULTIPLE_COPIES in rhs_str:
-                chk(n_multiple_copies < len(n_copies_list), f'A number of copies must be provided '
-                                                            f'for each `{Syntax.MULTIPLE_COPIES}` symbol used. '
-                                                            f'Error in {vset_config}', error_type='syntax')
+                chk(all(n_multiple_copies < len(n_copies_list[i]) for i in range(len(n_copies_list))), 
+                    f'A number of copies must be provided on each haplotype '
+                    f'for each `{Syntax.MULTIPLE_COPIES}` symbol used. '
+                    f'Error in {vset_config}', error_type='syntax')
                 n_copies_hap = tuple(self.get_sampled_int_value(n_copies_list[i][n_multiple_copies],
                                                                 not_one=(self.svtype == VariantType.mCNV))
                                      for i in range(len(n_copies_list)))
@@ -389,11 +390,12 @@ class SimulatedVariantSet(VariantSet):
             chk(not self.copies or self.copies[0] == self.copies[1], 'Whole chromosome duplications must have the same number of copies on both haplotypes.',
                 error_type='syntax')
 
-        if self.svtype == VariantType.mCNV:            
-            copiesB = parse_copies(self.vset_config.get('n_copiesB', ()), self.target, self.svtype, self.vset_config, 'n_copiesB')
+        copiesB = self.vset_config.get('n_copiesB', ())
+        if self.svtype == VariantType.mCNV or copiesB:            
+            copiesB = parse_copies(copiesB, self.target, self.svtype, self.vset_config, 'n_copiesB')
 
             self.copies = (self.copies[0], copiesB[0])
-            chk('haploid' not in self.config or not self.config['haploid'], f'mCNV are not defined for haploid genomes.')
+            chk('haploid' not in self.config or not self.config['haploid'], f'SV with `n_copiesB` {self.vset_config} are not defined for haploid genomes.')
 
     # end: def preprocess_config(self)
 
