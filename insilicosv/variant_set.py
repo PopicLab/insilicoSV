@@ -1102,9 +1102,7 @@ class ImportedVariantSet(VariantSet):
             parsed_info['DIVERGENCE_PROB'] = [1.0]
             if vcf_rec.alts[0] != '<SNP>':
                 chk(1 <= len(vcf_rec.alts) <= 2, f'Error in the ALT field format {vcf_rec}')
-                # Build the [hap0, hap1] replacement pair directly, keeping each haplotype's own
-                # allele (or None if it does not carry the variant) instead of collapsing them
-                # into a single filtered list.
+                # Build the [hap0, hap1] replacement pair
                 parsed_info['ALT'] = [
                                         (vcf_rec.alts[0] if len(vcf_rec.alts) == 1 else vcf_rec.alts[hap_index])
                                         if parsed_info['GENOTYPE'][hap_index] else None

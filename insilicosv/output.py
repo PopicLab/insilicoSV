@@ -134,25 +134,21 @@ class OutputWriter:
         self.homozygous_only = config.get('homozygous_only', False)
         self.allow_hap_overlap = allow_hap_overlap
 
-    def resolve_divergence_haplotypes(self, transform, hap_index, new_seq):
+    def resolve_divergence_haplotypes(self, transform, hap_index, seq):
         """
-        Determine the sequenceof. a SNP or a divergence.
-        It is performed on hap0 first and then hap1.
-        If homozygous, the same mutation is used otherwise we reuse the previously computed change.
+        Determine the sequence of a SNP or a divergence.
         """
         other_index = 1 - hap_index
         other_seq = transform.get_replacement(other_index)
 
         haplotypes = [None, None]
-        haplotypes[hap_index] = new_seq
         if other_seq is None:
-            # This is the first haplotype resolved for this operation; the other stays pending.
+            # First call for this operation
+            new_seq = utils.divergence(seq, transform.divergence_prob)
+            haplotypes[hap_index] = new_seq
             return haplotypes
-        if transform.divergence_prob == 1 and not self.homozygous_only:
-            # Heterozygous SNP: each haplotype keeps its own independently mutated allele.
-            haplotypes[other_index] = other_seq
-            return haplotypes
-        # Homozygous divergence: both haplotypes share the sequence already resolved for the other one.
+
+        # Homozygous operation
         haplotypes[hap_index] = other_seq
         haplotypes[other_index] = other_seq
         return haplotypes
@@ -321,8 +317,7 @@ class OutputWriter:
                                 # There is a divergence
                                 if operation.transform.get_replacement(hap_index) is None:
                                     # Compute the modified sequence according to the genotype.
-                                    new_seq = utils.divergence(modified_seq, operation.transform.divergence_prob)
-                                    haplotypes = self.resolve_divergence_haplotypes(operation.transform, hap_index, new_seq)
+                                    haplotypes = self.resolve_divergence_haplotypes(operation.transform, hap_index, modified_seq)
 
                                     # Retain the replacement_seq and orig_seq for applying to other copies and to write in the VCF output
                                     operation.transform = operation.transform.replace(replacement_seq=haplotypes,

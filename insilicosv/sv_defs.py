@@ -43,12 +43,12 @@ class Transform:
         return dataclasses.replace(self, **kw)
 
     def get_replacement(self, hap_index):
-        """The replacement sequence for one haplotype, or None if absent/not yet resolved for it."""
+        """Return the replacement sequence for one haplotype, or None if not yet resolved."""
         return self.replacement_seq[hap_index] if self.replacement_seq is not None else None
 
     @property
     def has_divergence(self):
-        """Whether this transform introduces a divergence/replacement, pending or already resolved."""
+        """Whether this transform introduces a divergence"""
         return self.divergence_prob > 0 or self.replacement_seq is not None
 
 

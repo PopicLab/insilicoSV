@@ -51,8 +51,6 @@ class SVSimulator:
     imported_regions: RegionSet
     # Region Set defined by the reference regions to keep track of available regions for overlap SVs
     reference_sv_overlap_regions: RegionSet
-    # RegionSet of the imported SVs to check if they overlap each other (regions without the padding)
-    imported_regions: RegionSet
     blacklist_regions: RegionSet
     reference: FastaFile
     chrom_lengths: dict[str, int]
@@ -98,6 +96,7 @@ class SVSimulator:
         self.chrom_lengths = {chrom: chrom_length
                               for chrom, chrom_length in zip(self.reference.references,
                                                              self.reference.lengths)}
+        # Always allow overlap over different haplotypes of the imported SVs
         self.imported_regions = RegionSet(allow_hap_overlap=True)
 
     def pre_check_config(self):
@@ -321,8 +320,9 @@ class SVSimulator:
     def determine_sv_placement_order(self) -> None:
         # place most constrained SVs first
         logger.info(f'Deciding placement order for {len(self.svs)} SVs')
-        types_order = ['SV OVERLAP and FIXED','SV OVERLAP', 'FIXED', OverlapMode.CHROM, OverlapMode.TERMINAL, OverlapMode.EXACT,
+        overlap_order = [OverlapMode.CHROM, OverlapMode.TERMINAL, OverlapMode.EXACT,
                        OverlapMode.PARTIAL, OverlapMode.CONTAINING, OverlapMode.CONTAINED, None]
+        types_order = ['SV OVERLAP and FIXED','SV OVERLAP', 'FIXED'] + overlap_order
         for sv in self.svs:
             if sv.allow_sv_overlap and sv.fixed_placement is not None:
                 sv.priority = 0
@@ -331,8 +331,9 @@ class SVSimulator:
             elif sv.fixed_placement:
                 sv.priority = 2
             else:
-                distance = sum([dist for dist in sv.breakend_interval_lengths if dist is not None]) + 1
-                sv.priority = (types_order.index(sv.overlap_mode)) + 1 / distance
+                # The larger the distance the earlier the event is placed
+                distance = sum([dist for dist in sv.breakend_interval_lengths if dist is not None]) + 2
+                sv.priority = types_order.index(sv.overlap_mode) + 1 / distance
         self.svs.sort(key=lambda sv: sv.priority)
 
     def is_placement_valid(self, sv, placement):
@@ -359,6 +360,7 @@ class SVSimulator:
                      >= sv.breakend_interval_min_lengths[breakend1])): return False
         
         if sv.fixed_placement is None:
+            # Imported SVs ignore the th_proportion_N parameter
             for op_region in sv.get_regions(placement):
                 # Ensure the regions covered by the SV do not contain a proportion of Ns above th_proportion_N
                 # To ensure that am insertion target is not in between two Ns, the region is padded
@@ -833,9 +835,11 @@ class SVSimulator:
                 f'cannot place imported SV {sv}, please check your SVs are well defined.')
             sv.set_placement(placement=sv.fixed_placement, roi=None)
             if not sv.allow_sv_overlap:
-                chk(not self.imported_regions.overlaps_sv_placement(sv, sv.genotype), f'Imported SV {sv} overlaps with another imported SV, please check your SVs are well defined.')
+                chk(not self.imported_regions.overlaps_sv_placement(sv, sv.genotype), 
+                    f'Imported SV {sv} overlaps with another imported SV, please check your SVs are well defined.')
             else:
-                chk(not self.overlap_sv_regions.overlaps_sv_placement(sv, sv.genotype), f'Imported SV {sv} overlaps with another overlapping imported SV, please check your SVs are well defined.')
+                chk(not self.overlap_sv_regions.overlaps_sv_placement(sv, sv.genotype), 
+                    f'Imported SV {sv} overlaps with another overlapping imported SV, please check your SVs are well defined.')
             return
 
         n_placement_attempts = 0

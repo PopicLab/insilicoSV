@@ -114,7 +114,7 @@ class TestPickSymbolLengths:
     ])
     
     def test_pick_symbol_lengths_failure_modes(self, length_ranges, letter_indexes, expected_error, match_text):
-        """Tests that all invalid configurations safely crash with the exact correct insilicoSV error."""
+        """Tests that all invalid configurations safely crash."""
         
         with pytest.raises(expected_error, match=match_text):
             FromGrammarVariantSet.pick_symbol_lengths(
