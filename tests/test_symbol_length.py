@@ -36,6 +36,12 @@ class TestResolverOrder:
         li = {"A": 0, "B": 1, "C": 2}
         order = FromGrammarVariantSet.resolver_order(ranges, li, DUMMY_VSET_CONFIG)
         assert order[-1] == 0
+
+    def test_implicit_multiplication(self):
+        ranges = [[3, 3], [4, 4], ["2AB", 5]]
+        li = {"A": 0, "B": 1, "C": 2}
+        order = FromGrammarVariantSet.resolver_order(ranges, li, DUMMY_VSET_CONFIG)
+        assert order[-1] == 2
  
     def test_min_and_max_different_letters(self):
         ranges = [[3, 3], ["A", "C"], [1, 1]]
