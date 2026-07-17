@@ -527,6 +527,13 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 (Syntax.ANCHOR_START not in self.source)):
             self.source = tuple([Syntax.ANCHOR_START, *self.source, Syntax.ANCHOR_END])
 
+        chk('divergence_prob' not in vset_cfg or Syntax.DIVERGENCE not in self.target,
+            f'\'{Syntax.DIVERGENCE}\' is not used but divergence_prob has been provided in {vset_cfg}', error_type='syntax')
+        
+        self.divergence_prob_list = self.vset_config.get('divergence_prob', [])
+        if not isinstance(self.divergence_prob_list, list):
+            self.divergence_prob_list = [self.divergence_prob_list]
+
         # Check if a type provided as grammar is a predefined type
         if self.svtype == VariantType.CUSTOM:
             lhs = tuple([letter for letter in self.source if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]])
@@ -542,7 +549,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                         grammar[0] == lhs[::-1] and grammar[1] == rhs[::-1]):
                     # Distinguish between SNP/DIVERGENCE/Identity
                     if (key == VariantType.SNP and ((vset_cfg.get('length_ranges') not in (None, [[1, 1]])) or (Syntax.DIVERGENCE not in self.target[0])
-                                                    or ('divergence_prob' in vset_cfg and vset_cfg['divergence_prob'] not in [[1], 1, 1., [1.]]))):
+                                                    or ('divergence_prob' in vset_cfg and self.divergence_prob_list == [1]))):
                             continue
                     # we found a match and update the types
                     self.svtype = key
@@ -553,13 +560,10 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             'Only DEL and DUP SVs are allowed '
             'to have overlap_mode: chrom. Error in %s' % vset_cfg['config_descr'], error_type='syntax')
 
-        chk('divergence_prob' not in vset_cfg or Syntax.DIVERGENCE not in self.target,
-            f'\'{Syntax.DIVERGENCE}\' is not used but divergence_prob has been provided in {vset_cfg}', error_type='syntax')
-
         if self.svtype == VariantType.SNP:
             chk(vset_cfg.get('length_ranges') in (None, [[1, 1]]),
                 f'length_ranges for SNP can only be [[1, 1]]. Error in %s' % vset_cfg['config_descr'], error_type='value')
-            chk('divergence_prob' not in vset_cfg or vset_cfg['divergence_prob'] in [[1], 1],
+            chk('divergence_prob' not in vset_cfg or self.divergence_prob_list == [1],
                 f'divergence prob for SNP can only be 1. Error in %s' % vset_cfg['config_descr'], error_type='value')
             vset_cfg['length_ranges'] = [[1, 1]]
             vset_cfg['divergence_prob'] = [1.0]
@@ -701,6 +705,9 @@ class FromGrammarVariantSet(SimulatedVariantSet):
 
     @staticmethod
     def resolver_order(ranges, letter_indexes, vset_config):
+        """
+        Resolve the dependencies between symbol lengths and compute an order in which they should be computed
+        """
         dependencies = {idx: set() for idx in range(len(ranges))}
         for idx, (min_range, max_range) in enumerate(ranges):
             for bound in (min_range, max_range):
@@ -818,16 +825,12 @@ class FromGrammarVariantSet(SimulatedVariantSet):
 
         novel_insertion_seqs = self.novel_insertion_seqs
 
-        divergence_prob_list = self.vset_config.get('divergence_prob', [])
-        if not isinstance(divergence_prob_list, list):
-            divergence_prob_list = [divergence_prob_list]
-
         # Build the different operations and anchor, determine the breakends and the distance between them.
         (operations, anchor, dispersions, breakend_interval_lengths,
          breakend_interval_min_lengths) = self.grammar_to_variant_set(lhs_strs, rhs_strs, symbol_lengths,
                                                                       symbol_min_lengths, self.num_letters,
                                                                       novel_insertion_seqs, self.copies,
-                                                                      divergence_prob_list,
+                                                                      self.divergence_prob_list,
                                                                       vset_config=self.vset_config)
 
         #

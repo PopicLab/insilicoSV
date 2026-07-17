@@ -10,7 +10,7 @@ from functools import cmp_to_key
 
 from insilicosv import __version__
 from insilicosv import utils
-from insilicosv.utils import Region, Locus, if_not_none
+from insilicosv.utils import Region, Locus
 from insilicosv.sv_defs import Operation, Transform, TransformType, BreakendRegion, Breakend, VariantType, Syntax
 from insilicosv.variant_set import get_vcf_header_infos
 
