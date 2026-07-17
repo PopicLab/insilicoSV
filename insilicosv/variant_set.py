@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections import defaultdict, deque
+from collections import defaultdict
 from contextlib import closing
 import copy
 import math
@@ -616,14 +616,14 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             try:
                 with open(vset_cfg['novel_insertions'], 'r') as sequences:
                     self.novel_insertion_seqs = [line.rstrip() for line in sequences]
-                    chk(all(bool(re.match('^[TCGA]+$', line)) for line in self.novel_insertion_seqs),
-                        f'The file novel_insertions %s' % self.vset_config['novel_insertions'] +
-                        f' contains invalid characters. It must be a list of sequences.', error_type='value')
-            except:
+            except OSError:
                 chk(False, f'novel_insertion file %s must be a readable ' % vset_cfg['novel_insertions'] +
                            f'file containing a sequence per line.', error_type='file not found')
+            chk(all(bool(re.match('^[TCGA]+$', line)) for line in self.novel_insertion_seqs),
+                        f'The file novel_insertions %s' % self.vset_config['novel_insertions'] +
+                        f' contains invalid characters. It must be a list of sequences.', error_type='value')
         chk(isinstance(vset_cfg.get('type'), (type(None), list, str, tuple)),
-            '%s must be a string or list of strings'.format(vset_cfg.get('type')), error_type='syntax')
+            f'{vset_cfg.get("type")} must be a string or list of strings', error_type='syntax')
 
         chk('interchromosomal_period' not in vset_cfg or isinstance(vset_cfg['interchromosomal_period'], (int, list)),
             'interchromosomal_period must be an int or a list of ints. '
