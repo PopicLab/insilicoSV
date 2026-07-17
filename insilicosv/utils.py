@@ -11,10 +11,6 @@ from typing_extensions import Optional, override
 from intervaltree import IntervalTree
 import pysam
 from copy import deepcopy
-from collections import deque
-import re, math
-
-from insilicosv.constants import Syntax, VariantType
 
 logger = logging.getLogger(__name__)
 
@@ -45,124 +41,6 @@ def complement(seq):
             output += base
 
     return output
-
-
-def parse_copies(copies, target, svtype, vset_config, field_name):
-    if (Syntax.MULTIPLE_COPIES in ''.join(target)) and not copies:
-        chk(svtype not in [VariantType.mCNV, VariantType.CUSTOM], f'{field_name} must be provided for a {svtype}: {vset_config}', error_type='value')
-        # Default the number of copies to 2 on each haplotype for other predefined types with duplications
-        copies = ([1], [1])
-
-    chk(not copies or isinstance(copies, (list, int, tuple)),
-        f'{field_name} must be an integer or a list of integers or a list of ranges in {vset_config}', error_type='value')
-
-    if isinstance(copies, int):
-        copies = [copies]
-
-    if isinstance(copies, list):
-        # Extend the number of copies on each haplotype, in the case of mCNV the correct number per haplotype will be selected
-        copies = (copies, copies)
-
-    if svtype == VariantType.mCNV:
-            chk(copies and all(len(n_copies) == 1 and n_copies[0] not in [1, [1, 1]] for n_copies in copies),
-                f'{field_name} has to be provided and be different from 1 for a mCNV in {vset_config}', error_type='value')
-    return copies
-
-
-# Randomly pick distances within the ranges defined for each symbol
-def pick_symbol_lengths(length_ranges, dispersion_ranges, letter_indexes, vset_config= None):
-    ranges = deepcopy(length_ranges + dispersion_ranges)
-    remaining_symbols = deque(range(len(ranges)))
-    chk(all(isinstance(length_range, str) or (isinstance(length_range, list) and (len(length_range) == 2))
-            for length_range in ranges), f'length_ranges must be a list of [min, max] pairs {ranges} in %s' % vset_config['config_descr'], error_type='syntax')
-    
-    def _assign_length(min_range, max_range, is_dispersion, ranges, vset_config):
-        if max_range is None:
-            length = None
-            if min_range is not None:
-                chk(is_dispersion, f'Only dispersions can have min but not max length {ranges} in %s' % vset_config['config_descr'], error_type='syntax')
-            min_length = min_range
-        else:
-            chk(min_range is not None, f'max_length given but not min_length {ranges} in %s' % vset_config['config_descr'], error_type='syntax')
-            chk(min_range <= max_range, f'max bound less than min bound {ranges} in %s' % vset_config['config_descr'], error_type='syntax')
-            chk(min_range >= 0, f'min length cannot be negative {ranges} in %s' % vset_config['config_descr'], error_type='value')
-            length = random.randint(min_range, max_range)
-            min_length = None
-        return length, min_length
-
-    # Keep track of the dependencies between the symbols length ranges.
-    # A dependency is the index of the letter the range is depending on (possibly a different letter for the min and max bounds)
-    # and the operations on those letter lengths.
-    dependencies = {}
-    symbol_lengths = {}
-    symbol_min_lengths = {}
-    while remaining_symbols:
-        idx = remaining_symbols.popleft()
-        min_range, max_range = ranges[idx]
-        if (isinstance(min_range, int) or min_range is None) and \
-            (isinstance(max_range, int) or max_range is None):
-            # Both bounds are independent to other letter lengths.
-            is_dispersion = (idx >= len(length_ranges))
-            length, min_length = _assign_length(min_range, max_range, is_dispersion, ranges, vset_config)
-            
-            symbol_lengths[idx] = length
-            symbol_min_lengths[idx] = min_length
-        else:
-            all_resolved = True
-            for pos, bound in enumerate([min_range, max_range]):
-                if isinstance(bound, str):
-                    # The bound is dependent of another letter
-                    expr = bound.strip()
-
-                    dependent_letters = set(re.findall(r'[A-Za-z]+', expr))
-                    chk(all(letter in letter_indexes for letter in dependent_letters),
-                        f'The length of a symbol depends on {dependent_letters} '
-                        f'one of which is not define in neither the source nor target in %s' % vset_config['config_descr'], error_type='value')
-                    
-                    eval_context = {}
-                    for letter in dependent_letters:
-                        # Gets the index of the letter in the list of length ranges.
-                        letter_idx = letter_indexes[letter]
-                        if letter_idx in symbol_lengths:
-                            # The letter has been assigned a length
-                            chk(symbol_lengths[letter_idx] is not None,
-                                f'A symbol length cannot depend on an unbounded symbol in %s' % vset_config['config_descr'], error_type='syntax')
-                            eval_context[letter] = symbol_lengths[letter_idx]
-                        else:
-                            # Unresolved letter length
-                            if not idx in dependencies:
-                                dependencies[idx] = []
-                            dependencies[idx].append(letter_idx)
-                            if letter_idx in dependencies:
-                                chk(not idx in dependencies[letter_idx],
-                                    f'There is a cyclic dependency in the length definitions {letter} in %s' % vset_config['config_descr'],
-                                    error_type='syntax')
-                                dependencies[idx] += dependencies[letter_idx]
-                            dependencies[idx] = list(set(dependencies[idx]))
-                            all_resolved = False
-                            break
-
-                    if all_resolved:
-                        # All the dependencies are satisfied
-                        try:
-                            op_expr = re.sub(r'(\d)([A-Za-z]+)', r'\1*\2', expr)
-                            
-                            # Evaluate using math context and our resolved variables
-                            eval_bound = eval(op_expr, {"__builtins__": None, "math": math}, eval_context)
-                            eval_bound = math.ceil(eval_bound) if pos == 0 else math.floor(eval_bound)
-                            
-                            chk(eval_bound >= 0, 
-                                f"Length calculation yielded negative bound for symbol {idx}", 
-                                error_type='value')
-                                
-                            ranges[idx][pos] = eval_bound
-                        except Exception as e:
-                            chk(False, f"Invalid math operation '{op_expr}' for symbol {idx}: {e}", error_type='syntax')
-                
-            remaining_symbols.append(idx)
-    lengths = sorted(symbol_lengths.items(), key=lambda x: x[0])
-    min_lengths = sorted(symbol_min_lengths.items(), key=lambda x: x[0])
-    return [l[1] for l in lengths], [m_l[1] for m_l in min_lengths]
 
 
 def reverse_complement(seq):

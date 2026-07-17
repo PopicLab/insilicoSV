@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections import defaultdict
+from collections import defaultdict, deque
 from contextlib import closing
 import copy
 import math
@@ -10,10 +10,9 @@ import re
 from pysam import FastaFile, VariantFile
 
 from insilicosv import utils
-from insilicosv.utils import RegionFilter, OverlapMode, Locus, error_context, chk, TandemRepeatRegionFilter, if_not_none, parse_copies, pick_symbol_lengths
+from insilicosv.utils import RegionFilter, OverlapMode, Locus, error_context, chk, TandemRepeatRegionFilter, if_not_none
 from insilicosv.sv_defs import (Transform, TransformType, BreakendRegion, Operation, SV, BaseSV,
-                                Syntax, Symbol, TandemRepeatExpansionContractionSV)
-from insilicosv.constants import VariantType, TR, SV_KEY
+                                Syntax, Symbol, TandemRepeatExpansionContractionSV,  VariantType, TR, SV_KEY)
 
 logger = logging.getLogger(__name__)
 
@@ -384,7 +383,7 @@ class SimulatedVariantSet(VariantSet):
             f'divergence_prob must be a float or an int or a list of floats in ]0, 1] or a list of ranges. But, a '
                  f'%s was provided in %s' % (type(self.vset_config.get('divergence_prob', [])), self.vset_config), error_type='value')
 
-        self.copies = parse_copies(self.vset_config.get('n_copies', ()), self.target, self.svtype, self.vset_config, 'n_copies')
+        self.copies = self.parse_copies(self.vset_config.get('n_copies', ()), self.target, self.svtype, self.vset_config, 'n_copies')
         
         if self.overlap_mode == OverlapMode.CHROM:
             chk(not self.copies or self.copies[0] == self.copies[1], 'Whole chromosome duplications must have the same number of copies on both haplotypes.',
@@ -392,11 +391,10 @@ class SimulatedVariantSet(VariantSet):
 
         copiesB = self.vset_config.get('n_copiesB', ())
         if self.svtype == VariantType.mCNV or copiesB:            
-            copiesB = parse_copies(copiesB, self.target, self.svtype, self.vset_config, 'n_copiesB')
+            copiesB = self.parse_copies(copiesB, self.target, self.svtype, self.vset_config, 'n_copiesB')
 
             self.copies = (self.copies[0], copiesB[0])
-            chk('haploid' not in self.config or not self.config['haploid'], f'SV with `n_copiesB` {self.vset_config} are not defined for haploid genomes.')
-
+            chk('haploid' not in self.config or not self.config['haploid'], f'SV with `n_copiesB` {self.vset_config} are not defined for haploid genomes.')      
     # end: def preprocess_config(self)
 
     @property
@@ -448,6 +446,28 @@ class SimulatedVariantSet(VariantSet):
     @override
     def make_variant_set(self):
         return [self.simulate_sv() for _ in range(self.vset_config['number'])]
+    
+    @staticmethod
+    def parse_copies(copies, target, svtype, vset_config, field_name):
+        if (Syntax.MULTIPLE_COPIES in ''.join(target)) and not copies:
+            chk(svtype not in [VariantType.mCNV, VariantType.CUSTOM], f'{field_name} must be provided for a {svtype}: {vset_config}', error_type='value')
+            # Default the number of copies to 2 on each haplotype for other predefined types with duplications
+            copies = ([1], [1])
+
+        chk(not copies or isinstance(copies, (list, int, tuple)),
+            f'{field_name} must be an integer or a list of integers or a list of ranges in {vset_config}', error_type='value')
+
+        if isinstance(copies, int):
+            copies = [copies]
+
+        if isinstance(copies, list):
+            # Extend the number of copies on each haplotype, in the case of mCNV the correct number per haplotype will be selected
+            copies = (copies, copies)
+
+        if svtype == VariantType.mCNV:
+                chk(copies and all(len(n_copies) == 1 and n_copies[0] not in [1, [1, 1]] for n_copies in copies),
+                    f'{field_name} has to be provided and be different from 1 for a mCNV in {vset_config}', error_type='value')
+        return copies
 
     @abstractmethod
     def simulate_sv(self):
@@ -616,8 +636,146 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 isinstance(interchromosomal_period[1], int),
                 'interchromosomal_period when provided as a range must contain two integers. '
                 'Provided %s' % vset_cfg['config_descr'], error_type='syntax')
+            
+        letter_ranges, dispersion_ranges, letter_indexes, self.indexes_letter = self.get_length_ranges()
+        self.num_letters = len(letter_ranges)
+        self.ranges = letter_ranges + dispersion_ranges
 
-    def symmetrize(self, lhs_strs, rhs_strs, letter_ranges):
+        self.order = self.resolver_order(self.ranges, letter_indexes, self.vset_config)
+
+    def get_length_ranges(self):
+        lhs_strs = self.source
+        rhs_strs = self.target
+
+        if self.vset_config['type'] == 'INDEL':
+            # For length purposes having a DEL or INS is equivalent
+            lhs_strs, rhs_strs = SV_KEY[VariantType.DEL]
+
+        length_ranges = self.vset_config['length_ranges'] if 'length_ranges' in self.vset_config else []
+        chk(all(isinstance(length_range, str) or (isinstance(length_range, list) and (len(length_range) == 2))
+                for length_range in length_ranges), f'length_ranges must be a list of [min, max] pairs {length_ranges} in %s' % self.vset_config['config_descr'], error_type='syntax')
+        
+        letter_ranges = length_ranges
+        dispersion_ranges = []
+        lhs_strs_no_anchor = [letter for letter in lhs_strs if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]]
+
+        # Find the length ranges corresponding to dispersions and those corresponding to letters
+        dispersions = [idx for idx, letter in enumerate(lhs_strs_no_anchor) if letter == Syntax.DISPERSION]
+        if dispersions:
+            if self.svtype != VariantType.CUSTOM and not self.input_type:
+                # The SV was provided from a predefined type, the dispersion lengths are last
+                letter_ranges = length_ranges[:-1]
+                dispersion_ranges = [length_ranges[-1]]
+            else:
+                # The SV was provided from the grammar, the dispersion lengths are at the last position in the source
+                letter_ranges = [length_range for idx, length_range in enumerate(length_ranges) if
+                                 idx not in dispersions]
+                dispersion_ranges = [length_range for idx, length_range in enumerate(length_ranges) if
+                                     idx in dispersions]
+                
+        letters = [letter for letter in lhs_strs if
+                   letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START, Syntax.DISPERSION]]
+        chk(len(letters) == len(set(letters)), f'Duplicate LHS symbol {letters} in {lhs_strs} for {self.vset_config}', error_type='syntax')
+
+        # Add novel insertion letters only appearing in the rhs.
+        for letter in rhs_strs:
+            if letter[0].upper() not in letters + [Syntax.ANCHOR_END, Syntax.ANCHOR_START, Syntax.DISPERSION]:
+                chk(letter[0].isupper(), 'A novel insertion letter has to be uppercase. But, %s was provided' % self.vset_config)
+                letters.append(letter[0].upper())
+        chk(len(length_ranges) == len(letters) + len(dispersions),
+            f'Mismatched length ranges, expected {len(letters) + len(dispersions)} provided {len(length_ranges)} for '
+            f'{self.vset_config}', error_type='syntax')
+        letter_indexes = {letter: index for index, letter in enumerate(letters)}
+        indexes_letter = {index: letter for index, letter in enumerate(letters)}
+
+        return letter_ranges, dispersion_ranges, letter_indexes, indexes_letter
+    
+    @staticmethod
+    def validate_ranges(min_range, max_range, vset_config=None, is_dispersion=False):      
+        if max_range is None:
+            chk((min_range is None) or is_dispersion, f'Only dispersions can have min but not max length [{min_range}, {max_range}]  in %s' % vset_config['config_descr'], error_type='syntax')
+        else:
+            chk(min_range is not None, f'max_length given but not min_length [{min_range}, {max_range}] in %s' % vset_config['config_descr'], error_type='syntax')
+            chk(min_range <= max_range, f'max bound less than min bound [{min_range}, {max_range}] in %s' % vset_config['config_descr'], error_type='syntax')
+            chk(min_range >= 0, f'min length cannot be negative [{min_range}, {max_range}] in %s' % vset_config['config_descr'], error_type='value')
+
+    @staticmethod
+    def resolver_order(ranges, letter_indexes, vset_config):
+        dependencies = {idx: set() for idx in range(len(ranges))}
+        for idx, (min_range, max_range) in enumerate(ranges):
+            for bound in (min_range, max_range):
+                if not isinstance(bound, str): continue
+                letters = set(re.findall(r'[A-Za-z]', bound))
+                chk(all(letter in letter_indexes for letter in letters),
+                            f'The length of a symbol depends on {letters} '
+                            f'one of which is not define in neither the source nor target in %s' % vset_config['config_descr'], error_type='value')
+                dependencies[idx].update(set(letter_indexes[letter] for letter in letters))
+        
+        order = []
+        visited = {idx: 0 for idx in dependencies}
+        def visit(idx):
+            # Marked as in the current depth exploration
+            visited[idx] = 1
+            for dep in dependencies[idx]:
+                chk(visited[dep] != 1, f'There is a cyclic dependency in the length definitions {ranges[dep]} in %s' % vset_config['config_descr'], error_type='syntax')
+                if visited[dep] == 0:
+                    visit(dep)
+            # Done exploring this letter
+            visited[idx] = 2
+            order.append(idx)
+        for letter_idx in dependencies:
+            if visited[letter_idx] == 0:
+                visit(letter_idx)
+        return order
+
+    @staticmethod
+    def _eval_formula(expr, lengths, is_min, vset_config):
+        eval_bound = expr
+        if isinstance(expr, str):
+            formula = re.sub(r'(?<=[A-Za-z])(?=[A-Za-z0-9])|(?<=[0-9])(?=[A-Za-z])', '*', expr.strip())
+
+            for letter in set(re.findall(r'[A-Za-z]', expr)):
+                chk(lengths.get(letter) is not None,
+                    f'A symbol length cannot depend on an unbounded symbol in %s'
+                    % vset_config['config_descr'], error_type='syntax')
+            eval_bound = eval(formula, {"__builtins__": None}, lengths)
+            eval_bound = math.ceil(eval_bound) if is_min else math.floor(eval_bound)
+        return eval_bound
+
+    @staticmethod
+    def pick_symbol_lengths(ranges, order, num_letters, indexes_letter, vset_config):
+        # Randomly pick distances within the ranges defined for each symbol
+        def _assign_length(min_range, max_range):
+            if max_range is None:
+                length = None                    
+                min_length = min_range
+            else:
+                length = random.randint(min_range, max_range)
+                min_length = None
+            return length, min_length
+
+        symbol_lengths = {}
+        symbol_min_lengths = {}
+        letter_lengths = {}
+        for letter_idx in order:
+            min_range, max_range = ranges[letter_idx]
+            explicit_min = FromGrammarVariantSet._eval_formula(min_range, letter_lengths, True, vset_config)
+            explicit_max = FromGrammarVariantSet._eval_formula(max_range, letter_lengths, False, vset_config)
+
+            is_dispersion = letter_idx >= num_letters
+            FromGrammarVariantSet.validate_ranges(explicit_min, explicit_max, vset_config=vset_config, is_dispersion=is_dispersion)
+            length, min_length = _assign_length(explicit_min, explicit_max)
+                
+            symbol_lengths[letter_idx] = length
+            symbol_min_lengths[letter_idx] = min_length
+            
+            if not is_dispersion:
+                letter_lengths[indexes_letter[letter_idx]] = length
+        lengths = sorted(symbol_lengths.items(), key=lambda x: x[0])
+        min_lengths = sorted(symbol_min_lengths.items(), key=lambda x: x[0])
+        return [l[1] for l in lengths], [m_l[1] for m_l in min_lengths]
+    
+    def symmetrize(self, lhs_strs, rhs_strs, symbol_lengths, symbol_min_lengths):
         # Enforce the symmetry of the predefined SVs with duplications or dispersions.
         if (("DUP" in self.svtype.name or "TRA" in self.svtype.name or
              "iDEL" in self.svtype.name)
@@ -633,12 +791,13 @@ class FromGrammarVariantSet(SimulatedVariantSet):
 
             lhs_strs = tuple(map(flip_anchor, lhs_strs))[::-1]
             rhs_strs = tuple(map(flip_anchor, rhs_strs))[::-1]
-            if "length_ranges" in self.vset_config:
-                letter_ranges = letter_ranges[::-1]
+            # Keep the length of the dispersion at the end
+            symbol_lengths = symbol_lengths[:self.num_letters][::-1] + symbol_lengths[self.num_letters:][::-1]
+            symbol_min_lengths = symbol_min_lengths[:self.num_letters][::-1] + symbol_min_lengths[self.num_letters:][::-1]
         chk(all(len(rhs) < 3 for rhs in rhs_strs),
             f'The operators + and * cannot be used at the same time {rhs_strs}.',
             error_type='syntax')
-        return lhs_strs, rhs_strs, letter_ranges
+        return lhs_strs, rhs_strs, symbol_lengths, symbol_min_lengths
 
     @override
     def simulate_sv(self) -> SV:
@@ -651,42 +810,11 @@ class FromGrammarVariantSet(SimulatedVariantSet):
             lhs_strs, rhs_strs = SV_KEY[svtype]
             if anchor:
                 lhs_strs = tuple(Syntax.ANCHOR_START) + lhs_strs + tuple(Syntax.ANCHOR_END)
-        length_ranges = self.vset_config['length_ranges'] if 'length_ranges' in self.vset_config else []
-        letter_ranges = length_ranges
-        dispersion_ranges = []
-        lhs_strs_no_anchor = [letter for letter in lhs_strs if letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START]]
-
-        # Find the length ranges corresponding to dispersions and those corresponding to letters
-        dispersions = [idx for idx, letter in enumerate(lhs_strs_no_anchor) if letter == Syntax.DISPERSION]
-        if dispersions:
-            if svtype != VariantType.CUSTOM and not self.input_type:
-                # The SV was provided from a predefined type, the dispersion lengths are last
-                letter_ranges = length_ranges[:-1]
-                dispersion_ranges = [length_ranges[-1]]
-            else:
-                # The SV was provided from the grammar, the dispersion lengths are at the last position in the source
-                letter_ranges = [length_range for idx, length_range in enumerate(length_ranges) if
-                                 idx not in dispersions]
-                dispersion_ranges = [length_range for idx, length_range in enumerate(length_ranges) if
-                                     idx in dispersions]
-
-        lhs_strs, rhs_strs, letter_ranges = self.symmetrize(lhs_strs, rhs_strs, letter_ranges)
-        letters = [letter for letter in lhs_strs if
-                   letter not in [Syntax.ANCHOR_END, Syntax.ANCHOR_START, Syntax.DISPERSION]]
-        chk(len(letters) == len(set(letters)), f'Duplicate LHS symbol {letters} in {lhs_strs} for {self.vset_config}', error_type='syntax')
-
-        # Add novel insertion letters only appearing in the rhs.
-        for letter in rhs_strs:
-            if letter[0].upper() not in letters + [Syntax.ANCHOR_END, Syntax.ANCHOR_START, Syntax.DISPERSION]:
-                chk(letter[0].isupper(), 'A novel insertion letter has to be uppercase. But, %s was provided' % self.vset_config)
-                letters.append(letter[0].upper())
-        chk(len(length_ranges) == len(letters) + len(dispersions),
-            f'Mismatched length ranges, expected {len(letters) + len(dispersions)} provided {len(length_ranges)} for '
-            f'{self.vset_config}', error_type='syntax')
-        letter_indexes = {letter: index for index, letter in enumerate(letters)}
 
         # Compute the lengths of the different symbols and dispersions from the length ranges.
-        symbol_lengths, symbol_min_lengths = pick_symbol_lengths(letter_ranges, dispersion_ranges, letter_indexes, self.vset_config)
+        symbol_lengths, symbol_min_lengths = self.pick_symbol_lengths(self.ranges, self.order, self.num_letters, self.indexes_letter, self.vset_config)
+
+        lhs_strs, rhs_strs, symbol_lengths, symbol_min_lengths = self.symmetrize(lhs_strs, rhs_strs, symbol_lengths, symbol_min_lengths)
 
         novel_insertion_seqs = self.novel_insertion_seqs
 
@@ -697,7 +825,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         # Build the different operations and anchor, determine the breakends and the distance between them.
         (operations, anchor, dispersions, breakend_interval_lengths,
          breakend_interval_min_lengths) = self.grammar_to_variant_set(lhs_strs, rhs_strs, symbol_lengths,
-                                                                      symbol_min_lengths, len(letters),
+                                                                      symbol_min_lengths, self.num_letters,
                                                                       novel_insertion_seqs, self.copies,
                                                                       divergence_prob_list,
                                                                       vset_config=self.vset_config)

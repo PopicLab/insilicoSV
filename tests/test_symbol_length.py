@@ -1,120 +1,144 @@
-import copy
-import math
 import pytest
+import math
 
 
-from insilicosv.utils import pick_symbol_lengths 
+from insilicosv.variant_set import FromGrammarVariantSet 
 
 # Dummy config to format error messages
 DUMMY_VSET_CONFIG = {"config_descr": "test_sv_config"}
 
-class TestPickSymbolLengths:
-
-    def test_complex_dependencies_variance_and_isolation(self):
-        """
-        Tests that when simulating multiple SVs:
-        - The generated lengths are correct.
-        - Randomness works.
-        - The bounds are not modified from one iteration to the next.
-        """
-        original_ranges = [[10, 20], ["A + 5", "2A"], ["B/2", "B"]]
-        dispersion_ranges = []
-        letter_indexes = {"A": 0, "B": 1, "C": 2}
-        
-        input_ranges = copy.deepcopy(original_ranges)
-
-        results_A = set()
-        results_B = set()
-
-        for _ in range(100):
-            lengths, min_lengths = pick_symbol_lengths(
-                input_ranges, dispersion_ranges, letter_indexes, DUMMY_VSET_CONFIG
+class TestResolverOrder:
+    def test_independent(self):
+        ranges = [[1, 2], [3, 4], [5, 6]]
+        order = FromGrammarVariantSet.resolver_order(ranges, {"A": 0, "B": 1, "C": 2}, DUMMY_VSET_CONFIG)
+        assert order == [0, 1, 2]
+ 
+    def test_single_dependency(self):
+        ranges = [["B", 5], [5, 5]]
+        li = {"A": 0, "B": 1}
+        order = FromGrammarVariantSet.resolver_order(ranges, li, DUMMY_VSET_CONFIG)
+        assert order == [1, 0]
+ 
+    def test_transitive(self):
+        ranges = [["2B", "2B"], ["C+1", "C+1"], [5, 5]]
+        li = {"A": 0, "B": 1, "C": 2}
+        order = FromGrammarVariantSet.resolver_order(ranges, li, DUMMY_VSET_CONFIG)
+        assert order == [2, 1, 0]
+    
+    def test_two_chains(self):
+        ranges = [["2B", "2B"], ["C+1", "C+1"], [5, 5], ["C", 5], [4, "D"]]
+        li = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4}
+        order = FromGrammarVariantSet.resolver_order(ranges, li, DUMMY_VSET_CONFIG)
+        assert order == [2, 1, 0, 3, 4]
+ 
+    def test_double_dependency(self):
+        ranges = [["B+C", 3], [2, 2], [3, 3]]
+        li = {"A": 0, "B": 1, "C": 2}
+        order = FromGrammarVariantSet.resolver_order(ranges, li, DUMMY_VSET_CONFIG)
+        assert order[-1] == 0
+ 
+    def test_min_and_max_different_letters(self):
+        ranges = [[3, 3], ["A", "C"], [1, 1]]
+        li = {"A": 0, "B": 1, "C": 2}
+        order = FromGrammarVariantSet.resolver_order(ranges, li, DUMMY_VSET_CONFIG)
+        assert order[-1] == 1
+ 
+    def test_missing_symbol(self):
+        with pytest.raises(ValueError):
+            FromGrammarVariantSet.resolver_order(
+                [[1, 1], ["Z", "Z"]], {"A": 0, "B": 1}, DUMMY_VSET_CONFIG
             )
-            
-            assert input_ranges == original_ranges, "Function mutated the original length_ranges!"
+ 
+    def test_cycle(self):
+        with pytest.raises(SyntaxError):
+            FromGrammarVariantSet.resolver_order(
+                [["B", "B"], ["A", "A"]], {"A": 0, "B": 1}, DUMMY_VSET_CONFIG
+            )
+ 
 
-            A, B, C = lengths
-            
-            assert 10 <= A <= 20
-            assert A + 5 <= B <= 2 * A
-            assert math.ceil(B / 2) <= C <= math.floor(B)
+class TestEvalFormula:
+    def test_non_string(self):
+        assert FromGrammarVariantSet._eval_formula(7, {}, True, DUMMY_VSET_CONFIG) == 7
+        assert FromGrammarVariantSet._eval_formula(None, {}, False, DUMMY_VSET_CONFIG) is None
+ 
+    def test_letter(self):
+        assert FromGrammarVariantSet._eval_formula("A", {"A": 6}, True, DUMMY_VSET_CONFIG) == 6
+ 
+    def test_multiplication(self):
+        assert FromGrammarVariantSet._eval_formula("2A", {"A": 6}, False, DUMMY_VSET_CONFIG) == 12
+ 
+    def test_min_bound_division(self):
+        assert FromGrammarVariantSet._eval_formula("A/3", {"A": 10}, True, DUMMY_VSET_CONFIG) == 4
+ 
+    def test_max_bound_division(self):
+        assert FromGrammarVariantSet._eval_formula("A/3", {"A": 10}, False, DUMMY_VSET_CONFIG) == 3
+ 
+    def test_dependency_none(self):
+        with pytest.raises(SyntaxError):
+            FromGrammarVariantSet._eval_formula("A", {"A": None}, True, DUMMY_VSET_CONFIG)
+ 
+    def test_letters_multiplication(self):
+        assert FromGrammarVariantSet._eval_formula("2AB", {"A": 4, "B": 3}, False, DUMMY_VSET_CONFIG) == 24
 
-            results_A.add(A)
-            results_B.add(B)
+    def test_letters_addition(self):
+        assert FromGrammarVariantSet._eval_formula("A+ B", {"A": 4, "B": 3}, False, DUMMY_VSET_CONFIG) == 7
 
-        assert len(results_A) > 1, "Randomness failed: Symbol A was identical across 100 iterations."
-        assert len(results_B) > 1, "Randomness failed: Symbol B was identical across 100 iterations."
+    def test_letters_substraction(self):
+        assert FromGrammarVariantSet._eval_formula("A -B", {"A": 4, "B": 3}, False, DUMMY_VSET_CONFIG) == 1
 
-    def test_transitive_and_implicit_math(self):
-        """
-        Tests that the deque processes the order of the know variable doesn't matter.
-        Test implicit math notations
-        """
-        length_ranges = [["2B", "2B"], ["C+1", "C+1"], [5, 5]]
-        letter_indexes = {"A": 0, "B": 1, "C": 2}
 
-        lengths, _ = pick_symbol_lengths(
-            length_ranges, [], letter_indexes, DUMMY_VSET_CONFIG
-        )
+class TestPickSymbolLengths:
+    def test_fixed_ranges(self):
+        ranges = [[5, 5], [7, 7]]
+        order = [0, 1]
+        num_letters = 2
+        indexes_letter = {0: "A", 1: "B"}
+        lengths, min_lengths = FromGrammarVariantSet.pick_symbol_lengths(ranges, order, num_letters, indexes_letter, DUMMY_VSET_CONFIG)
+        assert lengths == [5, 7]
+        assert min_lengths == [None, None]
+ 
+    def test_transitive(self):
+        ranges = [["2B", "2B"], ["C+1", "C+1"], [5, 5]]
+        order = [2, 1, 0]
+        num_letters = 3
+        indexes_letter = {0: "A", 1: "B", 2: "C"}
+        lengths, min_lengths = FromGrammarVariantSet.pick_symbol_lengths(ranges, order, num_letters, indexes_letter, DUMMY_VSET_CONFIG)
 
         assert lengths == [12, 6, 5]
+        assert min_lengths == [None, None, None]
+ 
+    def test_fraction(self):
+        ranges = [[10, 10], ["A/3", 4]]
+        order = [0, 1]
+        num_letters = 2
+        indexes_letter = {0: "A", 1: "B"}
+        lengths, min_lengths = FromGrammarVariantSet.pick_symbol_lengths(ranges, order, num_letters, indexes_letter, DUMMY_VSET_CONFIG)
 
-    def test_fractional_bounds_rounding(self):
-        """
-        Check the rounding of math expressions
-        """
-        length_ranges = [[10, 10], ["A/3", "A/2"]] 
-        letter_indexes = {"A": 0, "B": 1}
+        assert lengths == [10, 4]
+        assert min_lengths == [None, None]
+ 
+    def test_dispersion(self):
+        ranges = [[10, 10], [100, None]]
+        order = [0, 1]
+        num_letters = 1
+        indexes_letter = {0: "A"}
+        lengths, min_lengths = FromGrammarVariantSet.pick_symbol_lengths(ranges, order, num_letters, indexes_letter, DUMMY_VSET_CONFIG)
 
-        lengths, _ = pick_symbol_lengths(
-            length_ranges, [], letter_indexes, DUMMY_VSET_CONFIG
-        )
+        assert lengths == [10, None]
+        assert min_lengths == [None, 100]       
+ 
+    def test_randomness(self):
+        ranges = [[10, 20], ["A + 5", "2A"], ["B/2", "B"]]
+        order = [0, 1, 2]
+        num_letters = 3
+        indexes_letter = {0: "A", 1: "B", 2: "C"}
 
-        assert lengths[0] == 10
-        assert lengths[1] in [4, 5]
-
-    @pytest.mark.parametrize("length_ranges, letter_indexes, expected_error, match_text", [
-        #Check failure modes.
-
-        # Missing bounds
-        ([[10]], {"A": 0}, SyntaxError, r"must be a list of \[min, max\] pairs"),
+        seen_lengths = set()
+        for _ in range(100):
+            lengths, _ = FromGrammarVariantSet.pick_symbol_lengths(ranges, order, num_letters, indexes_letter, DUMMY_VSET_CONFIG)
+            seen_lengths.add(lengths[0])
+            assert 10 <= lengths[0] <= 20
+            assert lengths[0] + 5 <= lengths[1] <= 2 * lengths[0]
+            assert math.ceil(lengths[1]/2) <= lengths[2] <= lengths[1]
+        assert len(seen_lengths) > 1
         
-        # Min > Max
-        ([[20, 10]], {"A": 0}, SyntaxError, "max bound less than min bound"),
-        
-        # Min > Max from math expression
-        ([[10, 10], ["A", "A/2"]], {"A": 0, "B": 1}, SyntaxError, "max bound less than min bound"),
-        
-        # Negative length
-        ([[-5, 5]], {"A": 0}, ValueError, "min length cannot be negative"),
-        
-        # Negative length from math expression
-        ([[10, 10], ["A-20", "A"]], {"A": 0, "B": 1}, SyntaxError, "yielded negative bound"),
-        
-        # Missing Dependency
-        ([[10, 10], ["Z", "Z"]], {"A": 0, "B": 1}, ValueError, "one of which is not define"),
-        
-        # Cyclic Dependency
-        ([["B", "B"], ["A", "A"]], {"A": 0, "B": 1}, SyntaxError, "cyclic dependency"),
-        
-        # Invalid Math
-        ([[10, 10], ["A/0", "A"]], {"A": 0, "B": 1}, SyntaxError, "Invalid math operation"),
-        
-        # Dependency on an Unbounded Symbol
-        ([[None, None], ["A", "A"]], {"A": 0, "B": 1}, SyntaxError, "cannot depend on an unbounded symbol"),
-
-    ], ids=[
-        "malformed_pair", "hardcoded_min_max", "evaluated_min_max", "hardcoded_negative",
-        "evaluated_negative", "undefined_symbol", "cyclic_dependency", "math_error", "unbounded_dependency"
-    ])
-    
-    def test_pick_symbol_lengths_failure_modes(self, length_ranges, letter_indexes, expected_error, match_text):
-        """Tests that all invalid configurations safely crash."""
-        
-        with pytest.raises(expected_error, match=match_text):
-            pick_symbol_lengths(
-                length_ranges, 
-                dispersion_ranges=[], 
-                letter_indexes=letter_indexes, 
-                vset_config=DUMMY_VSET_CONFIG
-            )
