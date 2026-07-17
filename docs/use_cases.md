@@ -140,6 +140,9 @@ If a sample with a 'GT' field is not specified, the genotype will be chosen at r
 Variant sets imported from VCFs may be combined in the same config file with variant sets specifying
 random variants to simulate.
 
+Imported variant sets will ignore the parameters `min_intersv_dist`, `allow_hap_overlap` and  `th_proportion_N` to respect the positions specified in the VCF.
+Imported SVs are not allowed to overlap each other on the same haplotype unless a single one of them has `allow_sv_overlap=True` specified in the INFO field.
+
 ### Example 4a - Marking genome blacklist intervals
 When initializing a new simulation the user can include a blacklist of genome intervals 
 (i.e., intervals that specified variants will avoid) via a VCF or BED file given (or multiple provided 
@@ -378,8 +381,9 @@ variant_sets:
       allow_sv_overlap: True
 ```
 Here the INDEL and SNP definitions have the `allow_sv_overlap` parameter set to `True`, which allows them to be randomly placed within the DUP intervals.
-Note: SNPs and INDELs that are allowed to overlap SVs are always considered as occurring first in the simulation process. 
+Note: SNPs and INDELs that are allowed to overlap SVs are always considered as occurring first in the simulation process, and they ignore the `min_intersv_dist` parameter. 
 As such, they might be modified or even deleted by SVs that are placed later. Regardless of whether they are ultimately observable in the final genome, all simulated variants are included in the final VCF output.
+INDELs and SNPs with the `allow_sv_overlap` flag cannot overlap other INDELs and SNPs with the `allow_sv_overlap` flag.
 
 ### Example 8 - Divergence
 The divergence `*` symbol can be used to introduce point mutations in a duplicated sequence, causing it to differ from the original reference sequence. 
