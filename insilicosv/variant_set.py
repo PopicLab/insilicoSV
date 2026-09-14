@@ -841,7 +841,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
         roi_filter = self.get_roi_filter()
 
         interchromosomal_period = self.get_sampled_int_value(self.interchromosomal_period)
-
+        
         return BaseSV(sv_id=self.make_sv_id(),
                       breakend_interval_lengths=breakend_interval_lengths,
                       breakend_interval_min_lengths=breakend_interval_min_lengths,

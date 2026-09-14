@@ -340,16 +340,17 @@ class RegionSet:
         # Blacklist affect the three ploidy trees
         return RegionSet(filter(satisfies_filter, self.get_region_list()))
 
-    def add_region_set(self, other_region_set):
+    def add_region_set(self, other_region_set, genotype=None, allow_hap_overlap=False):
         for chrom, other_chrom_itree_list in other_region_set.chrom2itree.items():
             for hap, other_chrom_itree in other_chrom_itree_list.items():
+                if allow_hap_overlap and genotype is not None and (hap >= len(genotype) or not genotype[hap]): continue
                 self.chrom2itree[chrom][hap].update(other_chrom_itree)
 
-    def add_region(self, region, sv=None, allow_hap_overlap=None):
+    def add_region(self, region, sv=None, allow_hap_overlap=False):
         aux_region = deepcopy(region)
         if sv:
             aux_region = aux_region.replace(sv=sv)
-        self.add_region_set(RegionSet([aux_region], allow_hap_overlap=allow_hap_overlap))
+        self.add_region_set(RegionSet([aux_region], allow_hap_overlap=allow_hap_overlap), genotype=sv.genotype, allow_hap_overlap=allow_hap_overlap)
 
     def chop(self, sv_region, genotype):
         # Remove the parts of intervals overlapping sv_region.
@@ -394,7 +395,6 @@ class RegionSet:
                     # Add padding to ensure that adjacent regions are not considered overlapping (compensate for the padding in the tree)
                     start_pos = region.start + 0.2
                     end_pos = region.end - 0.2
-                    
                     if tree.overlap(start_pos, end_pos):
                         return True
 

@@ -308,7 +308,7 @@ class SVSimulator:
 
                 if sv.fixed_placement is not None:
                     for region in sv.get_regions():
-                        self.imported_regions.add_region(region, sv=sv, allow_hap_overlap=self.allow_hap_overlap)
+                        self.imported_regions.add_region(region, sv=sv, allow_hap_overlap=True)
             else:
                 self.update_overlap_svs(sv)
 
@@ -826,6 +826,7 @@ class SVSimulator:
 
     def place_sv(self, sv, roi_index):
         assert not sv.is_placed()
+
         reference_regions = self.reference_regions
         if sv.allow_sv_overlap:
             reference_regions = self.reference_sv_overlap_regions
