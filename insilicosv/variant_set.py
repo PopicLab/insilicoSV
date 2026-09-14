@@ -567,6 +567,7 @@ class FromGrammarVariantSet(SimulatedVariantSet):
                 f'divergence prob for SNP can only be 1. Error in %s' % vset_cfg['config_descr'], error_type='value')
             vset_cfg['length_ranges'] = [[1, 1]]
             vset_cfg['divergence_prob'] = [1.0]
+            self.divergence_prob_list = [1.0]
         elif vset_cfg['type'] == 'INDEL':
             # INDELS have to be of size <= 50
             chk(not vset_cfg.get('length_ranges', False) or (1 <= if_not_none(vset_cfg['length_ranges'][0][0], 1) <=
