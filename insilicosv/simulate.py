@@ -326,7 +326,7 @@ class SVSimulator:
         for sv in self.svs:
             if sv.allow_sv_overlap and sv.fixed_placement is not None:
                 sv.priority = 0
-            if sv.allow_sv_overlap:
+            elif sv.allow_sv_overlap:
                 sv.priority = 1
             elif sv.fixed_placement:
                 sv.priority = 2
