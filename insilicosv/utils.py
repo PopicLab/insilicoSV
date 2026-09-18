@@ -3,6 +3,7 @@ from contextlib import closing, contextmanager
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum
+import itertools
 import logging
 import os
 import os.path
@@ -11,6 +12,7 @@ from typing_extensions import Optional, override
 from intervaltree import IntervalTree
 import pysam
 from copy import deepcopy
+import bisect
 
 logger = logging.getLogger(__name__)
 
@@ -207,8 +209,11 @@ class RegionSet:
 
     chrom2itree: dict[str, dict[int, IntervalTree]]
     num_hap_tree: int
+    # The cumulative weights is used for sampling uniformly at random overlapping regions
+    cumulative_weights: dict[str, dict[int, list[int]]]
 
     def __init__(self, regions=None, allow_hap_overlap=False):
+        self.cumulative_weights = defaultdict(lambda: defaultdict(list))
         regions = regions or []
         self.num_hap_tree = 3 if allow_hap_overlap else 1
         chrom2regions = defaultdict(list)
@@ -238,6 +243,39 @@ class RegionSet:
                 return True
         return False
 
+    def build_union_tree(self, region_set):
+            """
+            Define an overlap-free RegionSet for the overlap ROIs when the overlap mode is CONTAINED or PARTIAL. 
+            This allows to draw a position uniformly at random over the union of ROIs.
+            """
+            for chrom, tree_dict in region_set.chrom2itree.items():
+                for hap in tree_dict:
+                    hap_tree = tree_dict[hap].copy()
+                    hap_tree.merge_overlaps(strict=True)
+                    self.chrom2itree[chrom][hap] = sorted(hap_tree)
+                    self.cumulative_weights[chrom][hap] = list(
+                        itertools.accumulate(chunk.end - chunk.begin for chunk in hap_tree))
+
+    def sample_uniform_position(self, hap=0):
+        """
+        Draws a position uniformly at random over the union of ROIs for this chromosome and haplotype
+        """
+        chrom = random.choice(list(self.chrom2itree.keys()))
+        hap_tree = self.chrom2itree[chrom][hap]
+
+        total_length = self.cumulative_weights[chrom][hap][-1]
+        random_position = random.uniform(0, total_length)
+
+        # Find the interval that contains the random position
+        idx = bisect.bisect_right(self.cumulative_weights[chrom][hap], random_position)
+
+        # Get the actual position within the interval
+        if idx == 0:
+            sampled_position = hap_tree[idx].begin + random_position
+        else:
+            sampled_position = hap_tree[idx].begin + (random_position - self.cumulative_weights[chrom][hap][idx - 1])
+        return chrom, sampled_position
+                    
     @staticmethod
     def from_files(file_paths, region_type):
         regions = []
