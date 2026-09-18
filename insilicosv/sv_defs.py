@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from copy import copy
 from enum import Enum
 from functools import cached_property
-from operator import length_hint
-
 from typing_extensions import TypeAlias, Optional, Any, cast, override
 
 from insilicosv.utils import (
@@ -33,14 +31,27 @@ class Transform:
         chk(0 <= self.divergence_prob <= 1,
             f'Invalid divergence probability, please specify a value between 0 and 1 {self.divergence_prob} provided.',
             error_type='value')
+        assert (self.replacement_seq is None or
+                (len(self.replacement_seq) == 2 and
+                 all(seq is None or isinstance(seq, str) for seq in self.replacement_seq))), (
+            f'replacement_seq must be None or a 2-element [hap0, hap1] list of str/None, '
+            f'got {self.replacement_seq!r}')
 
     def replace(self, **kw):
         """Return a copy of self with fields replaced according to `kw`"""
         return dataclasses.replace(self, **kw)
 
+    def get_replacement(self, hap_index):
+        """Return the replacement sequence for one haplotype, or None if not yet resolved."""
+        return self.replacement_seq[hap_index] if self.replacement_seq is not None else None
+
+    @property
+    def has_divergence(self):
+        """Whether this transform introduces a divergence"""
+        return self.divergence_prob > 0 or self.replacement_seq is not None
+
 
 Breakend: TypeAlias = int
-
 
 @dataclass(frozen=True)
 class BreakendRegion:

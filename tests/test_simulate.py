@@ -12,6 +12,8 @@ from pysam import FastaFile
 from insilicosv import utils
 from insilicosv.utils import Region, as_list
 from insilicosv.sv_defs import Transform, TransformType, SV
+import logging
+logging.getLogger("insilicosv.output").setLevel(logging.ERROR)
 
 
 def is_overlapping(event_ranges, addition, called_from_helper=False, strictly_partial=False):
