@@ -523,8 +523,9 @@ class SVSimulator:
             max_tries = self.config.get("max_random_breakend_tries", DEFAULT_MAX_TRIES)
             for _ in range(max_tries):
                 chrom, random_position = self.union_rois_overlap[sv_category].sample_uniform_position(hap_id)
-                overlap_regions = self.rois_overlap[sv_category].chrom2itree[chrom][hap_id].at(random_position)
-                for region in overlap_regions:
+                overlap_intervals = self.rois_overlap[sv_category].chrom2itree[chrom][hap_id].at(random_position)
+                for interval in overlap_intervals:
+                    region = interval.data
                     if not roi_filter.satisfied_for(region): continue
                     valid_region, ref_roi = self.check_interval_overlap(region, reference_regions, roi_filter,
                                                                         anchor_length, overlap_mode, hap_id, random_position=random_position)
@@ -588,6 +589,10 @@ class SVSimulator:
             # If the length of the anchor is 1 a strict overlap is not possible by definition
             if anchor_length == 1:
                 return None, None
+            # A partial overlap cannot have an extremity of the anchor at an extremity of the region, otherwise it would be a containing overlap
+            if region.start == random_position or region.end == random_position: 
+                return None, None  
+
             # In case the regions defined by the bed file do not match the ones defined by the reference we might have no or several containing intervals
             for ref_interval in ref_intervals:
                 # Check that the region is within the limits of the reference
@@ -849,7 +854,7 @@ class SVSimulator:
             breakend_interval_lengths = list(sv.breakend_interval_lengths)
             min_distances = list(sv.breakend_interval_min_lengths)
             anchor_start = anchor_end = 0
-            if sv.anchor is not None and not sv.overlap_mode in [OverlapMode.PARTIAL, OverlapMode.CONTAINED]:
+            if sv.anchor is not None:
                 roi, ref_roi, roi_index, random_position = self.get_overlap_region(sv_category=sv_set,
                                                                   anchor_length=sv.get_anchor_length(),
                                                                   reference_regions=reference_regions,

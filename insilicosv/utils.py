@@ -13,6 +13,7 @@ from intervaltree import IntervalTree
 import pysam
 from copy import deepcopy
 import bisect
+from math import ceil, floor
 
 logger = logging.getLogger(__name__)
 
@@ -253,8 +254,9 @@ class RegionSet:
                     hap_tree = tree_dict[hap].copy()
                     hap_tree.merge_overlaps(strict=True)
                     self.chrom2itree[chrom][hap] = sorted(hap_tree)
+                    # floor accounts for the interval offset in RegionSets
                     self.cumulative_weights[chrom][hap] = list(
-                        itertools.accumulate(chunk.end - chunk.begin for chunk in hap_tree))
+                        itertools.accumulate(floor(chunk.end - chunk.begin) for chunk in hap_tree))
 
     def sample_uniform_position(self, hap=0):
         """
@@ -264,16 +266,17 @@ class RegionSet:
         hap_tree = self.chrom2itree[chrom][hap]
 
         total_length = self.cumulative_weights[chrom][hap][-1]
-        random_position = random.uniform(0, total_length)
+        print(total_length, self.cumulative_weights[chrom][hap])
+        random_position = random.randrange(0, total_length)
 
         # Find the interval that contains the random position
         idx = bisect.bisect_right(self.cumulative_weights[chrom][hap], random_position)
 
         # Get the actual position within the interval
         if idx == 0:
-            sampled_position = hap_tree[idx].begin + random_position
+            sampled_position = ceil(hap_tree[idx].begin) + random_position
         else:
-            sampled_position = hap_tree[idx].begin + (random_position - self.cumulative_weights[chrom][hap][idx - 1])
+            sampled_position = ceil(hap_tree[idx].begin) + (random_position - self.cumulative_weights[chrom][hap][idx - 1])
         return chrom, sampled_position
                     
     @staticmethod
