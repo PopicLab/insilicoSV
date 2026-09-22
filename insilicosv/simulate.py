@@ -110,7 +110,7 @@ class SVSimulator:
         chk(isinstance(config, dict), 'Config must be a dict')
 
         for k in config:
-            chk(k in ('reference', 'max_tries', 'max_random_breakend_tries', 'homozygous_only', 'heterozygous_only',
+            chk(k in ('reference', 'max_tries', 'homozygous_only', 'heterozygous_only',
                       'min_intersv_dist',
                       'random_seed', 'output_no_haps', 'output_adjacencies', 'output_paf', 'output_svops_bed',
                       'th_proportion_N', 'haploid',
@@ -525,7 +525,7 @@ class SVSimulator:
     def get_overlap_region(self, sv_category, roi_index, reference_regions, hap_id, anchor_length=None,
                            overlap_mode=None, roi_filter=None):
         if overlap_mode in [OverlapMode.CONTAINED, OverlapMode.PARTIAL]:
-            max_tries = self.config.get("max_random_breakend_tries", DEFAULT_MAX_TRIES)
+            max_tries = self.config.get("max_tries", DEFAULT_MAX_TRIES)
             for _ in range(max_tries):
                 chrom, random_position = self.union_rois_overlap[sv_category].sample_uniform_position(hap_id)
                 overlap_intervals = self.rois_overlap[sv_category].chrom2itree[chrom][hap_id].at(random_position)
@@ -657,7 +657,7 @@ class SVSimulator:
         randomly chooses an anchor placement on the ROI, and returns the pair (anchor, roi).
         If no suitable placement exists for any ROI, returns (None, None).
         """
-        max_random_tries = self.config.get("max_random_breakend_tries", DEFAULT_MAX_TRIES)
+        max_random_tries = self.config.get("max_tries", DEFAULT_MAX_TRIES)
 
         if overlap_mode in [OverlapMode.EXACT, OverlapMode.CHROM, OverlapMode.TERMINAL]:
             if overlap_mode == OverlapMode.TERMINAL:
