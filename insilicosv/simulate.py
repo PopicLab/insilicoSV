@@ -85,6 +85,7 @@ class SVSimulator:
         # Variables used to prefilter ROIs according to the constraints of each category of SV
         self.overlap_ranges = {}
         self.overlap_types = {}
+        self.overlap_source_idx = {}
         self.overlap_modes = {}
         self.num_svs = {}
         self.rois_overlap = {}
@@ -152,44 +153,46 @@ class SVSimulator:
             self.reference_sv_overlap_regions = copy.deepcopy(self.reference_regions)
         # Get the ROIs for overlap constraints
         if any(mode is not None for mode in self.overlap_modes.values()):
-            rois_overlap = RegionSet.from_files(utils.as_list(self.config.get('overlap_regions', [])),
-                                                'overlap')
-            min_bounds = [min_bound for min_bound, _ in self.overlap_ranges.values()]
-            global_min_bound = 0
-            logger.info(
-                f'Filtering out ROIs not satisfying the overlap constraints from initial {len(rois_overlap)} ROIs')
-            if None not in min_bounds:
-                global_min_bound = min(min_bounds)
-                rois_overlap = sorted(rois_overlap, key=lambda x: x.length(), reverse=True)
-
-            # Get the reference regions
+            files_overlap = utils.as_list(self.config.get('overlap_regions', []))
             n_removed_rois = 0
-            for roi_index, roi in enumerate(rois_overlap):
-                # Check if the roi is under the global minimum, in which case no following ROI would satisfy the constraints.
-                if roi.length() < global_min_bound:
-                    n_removed_rois += len(rois_overlap) - roi_index
-                    break
-                if not roi.chrom in self.reference_regions.chrom2itree:
-                    n_removed_rois += 1
-                    continue
+            for file_idx, file_overlap in enumerate(files_overlap):
+                rois_overlap = RegionSet.from_files([file_overlap], 'overlap', start_idx=file_idx)
+                min_bounds = [min_bound for min_bound, _ in self.overlap_ranges.values()]
+                global_min_bound = 0
+                logger.info(
+                    f'Filtering out ROIs not satisfying the overlap constraints from initial {len(rois_overlap)} ROIs')
+                if None not in min_bounds:
+                    global_min_bound = min(min_bounds)
+                    rois_overlap = sorted(rois_overlap, key=lambda x: x.length(), reverse=True)
 
-                added_roi = False
-                for sv_idx, sv_category in enumerate(self.overlap_ranges):
-                    if self.overlap_modes[sv_idx] in [None, OverlapMode.TERMINAL, OverlapMode.CHROM]: continue
-                    if roi.length() < if_not_none(self.overlap_ranges[sv_category][0], 0): continue
-                    if (self.overlap_modes[sv_category] in [OverlapMode.CONTAINING, OverlapMode.EXACT] and
-                            roi.length() > if_not_none(self.overlap_ranges[sv_category][1], roi.length() + 1)):
+                # Get the reference regions
+                for roi_index, roi in enumerate(rois_overlap):
+                    # Check if the roi is under the global minimum, in which case no following ROI would satisfy the constraints.
+                    if roi.length() < global_min_bound:
+                        n_removed_rois += len(rois_overlap) - roi_index
+                        break
+                    if not roi.chrom in self.reference_regions.chrom2itree:
+                        n_removed_rois += 1
                         continue
-                    if not roi.region_type in self.overlap_types[sv_category] and not 'all' in self.overlap_types[sv_category]:
-                        found = False
-                        for region_type in self.overlap_types[sv_category]:
-                            if region_type in roi.region_type:
-                                found = True
-                                break
-                        if not found: continue
-                    added_roi = True
-                    self.rois_overlap[sv_category].append(roi)
-                if not added_roi: n_removed_rois += 1
+
+                    added_roi = False
+                    for sv_idx, sv_category in enumerate(self.overlap_ranges):
+                        if self.overlap_modes[sv_idx] in [None, OverlapMode.TERMINAL, OverlapMode.CHROM]: continue
+                        if roi.length() < if_not_none(self.overlap_ranges[sv_category][0], 0): continue
+                        if (self.overlap_modes[sv_category] in [OverlapMode.CONTAINING, OverlapMode.EXACT] and
+                                roi.length() > if_not_none(self.overlap_ranges[sv_category][1], roi.length() + 1)):
+                            continue
+                        wanted_types = [region_type for region_type, source_idx in zip(self.overlap_types[sv_category], self.overlap_source_idx[sv_category]) if source_idx == file_idx]
+                        if not roi.region_type in wanted_types and not 'all' in wanted_types:
+                            found = False
+                            for region_type in self.overlap_types[sv_category]:
+                                if region_type in roi.region_type:
+                                    found = True
+                                    break
+                            if not found: continue
+                        added_roi = True
+                        self.rois_overlap[sv_category].append(roi)
+                    if not added_roi: n_removed_rois += 1
 
             for sv_category in self.overlap_ranges:
                 if self.overlap_modes[sv_category] not in [OverlapMode.TERMINAL, OverlapMode.CHROM]: continue
@@ -221,6 +224,7 @@ class SVSimulator:
                     # We have two TERMINAL overlaps per chromosome and haplotype
                     chk(self.num_svs[sv_category] <= 2 * hap_overlap_mult * len(self.rois_overlap[sv_category]),
                         error_message_num_rois)
+                    
                 if self.overlap_modes[sv_category] in [OverlapMode.CONTAINED, OverlapMode.PARTIAL]:
                     # For these overlap modes, we need to sample a position uniformly at random in the union of the ROIs
                     # We build the interval tree of the unions of the intervals to be robust to overlapping ROIs
@@ -246,11 +250,12 @@ class SVSimulator:
         logger.info('Constructing SVs from {} categories'.format(len(self.config['variant_sets'])))
         for vset_num, variant_set_config in enumerate(self.config['variant_sets']):
             variant_set_config['VSET'] = vset_num
-            vset_svs, ranges, region_types, mode, header = make_variant_set_from_config(variant_set_config, self.config)
+            vset_svs, ranges, region_types, region_idx, mode, header = make_variant_set_from_config(variant_set_config, self.config)
             for sv in vset_svs:
                 sv.info['VSET'] = vset_num
             self.overlap_ranges[vset_num] = ranges
             self.overlap_types[vset_num] = region_types
+            self.overlap_source_idx[vset_num] = region_idx
             self.overlap_modes[vset_num] = mode
             self.svs.extend(vset_svs)
 
@@ -535,10 +540,9 @@ class SVSimulator:
         
         # The region is constrained we use the interval tree defined from the bed file
         roi_list = self.rois_overlap[sv_category]
-
         # Add the beginning of the ROIs list at the end of the list of ROIs to check to ensure all are checked in case we run out.
         for region in roi_list[roi_index:]:
-            roi_index += 1
+            roi_index += 1 % len(roi_list)
             if not roi_filter.satisfied_for(region): continue
             valid_region, ref_roi = self.check_interval_overlap(region, reference_regions, roi_filter, anchor_length,
                                                                 overlap_mode, hap_id)
@@ -563,11 +567,8 @@ class SVSimulator:
                 intersection = region.replace(start=left_bound, end=right_bound)
                 if random_position is not None:
                     if random_position < intersection.start or random_position > intersection.end: continue
-                    # Keep the biggest possible region with random_position as an extremity for more chance to fill the overlap constraints
-                    if random_position - intersection.start < random_position - intersection.end: 
-                        intersection = intersection.replace(start=random_position)
-                    else:
-                        intersection = intersection.replace(end=random_position)
+                    intersection = intersection.replace(start=random_position)
+
                 if intersection.length() < anchor_length: continue
                 # Discards intervals smaller than the minimum overlap.
                 if (roi_filter.region_length_range[0] is not None) and (
@@ -599,17 +600,19 @@ class SVSimulator:
                 left_bound = max(region.start, ref_interval.data.start)
                 right_bound = min(region.end, ref_interval.data.end)
                 if random_position < left_bound or random_position > right_bound: continue
-                for curr_left_bound, curr_right_bound in [(left_bound, random_position), (random_position, right_bound)]:
+                positions = [(left_bound, random_position), (random_position, right_bound)]
+                random.shuffle(positions)
+                for curr_left_bound, curr_right_bound in positions:
                     if curr_right_bound <= curr_left_bound: continue
                     # Check if the constraint region has an extremity overlapped by the reference, if not there is no possible partial overlap
                     if (curr_right_bound == ref_interval.data.end) and (curr_left_bound == ref_interval.data.start): continue
                     intersection = region.replace(start=curr_left_bound, end=curr_right_bound)
 
-                    # There is at least one valid partial overlap on the left or the right
+                    # Check there if at least one valid partial overlap on the left or the right
                     if curr_left_bound == random_position:
-                        overlap = ref_interval.data.end - anchor_length > intersection.start + 1
+                        overlap = random_position + anchor_length > intersection.end
                     else:
-                        overlap = ref_interval.data.start + anchor_length < intersection.end - 1
+                        overlap = 0 <= random_position - anchor_length < intersection.start
                     if not overlap: continue
 
                     # Discards regions smaller than the minimum overlap.
@@ -877,7 +880,6 @@ class SVSimulator:
                         region_length_range=sv.roi_filter.region_length_range,
                         blacklist_regions=blacklist_regions,
                         random_position=random_position))
-
                 if (roi is None) or (ref_roi is None):
                     continue
             else:

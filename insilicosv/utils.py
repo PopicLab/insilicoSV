@@ -171,6 +171,7 @@ class RegionFilter:
 
     def satisfied_for(self, region) -> bool:
         if self.region_types is None: return True
+
         if (not region.region_type or
                  not any((region_types.upper() == 'ALL' and region.region_type != '_reference_') or
                          ((region_types in region.region_type or region_types=='all') and file_idx == region.source_file_idx)
@@ -256,7 +257,7 @@ class RegionSet:
                     self.chrom2itree[chrom][hap] = sorted(hap_tree)
                     # floor accounts for the interval offset in RegionSets
                     self.cumulative_weights[chrom][hap] = list(
-                        itertools.accumulate(floor(chunk.end - chunk.begin) for chunk in hap_tree))
+                        itertools.accumulate(floor(chunk.end - chunk.begin) for chunk in self.chrom2itree[chrom][hap]))
 
     def sample_uniform_position(self, hap=0):
         """
@@ -266,7 +267,6 @@ class RegionSet:
         hap_tree = self.chrom2itree[chrom][hap]
 
         total_length = self.cumulative_weights[chrom][hap][-1]
-        print(total_length, self.cumulative_weights[chrom][hap])
         random_position = random.randrange(0, total_length)
 
         # Find the interval that contains the random position
@@ -280,14 +280,14 @@ class RegionSet:
         return chrom, sampled_position
                     
     @staticmethod
-    def from_files(file_paths, region_type):
+    def from_files(file_paths, region_type, start_idx=0):
         regions = []
         for file_idx, region_file in enumerate(file_paths):
             logger.info(f'Processing {region_type} region file {region_file}')
             if region_file.lower().endswith('.bed'):
-                regions += RegionSet.from_bed(region_file, file_idx=file_idx)
+                regions += RegionSet.from_bed(region_file, file_idx=file_idx+start_idx)
             elif region_file.lower().endswith('.vcf'):
-                regions += RegionSet.from_vcf(region_file, file_idx=file_idx)
+                regions += RegionSet.from_vcf(region_file, file_idx=file_idx+start_idx)
             else:
                 chk(False, f'Cannot import {region_type} regions from {region_file}: '
                           f'unsupported file type, please provide a .bed or .vcf file', error_type='type')
