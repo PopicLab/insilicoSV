@@ -398,7 +398,7 @@ class SVSimulator:
 
     def get_breakend(self, hap_id, reference_regions, containing_region=None, avoid_chrom=None, blacklist_regions=None,
                      roi_length=0, total_length=0, sv_regions=None):
-        max_random_tries = self.config.get("max_random_breakend_tries", DEFAULT_MAX_TRIES)
+        max_random_tries = self.config.get("max_tries", DEFAULT_MAX_TRIES)
         num_tries = 0
         breakend = None
         ref_roi = None
@@ -457,7 +457,7 @@ class SVSimulator:
     def get_breakend_from_regions(self, reference_regions, containing_region=None, avoid_chrom=None,
                                   blacklist_regions=None,
                                   roi_length=0, total_length=0, hap_id=0, sv_regions=None):
-        max_random_tries = self.config.get("max_random_breakend_tries", DEFAULT_MAX_TRIES)
+        max_random_tries = self.config.get("max_tries", DEFAULT_MAX_TRIES)
         # The region is not constrained, we use the interval tree defined from the reference file
         chrom_trees = reference_regions.chrom2itree
         rois = []
