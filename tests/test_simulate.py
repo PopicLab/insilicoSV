@@ -158,6 +158,7 @@ class TestSVSimulator(unittest.TestCase):
         self.test_exclude_bed = "tests/inputs/exclude.bed"
         self.import_snp = "tests/inputs/import_snp.vcf"
         self.import_snp_overlap = "tests/inputs/import_snp_overlap.vcf"
+        self.import_snp_overlap_hap = "tests/inputs/import_snp_overlap_hap.vcf"
         self.import_test = "tests/inputs/import_test.vcf"
 
         self.test_insertion_order_exact = "tests/inputs/test_insertion_order_exact.bed"
@@ -1355,6 +1356,16 @@ class TestSVSimulator(unittest.TestCase):
                                                       'length_ranges': [[2, 2]]}]}],
                         self.hap1, self.hap2, self.bed),
              ["TATA", "TCTC"]],
+             ["TC",
+                          TestObject([self.ref_file, {"chr21": "TC"}],
+                                     [self.par, {"reference": self.ref_file, "random_seed": 2, "min_intersv_dist": 0,
+                                                 "variant_sets": [{"import": self.import_snp_overlap_hap,
+                                                                   },
+                                                                  {"type": 'DEL',
+                                                                   "number": 1,
+                                                                   'length_ranges': [[1, 1]]}]}],
+                                     self.hap1, self.hap2, self.bed),
+                          ["A", "T"]],
             ["TC",
              TestObject([self.ref_file, {"chr21": "TC"}],
                         [self.par, {"reference": self.ref_file, "random_seed": 2,
@@ -2774,8 +2785,7 @@ variant_sets:
             svs[0].operations[0].source_region)
 
     assert (svs[0].operations[0].target_region.replace(order_key=()) in
-            [Region(chrom='chr19', start=0, end=3),
-             Region(chrom='chr19', start=1, end=4),
+            [Region(chrom='chr19', start=1, end=4),
              Region(chrom='chr19', start=2, end=5),
              Region(chrom='chr19', start=5, end=8),
              Region(chrom='chr19', start=6, end=9), ])
