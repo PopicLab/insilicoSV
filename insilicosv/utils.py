@@ -213,6 +213,7 @@ class RegionSet:
     num_hap_tree: int
     # The cumulative weights is used for sampling uniformly at random overlapping regions
     cumulative_weights: dict[str, dict[int, list[int]]]
+    total_length: int = 0
 
     def __init__(self, regions=None, allow_hap_overlap=False):
         self.cumulative_weights = defaultdict(lambda: defaultdict(list))
@@ -258,6 +259,7 @@ class RegionSet:
                     # floor accounts for the interval offset in RegionSets
                     self.cumulative_weights[chrom][hap] = list(
                         itertools.accumulate(floor(chunk.end - chunk.begin) for chunk in self.chrom2itree[chrom][hap]))
+                    self.total_length += self.cumulative_weights[chrom][hap][-1]
 
     def sample_uniform_position(self, hap=0):
         """

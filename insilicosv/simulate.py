@@ -231,6 +231,8 @@ class SVSimulator:
                     self.rois_overlap[sv_category] = RegionSet(self.rois_overlap[sv_category])
                     self.union_rois_overlap[sv_category]  = RegionSet()
                     self.union_rois_overlap[sv_category].build_union_tree(self.rois_overlap[sv_category])
+                    logger.info(f'Built union of ROIs for variant set {sv_category}, '
+                                f'the total available length is {self.union_rois_overlap[sv_category].total_length}')
                 else:
                     # Shuffle the ROIs so the selection is not biased on their positions in the input bed file
                     random.shuffle(self.rois_overlap[sv_category])
