@@ -75,8 +75,8 @@ class VariantSet(ABC):
 
 
         if overlap_region_per_files == [['all']]:
-            self.overlap_types = ['all']
-            self.overlap_source_idx = [0]
+            self.overlap_types = ['all'] * number_overlap_files
+            self.overlap_source_idx = [i for i in range(number_overlap_files)]
         else:
             for idx_file, overlap_file in enumerate(overlap_region_per_files):
                 self.overlap_types += [overlap_name for overlap_name in overlap_file]
@@ -404,6 +404,7 @@ class SimulatedVariantSet(VariantSet):
     def get_roi_filter(self):
         if self.overlap_mode is None:
             return None
+
         return RegionFilter(region_types=tuple(self.overlap_types),
                             region_file_idx=tuple(self.overlap_source_idx),
                             region_length_range=self.overlap_ranges)
@@ -1373,7 +1374,7 @@ def make_variant_set_from_config(vset_config, config) -> list[SV]:  # type: igno
     for variant_set_class in VARIANT_SET_CLASSES:
         if variant_set_class.can_make_from(vset_config):
             variant_set = variant_set_class(vset_config, config)
-            return variant_set.make_variant_set(), variant_set.overlap_ranges, variant_set.overlap_types, variant_set.overlap_mode, variant_set.header
+            return variant_set.make_variant_set(), variant_set.overlap_ranges, variant_set.overlap_types, variant_set.overlap_source_idx, variant_set.overlap_mode, variant_set.header
     chk(False, f"The format of the config or the sv_type is not supported {vset_config}")
 
 
